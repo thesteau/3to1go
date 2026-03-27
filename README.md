@@ -5,7 +5,7 @@ RelayCentralizer is a lightweight distributed backup proof of concept with two i
 - `Central`: receives uploaded backup snapshots, stores them on disk, and applies retention.
 - `Edge`: discovers backup jobs from the filesystem, creates `tar.zst` snapshots, and uploads them to Central.
 
-Each service is now packaged and documented separately so someone can work from `central/` or `edge/` directly without needing a repo-level Docker Compose file.
+Each service is packaged and documented separately so someone can work from `central/` or `edge/` directly without needing a repo-level Docker Compose file.
 
 ## Service Entry Points
 
@@ -18,7 +18,7 @@ Each service is now packaged and documented separately so someone can work from 
 
 Edge scans a configured root directory for folders containing `.upload_dir`. Each such directory becomes a backup job. Edge fingerprints the job contents, skips unchanged jobs, creates a `tar.zst` archive for changed jobs, and uploads the snapshot to Central.
 
-Edge now also serves a small HTML UI that lets users:
+Edge serves a small HTML UI that lets users:
 
 - see the current scan root pathing
 - browse discovered directories under the scan root
@@ -28,6 +28,8 @@ Edge now also serves a small HTML UI that lets users:
 - delete `.upload_dir` markers
 
 If a directory already has `.upload_dir`, it appears in the selected/upload set automatically inside the UI.
+
+Edge also has its own internal cron-style scheduler inside the container. It runs once on startup, then follows `CRON_SCHEDULE`, while enforcing a minimum 5-minute gap after each completed cycle so overlapping or overly aggressive schedules do not thrash the backup process.
 
 ### Central
 

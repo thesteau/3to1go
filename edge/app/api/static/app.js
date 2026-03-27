@@ -27,11 +27,16 @@ function statusBadge(entry) {
 }
 
 function fillMeta(data) {
+  const scheduler = data.scheduler || {};
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${escapeHtml(data.edge_id)}</div>
     <div><strong>Scan Root</strong><br>${escapeHtml(data.scan_root)}</div>
     <div><strong>Central URL</strong><br>${escapeHtml(data.central_url)}</div>
     <div><strong>Edge UI</strong><br>${escapeHtml(data.http_url)}</div>
+    <div><strong>Cron Schedule</strong><br><code>${escapeHtml(data.cron_schedule)}</code></div>
+    <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
+    <div><strong>Scheduler</strong><br>${escapeHtml(scheduler.state || "idle")}</div>
+    <div><strong>Next Run</strong><br>${escapeHtml(scheduler.next_run_at || "waiting for first cycle")}</div>
   `;
 }
 
@@ -180,8 +185,8 @@ async function deleteJob() {
 async function runNow() {
   const response = await fetch("/api/run-now", { method: "POST" });
   const body = await response.json();
-  document.getElementById("run-status").textContent = body.status === "started"
-    ? "Backup cycle started."
+  document.getElementById("run-status").textContent = body.status === "queued" || body.status === "started"
+    ? "Backup cycle requested."
     : "A cycle is already running.";
 }
 

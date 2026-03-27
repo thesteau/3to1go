@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-import logging
+import os
 import threading
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -24,6 +23,7 @@ from app.backup.fingerprint import compute_fingerprint
 from app.backup.quiesce import DockerComposeQuiescer, QuiesceContext
 from app.core.config import Settings
 from app.core.logging import configure_logging
+from app.core.schedule import MINIMUM_SCHEDULE_MINUTES
 from app.services.state import JobState, StateStore
 from app.services.upload import UploadClient
 
@@ -42,9 +42,8 @@ class JobLockManager:
 
 
 class EdgeRunner:
-    def __init__(self, settings: Settings, dry_run: bool = False) -> None:
+    def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.dry_run = dry_run
         self.logger = configure_logging(settings.log_level)
         self.state_store = StateStore(settings.state_dir)
         self.upload_client = UploadClient(settings.central_url, settings.auth_token)
@@ -87,12 +86,14 @@ class EdgeRunner:
 
     def _process_job_locked(self, job: JobDefinition) -> None:
         state = self.state_store.get(job.state_key)
+        state.job_name = job.job_name
+
         if self._retry_pending_if_needed(job, state):
             return
 
-        state.job_name = job.job_name
         files = build_file_list(job, self.logger)
         if not files:
+            self._clear_pending_archive(state)
             state.last_status = "skipped_empty"
             self.state_store.set(job.state_key, state)
             self.logger.info("skipped_empty job_name=%s path=%s", job.job_name, job.root_path)
@@ -100,37 +101,41 @@ class EdgeRunner:
 
         fingerprint = compute_fingerprint(files)
         if fingerprint == state.last_successful_fingerprint:
+            self._clear_pending_archive(state)
             state.last_status = "skipped_unchanged"
             self.state_store.set(job.state_key, state)
             self.logger.info("skipped_unchanged job_name=%s fingerprint=%s", job.job_name, fingerprint[:8])
             return
 
-        archive_path, timestamp = self._create_pending_archive(job, files, fingerprint, state)
+        if state.pending_archive and state.pending_fingerprint == fingerprint and Path(state.pending_archive).exists():
+            state.last_status = "upload_failure"
+            self.state_store.set(job.state_key, state)
+            self.logger.info(
+                "pending_archive_preserved job_name=%s archive=%s fingerprint=%s",
+                job.job_name,
+                Path(state.pending_archive).name,
+                fingerprint[:8],
+            )
+            return
+
+        archive_path, timestamp = self._create_pending_archive(job, files, fingerprint)
+        previous_pending_archive = state.pending_archive
         state.pending_archive = str(archive_path)
         state.pending_fingerprint = fingerprint
         state.pending_timestamp = timestamp
-        state.job_name = job.job_name
         state.last_status = "archive_created"
         self.state_store.set(job.state_key, state)
+
+        if previous_pending_archive and previous_pending_archive != str(archive_path):
+            Path(previous_pending_archive).unlink(missing_ok=True)
+
         self._upload_pending_archive(job, state)
 
-    def _create_pending_archive(
-        self,
-        job: JobDefinition,
-        files: list,
-        fingerprint: str,
-        state: JobState,
-    ) -> tuple[Path, str]:
+    def _create_pending_archive(self, job: JobDefinition, files: list, fingerprint: str) -> tuple[Path, str]:
         now = datetime.now(timezone.utc)
         timestamp = timestamp_for_api(now)
         archive_name = build_archive_name(job.job_name, now, fingerprint)
         archive_path = self.settings.spool_dir / archive_name
-
-        if self.dry_run:
-            state.last_status = "dry_run"
-            self.state_store.set(job.state_key, state)
-            self.logger.info("dry_run_upload job_name=%s fingerprint=%s archive=%s", job.job_name, fingerprint[:8], archive_name)
-            return archive_path, timestamp
 
         quiesce_context: QuiesceContext | None = None
         try:
@@ -138,6 +143,7 @@ class EdgeRunner:
             create_archive(archive_path=archive_path, files=files)
         finally:
             self.quiescer.restore(job, quiesce_context)
+
         self.logger.info("archive_created job_name=%s archive=%s", job.job_name, archive_name)
         return archive_path, timestamp
 
@@ -147,21 +153,18 @@ class EdgeRunner:
 
         pending_path = Path(state.pending_archive)
         if not pending_path.exists():
-            state.pending_archive = None
-            state.pending_fingerprint = None
-            state.pending_timestamp = None
+            self._clear_pending_archive(state)
             state.last_status = "skipped_missing"
             self.state_store.set(job.state_key, state)
             self.logger.warning("skipped_missing job_name=%s pending_archive=%s", state.job_name or job.job_name, pending_path)
             return False
 
         self.logger.info("retry_pending job_name=%s archive=%s", state.job_name or job.job_name, pending_path.name)
-        self._upload_pending_archive(job, state)
-        return True
+        return self._upload_pending_archive(job, state)
 
-    def _upload_pending_archive(self, job: JobDefinition, state: JobState) -> None:
+    def _upload_pending_archive(self, job: JobDefinition, state: JobState) -> bool:
         if not state.pending_archive or not state.pending_fingerprint or not state.pending_timestamp:
-            return
+            return False
 
         archive_path = Path(state.pending_archive)
         upload_job_name = state.job_name or job.job_name
@@ -177,12 +180,9 @@ class EdgeRunner:
             self.logger.error("upload_failure job_name=%s archive=%s detail=%s", upload_job_name, archive_path.name, exc)
             state.last_status = "upload_failure"
             if not self.settings.keep_local_pending:
-                archive_path.unlink(missing_ok=True)
-                state.pending_archive = None
-                state.pending_fingerprint = None
-                state.pending_timestamp = None
+                self._clear_pending_archive(state)
             self.state_store.set(job.state_key, state)
-            return
+            return False
 
         archive_path.unlink(missing_ok=True)
         state.last_successful_fingerprint = state.pending_fingerprint
@@ -199,6 +199,14 @@ class EdgeRunner:
             response.get("stored_as"),
             response.get("pruned"),
         )
+        return True
+
+    def _clear_pending_archive(self, state: JobState) -> None:
+        if state.pending_archive:
+            Path(state.pending_archive).unlink(missing_ok=True)
+        state.pending_archive = None
+        state.pending_fingerprint = None
+        state.pending_timestamp = None
 
     def cleanup_stale_archives(self) -> None:
         referenced = self.state_store.referenced_pending_archives()
@@ -322,12 +330,14 @@ class EdgeRunner:
             current = current.parent
 
 
+
 def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
     return {
         "edge_id": runner.settings.edge_id,
         "scan_root": str(runner.settings.scan_root),
         "central_url": runner.settings.central_url,
-        "interval_seconds": runner.settings.interval_seconds,
+        "cron_schedule": runner.settings.cron_schedule,
+        "minimum_cycle_gap_minutes": MINIMUM_SCHEDULE_MINUTES,
         "http_url": f"http://localhost:{runner.settings.http_port}",
         "directories": runner.list_directories(),
     }

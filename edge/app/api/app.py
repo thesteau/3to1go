@@ -18,8 +18,8 @@ API_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(API_DIR / "templates"))
 
 
-def create_app(settings: Settings | None = None, dry_run: bool = False, start_scheduler: bool = True) -> FastAPI:
-    runner = EdgeRunner(settings or load_settings(), dry_run=dry_run)
+def create_app(settings: Settings | None = None, start_scheduler: bool = True) -> FastAPI:
+    runner = EdgeRunner(settings or load_settings())
     scheduler = SchedulerController(runner)
 
     app = FastAPI(title="RelayCentralizer Edge", version="0.1.0")
@@ -42,7 +42,9 @@ def create_app(settings: Settings | None = None, dry_run: bool = False, start_sc
 
     @app.get("/api/directories")
     async def list_directories() -> dict:
-        return build_directory_response(runner)
+        response = build_directory_response(runner)
+        response["scheduler"] = scheduler.snapshot()
+        return response
 
     @app.post("/api/jobs")
     async def save_job(config: JobConfigInput) -> dict:
@@ -75,6 +77,8 @@ def create_app(settings: Settings | None = None, dry_run: bool = False, start_sc
 
     @app.post("/api/run-now")
     async def run_now() -> dict:
+        if start_scheduler:
+            return {"status": scheduler.request_run_now()}
         return {"status": "started" if runner.run_cycle() else "already_running"}
 
     @app.get("/", response_class=HTMLResponse)
