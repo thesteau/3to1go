@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero panel">
+      <h1>{{ title }}</h1>
+      <p class="eyebrow">Snapshot receiver</p>
+      <p class="lede">
+        Inspect storage paths, retention settings, and the snapshots currently stored per Edge/job namespace.
+      </p>
+      <div class="meta-grid" id="meta"></div>
+      <div class="toolbar">
+        <button type="button" onclick="loadOverview()">Refresh</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Stored Snapshots</h2>
+        <p class="hint">Central remains file-based. This view reads directly from the current backup root on disk.</p>
+      </div>
+      <div id="namespaces" class="job-list"></div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', path='app.js') }}"></script>
+</body>
+</html>

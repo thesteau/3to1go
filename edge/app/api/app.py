@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.api.models import JobConfigInput
-from app.api.ui import render_edge_ui
 from app.core.config import Settings, load_settings
 from app.services.runner import EdgeRunner, build_directory_response
 from app.services.scheduler import SchedulerController
+
+
+API_DIR = Path(__file__).resolve().parent
+TEMPLATES = Jinja2Templates(directory=str(API_DIR / "templates"))
 
 
 def create_app(settings: Settings | None = None, dry_run: bool = False, start_scheduler: bool = True) -> FastAPI:
@@ -15,6 +23,7 @@ def create_app(settings: Settings | None = None, dry_run: bool = False, start_sc
     scheduler = SchedulerController(runner)
 
     app = FastAPI(title="RelayCentralizer Edge", version="0.1.0")
+    app.mount("/static", StaticFiles(directory=str(API_DIR / "static")), name="static")
     app.state.runner = runner
     app.state.scheduler = scheduler
 
@@ -69,7 +78,7 @@ def create_app(settings: Settings | None = None, dry_run: bool = False, start_sc
         return {"status": "started" if runner.run_cycle() else "already_running"}
 
     @app.get("/", response_class=HTMLResponse)
-    async def ui() -> str:
-        return render_edge_ui()
+    async def ui(request: Request) -> HTMLResponse:
+        return TEMPLATES.TemplateResponse("index.html", {"request": request, "title": "RelayCentralizer Edge"})
 
     return app

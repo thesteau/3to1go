@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero panel">
+      <h1>{{ title }}</h1>
+      <p class="eyebrow">Filesystem-driven backup selection</p>
+      <p class="lede">
+        Browse the scan root, inspect current pathing, and create, edit, or delete
+        <code>.upload_dir</code> markers without touching the terminal.
+      </p>
+      <div class="meta-grid" id="meta"></div>
+      <div class="toolbar">
+        <button type="button" onclick="loadData()">Refresh</button>
+        <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
+        <span class="hint" id="run-status"></span>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <section class="panel">
+        <div class="section-head">
+          <h2>Selected Jobs</h2>
+          <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically.</p>
+        </div>
+        <div id="selected-jobs" class="job-list"></div>
+
+        <div class="section-head">
+          <h2>Directories Under Scan Root</h2>
+          <p class="hint">Nested directories under an existing selected parent are shown, but new nested jobs are blocked.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Status</th>
+                <th>Last State</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="directory-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Job Editor</h2>
+          <p class="hint">Saving writes or updates the <code>.upload_dir</code> file for the selected directory.</p>
+        </div>
+
+        <label for="relative_path">Directory</label>
+        <input id="relative_path" readonly>
+
+        <label for="job_name">Job Name</label>
+        <input id="job_name" placeholder="Defaults to the folder name">
+
+        <label for="exclude">Exclude Patterns</label>
+        <textarea id="exclude" placeholder="One pattern per line"></textarea>
+
+        <div class="split-row">
+          <label class="checkbox">
+            <input type="checkbox" id="include_hidden" checked>
+            <span>Include hidden files</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="follow_symlinks">
+            <span>Follow symlinks</span>
+          </label>
+        </div>
+
+        <div class="section-head compact">
+          <h3>Docker Compose Controls</h3>
+          <p class="hint">Optional. Use this when a job should stop or start a Compose workload around archive creation.</p>
+        </div>
+
+        <label for="dc_project_dir">Project Dir</label>
+        <input id="dc_project_dir" placeholder="/srv/stacks/app">
+
+        <div class="split-row">
+          <div>
+            <label for="dc_compose_file">Compose File</label>
+            <input id="dc_compose_file" placeholder="compose.yml">
+          </div>
+          <div>
+            <label for="dc_env_file">Env File</label>
+            <input id="dc_env_file" placeholder=".env">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="dc_project_name">Project Name</label>
+            <input id="dc_project_name" placeholder="Optional">
+          </div>
+          <div>
+            <label for="dc_services">Services</label>
+            <input id="dc_services" placeholder="comma,separated,services">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="dc_shutdown_action">Shutdown Action</label>
+            <select id="dc_shutdown_action">
+              <option value="stop">stop</option>
+              <option value="down">down</option>
+            </select>
+          </div>
+          <div>
+            <label for="dc_startup_action">Startup Action</label>
+            <select id="dc_startup_action">
+              <option value="">default</option>
+              <option value="start">start</option>
+              <option value="up">up</option>
+              <option value="none">none</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="dc_timeout">Compose Timeout Seconds</label>
+        <input id="dc_timeout" type="number" min="1" value="300">
+
+        <div class="toolbar">
+          <button type="button" onclick="saveJob()">Save Job</button>
+          <button type="button" class="secondary" onclick="resetForm()">New Selection</button>
+          <button type="button" class="danger" onclick="deleteJob()">Delete .upload_dir</button>
+        </div>
+        <p class="hint status-line" id="form-status"></p>
+      </section>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', path='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+:root {
+  --page: #f3efe7;
+  --panel: #fffdf9;
+  --ink: #24303b;
+  --muted: #667085;
+  --accent: #8a3b12;
+  --border: #e3d8ca;
+  --shadow: 0 14px 32px rgba(36, 48, 59, 0.09);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(circle at top left, rgba(138, 59, 18, 0.08), transparent 28%),
+    linear-gradient(160deg, #ede4d7 0%, #f9f7f2 58%, #edf3f0 100%);
+}
+
+code {
+  padding: 0.12rem 0.38rem;
+  border-radius: 0.45rem;
+  background: #f3ece3;
+}
+
+.page-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.hero,
+.panel {
+  padding: 24px;
+}
+
+.hero {
+  margin-bottom: 22px;
+}
+
+.hero h1,
+h2 {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0.4rem 0 0;
+  color: var(--accent);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lede,
+.hint,
+.job-detail {
+  color: var(--muted);
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.meta-grid > div,
+.job-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: #faf4ec;
+}
+
+.section-head {
+  margin-bottom: 14px;
+}
+
+.toolbar {
+  margin-top: 16px;
+}
+
+button {
+  border: 0;
+  border-radius: 11px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  background: var(--accent);
+  color: #fff;
+}
+
+.job-list {
+  display: grid;
+  gap: 12px;
+}
+
+.job-card strong {
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    padding: 14px;
+  }
+}

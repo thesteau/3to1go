@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.api.models import HealthResponse, UploadMetadata, UploadResponse
-from app.api.ui import render_central_ui
 from app.core.config import Settings, load_settings
 from app.core.logging import configure_logging
 from app.services.ingest import IngestService
 from app.services.locks import NamespaceLockManager
 from app.storage.local import LocalFilesystemBackend
 from app.utils.paths import build_snapshot_filename, validate_namespace_component
+
+
+API_DIR = Path(__file__).resolve().parent
+TEMPLATES = Jinja2Templates(directory=str(API_DIR / "templates"))
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,14 +35,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app = FastAPI(title="RelayCentralizer Central", version="0.1.0")
+    app.mount("/static", StaticFiles(directory=str(API_DIR / "static")), name="static")
     app.state.settings = settings
     app.state.logger = logger
     app.state.storage_backend = storage_backend
     app.state.ingest_service = ingest_service
 
     @app.get("/", response_class=HTMLResponse)
-    async def ui() -> str:
-        return render_central_ui()
+    async def ui(request: Request) -> HTMLResponse:
+        return TEMPLATES.TemplateResponse("index.html", {"request": request, "title": "RelayCentralizer Central"})
 
     @app.get("/api/overview")
     async def overview() -> dict:

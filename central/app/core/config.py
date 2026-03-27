@@ -4,15 +4,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
-
 
 @dataclass(slots=True)
 class Settings:
@@ -32,8 +23,6 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    load_dotenv()
-
     return Settings(
         auth_token=os.getenv("AUTH_TOKEN", "change-me"),
         storage_backend=os.getenv("STORAGE_BACKEND", "local").strip().lower(),

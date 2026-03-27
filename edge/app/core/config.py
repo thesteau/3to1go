@@ -4,8 +4,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 
 def _env_bool(name: str, default: bool) -> bool:
     raw_value = os.getenv(name)
@@ -32,8 +30,6 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    load_dotenv()
-
     return Settings(
         edge_id=os.getenv("EDGE_ID", "edge-01").strip(),
         scan_root=Path(os.getenv("SCAN_ROOT", "/scan")).resolve(),
