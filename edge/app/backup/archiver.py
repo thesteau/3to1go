@@ -7,7 +7,7 @@ from pathlib import Path
 
 import zstandard
 
-from app.filters import DiscoveredFile
+from app.backup.filters import DiscoveredFile
 
 
 def timestamp_for_filename(timestamp: datetime) -> str:
@@ -22,10 +22,7 @@ def build_archive_name(job_name: str, timestamp: datetime, fingerprint: str) -> 
     return f"{job_name}__{timestamp_for_filename(timestamp)}__{fingerprint[:8]}.tar.zst"
 
 
-def create_archive(
-    archive_path: Path,
-    files: list[DiscoveredFile],
-) -> None:
+def create_archive(archive_path: Path, files: list[DiscoveredFile]) -> None:
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     compressor = zstandard.ZstdCompressor(level=3)
 
@@ -47,4 +44,3 @@ def create_archive(
 
         raw_handle.flush()
         os.fsync(raw_handle.fileno())
-

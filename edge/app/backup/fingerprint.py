@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
-from app.filters import DiscoveredFile
+from app.backup.filters import DiscoveredFile
 
 
 def build_manifest(files: list[DiscoveredFile]) -> str:
@@ -16,4 +16,3 @@ def build_manifest(files: list[DiscoveredFile]) -> str:
 def compute_fingerprint(files: list[DiscoveredFile]) -> str:
     manifest = build_manifest(files)
     return hashlib.sha256(manifest.encode("utf-8")).hexdigest()
-

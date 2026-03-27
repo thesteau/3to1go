@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
-from app.models import UploadMetadata
+from app.api.models import UploadMetadata
 from app.services.locks import NamespaceLockManager
 from app.services.retention import prune_old_snapshots
 from app.storage.base import StorageBackend
@@ -44,36 +44,14 @@ class IngestService:
             try:
                 staged_path = await self._stage_upload(archive)
                 storage_result = self.storage_backend.store(namespace, filename, staged_path)
-                pruned = prune_old_snapshots(
-                    self.storage_backend,
-                    namespace=namespace,
-                    keep_last=self.retention_keep_last,
-                )
-                self.logger.info(
-                    "commit_success edge_id=%s job_name=%s stored_as=%s",
-                    metadata.edge_id,
-                    metadata.job_name,
-                    storage_result["stored_as"],
-                )
-                self.logger.info(
-                    "prune_result edge_id=%s job_name=%s pruned=%s",
-                    metadata.edge_id,
-                    metadata.job_name,
-                    pruned,
-                )
-                return {
-                    "status": "ok",
-                    "stored_as": storage_result["stored_as"],
-                    "pruned": pruned,
-                }
+                pruned = prune_old_snapshots(self.storage_backend, namespace=namespace, keep_last=self.retention_keep_last)
+                self.logger.info("commit_success edge_id=%s job_name=%s stored_as=%s", metadata.edge_id, metadata.job_name, storage_result["stored_as"])
+                self.logger.info("prune_result edge_id=%s job_name=%s pruned=%s", metadata.edge_id, metadata.job_name, pruned)
+                return {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned}
             except HTTPException:
                 raise
             except Exception:
-                self.logger.exception(
-                    "unexpected_exception edge_id=%s job_name=%s",
-                    metadata.edge_id,
-                    metadata.job_name,
-                )
+                self.logger.exception("unexpected_exception edge_id=%s job_name=%s", metadata.edge_id, metadata.job_name)
                 raise
             finally:
                 await archive.close()
@@ -105,4 +83,3 @@ class IngestService:
             raise HTTPException(status_code=500, detail="failed to stage upload") from exc
 
         return staged_path
-

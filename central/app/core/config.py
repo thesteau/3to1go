@@ -23,6 +23,8 @@ class Settings:
     log_level: str
     max_upload_size_mb: int
     staging_dir: Path
+    http_host: str
+    http_port: int
 
     @property
     def max_upload_size_bytes(self) -> int:
@@ -40,5 +42,6 @@ def load_settings() -> Settings:
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         max_upload_size_mb=max(1, int(os.getenv("MAX_UPLOAD_SIZE_MB", "2048"))),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
+        http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
+        http_port=max(1, int(os.getenv("HTTP_PORT", "8000"))),
     )
-

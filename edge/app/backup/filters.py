@@ -6,7 +6,7 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from app.discovery import JobDefinition, UPLOAD_DIR_FILENAME
+from app.backup.discovery import JobDefinition, UPLOAD_DIR_FILENAME
 
 
 @dataclass(slots=True)
@@ -39,10 +39,8 @@ def build_file_list(job: JobDefinition, logger) -> list[DiscoveredFile]:
             relative_path = Path(entry.path).relative_to(job.root_path).as_posix()
             if relative_path == UPLOAD_DIR_FILENAME:
                 continue
-
             if not job.include_hidden and _contains_hidden(relative_path):
                 continue
-
             if _matches_exclude(relative_path, job.exclude_patterns):
                 continue
 
@@ -50,7 +48,6 @@ def build_file_list(job: JobDefinition, logger) -> list[DiscoveredFile]:
                 if entry.is_dir(follow_symlinks=job.follow_symlinks):
                     stack.append(Path(entry.path))
                     continue
-
                 stat_result = entry.stat(follow_symlinks=job.follow_symlinks)
             except (FileNotFoundError, PermissionError, OSError) as exc:
                 logger.warning("skipped_missing path=%s detail=%s", entry.path, exc)
@@ -103,4 +100,3 @@ def _matches_exclude(relative_path: str, patterns: list[str]) -> bool:
             return True
 
     return False
-

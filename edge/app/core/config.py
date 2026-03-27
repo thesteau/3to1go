@@ -26,6 +26,9 @@ class Settings:
     log_level: str
     max_depth: int
     keep_local_pending: bool
+    http_host: str
+    http_port: int
+
 
 
 def load_settings() -> Settings:
@@ -42,5 +45,6 @@ def load_settings() -> Settings:
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         max_depth=max(0, int(os.getenv("MAX_DEPTH", "10"))),
         keep_local_pending=_env_bool("KEEP_LOCAL_PENDING", True),
+        http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
+        http_port=max(1, int(os.getenv("HTTP_PORT", "8080"))),
     )
-

@@ -1,8 +1,0 @@
-job_name: navidrome
-exclude:
-  - "*.log"
-  - "cache/"
-  - "tmp/"
-include_hidden: true
-follow_symlinks: false
-
