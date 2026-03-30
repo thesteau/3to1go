@@ -106,3 +106,4 @@ The bundled compose files are convenience wrappers for local setup, not the core
 
 - Central setup and API details: [`central/README.md`](central/README.md)
 - Edge setup, job format, scheduler behavior, and Compose-aware backup flow: [`edge/README.md`](edge/README.md)
+
