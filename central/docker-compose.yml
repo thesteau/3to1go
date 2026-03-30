@@ -8,6 +8,7 @@ services:
     volumes:
       - ./data/backups:/backups
       - ./data/staging:/staging
+      - ../.relay-secrets:/run/relay-secrets
     healthcheck:
       test:
         - CMD

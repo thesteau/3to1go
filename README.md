@@ -20,6 +20,23 @@ The two images are meant to run separately:
 6. Edge uploads the archive to Central.
 7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
 
+## Auth Token
+
+For local development, the recommended setup is file-based auth instead of hardcoding `AUTH_TOKEN` into multiple env files.
+
+Both sample compose files mount the same hidden repo directory:
+
+- [`/.relay-secrets/.auth_token`](/d:/projects/relay_central/.relay-secrets/.auth_token)
+
+With the sample `.env` values, both services use `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`.
+Central is the service that creates that file if it is missing. Edge only reads it.
+
+Precedence:
+
+- If `AUTH_TOKEN` is set, it wins.
+- Otherwise, if `AUTH_TOKEN_FILE` is set, Central reads or creates that file and Edge reads the existing file.
+- Otherwise, the fallback remains `change-me`.
+
 ## `.upload_dir` At A Glance
 
 A `.upload_dir` file is the marker that tells Edge: back up this directory.
@@ -48,9 +65,10 @@ You can also use an empty `.upload_dir` file. In that case, Edge uses the direct
 3. Add the YAML fields you want, or leave it empty for the default behavior.
 4. If the directory is a Docker Compose project, set `is_docker_composed: true` only when that same directory contains `docker-compose.yml` or `compose.yml`.
 5. Set `update_container_on_packup: true` only if you also want Edge to run `docker compose pull` before it brings the stack back up.
-6. Wait for the next scheduled cycle, restart Edge, or use the Edge UI `Run Backup Cycle Now` action.
-7. Check the Edge UI to confirm the job was discovered.
-8. Check the Central UI to confirm the archive was uploaded and stored.
+6. Start Central first so it can create the shared auth token file when needed.
+7. Start Edge.
+8. Check the Edge UI to confirm the job was discovered.
+9. Check the Central UI to confirm the archive was uploaded and stored.
 
 Example path:
 
@@ -74,7 +92,7 @@ For local development only:
 
 1. Start Central from [`central/`](central/).
 2. Start Edge from [`edge/`](edge/).
-3. Set the same `AUTH_TOKEN` in both env files.
+3. Leave `AUTH_TOKEN_FILE` pointed at the shared hidden secret file unless you want to override it.
 4. Point Edge `CENTRAL_URL` at the Central service it can reach.
 
 The bundled compose files are convenience wrappers for local setup, not the core backup workflow.

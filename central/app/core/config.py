@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.core.auth import load_auth_token
+
 
 @dataclass(slots=True)
 class Settings:
@@ -24,7 +26,7 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        auth_token=os.getenv("AUTH_TOKEN", "change-me"),
+        auth_token=load_auth_token(),
         storage_backend=os.getenv("STORAGE_BACKEND", "local").strip().lower(),
         backup_root=Path(os.getenv("BACKUP_ROOT", "/backups")),
         retention_keep_last=max(1, int(os.getenv("RETENTION_KEEP_LAST", "3"))),

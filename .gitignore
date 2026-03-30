@@ -10,3 +10,4 @@ central/.env
 edge/.env
 central/data/
 edge/data/
+.relay-secrets/.auth_token

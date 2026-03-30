@@ -22,12 +22,22 @@ Local development example:
 
 ```powershell
 Copy-Item .env.example .env
-# set AUTH_TOKEN to match Central
-# set CENTRAL_URL to the Central service Edge can reach
 docker compose up --build
 ```
 
+With the sample env file, Edge reads `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`. Central should create that file first. If the file is missing, Edge now fails fast with a clear startup error instead of silently generating a different token.
+
 Open the UI at `http://localhost:8080/`.
+
+## Auth Token Behavior
+
+Token precedence is:
+
+1. `AUTH_TOKEN`
+2. `AUTH_TOKEN_FILE`
+3. fallback `change-me`
+
+For local development, the recommended option is `AUTH_TOKEN_FILE` so both services read the same secret from the shared hidden repo directory. Central creates it. Edge only reads it.
 
 ## How Job Discovery Works
 
@@ -101,7 +111,8 @@ Edge runs its Compose operations through the bundled scripts in [`edge/scripts/`
 | `EDGE_ID` | `edge-01` | Namespace sent to Central |
 | `SCAN_ROOT` | `/scan` | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://central:8000` | Base URL for Central |
-| `AUTH_TOKEN` | `change-me` | Bearer token used for uploads |
+| `AUTH_TOKEN` | unset in `.env.example` | Direct bearer token override; if set, it takes precedence |
+| `AUTH_TOKEN_FILE` | `/run/relay-secrets/.auth_token` | Shared bearer token file created by Central and read by Edge |
 | `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule inside the Edge runtime |
 | `STATE_DIR` | `/data/state` | Persistent job state and retry metadata |
 | `SPOOL_DIR` | `/data/spool` | Temporary archive storage before successful upload |
@@ -127,6 +138,7 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 - `./data/scan_root` -> `/scan`
 - `./data/state` -> `/data/state`
 - `./data/spool` -> `/data/spool`
+- `../.relay-secrets` -> `/run/relay-secrets`
 
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
 

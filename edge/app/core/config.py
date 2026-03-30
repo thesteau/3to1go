@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.core.auth import load_auth_token
 from app.core.schedule import CronSchedule
 
 
@@ -39,7 +40,7 @@ def load_settings() -> Settings:
         edge_id=os.getenv("EDGE_ID", "edge-01").strip(),
         scan_root=Path(os.getenv("SCAN_ROOT", "/scan")).resolve(),
         central_url=os.getenv("CENTRAL_URL", "http://central:8000").rstrip("/"),
-        auth_token=os.getenv("AUTH_TOKEN", "change-me"),
+        auth_token=load_auth_token(),
         cron_schedule=cron_schedule,
         state_dir=Path(os.getenv("STATE_DIR", "/data/state")),
         spool_dir=Path(os.getenv("SPOOL_DIR", "/data/spool")),

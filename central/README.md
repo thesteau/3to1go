@@ -4,7 +4,7 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 
 ## What Central Is Responsible For
 
-- authenticating uploads from Edge with `AUTH_TOKEN`
+- authenticating uploads from Edge with a shared bearer token
 - staging incoming archives before commit
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
@@ -18,17 +18,29 @@ Local development example:
 
 ```powershell
 Copy-Item .env.example .env
-# set AUTH_TOKEN to a real shared secret
 docker compose up --build
 ```
 
+With the sample env file, Central reads `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`. If that file does not exist yet, Central generates a random token once and stores it in the shared hidden repo directory at [`.relay-secrets/.auth_token`](/d:/projects/relay_central/.relay-secrets/.auth_token).
+
 Open the UI at `http://localhost:8000/`.
+
+## Auth Token Behavior
+
+Token precedence is:
+
+1. `AUTH_TOKEN`
+2. `AUTH_TOKEN_FILE`
+3. fallback `change-me`
+
+That means `AUTH_TOKEN` still works when you want to inject the secret directly, but `AUTH_TOKEN_FILE` is the safer default for local development and mounted-secret deployments.
 
 ## Environment
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AUTH_TOKEN` | `change-me` | Bearer token required by `POST /backup/upload` |
+| `AUTH_TOKEN` | unset in `.env.example` | Direct bearer token override; if set, it takes precedence |
+| `AUTH_TOKEN_FILE` | `/run/relay-secrets/.auth_token` | File containing the shared bearer token; created if missing |
 | `STORAGE_BACKEND` | `local` | Storage backend selector; only `local` is implemented |
 | `BACKUP_ROOT` | `/backups` | Final snapshot storage location |
 | `RETENTION_KEEP_LAST` | `3` | Number of snapshots to keep per `edge_id/job_name` |
@@ -73,8 +85,9 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 
 - `./data/backups` -> `/backups`
 - `./data/staging` -> `/staging`
+- `../.relay-secrets` -> `/run/relay-secrets`
 
-That keeps uploaded archives on the host during local development.
+That keeps uploaded archives on the host during local development and shares the auth token file with Edge.
 
 ## Running Without Docker
 
