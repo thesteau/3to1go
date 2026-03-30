@@ -4,3 +4,5 @@ exclude:
   - cache/**
 include_hidden: true
 follow_symlinks: false
+is_docker_composed: false
+update_container_on_packup: false

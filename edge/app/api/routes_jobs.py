@@ -20,9 +20,9 @@ async def save_job(
         "exclude": [item for item in config.exclude if item],
         "include_hidden": config.include_hidden,
         "follow_symlinks": config.follow_symlinks,
+        "is_docker_composed": config.is_docker_composed,
+        "update_container_on_packup": config.update_container_on_packup,
     }
-    if config.docker_compose is not None:
-        payload["docker_compose"] = config.docker_compose.model_dump(exclude_none=True)
 
     try:
         job = runner.save_job(config.relative_path, payload)

@@ -83,14 +83,8 @@ function editPath(relativePath) {
   document.getElementById("exclude").value = (entry?.config?.exclude || []).join("\n");
   document.getElementById("include_hidden").checked = entry?.config?.include_hidden ?? true;
   document.getElementById("follow_symlinks").checked = entry?.config?.follow_symlinks ?? false;
-  document.getElementById("dc_project_dir").value = entry?.config?.docker_compose?.project_dir || "";
-  document.getElementById("dc_compose_file").value = entry?.config?.docker_compose?.compose_file || "";
-  document.getElementById("dc_env_file").value = entry?.config?.docker_compose?.env_file || "";
-  document.getElementById("dc_project_name").value = entry?.config?.docker_compose?.project_name || "";
-  document.getElementById("dc_services").value = (entry?.config?.docker_compose?.services || []).join(",");
-  document.getElementById("dc_shutdown_action").value = entry?.config?.docker_compose?.shutdown_action || "stop";
-  document.getElementById("dc_startup_action").value = entry?.config?.docker_compose?.startup_action || "";
-  document.getElementById("dc_timeout").value = entry?.config?.docker_compose?.command_timeout_seconds || 300;
+  document.getElementById("is_docker_composed").checked = entry?.config?.is_docker_composed ?? false;
+  document.getElementById("update_container_on_packup").checked = entry?.config?.update_container_on_packup ?? false;
   document.getElementById("form-status").textContent = entry?.selected
     ? "Editing existing .upload_dir"
     : "Creating a new .upload_dir";
@@ -102,14 +96,8 @@ function resetForm() {
   document.getElementById("exclude").value = "";
   document.getElementById("include_hidden").checked = true;
   document.getElementById("follow_symlinks").checked = false;
-  document.getElementById("dc_project_dir").value = "";
-  document.getElementById("dc_compose_file").value = "";
-  document.getElementById("dc_env_file").value = "";
-  document.getElementById("dc_project_name").value = "";
-  document.getElementById("dc_services").value = "";
-  document.getElementById("dc_shutdown_action").value = "stop";
-  document.getElementById("dc_startup_action").value = "";
-  document.getElementById("dc_timeout").value = 300;
+  document.getElementById("is_docker_composed").checked = false;
+  document.getElementById("update_container_on_packup").checked = false;
   document.getElementById("form-status").textContent = "Pick a directory from the list to edit it.";
 }
 
@@ -125,27 +113,15 @@ async function loadData() {
 
 async function saveJob() {
   const relativePath = document.getElementById("relative_path").value || ".";
-  const dockerProjectDir = document.getElementById("dc_project_dir").value.trim();
   const payload = {
     relative_path: relativePath,
     job_name: document.getElementById("job_name").value.trim() || null,
     exclude: document.getElementById("exclude").value.split("\n").map((value) => value.trim()).filter(Boolean),
     include_hidden: document.getElementById("include_hidden").checked,
     follow_symlinks: document.getElementById("follow_symlinks").checked,
+    is_docker_composed: document.getElementById("is_docker_composed").checked,
+    update_container_on_packup: document.getElementById("update_container_on_packup").checked,
   };
-
-  if (dockerProjectDir) {
-    payload.docker_compose = {
-      project_dir: dockerProjectDir,
-      compose_file: document.getElementById("dc_compose_file").value.trim() || null,
-      env_file: document.getElementById("dc_env_file").value.trim() || null,
-      project_name: document.getElementById("dc_project_name").value.trim() || null,
-      services: document.getElementById("dc_services").value.split(",").map((value) => value.trim()).filter(Boolean),
-      shutdown_action: document.getElementById("dc_shutdown_action").value,
-      startup_action: document.getElementById("dc_startup_action").value || null,
-      command_timeout_seconds: Number(document.getElementById("dc_timeout").value || 300),
-    };
-  }
 
   const response = await fetch("/api/jobs", {
     method: "POST",

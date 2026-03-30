@@ -10,7 +10,8 @@ It also serves a small UI for creating, editing, and deleting `.upload_dir` mark
 - building job definitions from those marker files
 - skipping unchanged jobs by comparing fingerprints
 - keeping failed uploads in the spool for retry when configured
-- optionally quiescing a Docker Compose-managed app before archiving it
+- optionally stopping and starting Docker Compose-managed directories around archive creation
+- optionally pulling updated images before bringing a Compose stack back up
 - uploading successful archives to Central
 
 ## Starting Edge
@@ -49,6 +50,8 @@ exclude:
   - cache/**
 include_hidden: true
 follow_symlinks: false
+is_docker_composed: false
+update_container_on_packup: false
 ```
 
 Supported keys:
@@ -57,44 +60,31 @@ Supported keys:
 - `exclude`: list of glob-style patterns
 - `include_hidden`: include dotfiles and dot-directories
 - `follow_symlinks`: follow symlinked files when building the archive
-- `docker_compose`: optional stop/start behavior around archive creation
+- `is_docker_composed`: set to `true` only when that directory itself contains `docker-compose.yml` or `compose.yml`
+- `update_container_on_packup`: when `true`, Edge runs `docker compose pull` before `docker compose up -d`; default is `false`
 
-## Optional `docker_compose` Quiesce Block
+## Docker Compose Behavior
 
-Only use this if Edge should stop a Docker Compose-managed app before creating the archive and start it again afterward.
+When `is_docker_composed: true`, Edge checks the selected job directory itself for one of these files:
 
-```yaml
-docker_compose:
-  project_dir: /srv/stacks/photos
-  compose_file: docker-compose.yml
-  env_file: .env
-  project_name: photos
-  services:
-    - app
-    - worker
-  shutdown_action: stop
-  startup_action: start
-  command_timeout_seconds: 300
-```
+- `docker-compose.yml`
+- `compose.yml`
 
-## Quiesce Flow For Docker Compose Jobs
+If one is present, Edge performs the backup in this order:
 
-When a job includes the optional `docker_compose` block, Edge performs the backup in this order:
+1. Run `docker compose stop`.
+2. Create the `tar.zst` archive.
+3. If `update_container_on_packup: true`, run `docker compose pull`.
+4. Run `docker compose up -d`.
+5. Upload the archive to Central.
 
-1. Run the configured shutdown action against the target Compose project.
-2. Create the `tar.zst` archive from the selected files.
-3. Run the configured startup action.
-4. Upload the archive to Central.
+If `is_docker_composed: true` but neither Compose file is present, Edge logs the mismatch and skips the Compose operations. The backup itself still proceeds.
 
-That means the application being backed up can be stopped during archive creation and brought back before the upload finishes.
+If `update_container_on_packup: true` while `is_docker_composed` is `false` or not set, Edge logs that contradiction and skips the update step.
 
-Action mapping:
+## Shell Script Wrapper
 
-- `shutdown_action: stop` -> `docker compose stop`
-- `shutdown_action: down` -> `docker compose down`
-- `startup_action: start` -> `docker compose start`
-- `startup_action: up` -> `docker compose up -d`
-- `startup_action: none` -> leave the application stopped
+Edge runs its Compose operations through the bundled scripts in [`edge/scripts/`](scripts/) so the Python quiesce logic stays small and the operational commands are easy to extend later.
 
 ## Scheduler Behavior
 
@@ -140,15 +130,14 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
 
-## Running Compose Quiesce Inside The Edge Container
+## Running Compose Support Inside The Edge Container
 
-If a job uses the optional `docker_compose` block, the Edge runtime must be able to reach the Docker CLI and the target Compose project files.
+If you enable `is_docker_composed: true`, the Edge runtime must be able to reach the Docker CLI and the selected directory's Compose file.
 
 That usually means mounting:
 
 - the Docker socket
-- the relevant Compose project directories
-- any referenced compose or env files
+- the Compose project directory itself into the Edge container
 
 ## Running Without Docker
 

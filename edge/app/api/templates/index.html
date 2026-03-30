@@ -78,56 +78,19 @@
         </div>
 
         <div class="section-head compact">
-          <h3>Docker Compose Controls</h3>
-          <p class="hint">Optional. Use this when a job should stop or start a Compose workload around archive creation.</p>
+          <h3>Docker Compose Flags</h3>
+          <p class="hint">Only enable these if the selected directory itself contains `docker-compose.yml` or `compose.yml`.</p>
         </div>
 
-        <label for="dc_project_dir">Project Dir</label>
-        <input id="dc_project_dir" placeholder="/srv/stacks/app">
+        <label class="checkbox">
+          <input type="checkbox" id="is_docker_composed">
+          <span>Directory is Docker Compose-managed</span>
+        </label>
 
-        <div class="split-row">
-          <div>
-            <label for="dc_compose_file">Compose File</label>
-            <input id="dc_compose_file" placeholder="compose.yml">
-          </div>
-          <div>
-            <label for="dc_env_file">Env File</label>
-            <input id="dc_env_file" placeholder=".env">
-          </div>
-        </div>
-
-        <div class="split-row">
-          <div>
-            <label for="dc_project_name">Project Name</label>
-            <input id="dc_project_name" placeholder="Optional">
-          </div>
-          <div>
-            <label for="dc_services">Services</label>
-            <input id="dc_services" placeholder="comma,separated,services">
-          </div>
-        </div>
-
-        <div class="split-row">
-          <div>
-            <label for="dc_shutdown_action">Shutdown Action</label>
-            <select id="dc_shutdown_action">
-              <option value="stop">stop</option>
-              <option value="down">down</option>
-            </select>
-          </div>
-          <div>
-            <label for="dc_startup_action">Startup Action</label>
-            <select id="dc_startup_action">
-              <option value="">default</option>
-              <option value="start">start</option>
-              <option value="up">up</option>
-              <option value="none">none</option>
-            </select>
-          </div>
-        </div>
-
-        <label for="dc_timeout">Compose Timeout Seconds</label>
-        <input id="dc_timeout" type="number" min="1" value="300">
+        <label class="checkbox">
+          <input type="checkbox" id="update_container_on_packup">
+          <span>Pull updated images before bringing the stack back up</span>
+        </label>
 
         <div class="toolbar">
           <button type="button" onclick="saveJob()">Save Job</button>
