@@ -1,92 +1,52 @@
 # RelayCentralizer
 
-RelayCentralizer is a lightweight distributed backup proof of concept with two independent services:
+RelayCentralizer is a two-service backup proof of concept:
 
-- `Central`: receives uploaded backup snapshots, stores them on disk, and applies retention.
-- `Edge`: discovers backup jobs from the filesystem, creates `tar.zst` snapshots, and uploads them to Central.
+- `central/` receives uploaded backup archives, stores them on disk, and applies retention.
+- `edge/` discovers backup jobs under a scan root, creates `tar.zst` snapshots, and uploads them to Central.
 
-Each service is packaged and documented separately so someone can work from `central/` or `edge/` directly without needing a repo-level Docker Compose file.
+The repo is split so each service can be built and run on its own.
 
-## Service Entry Points
+## Repo Layout
 
-- [central/README.md](/d:/projects/relay_central/central/README.md)
-- [edge/README.md](/d:/projects/relay_central/edge/README.md)
+- [`central/`](central/) - receiver API, storage, retention, and a small status UI
+- [`edge/`](edge/) - backup agent, scheduler, upload logic, and job-management UI
+- [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) - builds and pushes both Docker images
 
-## High-Level Behavior
+## Quick Start
 
-### Edge
+1. Start Central:
 
-Edge scans a configured root directory for folders containing `.upload_dir`. Each such directory becomes a backup job. Edge fingerprints the job contents, skips unchanged jobs, creates a `tar.zst` archive for changed jobs, and uploads the snapshot to Central.
+   ```powershell
+   cd central
+   Copy-Item .env.example .env
+   docker compose up --build
+   ```
 
-Edge serves a small HTML UI that lets users:
+2. Start Edge in a second shell:
 
-- see the current scan root pathing
-- browse discovered directories under the scan root
-- see which directories already have `.upload_dir`
-- create new `.upload_dir` markers
-- edit existing `.upload_dir` configuration
-- delete `.upload_dir` markers
+   ```powershell
+   cd edge
+   Copy-Item .env.example .env
+   docker compose up --build
+   ```
 
-If a directory already has `.upload_dir`, it appears in the selected/upload set automatically inside the UI.
+3. Before starting Edge, make sure `edge/.env` `AUTH_TOKEN` matches `central/.env` `AUTH_TOKEN`, and `edge/.env` `CENTRAL_URL` points at the Central service Edge can reach.
 
-Edge also has its own internal cron-style scheduler inside the container. It runs once on startup, then follows `CRON_SCHEDULE`, while enforcing a minimum 5-minute gap after each completed cycle so overlapping or overly aggressive schedules do not thrash the backup process.
+4. Open the UIs at `http://localhost:8000/` for Central and `http://localhost:8080/` for Edge.
 
-### Central
+From the Edge UI, create or edit `.upload_dir` markers under the scan root to define backup jobs.
 
-Central exposes the upload API and a small HTML landing page. It stages uploads to a temp location, atomically moves them into final storage, and keeps only the newest snapshots according to retention settings.
+## Where To Start
 
-## Docker Layout
+- Central setup and API details: [`central/README.md`](central/README.md)
+- Edge setup, job format, and scheduler details: [`edge/README.md`](edge/README.md)
 
-Packaging is separated per service:
+## Images And CI
 
-- [central/Dockerfile](/d:/projects/relay_central/central/Dockerfile)
-- [central/docker-compose.yml](/d:/projects/relay_central/central/docker-compose.yml)
-- [edge/Dockerfile](/d:/projects/relay_central/edge/Dockerfile)
-- [edge/docker-compose.yml](/d:/projects/relay_central/edge/docker-compose.yml)
+The GitHub Actions workflow at [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) builds both service images from a single matrix job and pushes:
 
-That means users can run only the container they need:
+- `ghcr.io/<owner>/<repo>-relay-central:latest`
+- `ghcr.io/<owner>/<repo>-relay-edge:latest`
 
-Central:
-
-```powershell
-cd central
-docker compose up --build
-```
-
-Edge:
-
-```powershell
-cd edge
-docker compose up --build
-```
-
-## CI Layout
-
-The build pipeline is also separated:
-
-- [.github/workflows/build-central.yml](/d:/projects/relay_central/.github/workflows/build-central.yml)
-- [.github/workflows/build-edge.yml](/d:/projects/relay_central/.github/workflows/build-edge.yml)
-
-Each workflow builds only its own service and exports a downloadable OCI artifact.
-
-## UI URLs
-
-Default local URLs:
-
-- Central UI: `http://localhost:8000/`
-- Edge UI: `http://localhost:8080/`
-
-## Repo Notes
-
-- The old repo-level `.env.example` has been removed.
-- The old `examples/` directory has been removed.
-- Service-specific env examples live in [central/.env.example](/d:/projects/relay_central/central/.env.example) and [edge/.env.example](/d:/projects/relay_central/edge/.env.example).
-- A root [.dockerignore](/d:/projects/relay_central/.dockerignore) is included for general repo hygiene.
-
-## Known Limitations
-
-- Central still uses a single shared bearer token for the POC.
-- Only the local filesystem backend is implemented.
-- Edge fingerprints trigger full snapshot uploads, not delta transfers.
-- Docker Compose quiescing on Edge assumes the Docker socket and relevant Compose project paths are mounted into the Edge runtime.
-- No formal automated end-to-end test suite is included yet.
+Short-SHA tags are published alongside `latest`.

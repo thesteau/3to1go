@@ -1,75 +1,129 @@
 # RelayCentralizer Edge
 
-RelayCentralizer Edge is the scanning and upload agent. It discovers `.upload_dir` markers under the configured scan root, fingerprints directory contents, creates `tar.zst` archives, uploads changed jobs to Central, and includes a small HTML UI for managing job markers.
+Edge is the scanning and upload agent. It discovers backup jobs under a scan root, fingerprints directory contents, creates `tar.zst` archives, and uploads changed jobs to Central.
 
-## What It Does
-
-- Scans `SCAN_ROOT` for directories containing `.upload_dir`
-- Runs one backup cycle on container startup, then continues on an internal cron-style schedule
-- Enforces a minimum 5-minute gap after each completed cycle so close schedules cannot pile up
-- Lets users browse folders and create, edit, or delete `.upload_dir` markers from the UI
-- Includes already-marked directories in the selected job list automatically
-- Supports editing `job_name`, exclude patterns, hidden-file behavior, symlink behavior, and optional Docker Compose quiesce settings
-- Preserves pending archives for retry when uploads fail if `KEEP_LOCAL_PENDING=true`
-- Serves a simple UI at `/` and `GET /health`
+It also serves a small UI for creating, editing, and deleting `.upload_dir` marker files.
 
 ## Quick Start
 
-1. Copy the env file:
+1. Create a local env file:
 
-```powershell
-Copy-Item .env.example .env
-```
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-2. Point `CENTRAL_URL` at your Central instance.
+2. Update `AUTH_TOKEN` to match Central and `CENTRAL_URL` to point at the Central service Edge can reach.
 
 3. Start the service:
 
-```powershell
-docker compose up --build
+   ```powershell
+   docker compose up --build
+   ```
+
+4. Open the UI at `http://localhost:8080/`.
+
+## How Job Discovery Works
+
+- Edge scans `SCAN_ROOT` for directories containing a `.upload_dir` file.
+- The first `.upload_dir` found on a path becomes the backup job root.
+- Nested jobs under an already selected parent are blocked.
+- If a job's fingerprint has not changed since the last successful upload, Edge skips it.
+- If an upload fails and `KEEP_LOCAL_PENDING=true`, the archive is kept in the spool directory and retried later.
+
+An empty `.upload_dir` is valid and uses the directory name as the default `job_name`.
+
+## `.upload_dir` Format
+
+Example:
+
+```yaml
+job_name: photos
+exclude:
+  - '*.tmp'
+  - cache/**
+include_hidden: true
+follow_symlinks: false
+docker_compose:
+  project_dir: /srv/stacks/photos
+  compose_file: docker-compose.yml
+  env_file: .env
+  project_name: photos
+  services:
+    - app
+    - worker
+  shutdown_action: stop
+  startup_action: start
+  command_timeout_seconds: 300
 ```
 
-4. Open the UI:
+Supported keys:
 
-```text
-http://localhost:8080/
-```
+- `job_name`: letters, numbers, `.`, `_`, and `-`
+- `exclude`: list of glob-style patterns
+- `include_hidden`: include dotfiles and dot-directories
+- `follow_symlinks`: follow symlinked files when building the archive
+- `docker_compose`: optional stop/start behavior around archive creation
+
+## Scheduler Behavior
+
+- `CRON_SCHEDULE` uses a 5-field cron expression.
+- Edge runs one backup cycle immediately on startup.
+- Scheduled runs are serialized so overlapping cycles do not run at the same time.
+- The schedule may not be more frequent than every 5 minutes.
+- The UI's `Run Backup Cycle Now` action goes through the same scheduler controls.
 
 ## Environment
 
-```env
-EDGE_ID=edge-01
-SCAN_ROOT=/scan
-CENTRAL_URL=http://central:8000
-AUTH_TOKEN=change-me
-CRON_SCHEDULE=0 2 * * *
-STATE_DIR=/data/state
-SPOOL_DIR=/data/spool
-LOG_LEVEL=INFO
-MAX_DEPTH=10
-KEEP_LOCAL_PENDING=true
-HTTP_HOST=0.0.0.0
-HTTP_PORT=8080
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `EDGE_ID` | `edge-01` | Namespace sent to Central |
+| `SCAN_ROOT` | `/scan` | Root directory Edge scans for `.upload_dir` files |
+| `CENTRAL_URL` | `http://central:8000` | Base URL for Central |
+| `AUTH_TOKEN` | `change-me` | Bearer token used for uploads |
+| `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule inside the Edge runtime |
+| `STATE_DIR` | `/data/state` | Persistent job state and retry metadata |
+| `SPOOL_DIR` | `/data/spool` | Temporary archive storage before successful upload |
+| `LOG_LEVEL` | `INFO` | Application log level |
+| `MAX_DEPTH` | `10` | Maximum recursion depth under `SCAN_ROOT` |
+| `KEEP_LOCAL_PENDING` | `true` | Keep failed-upload archives for retry |
+| `HTTP_HOST` | `0.0.0.0` | Bind address |
+| `HTTP_PORT` | `8080` | Listen port |
+
+## HTTP Surface
+
+- `GET /` - HTML job-management UI
+- `GET /health` - health check
+- `GET /api/directories` - scan-root view, job configs, job state, and scheduler status
+- `POST /api/jobs` - create or update a `.upload_dir`
+- `DELETE /api/jobs?relative_path=...` - remove a `.upload_dir`
+- `POST /api/run-now` - request an immediate backup cycle
+
+## Docker Compose Notes
+
+The provided [`docker-compose.yml`](docker-compose.yml) mounts:
+
+- `./data/scan_root` -> `/scan`
+- `./data/state` -> `/data/state`
+- `./data/spool` -> `/data/spool`
+
+`/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
+
+## Docker Quiesce Support
+
+If a job uses the optional `docker_compose` block, Edge can stop services before archiving and start them again afterward.
+
+For that to work inside the container, you need to mount:
+
+- the Docker socket
+- the relevant Compose project directories
+- any referenced compose or env files
+
+The Edge image includes `docker` and `docker-compose` so those commands are available inside the runtime.
+
+## Running Without Docker
+
+The app does not load `.env` automatically when run directly. Export the environment variables in your shell first, then start it from this directory:
+
+```powershell
+python -m app.main
 ```
-
-## Scheduling Notes
-
-- `CRON_SCHEDULE` uses a standard 5-field cron expression: minute, hour, day of month, month, day of week.
-- Default `0 2 * * *` means one backup every day at 02:00 inside the container timezone.
-- Edge always runs one cycle immediately when the container starts.
-- After any cycle completes, Edge waits at least 5 minutes before the next scheduled cycle can begin.
-- Manual `Run Backup Cycle Now` requests from the UI are serialized through the same scheduler so they do not collide with scheduled work.
-
-## Notes
-
-- The scan root mount is writable in Docker because the UI needs to create and delete `.upload_dir` marker files.
-- If a directory already contains `.upload_dir`, it appears in the UI as an existing selected job and can be edited or deleted.
-- Docker Compose quiescing is optional and requires mounting the Docker socket plus any Compose project directories the job references.
-- If Central is unavailable, Edge can still create the archive locally and keep it in the spool directory for a later retry.
-
-## Files
-
-- `Dockerfile`: container image for Edge only
-- `docker-compose.yml`: local compose runner for Edge only
-- `.env.example`: runtime configuration example
-- `app/`: Edge scheduler, archiving, upload, and UI code
