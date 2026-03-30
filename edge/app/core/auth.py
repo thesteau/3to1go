@@ -6,15 +6,11 @@ from pathlib import Path
 
 
 def load_auth_token() -> str:
-    env_token = os.getenv("AUTH_TOKEN")
-    if env_token and env_token.strip():
-        return env_token.strip()
-
     raw_path = os.getenv("AUTH_TOKEN_FILE")
     if raw_path and raw_path.strip():
         return _load_auth_token_from_file(Path(raw_path.strip()))
 
-    return "change-me"
+    raise RuntimeError("AUTH_TOKEN_FILE environment variable is not set or empty")
 
 
 

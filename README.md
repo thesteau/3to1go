@@ -39,9 +39,8 @@ Central is the service that creates that file if it is missing. Edge only reads 
 
 Precedence:
 
-- If `AUTH_TOKEN` is set, it wins.
-- Otherwise, if `AUTH_TOKEN_FILE` is set, Central reads or creates that file and Edge reads the existing file.
-- Otherwise, the fallback remains `change-me`.
+- if `AUTH_TOKEN_FILE` is set, Central reads or creates that file and Edge reads the existing file.
+- Otherwise, an exception error is raised
 
 ## `.upload_dir` At A Glance
 

@@ -150,11 +150,3 @@ That usually means mounting:
 
 - the Docker socket
 - the Compose project directory itself into the Edge container
-
-## Running Without Docker
-
-The app does not load `.env` automatically when run directly. Export the environment variables in your shell first, then start it from this directory:
-
-```powershell
-python -m app.main
-```
