@@ -20,6 +20,44 @@ The two images are meant to run separately:
 6. Edge uploads the archive to Central.
 7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
 
+## `.upload_dir` At A Glance
+
+A `.upload_dir` file is the marker that tells Edge: back up this directory.
+
+With the default settings shown in [`edge/.env.example`](edge/.env.example), Edge scans under `SCAN_ROOT=/scan`. That means you place a `.upload_dir` file inside the directory you want backed up somewhere under `/scan` inside the Edge runtime.
+
+Default example:
+
+```yaml
+job_name: photos
+exclude:
+  - '*.tmp'
+  - cache/**
+include_hidden: true
+follow_symlinks: false
+```
+
+A copy-ready example file is also provided at [`upload_dir.example`](upload_dir.example). Copy its contents into a `.upload_dir` file inside the directory you want Edge to back up.
+
+You can also use an empty `.upload_dir` file. In that case, Edge uses the directory name as `job_name` and the other defaults from the code.
+
+## How To Use `.upload_dir`
+
+1. Make sure the directory you want to back up is visible under Edge `SCAN_ROOT`.
+2. Create a file named `.upload_dir` inside that directory.
+3. Add the YAML fields you want, or leave it empty for the default behavior.
+4. Wait for the next scheduled cycle, restart Edge, or use the Edge UI `Run Backup Cycle Now` action.
+5. Check the Edge UI to confirm the job was discovered.
+6. Check the Central UI to confirm the archive was uploaded and stored.
+
+Example path:
+
+```text
+/scan/photos/.upload_dir
+```
+
+That tells Edge to treat `/scan/photos` as a backup job root.
+
 ## Repo Layout
 
 - [`central/`](central/) - receiver API, storage, retention, and Central status UI
