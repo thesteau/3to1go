@@ -4,7 +4,7 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 
 ## What Central Is Responsible For
 
-- authenticating uploads from Edge with a shared bearer token
+- authenticating uploads from Edge with the configured bearer token
 - staging incoming archives before commit
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
@@ -26,29 +26,35 @@ Local development example:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
 ```
 
-With the sample env file, Central reads `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`. If that file does not exist yet, Central generates a random token once and stores it in the shared hidden repo directory at [`.relay-secrets/.auth_token`](/d:/projects/relay_central/.relay-secrets/.auth_token).
+`AUTH_TOKEN_FILE` points to Central's local token file path. If the file already exists, Central reuses it. If it is missing, Central creates it once at startup and keeps using that same file on later restarts.
+
+Then start Central:
+
+```powershell
+docker compose up --build
+```
 
 Open the UI at `http://localhost:8000/`.
 
 ## Auth Token Behavior
 
-Token precedence is:
+Central uses filesystem-based auth configuration only.
 
-1. `AUTH_TOKEN`
-2. `AUTH_TOKEN_FILE`
-3. fallback `change-me`
+- `AUTH_TOKEN_FILE` is required.
+- If the file already exists, Central reuses it.
+- If the file is missing, Central creates it at startup.
+- Central only manages its own local token file.
+- Central does not write token files for Edge devices.
 
-That means `AUTH_TOKEN` still works when you want to inject the secret directly, but `AUTH_TOKEN_FILE` is the safer default for local development and mounted-secret deployments.
+Each Edge device must be configured with its own local token file containing the same token value.
 
 ## Environment
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AUTH_TOKEN` | unset in `.env.example` | Direct bearer token override; if set, it takes precedence |
-| `AUTH_TOKEN_FILE` | `/run/relay-secrets/.auth_token` | File containing the shared bearer token; created if missing |
+| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token for upload authentication; created by Central if missing |
 | `STORAGE_BACKEND` | `local` | Storage backend selector; only `local` is implemented |
 | `BACKUP_ROOT` | `/backups` | Final snapshot storage location |
 | `RETENTION_KEEP_LAST` | `3` | Number of snapshots to keep per `edge_id/job_name` |
@@ -83,6 +89,15 @@ Uploads are first written to `STAGING_DIR`, then moved into final storage only a
 
 The upload endpoint expects:
 
-- `Authorization: Bearer <AUTH_TOKEN>`
+- `Authorization: Bearer <token from AUTH_TOKEN_FILE>`
 - form fields: `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`
 - file field: `archive`
+
+## Local Compose Notes
+
+The provided [`docker-compose.yml`](docker-compose.yml) mounts:
+
+- `./data/backups` -> `/backups`
+- `./data/staging` -> `/staging`
+
+If you run Central in Docker and want bootstrap behavior, mount a writable path so Central can create `/run/secrets/relay_auth_token` when it is missing.

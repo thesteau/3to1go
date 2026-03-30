@@ -22,22 +22,28 @@ Local development example:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
 ```
 
-With the sample env file, Edge reads `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`. Central should create that file first. If the file is missing, Edge now fails fast with a clear startup error instead of silently generating a different token.
+`AUTH_TOKEN_FILE` must point to an existing file on the Edge device or inside the Edge container. Edge reads that file at startup and uses its contents to authenticate upload requests to Central.
+
+Then start Edge:
+
+```powershell
+docker compose up --build
+```
 
 Open the UI at `http://localhost:8080/`.
 
 ## Auth Token Behavior
 
-Token precedence is:
+Edge uses filesystem-based auth configuration only.
 
-1. `AUTH_TOKEN`
-2. `AUTH_TOKEN_FILE`
-3. fallback `change-me`
+- `AUTH_TOKEN_FILE` is required.
+- The file must already exist before Edge starts.
+- Edge reads the token from its own local filesystem.
+- The token value must match the token file configured on Central.
 
-For local development, the recommended option is `AUTH_TOKEN_FILE` so both services read the same secret from the shared hidden repo directory. Central creates it. Edge only reads it.
+Edge never reads secrets from Central's filesystem and does not depend on a shared auth folder.
 
 ## How Job Discovery Works
 
@@ -111,8 +117,7 @@ Edge runs its Compose operations through the bundled scripts in [`edge/scripts/`
 | `EDGE_ID` | `edge-01` | Namespace sent to Central |
 | `SCAN_ROOT` | `/scan` | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://central:8000` | Base URL for Central |
-| `AUTH_TOKEN` | unset in `.env.example` | Direct bearer token override; if set, it takes precedence |
-| `AUTH_TOKEN_FILE` | `/run/relay-secrets/.auth_token` | Shared bearer token file created by Central and read by Edge |
+| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token on the Edge host or container |
 | `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule inside the Edge runtime |
 | `STATE_DIR` | `/data/state` | Persistent job state and retry metadata |
 | `SPOOL_DIR` | `/data/spool` | Temporary archive storage before successful upload |
@@ -138,9 +143,10 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 - `./data/scan_root` -> `/scan`
 - `./data/state` -> `/data/state`
 - `./data/spool` -> `/data/spool`
-- `../.relay-secrets` -> `/run/relay-secrets`
 
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
+
+If you run Edge in Docker, mount the token file into the container yourself and keep `AUTH_TOKEN_FILE` pointed at that in-container path.
 
 ## Running Compose Support Inside The Edge Container
 

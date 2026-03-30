@@ -17,7 +17,7 @@ The two images are meant to run separately:
 3. Edge builds a fingerprint of the selected files.
 4. If nothing changed since the last successful upload, the job is skipped.
 5. If `is_docker_composed: true` and that same directory contains `docker-compose.yml` or `compose.yml`, Edge stops the stack before archiving it, optionally pulls updates, and brings it back up afterward.
-6. Edge uploads the archive to Central.
+6. Edge uploads the archive to Central over HTTP.
 7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
 
 ## Storage Philosophy
@@ -28,19 +28,14 @@ That keeps RelayCentralizer focused on backup intake and retention instead of tu
 
 ## Auth Token
 
-For local development, the recommended setup is file-based auth instead of hardcoding `AUTH_TOKEN` into multiple env files.
+RelayCentralizer uses filesystem-based auth configuration only.
 
-Both sample compose files mount the same hidden repo directory:
+- Central reads `AUTH_TOKEN_FILE` from its own host or container filesystem.
+- If Central's token file does not exist, Central creates it once and reuses it on later startups.
+- Each Edge device reads `AUTH_TOKEN_FILE` from that Edge device's own host or container filesystem.
+- The token file contents must match between Central and each Edge device.
 
-- [`/.relay-secrets/.auth_token`](/d:/projects/relay_central/.relay-secrets/.auth_token)
-
-With the sample `.env` values, both services use `AUTH_TOKEN_FILE=/run/relay-secrets/.auth_token`.
-Central is the service that creates that file if it is missing. Edge only reads it.
-
-Precedence:
-
-- if `AUTH_TOKEN_FILE` is set, Central reads or creates that file and Edge reads the existing file.
-- Otherwise, an exception error is raised
+Edge never reads auth data from Central's filesystem. Central only bootstraps its own local token file and does not write token files for Edge devices.
 
 ## `.upload_dir` At A Glance
 
@@ -70,10 +65,11 @@ You can also use an empty `.upload_dir` file. In that case, Edge uses the direct
 3. Add the YAML fields you want, or leave it empty for the default behavior.
 4. If the directory is a Docker Compose project, set `is_docker_composed: true` only when that same directory contains `docker-compose.yml` or `compose.yml`.
 5. Set `update_container_on_packup: true` only if you also want Edge to run `docker compose pull` before it brings the stack back up.
-6. Start Central first so it can create the shared auth token file when needed.
-7. Start Edge.
-8. Check the Edge UI to confirm the job was discovered.
-9. Check the Central UI to confirm the archive was uploaded and stored.
+6. Start Central so it can create its local token file if it does not exist yet.
+7. Copy that token value to the Edge device's own `AUTH_TOKEN_FILE` path.
+8. Start Edge.
+9. Check the Edge UI to confirm the job was discovered.
+10. Check the Central UI to confirm the archive was uploaded and stored.
 
 Example path:
 
@@ -95,9 +91,12 @@ You can run each service with its Docker image, directly with Python, or with th
 For local development only:
 
 1. Start Central from [`central/`](central/).
-2. Start Edge from [`edge/`](edge/).
-3. Leave `AUTH_TOKEN_FILE` pointed at the shared hidden secret file unless you want to override it.
-4. Point Edge `CENTRAL_URL` at the Central service it can reach.
+2. Let Central create its token file if it is missing.
+3. Copy the token value into the Edge device's own token file.
+4. Start Edge from [`edge/`](edge/).
+5. Leave `AUTH_TOKEN_FILE` pointed at the token file path for that service.
+6. If you run in containers, mount Central's token path writable and mount Edge's token path from that Edge host.
+7. Point Edge `CENTRAL_URL` at the Central service it can reach.
 
 The bundled compose files are convenience wrappers for local setup, not the core backup workflow.
 
@@ -105,4 +104,3 @@ The bundled compose files are convenience wrappers for local setup, not the core
 
 - Central setup and API details: [`central/README.md`](central/README.md)
 - Edge setup, job format, scheduler behavior, and Compose-aware backup flow: [`edge/README.md`](edge/README.md)
-

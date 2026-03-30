@@ -10,7 +10,7 @@ def load_auth_token() -> str:
     if raw_path and raw_path.strip():
         return _load_or_create_auth_token(Path(raw_path.strip()))
 
-    raise RuntimeError("AUTH_TOKEN_FILE environment variable is not set or empty")
+    raise RuntimeError("AUTH_TOKEN_FILE environment variable is not set or empty.")
 
 
 def _load_or_create_auth_token(path: Path) -> str:

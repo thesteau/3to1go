@@ -9,7 +9,7 @@ services:
       - ./data/scan_root:/scan
       - ./data/state:/data/state
       - ./data/spool:/data/spool
-      - ../.relay-secrets:/run/relay-secrets
+      - ./secrets/relay_auth_token:/run/secrets/relay_auth_token:ro
     restart: unless-stopped
     logging:
       driver: json-file
