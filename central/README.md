@@ -10,6 +10,14 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
 - exposing a small UI and JSON overview of stored backups
 
+## Storage Scope
+
+Central intentionally stores backups in local filesystem storage rooted at `BACKUP_ROOT`.
+
+If you want a second copy in S3, Google Drive, Dropbox, or another external system, the recommended approach is to sync `BACKUP_ROOT` outward with a separate service, scheduled task, or host-level script.
+
+That keeps Central focused on receiving, committing, and retaining backups without mixing in cloud-provider-specific sync logic.
+
 ## Starting Central
 
 You can run Central with the published image, directly with Python, or with the bundled [`docker-compose.yml`](docker-compose.yml) for local development.

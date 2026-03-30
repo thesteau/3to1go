@@ -20,6 +20,12 @@ The two images are meant to run separately:
 6. Edge uploads the archive to Central.
 7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
 
+## Storage Philosophy
+
+Central is intentionally focused on durable local storage and retention. If you want copies in S3, Google Drive, Dropbox, or another remote system, the recommended approach is to sync or replicate Central `BACKUP_ROOT` with a separate service, scheduled job, or host-level script.
+
+That keeps RelayCentralizer focused on backup intake and retention instead of turning Central into a multi-provider sync engine.
+
 ## Auth Token
 
 For local development, the recommended setup is file-based auth instead of hardcoding `AUTH_TOKEN` into multiple env files.
