@@ -88,7 +88,6 @@ That tells Edge to treat `/scan/photos` as a backup job root.
 
 - [`central/`](central/) - receiver API, storage, retention, and Central status UI
 - [`edge/`](edge/) - scan agent, scheduler, upload pipeline, Compose-aware backup hooks, and Edge job-management UI
-- [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) - builds and pushes both Docker images
 
 ## Running The Services
 
@@ -107,12 +106,3 @@ The bundled compose files are convenience wrappers for local setup, not the core
 
 - Central setup and API details: [`central/README.md`](central/README.md)
 - Edge setup, job format, scheduler behavior, and Compose-aware backup flow: [`edge/README.md`](edge/README.md)
-
-## Images And CI
-
-The GitHub Actions workflow at [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) builds both service images from a single matrix job and pushes:
-
-- `ghcr.io/<owner>/<repo>-relay-central:latest`
-- `ghcr.io/<owner>/<repo>-relay-edge:latest`
-
-Short-SHA tags are published alongside `latest`.
