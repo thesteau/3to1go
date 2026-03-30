@@ -9,9 +9,6 @@ services:
       - ./data/scan_root:/scan
       - ./data/state:/data/state
       - ./data/spool:/data/spool
-      # Optional for docker-native job quiescing:
-      # - /var/run/docker.sock:/var/run/docker.sock
-      # - /srv/stacks:/srv/stacks:ro
     restart: unless-stopped
     logging:
       driver: json-file
