@@ -14,10 +14,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: relay-central
+          - name: central
             context: ./central
             file: ./central/Dockerfile
-          - name: relay-edge
+          - name: edge
             context: ./edge
             file: ./edge/Dockerfile
 
@@ -41,5 +41,5 @@ jobs:
           file: ${{ matrix.file }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:latest
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ env.SHORT_SHA }}
+            ghcr.io/${{ github.repository_owner }}/${{ github.repository }}-${{ matrix.name }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ github.repository }}-${{ matrix.name }}:${{ env.SHORT_SHA }}
