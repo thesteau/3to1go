@@ -1,24 +1,28 @@
 # RelayCentralizer Central
 
-Central is the receiving service. It accepts backup uploads from Edge, stages them to disk, atomically commits them into local storage, and prunes older snapshots per job.
+Central is the receiving service. It accepts backup uploads from Edge, stages them to disk, atomically commits them into local storage, and prunes older snapshots per job namespace.
 
-## Quick Start
+## What Central Is Responsible For
 
-1. Create a local env file:
+- authenticating uploads from Edge with `AUTH_TOKEN`
+- staging incoming archives before commit
+- storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
+- pruning older snapshots according to `RETENTION_KEEP_LAST`
+- exposing a small UI and JSON overview of stored backups
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+## Starting Central
 
-2. Set a real `AUTH_TOKEN` in `.env`.
+You can run Central with the published image, directly with Python, or with the bundled [`docker-compose.yml`](docker-compose.yml) for local development.
 
-3. Start the service:
+Local development example:
 
-   ```powershell
-   docker compose up --build
-   ```
+```powershell
+Copy-Item .env.example .env
+# set AUTH_TOKEN to a real shared secret
+docker compose up --build
+```
 
-4. Open the UI at `http://localhost:8000/`.
+Open the UI at `http://localhost:8000/`.
 
 ## Environment
 
@@ -63,7 +67,7 @@ The upload endpoint expects:
 - form fields: `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`
 - file field: `archive`
 
-## Docker Compose Notes
+## Local Compose Notes
 
 The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 

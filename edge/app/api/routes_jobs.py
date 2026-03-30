@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.dependencies import get_runner
+from app.api.models import JobConfigInput
+from app.services.runner import EdgeRunner
+
+
+router = APIRouter()
+
+
+@router.post("/api/jobs")
+async def save_job(
+    config: JobConfigInput,
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    payload = {
+        "job_name": config.job_name or config.relative_path.rsplit("/", 1)[-1] or runner.settings.scan_root.name,
+        "exclude": [item for item in config.exclude if item],
+        "include_hidden": config.include_hidden,
+        "follow_symlinks": config.follow_symlinks,
+    }
+    if config.docker_compose is not None:
+        payload["docker_compose"] = config.docker_compose.model_dump(exclude_none=True)
+
+    try:
+        job = runner.save_job(config.relative_path, payload)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "directory not found" else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    return {"status": "ok", "job": job}
+
+
+@router.delete("/api/jobs")
+async def delete_job(
+    relative_path: str = Query(...),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        runner.delete_job(relative_path)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "directory not found" else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    return {"status": "ok"}

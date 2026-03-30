@@ -4,23 +4,29 @@ Edge is the scanning and upload agent. It discovers backup jobs under a scan roo
 
 It also serves a small UI for creating, editing, and deleting `.upload_dir` marker files.
 
-## Quick Start
+## What Edge Is Responsible For
 
-1. Create a local env file:
+- scanning `SCAN_ROOT` for `.upload_dir` markers
+- building job definitions from those marker files
+- skipping unchanged jobs by comparing fingerprints
+- keeping failed uploads in the spool for retry when configured
+- optionally quiescing a Docker Compose-managed app before archiving it
+- uploading successful archives to Central
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+## Starting Edge
 
-2. Update `AUTH_TOKEN` to match Central and `CENTRAL_URL` to point at the Central service Edge can reach.
+You can run Edge with the published image, directly with Python, or with the bundled [`docker-compose.yml`](docker-compose.yml) for local development.
 
-3. Start the service:
+Local development example:
 
-   ```powershell
-   docker compose up --build
-   ```
+```powershell
+Copy-Item .env.example .env
+# set AUTH_TOKEN to match Central
+# set CENTRAL_URL to the Central service Edge can reach
+docker compose up --build
+```
 
-4. Open the UI at `http://localhost:8080/`.
+Open the UI at `http://localhost:8080/`.
 
 ## How Job Discovery Works
 
@@ -34,7 +40,7 @@ An empty `.upload_dir` is valid and uses the directory name as the default `job_
 
 ## `.upload_dir` Format
 
-Example:
+Default example:
 
 ```yaml
 job_name: photos
@@ -43,6 +49,21 @@ exclude:
   - cache/**
 include_hidden: true
 follow_symlinks: false
+```
+
+Supported keys:
+
+- `job_name`: letters, numbers, `.`, `_`, and `-`
+- `exclude`: list of glob-style patterns
+- `include_hidden`: include dotfiles and dot-directories
+- `follow_symlinks`: follow symlinked files when building the archive
+- `docker_compose`: optional stop/start behavior around archive creation
+
+## Optional `docker_compose` Quiesce Block
+
+Only use this if Edge should stop a Docker Compose-managed app before creating the archive and start it again afterward.
+
+```yaml
 docker_compose:
   project_dir: /srv/stacks/photos
   compose_file: docker-compose.yml
@@ -56,13 +77,24 @@ docker_compose:
   command_timeout_seconds: 300
 ```
 
-Supported keys:
+## Quiesce Flow For Docker Compose Jobs
 
-- `job_name`: letters, numbers, `.`, `_`, and `-`
-- `exclude`: list of glob-style patterns
-- `include_hidden`: include dotfiles and dot-directories
-- `follow_symlinks`: follow symlinked files when building the archive
-- `docker_compose`: optional stop/start behavior around archive creation
+When a job includes the optional `docker_compose` block, Edge performs the backup in this order:
+
+1. Run the configured shutdown action against the target Compose project.
+2. Create the `tar.zst` archive from the selected files.
+3. Run the configured startup action.
+4. Upload the archive to Central.
+
+That means the application being backed up can be stopped during archive creation and brought back before the upload finishes.
+
+Action mapping:
+
+- `shutdown_action: stop` -> `docker compose stop`
+- `shutdown_action: down` -> `docker compose down`
+- `startup_action: start` -> `docker compose start`
+- `startup_action: up` -> `docker compose up -d`
+- `startup_action: none` -> leave the application stopped
 
 ## Scheduler Behavior
 
@@ -98,7 +130,7 @@ Supported keys:
 - `DELETE /api/jobs?relative_path=...` - remove a `.upload_dir`
 - `POST /api/run-now` - request an immediate backup cycle
 
-## Docker Compose Notes
+## Local Compose Notes
 
 The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 
@@ -108,17 +140,15 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
 
-## Docker Quiesce Support
+## Running Compose Quiesce Inside The Edge Container
 
-If a job uses the optional `docker_compose` block, Edge can stop services before archiving and start them again afterward.
+If a job uses the optional `docker_compose` block, the Edge runtime must be able to reach the Docker CLI and the target Compose project files.
 
-For that to work inside the container, you need to mount:
+That usually means mounting:
 
 - the Docker socket
 - the relevant Compose project directories
 - any referenced compose or env files
-
-The Edge image includes `docker` and `docker-compose` so those commands are available inside the runtime.
 
 ## Running Without Docker
 

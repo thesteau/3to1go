@@ -1,46 +1,48 @@
 # RelayCentralizer
 
-RelayCentralizer is a two-service backup proof of concept:
+RelayCentralizer is a two-image backup workflow:
 
-- `central/` receives uploaded backup archives, stores them on disk, and applies retention.
-- `edge/` discovers backup jobs under a scan root, creates `tar.zst` snapshots, and uploads them to Central.
+- `central/` is the receiving service. It accepts snapshot uploads from Edge, stages them safely, stores them by `edge_id/job_name`, and applies retention.
+- `edge/` is the device-side agent. It scans a configured root for `.upload_dir` markers, builds `tar.zst` archives for changed jobs, and uploads them to Central.
 
-The repo is split so each service can be built and run on its own.
+The two images are meant to run separately:
+
+- Central runs wherever you want backups collected and retained.
+- Edge runs on each device or host that should produce backups.
+
+## End-To-End Flow
+
+1. An operator creates a `.upload_dir` file in a directory under the Edge scan root.
+2. Edge discovers that directory as a backup job.
+3. Edge builds a fingerprint of the selected files.
+4. If nothing changed since the last successful upload, the job is skipped.
+5. If the job defines optional `docker_compose` quiesce settings, Edge can stop the target services before the archive is created and start them again afterward.
+6. Edge uploads the archive to Central.
+7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
 
 ## Repo Layout
 
-- [`central/`](central/) - receiver API, storage, retention, and a small status UI
-- [`edge/`](edge/) - backup agent, scheduler, upload logic, and job-management UI
+- [`central/`](central/) - receiver API, storage, retention, and Central status UI
+- [`edge/`](edge/) - scan agent, scheduler, upload pipeline, quiesce support, and Edge job-management UI
 - [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) - builds and pushes both Docker images
 
-## Quick Start
+## Running The Services
 
-1. Start Central:
+You can run each service with its Docker image, directly with Python, or with the bundled `docker-compose.yml` files during local development.
 
-   ```powershell
-   cd central
-   Copy-Item .env.example .env
-   docker compose up --build
-   ```
+For local development only:
 
-2. Start Edge in a second shell:
+1. Start Central from [`central/`](central/).
+2. Start Edge from [`edge/`](edge/).
+3. Set the same `AUTH_TOKEN` in both env files.
+4. Point Edge `CENTRAL_URL` at the Central service it can reach.
 
-   ```powershell
-   cd edge
-   Copy-Item .env.example .env
-   docker compose up --build
-   ```
-
-3. Before starting Edge, make sure `edge/.env` `AUTH_TOKEN` matches `central/.env` `AUTH_TOKEN`, and `edge/.env` `CENTRAL_URL` points at the Central service Edge can reach.
-
-4. Open the UIs at `http://localhost:8000/` for Central and `http://localhost:8080/` for Edge.
-
-From the Edge UI, create or edit `.upload_dir` markers under the scan root to define backup jobs.
+The bundled compose files are convenience wrappers for local setup, not the core backup workflow.
 
 ## Where To Start
 
 - Central setup and API details: [`central/README.md`](central/README.md)
-- Edge setup, job format, and scheduler details: [`edge/README.md`](edge/README.md)
+- Edge setup, job format, scheduler behavior, and quiesce flow: [`edge/README.md`](edge/README.md)
 
 ## Images And CI
 
