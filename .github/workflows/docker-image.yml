@@ -15,10 +15,10 @@ jobs:
       matrix:
         include:
           - name: relay-central
-            context: ./relay-central
+            context: ./central
             file: ./central/Dockerfile
           - name: relay-edge
-            context: ./relay-edge
+            context: ./edge
             file: ./edge/Dockerfile
 
     steps:
