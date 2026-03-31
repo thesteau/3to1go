@@ -12,8 +12,7 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY scripts ./scripts
 COPY app ./app
-RUN chmod +x ./scripts/*.sh
+RUN chmod +x ./app/scripts/*.sh
 
 CMD ["python", "-m", "app.main"]
