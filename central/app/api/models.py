@@ -7,6 +7,13 @@ from pydantic import BaseModel, Field, field_validator
 
 class HealthResponse(BaseModel):
     status: str = "ok"
+    staging_dir: str
+    staging_used_bytes: int
+    staging_free_bytes: int
+    backup_root: str
+    backup_used_bytes: int
+    backup_free_bytes: int
+    max_upload_size_bytes: int
 
 
 class UploadResponse(BaseModel):

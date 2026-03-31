@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -58,9 +59,17 @@ class IngestService:
                 if staged_path is not None and staged_path.exists():
                     staged_path.unlink(missing_ok=True)
 
+    def _free_space_bytes(self, path: Path) -> int:
+        path.mkdir(parents=True, exist_ok=True)
+        return shutil.disk_usage(path).free
+
     async def _stage_upload(self, archive: UploadFile) -> Path:
         staged_path = self.staging_dir / f"{uuid.uuid4().hex}.part"
         bytes_written = 0
+
+        staging_free = self._free_space_bytes(self.staging_dir)
+        backup_root = getattr(self.storage_backend, "backup_root", None)
+        backup_free = self._free_space_bytes(backup_root) if backup_root is not None else None
 
         try:
             with staged_path.open("wb") as handle:
@@ -71,6 +80,10 @@ class IngestService:
                     bytes_written += len(chunk)
                     if bytes_written > self.max_upload_size_bytes:
                         raise HTTPException(status_code=413, detail="upload too large")
+                    if bytes_written > staging_free:
+                        raise HTTPException(status_code=507, detail="insufficient staging storage")
+                    if backup_free is not None and bytes_written > backup_free:
+                        raise HTTPException(status_code=507, detail="insufficient backup storage")
                     handle.write(chunk)
                 handle.flush()
                 os.fsync(handle.fileno())
