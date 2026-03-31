@@ -19,7 +19,7 @@ class QuiesceContext:
 class DockerComposeQuiescer:
     def __init__(self, logger) -> None:
         self.logger = logger
-        self._scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+        self._scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
 
     def prepare(self, job: JobDefinition) -> QuiesceContext | None:
         if not job.is_docker_composed:

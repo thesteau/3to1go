@@ -100,7 +100,7 @@ If `update_container_on_packup: true` while `is_docker_composed` is `false` or n
 
 ## Shell Script Wrapper
 
-Edge runs its Compose operations through the bundled scripts in [`edge/scripts/`](scripts/) so the Python quiesce logic stays small and the operational commands are easy to extend later.
+Edge runs its Compose operations through the bundled scripts in [`edge/app/scripts/`](app/scripts/) so the Python quiesce logic stays small and the operational commands are easy to extend later.
 
 ## Scheduler Behavior
 
