@@ -53,6 +53,7 @@ Edge never reads secrets from Central's filesystem and does not depend on a shar
 - Nested jobs under an already selected parent are blocked.
 - If a job's fingerprint has not changed since the last successful upload, Edge skips it.
 - If an upload fails and `KEEP_LOCAL_PENDING=true`, the archive is kept in the spool directory and retried later.
+- If an upload fails permanently, Edge marks the job as requiring manual intervention instead of retrying forever.
 
 An empty `.upload_dir` is valid and uses the directory name as the default `job_name`.
 
@@ -109,7 +110,7 @@ Edge runs its Compose operations through the bundled scripts in [`edge/app/scrip
 - Edge runs one backup cycle immediately on startup.
 - Scheduled runs are serialized so overlapping cycles do not run at the same time.
 - The schedule may not be more frequent than every 5 minutes.
-- The UI's `Run Backup Cycle Now` action goes through the same scheduler controls.
+- The UI's `Run Backup Cycle Now` action goes through the same scheduler controls and also clears any manual-intervention blocks for one explicit retry attempt.
 
 ## Environment
 

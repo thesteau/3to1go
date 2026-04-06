@@ -169,9 +169,14 @@ async function deleteJob() {
 async function runNow() {
   const response = await fetch("/api/run-now", { method: "POST" });
   const body = await response.json();
-  document.getElementById("run-status").textContent = body.status === "queued" || body.status === "started"
-    ? "Backup cycle requested."
-    : "A cycle is already running.";
+  if (body.status === "queued" || body.status === "started") {
+    const cleared = body.manual_retries_cleared || 0;
+    document.getElementById("run-status").textContent = cleared > 0
+      ? `Backup cycle requested. ${cleared} manual block(s) cleared for retry.`
+      : "Backup cycle requested.";
+    return;
+  }
+  document.getElementById("run-status").textContent = "A cycle is already running.";
 }
 
 resetForm();

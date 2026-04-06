@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,8 +37,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.logger = logger
     app.state.storage_backend = storage_backend
     app.state.ingest_service = ingest_service
+    app.state.cleanup_task = None
     app.include_router(overview_router)
     app.include_router(uploads_router)
+
+    @app.on_event("startup")
+    async def on_startup() -> None:
+        app.state.cleanup_task = asyncio.create_task(
+            ingest_service.cleanup_loop(settings.upload_cleanup_interval_seconds)
+        )
+
+    @app.on_event("shutdown")
+    async def on_shutdown() -> None:
+        cleanup_task = app.state.cleanup_task
+        if cleanup_task is not None:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_, exc: HTTPException) -> JSONResponse:

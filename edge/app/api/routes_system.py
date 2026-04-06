@@ -35,9 +35,13 @@ async def run_now(
     scheduler: SchedulerController = Depends(get_scheduler),
     start_scheduler: bool = Depends(get_start_scheduler),
 ) -> dict:
+    cleared = runner.clear_manual_interventions()
     if start_scheduler:
-        return {"status": scheduler.request_run_now()}
-    return {"status": "started" if runner.run_cycle() else "already_running"}
+        return {"status": scheduler.request_run_now(), "manual_retries_cleared": cleared}
+    return {
+        "status": "started" if runner.run_cycle() else "already_running",
+        "manual_retries_cleared": cleared,
+    }
 
 
 @router.get("/", response_class=HTMLResponse)

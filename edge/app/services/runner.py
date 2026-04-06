@@ -52,3 +52,6 @@ class EdgeRunner:
 
     def delete_job(self, relative_path: str) -> None:
         self.directory_service.delete_job(relative_path)
+
+    def clear_manual_interventions(self) -> int:
+        return self.state_store.clear_manual_interventions()

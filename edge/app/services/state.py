@@ -17,6 +17,7 @@ class JobState:
     last_successful_upload: str | None = None
     pending_archive: str | None = None
     pending_archive_size: int | None = None
+    pending_archive_sha256: str | None = None
     pending_fingerprint: str | None = None
     pending_timestamp: str | None = None
     upload_id: str | None = None
@@ -28,6 +29,7 @@ class JobState:
     last_error_category: str | None = None
     last_upload_started_at: str | None = None
     last_upload_updated_at: str | None = None
+    manual_intervention_required: bool = False
     last_status: str | None = None
 
 
@@ -67,6 +69,21 @@ class StateStore:
     def snapshot(self) -> dict[str, dict]:
         with self._lock:
             return json.loads(json.dumps(self._data))
+
+    def clear_manual_interventions(self) -> int:
+        with self._lock:
+            updated = 0
+            for key, item in self._data.items():
+                if not item.get("manual_intervention_required"):
+                    continue
+                item["manual_intervention_required"] = False
+                item["next_retry_at"] = None
+                item["last_status"] = "manual_retry_requested"
+                self._data[key] = item
+                updated += 1
+            if updated:
+                self._save_locked()
+            return updated
 
     def _save_locked(self) -> None:
         with tempfile.NamedTemporaryFile(

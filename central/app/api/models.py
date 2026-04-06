@@ -21,6 +21,7 @@ class UploadResponse(BaseModel):
     status: str = "ok"
     stored_as: str
     pruned: int
+    duplicate: bool = False
 
 
 class UploadMetadata(BaseModel):
@@ -53,6 +54,7 @@ class UploadInitRequest(BaseModel):
     timestamp: str = Field(min_length=1, max_length=64)
     archive_format: str
     archive_size_bytes: int = Field(gt=0)
+    archive_sha256: str = Field(min_length=64, max_length=64)
     idempotency_key: str = Field(min_length=8, max_length=256)
 
     @field_validator("archive_format")
@@ -70,6 +72,14 @@ class UploadInitRequest(BaseModel):
         datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%SZ")
         return normalized
 
+    @field_validator("archive_sha256")
+    @classmethod
+    def validate_archive_sha256(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if len(normalized) != 64 or any(ch not in "0123456789abcdef" for ch in normalized):
+            raise ValueError("archive_sha256 must be a 64-character lowercase hex digest")
+        return normalized
+
 
 class UploadSessionResponse(BaseModel):
     upload_id: str
@@ -79,6 +89,7 @@ class UploadSessionResponse(BaseModel):
     recommended_chunk_size_bytes: int
     stored_as: str | None = None
     pruned: int = 0
+    duplicate: bool = False
 
 
 class UploadChunkResponse(BaseModel):

@@ -20,6 +20,7 @@ from app.storage.base import StorageBackend
 
 
 _TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+_ACTIVE_SESSION_STATUSES = {"initiated", "in_progress", "uploaded", "checksum_retry_required"}
 
 
 @dataclass(slots=True)
@@ -34,6 +35,7 @@ class UploadSession:
     timestamp: str
     archive_format: str
     archive_size_bytes: int
+    archive_sha256: str
     uploaded_bytes: int
     status: str
     created_at: str
@@ -66,8 +68,12 @@ class IngestService:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         self.upload_root = self.staging_dir / "uploads"
         self.key_root = self.upload_root / "keys"
+        backup_root = getattr(self.storage_backend, "backup_root", None)
+        self.index_root = backup_root / ".relay_index" if backup_root is not None else None
         self.upload_root.mkdir(parents=True, exist_ok=True)
         self.key_root.mkdir(parents=True, exist_ok=True)
+        if self.index_root is not None:
+            self.index_root.mkdir(parents=True, exist_ok=True)
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_manager_lock = asyncio.Lock()
 
@@ -77,19 +83,29 @@ class IngestService:
         filename: str,
         metadata: UploadMetadata,
         archive_size_bytes: int,
+        archive_sha256: str,
         idempotency_key: str,
     ) -> UploadSessionResponse:
         self.cleanup_stale_uploads()
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
+            if existing.archive_sha256 != archive_sha256:
+                raise HTTPException(status_code=409, detail="idempotency key reused with different archive checksum")
             existing.uploaded_bytes = self._current_upload_size(existing.upload_id)
             existing.updated_at = _utc_now_text()
             existing.expires_at = _utc_text_after(self.upload_session_ttl)
             self._save_session(existing)
             return self._build_session_response(existing)
 
-        self._validate_capacity(archive_size_bytes)
+        committed_duplicate = self._find_committed_duplicate(namespace, archive_sha256)
+        if committed_duplicate is not None:
+            return self._build_committed_duplicate_response(
+                archive_size_bytes=archive_size_bytes,
+                stored_as=committed_duplicate["stored_as"],
+            )
+
+        self._validate_new_reservation(archive_size_bytes)
 
         created_at = _utc_now_text()
         session = UploadSession(
@@ -103,6 +119,7 @@ class IngestService:
             timestamp=metadata.timestamp,
             archive_format=metadata.archive_format,
             archive_size_bytes=archive_size_bytes,
+            archive_sha256=archive_sha256,
             uploaded_bytes=0,
             status="initiated",
             created_at=created_at,
@@ -140,7 +157,6 @@ class IngestService:
 
             stage_path = self._upload_data_path(upload_id)
             stage_path.parent.mkdir(parents=True, exist_ok=True)
-            staging_free = self._free_space_bytes(self.staging_dir)
             bytes_received = 0
 
             try:
@@ -151,8 +167,6 @@ class IngestService:
                         bytes_received += len(chunk)
                         if current_size + bytes_received > session.archive_size_bytes:
                             raise HTTPException(status_code=400, detail="chunk exceeds declared upload size")
-                        if bytes_received > staging_free:
-                            raise HTTPException(status_code=507, detail="insufficient staging storage")
                         handle.write(chunk)
                     handle.flush()
                     os.fsync(handle.fileno())
@@ -198,6 +212,48 @@ class IngestService:
                 )
 
             staged_path = self._upload_data_path(upload_id)
+            actual_sha256 = _sha256_path(staged_path)
+            if actual_sha256 != session.archive_sha256:
+                self.logger.error(
+                    "checksum_mismatch upload_id=%s expected=%s actual=%s",
+                    upload_id,
+                    session.archive_sha256,
+                    actual_sha256,
+                )
+                staged_path.unlink(missing_ok=True)
+                session.uploaded_bytes = 0
+                session.status = "checksum_retry_required"
+                session.updated_at = _utc_now_text()
+                session.expires_at = _utc_text_after(self.upload_session_ttl)
+                self._save_session(session)
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "status": "checksum_mismatch",
+                        "next_offset": 0,
+                        "upload_id": upload_id,
+                    },
+                )
+
+            committed_duplicate = self._find_committed_duplicate(session.namespace, actual_sha256)
+            if committed_duplicate is not None:
+                staged_path.unlink(missing_ok=True)
+                session.uploaded_bytes = session.archive_size_bytes
+                session.status = "completed"
+                session.stored_as = committed_duplicate["stored_as"]
+                session.pruned = 0
+                session.updated_at = _utc_now_text()
+                session.expires_at = _utc_text_after(self.upload_session_ttl)
+                self._save_session(session)
+                self.logger.info(
+                    "duplicate_upload_rejected edge_id=%s job_name=%s upload_id=%s stored_as=%s",
+                    session.edge_id,
+                    session.job_name,
+                    session.upload_id,
+                    committed_duplicate["stored_as"],
+                )
+                return {"status": "ok", "stored_as": committed_duplicate["stored_as"], "pruned": 0, "duplicate": True}
+
             try:
                 storage_result = self.storage_backend.store(session.namespace, session.filename, staged_path)
                 pruned = prune_old_snapshots(
@@ -214,6 +270,16 @@ class IngestService:
                 )
                 raise
 
+            self._record_committed_snapshot(
+                session.namespace,
+                {
+                    "stored_as": storage_result["stored_as"],
+                    "archive_sha256": actual_sha256,
+                    "fingerprint": session.fingerprint,
+                    "timestamp": session.timestamp,
+                },
+            )
+            self._sync_committed_index(session.namespace)
             session.uploaded_bytes = session.archive_size_bytes
             session.status = "completed"
             session.stored_as = storage_result["stored_as"]
@@ -235,7 +301,15 @@ class IngestService:
                 session.upload_id,
                 pruned,
             )
-            return {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned}
+            return {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned, "duplicate": False}
+
+    async def cleanup_loop(self, interval_seconds: int) -> None:
+        while True:
+            try:
+                self.cleanup_stale_uploads()
+            except Exception:
+                self.logger.exception("upload_cleanup_failed")
+            await asyncio.sleep(interval_seconds)
 
     def cleanup_stale_uploads(self) -> None:
         cutoff = datetime.now(timezone.utc)
@@ -253,19 +327,34 @@ class IngestService:
             key_path.unlink(missing_ok=True)
             shutil.rmtree(metadata_path.parent, ignore_errors=True)
 
-    def _validate_capacity(self, archive_size_bytes: int) -> None:
+    def _validate_new_reservation(self, archive_size_bytes: int) -> None:
         if archive_size_bytes > self.max_upload_size_bytes:
             raise HTTPException(status_code=413, detail="upload too large")
 
+        reserved_bytes = self._reserved_bytes()
         staging_free = self._free_space_bytes(self.staging_dir)
         backup_root = getattr(self.storage_backend, "backup_root", None)
         backup_free = self._free_space_bytes(backup_root) if backup_root is not None else None
-        if archive_size_bytes > staging_free:
+
+        if archive_size_bytes + reserved_bytes > staging_free:
             raise HTTPException(status_code=507, detail="insufficient staging storage")
-        if backup_free is not None and archive_size_bytes > backup_free:
+        if backup_free is not None and archive_size_bytes + reserved_bytes > backup_free:
             raise HTTPException(status_code=507, detail="insufficient backup storage")
 
-    def _free_space_bytes(self, path: Path) -> int:
+    def _reserved_bytes(self) -> int:
+        total = 0
+        for metadata_path in self.upload_root.glob("*/metadata.json"):
+            try:
+                session = self._session_from_json(json.loads(metadata_path.read_text(encoding="utf-8")))
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if session.status in _ACTIVE_SESSION_STATUSES:
+                total += session.archive_size_bytes
+        return total
+
+    def _free_space_bytes(self, path: Path | None) -> int:
+        if path is None:
+            return 0
         path.mkdir(parents=True, exist_ok=True)
         return shutil.disk_usage(path).free
 
@@ -286,6 +375,19 @@ class IngestService:
             recommended_chunk_size_bytes=min(self.recommended_chunk_size_bytes, session.archive_size_bytes),
             stored_as=session.stored_as,
             pruned=session.pruned,
+            duplicate=False,
+        )
+
+    def _build_committed_duplicate_response(self, *, archive_size_bytes: int, stored_as: str) -> UploadSessionResponse:
+        return UploadSessionResponse(
+            upload_id=f"committed-{stored_as}",
+            status="completed",
+            next_offset=archive_size_bytes,
+            archive_size_bytes=archive_size_bytes,
+            recommended_chunk_size_bytes=min(self.recommended_chunk_size_bytes, archive_size_bytes),
+            stored_as=stored_as,
+            pruned=0,
+            duplicate=True,
         )
 
     def _session_dir(self, upload_id: str) -> Path:
@@ -300,6 +402,82 @@ class IngestService:
     def _key_mapping_path(self, idempotency_key: str) -> Path:
         digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
         return self.key_root / f"{digest}.json"
+
+    def _index_dir(self, namespace: str) -> Path | None:
+        if self.index_root is None:
+            return None
+        return self.index_root / namespace
+
+    def _index_path(self, namespace: str) -> Path | None:
+        index_dir = self._index_dir(namespace)
+        if index_dir is None:
+            return None
+        return index_dir / "committed.json"
+
+    def _load_committed_index(self, namespace: str) -> list[dict]:
+        index_path = self._index_path(namespace)
+        if index_path is None or not index_path.exists():
+            return []
+        try:
+            payload = json.loads(index_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        if not isinstance(payload, list):
+            return []
+        entries: list[dict] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            stored_as = item.get("stored_as")
+            archive_sha256 = item.get("archive_sha256")
+            if not isinstance(stored_as, str) or not isinstance(archive_sha256, str):
+                continue
+            entries.append(item)
+        return entries
+
+    def _save_committed_index(self, namespace: str, entries: list[dict]) -> None:
+        index_dir = self._index_dir(namespace)
+        index_path = self._index_path(namespace)
+        if index_dir is None or index_path is None:
+            return
+        index_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=index_dir,
+            delete=False,
+            suffix=".tmp",
+        ) as handle:
+            json.dump(entries, handle, indent=2, sort_keys=True)
+            handle.flush()
+            temp_path = Path(handle.name)
+        temp_path.replace(index_path)
+
+    def _record_committed_snapshot(self, namespace: str, entry: dict) -> None:
+        entries = self._load_committed_index(namespace)
+        updated = [item for item in entries if item.get("stored_as") != entry["stored_as"]]
+        updated.append(entry)
+        self._save_committed_index(namespace, updated)
+
+    def _sync_committed_index(self, namespace: str) -> None:
+        existing_files = {item["filename"] for item in self.storage_backend.list(namespace)}
+        entries = self._load_committed_index(namespace)
+        filtered = [item for item in entries if item.get("stored_as") in existing_files]
+        self._save_committed_index(namespace, filtered)
+
+    def _find_committed_duplicate(self, namespace: str, archive_sha256: str) -> dict | None:
+        entries = self._load_committed_index(namespace)
+        if not entries:
+            return None
+
+        existing_files = {item["filename"] for item in self.storage_backend.list(namespace)}
+        filtered = [item for item in entries if item.get("stored_as") in existing_files]
+        if len(filtered) != len(entries):
+            self._save_committed_index(namespace, filtered)
+        for item in filtered:
+            if item.get("archive_sha256") == archive_sha256:
+                return item
+        return None
 
     def _write_key_mapping(self, idempotency_key: str, upload_id: str) -> None:
         path = self._key_mapping_path(idempotency_key)
@@ -367,6 +545,17 @@ class IngestService:
         if not data_path.exists():
             return 0
         return data_path.stat().st_size
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _utc_now_text() -> str:

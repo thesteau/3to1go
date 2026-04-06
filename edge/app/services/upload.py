@@ -113,13 +113,22 @@ class UploadClient:
         fingerprint: str,
         timestamp: str,
         archive_path: Path,
+        archive_sha256: str | None = None,
         upload_id: str | None = None,
         upload_offset: int = 0,
         preferred_chunk_size: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> dict:
         archive_size = archive_path.stat().st_size
-        idempotency_key = build_idempotency_key(edge_id, job_name, fingerprint, timestamp, archive_size)
+        archive_sha256 = archive_sha256 or sha256_path(archive_path)
+        idempotency_key = build_idempotency_key(
+            edge_id,
+            job_name,
+            fingerprint,
+            timestamp,
+            archive_size,
+            archive_sha256,
+        )
         session_info = self._retry_phase(
             "initiate",
             lambda: self._initiate_session(
@@ -128,6 +137,7 @@ class UploadClient:
                 fingerprint=fingerprint,
                 timestamp=timestamp,
                 archive_size=archive_size,
+                archive_sha256=archive_sha256,
                 idempotency_key=idempotency_key,
             ),
         )
@@ -139,6 +149,7 @@ class UploadClient:
                 "status": "ok",
                 "stored_as": session_info.get("stored_as"),
                 "pruned": int(session_info.get("pruned", 0)),
+                "duplicate": bool(session_info.get("duplicate", False)),
                 "upload_id": upload_id,
             }
 
@@ -182,6 +193,7 @@ class UploadClient:
                                 fingerprint=fingerprint,
                                 timestamp=timestamp,
                                 archive_size=archive_size,
+                                archive_sha256=archive_sha256,
                                 idempotency_key=idempotency_key,
                             ),
                         )
@@ -232,6 +244,7 @@ class UploadClient:
         fingerprint: str,
         timestamp: str,
         archive_size: int,
+        archive_sha256: str,
         idempotency_key: str,
     ) -> dict:
         response = self._request(
@@ -245,6 +258,7 @@ class UploadClient:
                 "timestamp": timestamp,
                 "archive_format": "tar.zst",
                 "archive_size_bytes": archive_size,
+                "archive_sha256": archive_sha256,
                 "idempotency_key": idempotency_key,
             },
             timeout=(self.connect_timeout_seconds, self._timeout_for_bytes(self.chunk_size_bytes)),
@@ -319,8 +333,19 @@ class UploadClient:
         detail = payload.get("detail") if isinstance(payload, dict) else None
         message = _detail_message(detail) or response.text.strip() or f"http {response.status_code}"
         next_offset = _detail_next_offset(detail)
+        detail_status = _detail_status(detail)
         retry_after = _retry_after_seconds(response)
 
+        if response.status_code == 409 and detail_status == "checksum_mismatch":
+            return UploadFailure(
+                message=message,
+                category="integrity",
+                retryable=True,
+                status_code=response.status_code,
+                next_offset=next_offset,
+                retry_after_seconds=retry_after,
+                phase=phase,
+            )
         if response.status_code == 409 and next_offset is not None:
             return UploadFailure(
                 message=message,
@@ -346,6 +371,29 @@ class UploadClient:
             return UploadFailure(
                 message=message,
                 category="capacity",
+                retryable=False,
+                status_code=response.status_code,
+                next_offset=next_offset,
+                retry_after_seconds=retry_after,
+                phase=phase,
+            )
+        if response.status_code in {400, 404, 409, 413, 422}:
+            category = "validation"
+            if response.status_code == 413:
+                category = "too_large"
+            return UploadFailure(
+                message=message,
+                category=category,
+                retryable=False,
+                status_code=response.status_code,
+                next_offset=next_offset,
+                retry_after_seconds=retry_after,
+                phase=phase,
+            )
+        if response.status_code in {401, 403}:
+            return UploadFailure(
+                message=message,
+                category="unauthorized",
                 retryable=False,
                 status_code=response.status_code,
                 next_offset=next_offset,
@@ -383,11 +431,29 @@ class UploadClient:
         time.sleep(delay + random.uniform(0, jitter))
 
 
-def build_idempotency_key(edge_id: str, job_name: str, fingerprint: str, timestamp: str, archive_size: int) -> str:
+def build_idempotency_key(
+    edge_id: str,
+    job_name: str,
+    fingerprint: str,
+    timestamp: str,
+    archive_size: int,
+    archive_sha256: str,
+) -> str:
     digest = hashlib.sha256(
-        f"{edge_id}|{job_name}|{fingerprint}|{timestamp}|{archive_size}".encode("utf-8")
+        f"{edge_id}|{job_name}|{fingerprint}|{timestamp}|{archive_size}|{archive_sha256}".encode("utf-8")
     ).hexdigest()
     return digest
+
+
+def sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _safe_json(response: Response) -> dict | list | None:
@@ -414,6 +480,14 @@ def _detail_next_offset(detail) -> int | None:
     if isinstance(detail, dict):
         value = detail.get("next_offset")
         if isinstance(value, int):
+            return value
+    return None
+
+
+def _detail_status(detail) -> str | None:
+    if isinstance(detail, dict):
+        value = detail.get("status")
+        if isinstance(value, str):
             return value
     return None
 

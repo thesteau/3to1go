@@ -7,6 +7,7 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 - authenticating uploads from Edge with the configured bearer token
 - staging incoming archives before commit
 - keeping resumable upload-session metadata in `STAGING_DIR/uploads/`
+- rejecting already-committed duplicate archives within the same `edge_id/job_name` namespace by checksum
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
 - exposing a small UI and JSON overview of stored backups
@@ -63,6 +64,7 @@ Each Edge device must be configured with its own local token file containing the
 | `MAX_UPLOAD_SIZE_MB` | `2048` | Maximum accepted upload size |
 | `UPLOAD_CHUNK_SIZE_MB` | `8` | Recommended chunk size returned to Edge for resumable uploads |
 | `UPLOAD_SESSION_TTL_HOURS` | `24` | How long incomplete or completed upload-session metadata is retained before cleanup |
+| `UPLOAD_CLEANUP_INTERVAL_SECONDS` | `300` | How often Central runs its background cleanup loop for expired upload sessions |
 | `STAGING_DIR` | `/staging` | Temporary staging area before commit |
 | `HTTP_HOST` | `0.0.0.0` | Bind address |
 | `HTTP_PORT` | `8000` | Listen port |
@@ -95,9 +97,9 @@ Uploads are first written to `STAGING_DIR`, then moved into final storage only a
 The resumable upload flow expects:
 
 - `Authorization: Bearer <token from AUTH_TOKEN_FILE>`
-- an initiate payload containing `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`, `archive_size_bytes`, and `idempotency_key`
+- an initiate payload containing `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`, `archive_size_bytes`, `archive_sha256`, and `idempotency_key`
 - chunk bodies sent as raw `application/octet-stream`
-- finalize after the last acknowledged offset reaches the declared archive size
+- finalize after the last acknowledged offset reaches the declared archive size; Central verifies the final archive checksum before commit
 
 ## Local Compose Notes
 

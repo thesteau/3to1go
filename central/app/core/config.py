@@ -17,6 +17,7 @@ class Settings:
     max_upload_size_mb: int
     upload_chunk_size_mb: int
     upload_session_ttl_hours: int
+    upload_cleanup_interval_seconds: int
     staging_dir: Path
     http_host: str
     http_port: int
@@ -40,6 +41,7 @@ def load_settings() -> Settings:
         max_upload_size_mb=max(1, int(os.getenv("MAX_UPLOAD_SIZE_MB", "2048"))),
         upload_chunk_size_mb=max(1, int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "8"))),
         upload_session_ttl_hours=max(1, int(os.getenv("UPLOAD_SESSION_TTL_HOURS", "24"))),
+        upload_cleanup_interval_seconds=max(10, int(os.getenv("UPLOAD_CLEANUP_INTERVAL_SECONDS", "300"))),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
         http_port=max(1, int(os.getenv("HTTP_PORT", "8000"))),

@@ -64,6 +64,7 @@ async def initiate_upload(
         filename=stored_name,
         metadata=metadata,
         archive_size_bytes=payload.archive_size_bytes,
+        archive_sha256=payload.archive_sha256,
         idempotency_key=payload.idempotency_key.strip(),
     )
     return result

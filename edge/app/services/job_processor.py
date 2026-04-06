@@ -11,7 +11,7 @@ from app.backup.quiesce import DockerComposeQuiescer, QuiesceContext
 from app.core.config import Settings
 from app.services.job_locks import JobLockManager
 from app.services.state import JobState, StateStore
-from app.services.upload import UploadClient, UploadFailure
+from app.services.upload import UploadClient, UploadFailure, sha256_path
 
 
 class JobProcessor:
@@ -60,7 +60,7 @@ class JobProcessor:
         state = self.state_store.get(job.state_key)
         state.job_name = job.job_name
 
-        if self._retry_pending_if_needed(job, state):
+        if not state.manual_intervention_required and self._retry_pending_if_needed(job, state):
             return
 
         files = build_file_list(job, self.logger)
@@ -69,6 +69,7 @@ class JobProcessor:
             state.last_status = "skipped_empty"
             state.last_error_category = None
             state.last_error_detail = None
+            state.manual_intervention_required = False
             self.state_store.set(job.state_key, state)
             self.logger.info("skipped_empty job_name=%s path=%s", job.job_name, job.root_path)
             return
@@ -79,14 +80,32 @@ class JobProcessor:
             state.last_status = "skipped_unchanged"
             state.last_error_category = None
             state.last_error_detail = None
+            state.manual_intervention_required = False
             self.state_store.set(job.state_key, state)
             self.logger.info("skipped_unchanged job_name=%s fingerprint=%s", job.job_name, fingerprint[:8])
+            return
+
+        if (
+            state.manual_intervention_required
+            and state.pending_archive
+            and state.pending_fingerprint == fingerprint
+            and Path(state.pending_archive).exists()
+        ):
+            state.last_status = "manual_intervention_required"
+            self.state_store.set(job.state_key, state)
+            self.logger.warning(
+                "manual_intervention_required job_name=%s archive=%s detail=%s",
+                job.job_name,
+                Path(state.pending_archive).name,
+                state.last_error_detail,
+            )
             return
 
         archive_path, timestamp = self._create_pending_archive(job, files, fingerprint)
         previous_pending_archive = state.pending_archive
         state.pending_archive = str(archive_path)
         state.pending_archive_size = archive_path.stat().st_size
+        state.pending_archive_sha256 = sha256_path(archive_path)
         state.pending_fingerprint = fingerprint
         state.pending_timestamp = timestamp
         state.upload_id = None
@@ -98,6 +117,7 @@ class JobProcessor:
         state.last_error_category = None
         state.last_upload_started_at = None
         state.last_upload_updated_at = None
+        state.manual_intervention_required = False
         state.last_status = "archive_created"
         self.state_store.set(job.state_key, state)
 
@@ -163,11 +183,14 @@ class JobProcessor:
         upload_job_name = state.job_name or job.job_name
         if state.pending_archive_size is None:
             state.pending_archive_size = archive_path.stat().st_size
+        if state.pending_archive_sha256 is None:
+            state.pending_archive_sha256 = sha256_path(archive_path)
 
         state.last_status = "uploading"
         state.last_upload_started_at = _utc_now_text()
         state.last_upload_updated_at = state.last_upload_started_at
         state.next_retry_at = None
+        state.manual_intervention_required = False
         self.state_store.set(job.state_key, state)
 
         def persist_progress(upload_id: str, offset: int, chunk_size: int) -> None:
@@ -185,6 +208,7 @@ class JobProcessor:
                 fingerprint=state.pending_fingerprint,
                 timestamp=state.pending_timestamp,
                 archive_path=archive_path,
+                archive_sha256=state.pending_archive_sha256,
                 upload_id=state.upload_id,
                 upload_offset=state.upload_offset,
                 preferred_chunk_size=state.current_chunk_size_bytes,
@@ -201,10 +225,16 @@ class JobProcessor:
             state.upload_attempt_count += 1
             state.last_error_detail = str(exc)
             state.last_error_category = exc.category
-            state.last_status = "circuit_open" if exc.category == "circuit_open" else "retry_scheduled"
-            state.next_retry_at = _utc_after_seconds_text(self._retry_delay_seconds(state.upload_attempt_count, exc))
+            if exc.retryable:
+                state.last_status = "circuit_open" if exc.category == "circuit_open" else "retry_scheduled"
+                state.next_retry_at = _utc_after_seconds_text(self._retry_delay_seconds(state.upload_attempt_count, exc))
+                state.manual_intervention_required = False
+            else:
+                state.last_status = "manual_intervention_required"
+                state.next_retry_at = None
+                state.manual_intervention_required = True
             state.last_upload_updated_at = _utc_now_text()
-            if not self.settings.keep_local_pending:
+            if exc.retryable and not self.settings.keep_local_pending:
                 self._clear_pending_archive(state)
             self.state_store.set(job.state_key, state)
             return False
@@ -230,15 +260,17 @@ class JobProcessor:
         state.upload_attempt_count = 0
         state.last_status = "success"
         state.next_retry_at = None
+        state.manual_intervention_required = False
         self._clear_pending_archive(state)
         state.last_upload_updated_at = completed_at
         self.state_store.set(job.state_key, state)
         self.logger.info(
-            "upload_success job_name=%s archive=%s stored_as=%s pruned=%s",
+            "upload_success job_name=%s archive=%s stored_as=%s pruned=%s duplicate=%s",
             upload_job_name,
             archive_path.name,
             response.get("stored_as"),
             response.get("pruned"),
+            response.get("duplicate", False),
         )
         return True
 
@@ -256,6 +288,7 @@ class JobProcessor:
             Path(state.pending_archive).unlink(missing_ok=True)
         state.pending_archive = None
         state.pending_archive_size = None
+        state.pending_archive_sha256 = None
         state.pending_fingerprint = None
         state.pending_timestamp = None
         state.upload_id = None
