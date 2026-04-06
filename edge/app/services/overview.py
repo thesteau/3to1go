@@ -14,5 +14,6 @@ def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
         "cron_schedule": runner.settings.cron_schedule,
         "minimum_cycle_gap_minutes": MINIMUM_SCHEDULE_MINUTES,
         "http_url": f"http://localhost:{runner.settings.http_port}",
+        "upload_circuit": runner.upload_client.snapshot(),
         "directories": runner.list_directories(),
     }

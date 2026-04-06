@@ -10,6 +10,7 @@ It also serves a small UI for creating, editing, and deleting `.upload_dir` mark
 - building job definitions from those marker files
 - skipping unchanged jobs by comparing fingerprints
 - keeping failed uploads in the spool for retry when configured
+- resuming interrupted uploads by continuing from the last acknowledged byte offset
 - optionally stopping and starting Docker Compose-managed directories around archive creation
 - optionally pulling updated images before bringing a Compose stack back up
 - uploading successful archives to Central
@@ -124,6 +125,17 @@ Edge runs its Compose operations through the bundled scripts in [`edge/app/scrip
 | `LOG_LEVEL` | `INFO` | Application log level |
 | `MAX_DEPTH` | `10` | Maximum recursion depth under `SCAN_ROOT` |
 | `KEEP_LOCAL_PENDING` | `true` | Keep failed-upload archives for retry |
+| `UPLOAD_CHUNK_SIZE_MB` | `8` | Preferred chunk size for resumable uploads |
+| `MIN_UPLOAD_CHUNK_SIZE_MB` | `1` | Minimum chunk size after adaptive backoff |
+| `MAX_UPLOAD_CHUNK_SIZE_MB` | `16` | Maximum chunk size after successful transfers |
+| `UPLOAD_RETRY_MAX_ATTEMPTS` | `5` | Immediate retry attempts per upload phase before the job is deferred |
+| `UPLOAD_RETRY_BASE_DELAY_SECONDS` | `5` | Base delay for exponential backoff between deferred retries |
+| `UPLOAD_RETRY_MAX_DELAY_SECONDS` | `300` | Maximum deferred retry delay |
+| `UPLOAD_CONNECT_TIMEOUT_SECONDS` | `10` | Connect timeout per request to Central |
+| `UPLOAD_READ_TIMEOUT_PADDING_SECONDS` | `30` | Read-time padding added on top of the chunk-size throughput estimate |
+| `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` | Minimum expected throughput used to derive per-chunk read timeouts |
+| `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive transient failures before Edge opens the Central circuit breaker |
+| `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` | How long Edge waits before probing Central again after the circuit opens |
 | `HTTP_HOST` | `0.0.0.0` | Bind address |
 | `HTTP_PORT` | `8080` | Listen port |
 

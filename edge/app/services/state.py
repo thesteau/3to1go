@@ -16,8 +16,18 @@ class JobState:
     last_successful_fingerprint: str | None = None
     last_successful_upload: str | None = None
     pending_archive: str | None = None
+    pending_archive_size: int | None = None
     pending_fingerprint: str | None = None
     pending_timestamp: str | None = None
+    upload_id: str | None = None
+    upload_offset: int = 0
+    upload_attempt_count: int = 0
+    current_chunk_size_bytes: int | None = None
+    next_retry_at: str | None = None
+    last_error_detail: str | None = None
+    last_error_category: str | None = None
+    last_upload_started_at: str | None = None
+    last_upload_updated_at: str | None = None
     last_status: str | None = None
 
 

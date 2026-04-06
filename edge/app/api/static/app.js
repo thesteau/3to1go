@@ -28,6 +28,7 @@ function statusBadge(entry) {
 
 function fillMeta(data) {
   const scheduler = data.scheduler || {};
+  const uploadCircuit = data.upload_circuit || {};
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${escapeHtml(data.edge_id)}</div>
     <div><strong>Scan Root</strong><br>${escapeHtml(data.scan_root)}</div>
@@ -37,17 +38,21 @@ function fillMeta(data) {
     <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
     <div><strong>Scheduler</strong><br>${escapeHtml(scheduler.state || "idle")}</div>
     <div><strong>Next Run</strong><br>${escapeHtml(scheduler.next_run_at || "waiting for first cycle")}</div>
+    <div><strong>Upload Circuit</strong><br>${escapeHtml(uploadCircuit.state || "closed")}</div>
   `;
 }
 
 function renderDirectories(data) {
   const rows = data.directories.map((entry) => {
     const state = entry.state?.last_status || "none";
+    const progress = entry.state?.pending_archive_size
+      ? `${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size}`
+      : "n/a";
     return `
       <tr>
         <td><code>${escapeHtml(entry.relative_path)}</code><br><span class="hint">${escapeHtml(entry.absolute_path)}</span></td>
         <td>${statusBadge(entry)}</td>
-        <td>${escapeHtml(state)}</td>
+        <td>${escapeHtml(state)}<br><span class="hint">${escapeHtml(progress)}</span></td>
         <td><button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button></td>
       </tr>
     `;
@@ -61,6 +66,9 @@ function renderDirectories(data) {
         <strong>${escapeHtml(entry.config?.job_name || entry.relative_path)}</strong>
         <div class="hint"><code>${escapeHtml(entry.relative_path)}</code></div>
         <div class="hint">Last state: ${escapeHtml(entry.state?.last_status || "none")}</div>
+        ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
+        ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
+        ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${escapeHtml(entry.state.last_error_detail)}</div>` : ""}
         ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job <code>${escapeHtml(entry.blocked_by_parent)}</code></div>` : ""}
         ${entry.config_error ? `<div class="hint" style="color:#b42318;">${escapeHtml(entry.config_error)}</div>` : ""}
         <div class="toolbar">

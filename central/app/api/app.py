@@ -23,6 +23,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lock_manager=NamespaceLockManager(),
         staging_dir=settings.staging_dir,
         max_upload_size_bytes=settings.max_upload_size_bytes,
+        recommended_chunk_size_bytes=settings.upload_chunk_size_bytes,
+        upload_session_ttl_hours=settings.upload_session_ttl_hours,
         retention_keep_last=settings.retention_keep_last,
         logger=logger,
     )

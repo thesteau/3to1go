@@ -76,4 +76,5 @@ async def health(
         backup_used_bytes=backup_used_bytes,
         backup_free_bytes=backup_free,
         max_upload_size_bytes=settings.max_upload_size_bytes,
+        recommended_chunk_size_bytes=settings.upload_chunk_size_bytes,
     )

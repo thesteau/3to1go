@@ -14,6 +14,7 @@ class HealthResponse(BaseModel):
     backup_used_bytes: int
     backup_free_bytes: int
     max_upload_size_bytes: int
+    recommended_chunk_size_bytes: int
 
 
 class UploadResponse(BaseModel):
@@ -43,3 +44,45 @@ class UploadMetadata(BaseModel):
         normalized = value.strip()
         datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%SZ")
         return normalized
+
+
+class UploadInitRequest(BaseModel):
+    edge_id: str = Field(min_length=1, max_length=128)
+    job_name: str = Field(min_length=1, max_length=128)
+    fingerprint: str = Field(min_length=8, max_length=128)
+    timestamp: str = Field(min_length=1, max_length=64)
+    archive_format: str
+    archive_size_bytes: int = Field(gt=0)
+    idempotency_key: str = Field(min_length=8, max_length=256)
+
+    @field_validator("archive_format")
+    @classmethod
+    def validate_archive_format(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized != "tar.zst":
+            raise ValueError("archive_format must be tar.zst")
+        return normalized
+
+    @field_validator("timestamp")
+    @classmethod
+    def validate_timestamp(cls, value: str) -> str:
+        normalized = value.strip()
+        datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%SZ")
+        return normalized
+
+
+class UploadSessionResponse(BaseModel):
+    upload_id: str
+    status: str
+    next_offset: int
+    archive_size_bytes: int
+    recommended_chunk_size_bytes: int
+    stored_as: str | None = None
+    pruned: int = 0
+
+
+class UploadChunkResponse(BaseModel):
+    upload_id: str
+    status: str
+    next_offset: int
+    received_bytes: int

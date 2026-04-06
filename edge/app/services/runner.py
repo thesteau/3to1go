@@ -17,7 +17,7 @@ class EdgeRunner:
         self.settings = settings
         self.logger = configure_logging(settings.log_level)
         self.state_store = StateStore(settings.state_dir)
-        self.upload_client = UploadClient(settings.central_url, settings.auth_token)
+        self.upload_client = UploadClient(settings)
         self.quiescer = DockerComposeQuiescer(self.logger)
         self.lock_manager = JobLockManager()
         self._cycle_lock = threading.Lock()

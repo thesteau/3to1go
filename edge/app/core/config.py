@@ -27,8 +27,31 @@ class Settings:
     log_level: str
     max_depth: int
     keep_local_pending: bool
+    upload_chunk_size_mb: int
+    min_upload_chunk_size_mb: int
+    max_upload_chunk_size_mb: int
+    upload_retry_max_attempts: int
+    upload_retry_base_delay_seconds: int
+    upload_retry_max_delay_seconds: int
+    upload_connect_timeout_seconds: int
+    upload_read_timeout_padding_seconds: int
+    upload_min_throughput_bytes_per_second: int
+    circuit_breaker_failure_threshold: int
+    circuit_breaker_cooldown_seconds: int
     http_host: str
     http_port: int
+
+    @property
+    def upload_chunk_size_bytes(self) -> int:
+        return self.upload_chunk_size_mb * 1024 * 1024
+
+    @property
+    def min_upload_chunk_size_bytes(self) -> int:
+        return self.min_upload_chunk_size_mb * 1024 * 1024
+
+    @property
+    def max_upload_chunk_size_bytes(self) -> int:
+        return self.max_upload_chunk_size_mb * 1024 * 1024
 
 
 
@@ -47,6 +70,17 @@ def load_settings() -> Settings:
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         max_depth=max(0, int(os.getenv("MAX_DEPTH", "10"))),
         keep_local_pending=_env_bool("KEEP_LOCAL_PENDING", True),
+        upload_chunk_size_mb=max(1, int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "8"))),
+        min_upload_chunk_size_mb=max(1, int(os.getenv("MIN_UPLOAD_CHUNK_SIZE_MB", "1"))),
+        max_upload_chunk_size_mb=max(1, int(os.getenv("MAX_UPLOAD_CHUNK_SIZE_MB", "16"))),
+        upload_retry_max_attempts=max(1, int(os.getenv("UPLOAD_RETRY_MAX_ATTEMPTS", "5"))),
+        upload_retry_base_delay_seconds=max(1, int(os.getenv("UPLOAD_RETRY_BASE_DELAY_SECONDS", "5"))),
+        upload_retry_max_delay_seconds=max(1, int(os.getenv("UPLOAD_RETRY_MAX_DELAY_SECONDS", "300"))),
+        upload_connect_timeout_seconds=max(1, int(os.getenv("UPLOAD_CONNECT_TIMEOUT_SECONDS", "10"))),
+        upload_read_timeout_padding_seconds=max(5, int(os.getenv("UPLOAD_READ_TIMEOUT_PADDING_SECONDS", "30"))),
+        upload_min_throughput_bytes_per_second=max(1024, int(os.getenv("UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND", "262144"))),
+        circuit_breaker_failure_threshold=max(1, int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5"))),
+        circuit_breaker_cooldown_seconds=max(1, int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "300"))),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
         http_port=max(1, int(os.getenv("HTTP_PORT", "8080"))),
     )

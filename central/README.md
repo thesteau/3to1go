@@ -6,6 +6,7 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 
 - authenticating uploads from Edge with the configured bearer token
 - staging incoming archives before commit
+- keeping resumable upload-session metadata in `STAGING_DIR/uploads/`
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
 - exposing a small UI and JSON overview of stored backups
@@ -60,6 +61,8 @@ Each Edge device must be configured with its own local token file containing the
 | `RETENTION_KEEP_LAST` | `3` | Number of snapshots to keep per `edge_id/job_name` |
 | `LOG_LEVEL` | `INFO` | Application log level |
 | `MAX_UPLOAD_SIZE_MB` | `2048` | Maximum accepted upload size |
+| `UPLOAD_CHUNK_SIZE_MB` | `8` | Recommended chunk size returned to Edge for resumable uploads |
+| `UPLOAD_SESSION_TTL_HOURS` | `24` | How long incomplete or completed upload-session metadata is retained before cleanup |
 | `STAGING_DIR` | `/staging` | Temporary staging area before commit |
 | `HTTP_HOST` | `0.0.0.0` | Bind address |
 | `HTTP_PORT` | `8000` | Listen port |
@@ -85,13 +88,16 @@ Uploads are first written to `STAGING_DIR`, then moved into final storage only a
 - `GET /` - HTML status page
 - `GET /api/overview` - JSON summary of storage paths, retention, and stored snapshots
 - `GET /health` - health check; returns `503` if the storage backend is unavailable
-- `POST /backup/upload` - multipart upload endpoint used by Edge
+- `POST /backup/uploads/initiate` - create or resume an idempotent upload session
+- `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append one chunk at the declared byte offset
+- `POST /backup/uploads/{upload_id}/finalize` - atomically commit a completed upload into final storage
 
-The upload endpoint expects:
+The resumable upload flow expects:
 
 - `Authorization: Bearer <token from AUTH_TOKEN_FILE>`
-- form fields: `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`
-- file field: `archive`
+- an initiate payload containing `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`, `archive_size_bytes`, and `idempotency_key`
+- chunk bodies sent as raw `application/octet-stream`
+- finalize after the last acknowledged offset reaches the declared archive size
 
 ## Local Compose Notes
 

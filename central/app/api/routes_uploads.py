@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 
 from app.api.auth import authorize_request
 from app.api.dependencies import get_ingest_service, get_logger, get_settings
-from app.api.models import UploadMetadata, UploadResponse
+from app.api.models import (
+    UploadChunkResponse,
+    UploadInitRequest,
+    UploadMetadata,
+    UploadResponse,
+    UploadSessionResponse,
+)
 from app.core.config import Settings
 from app.services.ingest import IngestService
 from app.utils.paths import build_snapshot_filename, validate_namespace_component
@@ -13,28 +19,23 @@ from app.utils.paths import build_snapshot_filename, validate_namespace_componen
 router = APIRouter()
 
 
-@router.post("/backup/upload", response_model=UploadResponse)
-async def upload_backup(
-    edge_id: str = Form(...),
-    job_name: str = Form(...),
-    fingerprint: str = Form(...),
-    timestamp: str = Form(...),
-    archive_format: str = Form(...),
-    archive: UploadFile = File(...),
+@router.post("/backup/uploads/initiate", response_model=UploadSessionResponse)
+async def initiate_upload(
+    payload: UploadInitRequest,
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
     ingest_service: IngestService = Depends(get_ingest_service),
-) -> UploadResponse:
+) -> UploadSessionResponse:
     authorize_request(authorization, settings, logger)
 
     try:
         metadata = UploadMetadata(
-            edge_id=validate_namespace_component(edge_id, "edge_id"),
-            job_name=validate_namespace_component(job_name, "job_name"),
-            fingerprint=fingerprint.strip(),
-            timestamp=timestamp.strip(),
-            archive_format=archive_format,
+            edge_id=validate_namespace_component(payload.edge_id, "edge_id"),
+            job_name=validate_namespace_component(payload.job_name, "job_name"),
+            fingerprint=payload.fingerprint.strip(),
+            timestamp=payload.timestamp.strip(),
+            archive_format=payload.archive_format,
         )
     except ValueError as exc:
         logger.error("invalid_metadata detail=%s", exc)
@@ -50,17 +51,48 @@ async def upload_backup(
     )
     namespace = f"{metadata.edge_id}/{metadata.job_name}"
     logger.info(
-        "upload_received edge_id=%s job_name=%s filename=%s fingerprint=%s",
+        "upload_session_requested edge_id=%s job_name=%s filename=%s fingerprint=%s size=%s",
         metadata.edge_id,
         metadata.job_name,
         stored_name,
         metadata.fingerprint,
+        payload.archive_size_bytes,
     )
 
-    result = await ingest_service.ingest(
+    result = await ingest_service.start_upload(
         namespace=namespace,
         filename=stored_name,
         metadata=metadata,
-        archive=archive,
+        archive_size_bytes=payload.archive_size_bytes,
+        idempotency_key=payload.idempotency_key.strip(),
     )
+    return result
+
+
+@router.put("/backup/uploads/{upload_id}/chunk", response_model=UploadChunkResponse)
+async def append_upload_chunk(
+    upload_id: str,
+    request: Request,
+    offset: int = Query(..., ge=0),
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+    logger=Depends(get_logger),
+    ingest_service: IngestService = Depends(get_ingest_service),
+) -> UploadChunkResponse:
+    authorize_request(authorization, settings, logger)
+    result = await ingest_service.append_chunk(upload_id, offset, request.stream())
+    return UploadChunkResponse(**result)
+
+
+@router.post("/backup/uploads/{upload_id}/finalize", response_model=UploadResponse)
+async def finalize_upload(
+    upload_id: str,
+    _body: bytes = Body(default=b""),
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+    logger=Depends(get_logger),
+    ingest_service: IngestService = Depends(get_ingest_service),
+) -> UploadResponse:
+    authorize_request(authorization, settings, logger)
+    result = await ingest_service.finalize_upload(upload_id)
     return UploadResponse(**result)
