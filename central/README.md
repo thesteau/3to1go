@@ -97,6 +97,7 @@ Uploads are first written to `STAGING_DIR`, then moved into final storage only a
 
 - `GET /` - HTML status page
 - `GET /api/overview` - JSON summary of storage paths, retention, and stored snapshots
+- `GET /health/ready` - lightweight readiness check for container healthchecks
 - `GET /health` - health check; returns `503` if the storage backend is unavailable
 - `POST /backup/uploads/initiate` - create or resume an idempotent upload session
 - `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append one chunk at the declared byte offset

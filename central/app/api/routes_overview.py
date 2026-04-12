@@ -31,8 +31,8 @@ async def overview(
     return build_overview(settings, storage_backend)
 
 
-@router.get("/healthz")
-async def healthz(
+@router.get("/health/ready")
+async def health_ready(
     settings: Settings = Depends(get_settings),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
 ) -> dict:

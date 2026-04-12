@@ -43,9 +43,9 @@ class HealthcheckTests(unittest.TestCase):
         self.client.close()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_healthz_avoids_directory_walk(self) -> None:
+    def test_health_ready_avoids_directory_walk(self) -> None:
         with patch("app.api.routes_overview._directory_usage", side_effect=AssertionError("directory walk should not run")):
-            response = self.client.get("/healthz")
+            response = self.client.get("/health/ready")
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json(), {"status": "ok"})
