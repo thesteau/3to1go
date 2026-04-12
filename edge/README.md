@@ -35,6 +35,16 @@ docker compose up --build
 
 Open the UI at `http://localhost:8080/`.
 
+## Choosing `CENTRAL_URL`
+
+Set `CENTRAL_URL` to whatever address the Edge runtime can actually reach:
+
+- If Edge and Central run in the same Compose project or shared Docker network, use `http://central:8000`.
+- If Edge runs in a different Compose project on the same Docker Desktop host as Central, `http://host.docker.internal:8000` is often the simplest choice.
+- If Central runs on a different machine, use that machine's hostname or IP instead.
+
+`http://host.docker.internal:8000` is a same-host convenience for Docker Desktop. It is not the universal default and may not exist on all Linux Docker setups.
+
 ## Auth Token Behavior
 
 Edge uses filesystem-based auth configuration only.
@@ -160,6 +170,8 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
 
 If you run Edge in Docker, mount the token file into the container yourself and keep `AUTH_TOKEN_FILE` pointed at that in-container path.
+
+If Edge is in a separate Compose project from Central but both are on the same Docker Desktop host, set `CENTRAL_URL=http://host.docker.internal:8000`.
 
 ## Running Compose Support Inside The Edge Container
 

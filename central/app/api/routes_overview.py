@@ -31,6 +31,17 @@ async def overview(
     return build_overview(settings, storage_backend)
 
 
+@router.get("/healthz")
+async def healthz(
+    settings: Settings = Depends(get_settings),
+    storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
+) -> dict:
+    if not storage_backend.healthcheck():
+        raise HTTPException(status_code=503, detail="storage backend unavailable")
+    settings.staging_dir.mkdir(parents=True, exist_ok=True)
+    return {"status": "ok"}
+
+
 def _directory_usage(path: Path) -> int:
     total = 0
     if not path.exists():

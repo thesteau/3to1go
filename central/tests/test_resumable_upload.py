@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import sys
+import shutil
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -19,8 +20,9 @@ from app.core.config import Settings  # noqa: E402
 
 class ResumableUploadTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = TemporaryDirectory()
-        root = Path(self.temp_dir.name)
+        root = PROJECT_ROOT / ".tmp-test-resumable-upload" / uuid4().hex
+        root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = root
         self.settings = Settings(
             auth_token="secret",
             storage_backend="local",
@@ -40,7 +42,7 @@ class ResumableUploadTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.client.close()
-        self.temp_dir.cleanup()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_resumes_upload_and_completes_idempotently(self) -> None:
         archive_bytes = b"hello world"

@@ -143,7 +143,21 @@ class JobProcessor:
         return archive_path, timestamp
 
     def _retry_pending_if_needed(self, job: JobDefinition, state: JobState) -> bool:
-        if not state.pending_archive or not state.pending_fingerprint or not state.pending_timestamp:
+        if not state.pending_fingerprint:
+            return False
+
+        retry_at = _parse_utc_text(state.next_retry_at)
+        if not state.pending_archive:
+            if retry_at is not None and retry_at > datetime.now(timezone.utc):
+                state.last_status = "waiting_retry"
+                self.state_store.set(job.state_key, state)
+                self.logger.info(
+                    "waiting_retry job_name=%s archive=%s retry_at=%s",
+                    state.job_name or job.job_name,
+                    "rebuild_required",
+                    state.next_retry_at,
+                )
+                return True
             return False
 
         pending_path = Path(state.pending_archive)
@@ -154,7 +168,6 @@ class JobProcessor:
             self.logger.warning("skipped_missing job_name=%s pending_archive=%s", state.job_name or job.job_name, pending_path)
             return False
 
-        retry_at = _parse_utc_text(state.next_retry_at)
         if retry_at is not None and retry_at > datetime.now(timezone.utc):
             state.last_status = "waiting_retry"
             self.state_store.set(job.state_key, state)
@@ -235,7 +248,7 @@ class JobProcessor:
                 state.manual_intervention_required = True
             state.last_upload_updated_at = _utc_now_text()
             if exc.retryable and not self.settings.keep_local_pending:
-                self._clear_pending_archive(state)
+                self._discard_pending_archive_file(state)
             self.state_store.set(job.state_key, state)
             return False
         except Exception as exc:
@@ -247,7 +260,7 @@ class JobProcessor:
             state.next_retry_at = _utc_after_seconds_text(self._retry_delay_seconds(state.upload_attempt_count, None))
             state.last_upload_updated_at = _utc_now_text()
             if not self.settings.keep_local_pending:
-                self._clear_pending_archive(state)
+                self._discard_pending_archive_file(state)
             self.state_store.set(job.state_key, state)
             return False
 
@@ -295,6 +308,16 @@ class JobProcessor:
         state.upload_offset = 0
         state.current_chunk_size_bytes = None
         state.next_retry_at = None
+
+    def _discard_pending_archive_file(self, state: JobState) -> None:
+        if state.pending_archive:
+            Path(state.pending_archive).unlink(missing_ok=True)
+        state.pending_archive = None
+        state.pending_archive_size = None
+        state.pending_archive_sha256 = None
+        state.upload_id = None
+        state.upload_offset = 0
+        state.current_chunk_size_bytes = None
 
     def cleanup_stale_archives(self) -> None:
         referenced = self.state_store.referenced_pending_archives()

@@ -40,6 +40,14 @@ docker compose up --build
 
 Open the UI at `http://localhost:8000/`.
 
+## Same-Host Edge Note
+
+If you also run an Edge container on this same Docker Desktop host, but in a separate Compose project, that Edge container will often reach Central with:
+
+```text
+http://host.docker.internal:8000
+```
+
 ## Auth Token Behavior
 
 Central uses filesystem-based auth configuration only.
@@ -109,3 +117,5 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 - `./data/staging` -> `/staging`
 
 If you run Central in Docker and want bootstrap behavior, mount a writable path so Central can create `/run/secrets/relay_auth_token` when it is missing.
+
+If an Edge container runs separately on this same Docker Desktop machine, point that Edge instance at `http://host.docker.internal:8000`.
