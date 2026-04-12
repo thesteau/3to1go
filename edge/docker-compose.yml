@@ -10,6 +10,10 @@ services:
       - ./data/state:/data/state
       - ./data/spool:/data/spool
       - ./secrets/relay_auth_token:/run/secrets/relay_auth_token:ro
+      # Uncomment when using is_docker_composed=true jobs on this host.
+      # Edge only needs the host Docker socket because the image contains the
+      # Docker CLI and Compose plugin, not its own Docker daemon.
+      # - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test:
         - CMD

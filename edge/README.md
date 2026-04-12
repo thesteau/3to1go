@@ -114,6 +114,8 @@ If `update_container_on_packup: true` while `is_docker_composed` is `false` or n
 
 Edge runs its Compose operations through the bundled scripts in [`edge/app/scripts/`](app/scripts/) so the Python quiesce logic stays small and the operational commands are easy to extend later.
 
+The Edge image installs Docker client tooling only: the Docker CLI plus the Compose plugin used by `docker compose ...`. It does not run its own Docker daemon.
+
 ## Scheduler Behavior
 
 - `CRON_SCHEDULE` uses a 5-field cron expression.
@@ -181,3 +183,5 @@ That usually means mounting:
 
 - the Docker socket
 - the Compose project directory itself into the Edge container
+
+The bundled `docker-compose.yml` leaves the Docker socket mount commented out by default because normal file backups do not need it. Uncomment that socket mount only when you want Edge to manage same-host Compose workloads during backup.
