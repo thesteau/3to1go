@@ -29,6 +29,49 @@ Edge now boots with built-in defaults and stores its local configuration in a lo
 
 Open the UI at `http://localhost:8080/`.
 
+If you do not want to manually activate and deactivate a virtual environment every time, use the included dev scripts instead. They create `.venv`, install requirements when needed, and can run Edge in the foreground or background without shell activation.
+
+Windows PowerShell:
+
+```powershell
+.\dev-edge.ps1 setup
+.\dev-edge.ps1 run
+.\dev-edge.ps1 start
+.\dev-edge.ps1 stop
+.\dev-edge.ps1 status
+```
+
+Windows Command Prompt:
+
+```cmd
+dev-edge.cmd setup
+dev-edge.cmd run
+dev-edge.cmd start
+dev-edge.cmd stop
+dev-edge.cmd status
+```
+
+macOS and Linux:
+
+```bash
+chmod +x ./dev-edge.sh
+./dev-edge.sh setup
+./dev-edge.sh run
+./dev-edge.sh start
+./dev-edge.sh stop
+./dev-edge.sh status
+```
+
+Command meanings:
+
+- `setup` creates `.venv` and installs or updates Python requirements
+- `run` starts Edge in the foreground
+- `start` starts Edge in the background and writes logs to `.dev-runtime/edge.log`
+- `stop` stops the background Edge process
+- `restart` restarts the background Edge process
+- `status` shows whether the background Edge process is running
+- `clean` removes `.venv` and `.dev-runtime` when Edge is stopped
+
 GitHub Actions builds Linux, macOS, and Windows artifacts through [`.github/workflows/edge-executable.yml`](../.github/workflows/edge-executable.yml), including installable `.deb`, `.pkg`, and Windows installer outputs.
 
 ## Running Release Builds
