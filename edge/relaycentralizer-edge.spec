@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-spec_dir = Path(__file__).resolve().parent
+spec_dir = Path(globals().get("SPECPATH", Path.cwd() / "edge")).resolve()
 
 a = Analysis(
     [str(spec_dir / "app" / "main.py")],
