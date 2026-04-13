@@ -30,7 +30,7 @@ Local development example:
 Copy-Item .env.example .env
 ```
 
-`AUTH_TOKEN_FILE` points to Central's local token file path. If the file already exists, Central reuses it. If it is missing, Central creates it once at startup and keeps using that same file on later restarts.
+`AUTH_TOKEN_FILE` points to Central's local token file path. For the bundled Docker Compose setup, create that file on the host first so the container can mount it read-only.
 
 Then start Central:
 
@@ -64,7 +64,7 @@ Each Edge device must be configured with its own local token file containing the
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token for upload authentication; created by Central if missing |
+| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token for upload authentication |
 | `STORAGE_BACKEND` | `local` | Storage backend selector; only `local` is implemented |
 | `BACKUP_ROOT` | `/backups` | Final snapshot storage location |
 | `RETENTION_KEEP_LAST` | `3` | Number of snapshots to keep per `edge_id/job_name` |
@@ -116,7 +116,8 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 
 - `./data/backups` -> `/backups`
 - `./data/staging` -> `/staging`
+- `./secrets/relay_auth_token` -> `/run/secrets/relay_auth_token` (read-only)
 
-If you run Central in Docker and want bootstrap behavior, mount a writable path so Central can create `/run/secrets/relay_auth_token` when it is missing.
+Create `./secrets/relay_auth_token` on the host before you start the Compose stack.
 
 If an Edge container runs separately on this same Docker Desktop machine, point that Edge instance at `http://host.docker.internal:8000`.

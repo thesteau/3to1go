@@ -65,11 +65,10 @@ You can also use an empty `.upload_dir` file. In that case, Edge uses the direct
 3. Add the YAML fields you want, or leave it empty for the default behavior.
 4. If the directory is a Docker Compose project, set `is_docker_composed: true` only when that same directory contains `docker-compose.yml` or `compose.yml`.
 5. Set `update_container_on_packup: true` only if you also want Edge to run `docker compose pull` before it brings the stack back up.
-6. Start Central so it can create its local token file if it does not exist yet.
-7. Copy that token value to the Edge device's own `AUTH_TOKEN_FILE` path.
-8. Start Edge.
-9. Check the Edge UI to confirm the job was discovered.
-10. Check the Central UI to confirm the archive was uploaded and stored.
+6. Create the same token value in Central's local `AUTH_TOKEN_FILE` path and in the Edge device's own `AUTH_TOKEN_FILE` path.
+7. Start Edge.
+8. Check the Edge UI to confirm the job was discovered.
+9. Check the Central UI to confirm the archive was uploaded and stored.
 
 Example path:
 
@@ -91,12 +90,11 @@ You can run each service with its Docker image, directly with Python, or with th
 For local development only:
 
 1. Start Central from [`central/`](central/).
-2. Let Central create its token file if it is missing.
-3. Copy the token value into the Edge device's own token file.
-4. Start Edge from [`edge/`](edge/).
-5. Leave `AUTH_TOKEN_FILE` pointed at the token file path for that service.
-6. If you run in containers, mount Central's token path writable and mount Edge's token path from that Edge host.
-7. Point Edge `CENTRAL_URL` at the Central service it can reach.
+2. Create the same token value in `central/secrets/relay_auth_token` and `edge/secrets/relay_auth_token`.
+3. Start Edge from [`edge/`](edge/).
+4. Leave `AUTH_TOKEN_FILE` pointed at the token file path for that service.
+5. If you run in containers, mount each service's token file into that service container read-only.
+6. Point Edge `CENTRAL_URL` at the Central service it can reach.
 
 The bundled compose files are convenience wrappers for local setup, not the core backup workflow.
 

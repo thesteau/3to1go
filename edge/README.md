@@ -168,10 +168,11 @@ The provided [`docker-compose.yml`](docker-compose.yml) mounts:
 - `./data/scan_root` -> `/scan`
 - `./data/state` -> `/data/state`
 - `./data/spool` -> `/data/spool`
+- `./secrets/relay_auth_token` -> `/run/secrets/relay_auth_token` (read-only)
 
 `/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
 
-If you run Edge in Docker, mount the token file into the container yourself and keep `AUTH_TOKEN_FILE` pointed at that in-container path.
+Create `./secrets/relay_auth_token` on the host before you start the Compose stack, and keep `AUTH_TOKEN_FILE` pointed at that in-container path.
 
 If Edge is in a separate Compose project from Central but both are on the same Docker Desktop host, set `CENTRAL_URL=http://host.docker.internal:8000`.
 

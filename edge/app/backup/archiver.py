@@ -27,7 +27,9 @@ def create_archive(archive_path: Path, files: list[DiscoveredFile]) -> None:
     compressor = zstandard.ZstdCompressor(level=3)
 
     with archive_path.open("wb") as raw_handle:
-        with compressor.stream_writer(raw_handle) as compressed_handle:
+        # Keep the underlying file handle open so we can flush and fsync it
+        # after the streaming tar+zstd write completes.
+        with compressor.stream_writer(raw_handle, closefd=False) as compressed_handle:
             with tarfile.open(mode="w|", fileobj=compressed_handle, format=tarfile.PAX_FORMAT) as tar_handle:
                 for file in sorted(files, key=lambda item: item.archive_path):
                     tar_info = tarfile.TarInfo(name=file.archive_path)

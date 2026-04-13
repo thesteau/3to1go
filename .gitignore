@@ -8,6 +8,6 @@ __pycache__/
 .data/
 central/.env
 edge/.env
-central/data/
-edge/data/
-.relay-secrets/.auth_token
+data/
+.auth_token
+relay_auth_token

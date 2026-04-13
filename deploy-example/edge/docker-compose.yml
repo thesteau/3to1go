@@ -4,7 +4,7 @@ services:
     env_file:
       - ./.env
     ports:
-      - "8080:8080"
+      - "6556:8080"
     volumes:
       - ./data/scan_root:/scan
       - ./data/state:/data/state
