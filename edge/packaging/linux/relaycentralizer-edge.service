@@ -5,7 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-Environment=EDGE_ENV_FILE=/etc/relaycentralizer-edge/edge.env
 WorkingDirectory=/opt/relaycentralizer-edge
 ExecStart=/opt/relaycentralizer-edge/relaycentralizer-edge
 Restart=always

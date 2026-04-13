@@ -8,11 +8,6 @@
   <array>
     <string>/usr/local/lib/relaycentralizer-edge/relaycentralizer-edge</string>
   </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>EDGE_ENV_FILE</key>
-    <string>/usr/local/etc/relaycentralizer-edge/edge.env</string>
-  </dict>
   <key>WorkingDirectory</key>
   <string>/usr/local/lib/relaycentralizer-edge</string>
   <key>RunAtLoad</key>

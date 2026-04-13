@@ -1,26 +1,25 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from app.core.auth import load_auth_token
 from app.core.schedule import CronSchedule
 
 
 APP_DIR_NAME = "RelayCentralizerEdge"
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _default_scan_root() -> Path:
-    return Path.home()
+    if sys.platform == "win32":
+        return Path("C:/Users")
+    if sys.platform == "darwin":
+        return Path("/Users")
+    home_root = Path("/home")
+    return home_root if home_root.exists() else Path("/")
 
 
 def _default_config_dir() -> Path:
@@ -56,46 +55,35 @@ def _default_spool_dir() -> Path:
     return home / ".cache" / APP_DIR_NAME / "spool"
 
 
-def _path_from_env(name: str, default: Path) -> Path:
-    raw_value = os.getenv(name)
-    value = raw_value.strip() if raw_value and raw_value.strip() else str(default)
-    return Path(value).expanduser()
+def _settings_path() -> Path:
+    return _default_config_dir() / "settings.json"
 
 
-def _system_env_file() -> Path:
-    if sys.platform == "win32":
-        return Path(os.getenv("ProgramData", "C:/ProgramData")) / APP_DIR_NAME / "edge.env"
-    if sys.platform == "darwin":
-        return Path("/usr/local/etc/relaycentralizer-edge/edge.env")
-    return Path("/etc/relaycentralizer-edge/edge.env")
+def _coerce_bool(value: Any, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    if value is None:
+        return default
+    return bool(value)
 
 
-def _load_env_file() -> None:
-    candidates: list[Path] = []
-    explicit_path = os.getenv("EDGE_ENV_FILE")
-    if explicit_path and explicit_path.strip():
-        candidates.append(Path(explicit_path.strip()).expanduser())
-    else:
-        if getattr(sys, "frozen", False):
-            candidates.append(Path(sys.executable).resolve().parent / "edge.env")
-        candidates.append(Path.cwd() / ".env")
-        candidates.append(_system_env_file())
-        candidates.append(_default_config_dir() / "edge.env")
+def _coerce_text(value: Any, default: str) -> str:
+    if value is None:
+        return default
+    normalized = str(value).strip()
+    return normalized or default
 
-    for candidate in candidates:
-        if not candidate.exists() or not candidate.is_file():
-            continue
 
-        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            normalized_key = key.strip()
-            if not normalized_key or normalized_key in os.environ:
-                continue
-            os.environ[normalized_key] = value.strip()
-        return
+def _coerce_int(value: Any, default: int, minimum: int) -> int:
+    if value is None or value == "":
+        return default
+    return max(minimum, int(value))
 
 
 @dataclass(slots=True)
@@ -137,36 +125,79 @@ class Settings:
         return self.max_upload_chunk_size_mb * 1024 * 1024
 
 
+def settings_storage_path() -> Path:
+    return _settings_path()
 
-def load_settings() -> Settings:
-    _load_env_file()
-    cron_schedule = os.getenv("CRON_SCHEDULE", "0 2 * * *").strip()
+
+def settings_to_payload(settings: Settings) -> dict[str, Any]:
+    return {
+        "edge_id": settings.edge_id,
+        "scan_root": str(settings.scan_root),
+        "central_url": settings.central_url,
+        "auth_token": settings.auth_token,
+        "cron_schedule": settings.cron_schedule,
+        "state_dir": str(settings.state_dir),
+        "spool_dir": str(settings.spool_dir),
+        "log_level": settings.log_level,
+        "max_depth": settings.max_depth,
+        "keep_local_pending": settings.keep_local_pending,
+        "upload_chunk_size_mb": settings.upload_chunk_size_mb,
+        "min_upload_chunk_size_mb": settings.min_upload_chunk_size_mb,
+        "max_upload_chunk_size_mb": settings.max_upload_chunk_size_mb,
+        "upload_retry_max_attempts": settings.upload_retry_max_attempts,
+        "upload_retry_base_delay_seconds": settings.upload_retry_base_delay_seconds,
+        "upload_retry_max_delay_seconds": settings.upload_retry_max_delay_seconds,
+        "upload_connect_timeout_seconds": settings.upload_connect_timeout_seconds,
+        "upload_read_timeout_padding_seconds": settings.upload_read_timeout_padding_seconds,
+        "upload_min_throughput_bytes_per_second": settings.upload_min_throughput_bytes_per_second,
+        "circuit_breaker_failure_threshold": settings.circuit_breaker_failure_threshold,
+        "circuit_breaker_cooldown_seconds": settings.circuit_breaker_cooldown_seconds,
+        "http_host": settings.http_host,
+        "http_port": settings.http_port,
+    }
+
+
+def build_settings(payload: dict[str, Any] | None = None) -> Settings:
+    raw = payload or {}
+    cron_schedule = _coerce_text(raw.get("cron_schedule"), "0 2 * * *")
     CronSchedule.from_expression(cron_schedule)
-    config_dir = _default_config_dir()
-    auth_token_file = _path_from_env("AUTH_TOKEN_FILE", config_dir / "auth_token")
 
     return Settings(
-        edge_id=os.getenv("EDGE_ID", "edge-01").strip(),
-        scan_root=_path_from_env("SCAN_ROOT", _default_scan_root()).resolve(),
-        central_url=os.getenv("CENTRAL_URL", "http://127.0.0.1:8000").rstrip("/"),
-        auth_token=load_auth_token(auth_token_file),
+        edge_id=_coerce_text(raw.get("edge_id"), "edge-01"),
+        scan_root=Path(_coerce_text(raw.get("scan_root"), str(_default_scan_root()))).expanduser().resolve(),
+        central_url=_coerce_text(raw.get("central_url"), "http://127.0.0.1:8000").rstrip("/"),
+        auth_token=str(raw.get("auth_token") or "").strip(),
         cron_schedule=cron_schedule,
-        state_dir=_path_from_env("STATE_DIR", _default_state_dir()),
-        spool_dir=_path_from_env("SPOOL_DIR", _default_spool_dir()),
-        log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        max_depth=max(0, int(os.getenv("MAX_DEPTH", "10"))),
-        keep_local_pending=_env_bool("KEEP_LOCAL_PENDING", True),
-        upload_chunk_size_mb=max(1, int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "8"))),
-        min_upload_chunk_size_mb=max(1, int(os.getenv("MIN_UPLOAD_CHUNK_SIZE_MB", "1"))),
-        max_upload_chunk_size_mb=max(1, int(os.getenv("MAX_UPLOAD_CHUNK_SIZE_MB", "16"))),
-        upload_retry_max_attempts=max(1, int(os.getenv("UPLOAD_RETRY_MAX_ATTEMPTS", "5"))),
-        upload_retry_base_delay_seconds=max(1, int(os.getenv("UPLOAD_RETRY_BASE_DELAY_SECONDS", "5"))),
-        upload_retry_max_delay_seconds=max(1, int(os.getenv("UPLOAD_RETRY_MAX_DELAY_SECONDS", "300"))),
-        upload_connect_timeout_seconds=max(1, int(os.getenv("UPLOAD_CONNECT_TIMEOUT_SECONDS", "10"))),
-        upload_read_timeout_padding_seconds=max(5, int(os.getenv("UPLOAD_READ_TIMEOUT_PADDING_SECONDS", "30"))),
-        upload_min_throughput_bytes_per_second=max(1024, int(os.getenv("UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND", "262144"))),
-        circuit_breaker_failure_threshold=max(1, int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5"))),
-        circuit_breaker_cooldown_seconds=max(1, int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "300"))),
-        http_host=os.getenv("HTTP_HOST", "127.0.0.1"),
-        http_port=max(1, int(os.getenv("HTTP_PORT", "8080"))),
+        state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),
+        spool_dir=Path(_coerce_text(raw.get("spool_dir"), str(_default_spool_dir()))).expanduser(),
+        log_level=_coerce_text(raw.get("log_level"), "INFO").upper(),
+        max_depth=_coerce_int(raw.get("max_depth"), 10, 0),
+        keep_local_pending=_coerce_bool(raw.get("keep_local_pending"), True),
+        upload_chunk_size_mb=_coerce_int(raw.get("upload_chunk_size_mb"), 8, 1),
+        min_upload_chunk_size_mb=_coerce_int(raw.get("min_upload_chunk_size_mb"), 1, 1),
+        max_upload_chunk_size_mb=_coerce_int(raw.get("max_upload_chunk_size_mb"), 16, 1),
+        upload_retry_max_attempts=_coerce_int(raw.get("upload_retry_max_attempts"), 5, 1),
+        upload_retry_base_delay_seconds=_coerce_int(raw.get("upload_retry_base_delay_seconds"), 5, 1),
+        upload_retry_max_delay_seconds=_coerce_int(raw.get("upload_retry_max_delay_seconds"), 300, 1),
+        upload_connect_timeout_seconds=_coerce_int(raw.get("upload_connect_timeout_seconds"), 10, 1),
+        upload_read_timeout_padding_seconds=_coerce_int(raw.get("upload_read_timeout_padding_seconds"), 30, 5),
+        upload_min_throughput_bytes_per_second=_coerce_int(raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024),
+        circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
+        circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
+        http_host=_coerce_text(raw.get("http_host"), "127.0.0.1"),
+        http_port=_coerce_int(raw.get("http_port"), 8080, 1),
     )
+
+
+def load_settings() -> Settings:
+    path = _settings_path()
+    if not path.exists():
+        return build_settings()
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return build_settings()
+    if not isinstance(payload, dict):
+        return build_settings()
+    return build_settings(payload)

@@ -54,6 +54,120 @@
 
       <section class="panel">
         <div class="section-head">
+          <h2>Edge Settings</h2>
+          <p class="hint">These settings are saved locally by Edge, so users do not need to manage an environment file.</p>
+        </div>
+
+        <label for="settings_edge_id">Edge ID</label>
+        <input id="settings_edge_id" placeholder="edge-01">
+
+        <label for="settings_scan_root">Scan Root</label>
+        <input id="settings_scan_root" placeholder="/home or C:/Users">
+
+        <label for="settings_central_url">Central URL</label>
+        <input id="settings_central_url" placeholder="http://127.0.0.1:8000">
+
+        <label for="settings_auth_token">Auth Token</label>
+        <input id="settings_auth_token" type="password" placeholder="Shared token with Central">
+
+        <label for="settings_cron_schedule">Cron Schedule</label>
+        <input id="settings_cron_schedule" placeholder="0 2 * * *">
+
+        <div class="split-row">
+          <div>
+            <label for="settings_max_depth">Max Depth</label>
+            <input id="settings_max_depth" type="number" min="0">
+          </div>
+          <div>
+            <label for="settings_log_level">Log Level</label>
+            <select id="settings_log_level">
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" id="settings_keep_local_pending">
+          <span>Keep failed-upload archives for retry</span>
+        </label>
+
+        <details class="settings-advanced">
+          <summary>Advanced Settings</summary>
+
+          <label for="settings_state_dir">State Directory</label>
+          <input id="settings_state_dir">
+
+          <label for="settings_spool_dir">Spool Directory</label>
+          <input id="settings_spool_dir">
+
+          <div class="split-row">
+            <div>
+              <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
+              <input id="settings_upload_chunk_size_mb" type="number" min="1">
+            </div>
+            <div>
+              <label for="settings_min_upload_chunk_size_mb">Min Upload Chunk MB</label>
+              <input id="settings_min_upload_chunk_size_mb" type="number" min="1">
+            </div>
+          </div>
+
+          <div class="split-row">
+            <div>
+              <label for="settings_max_upload_chunk_size_mb">Max Upload Chunk MB</label>
+              <input id="settings_max_upload_chunk_size_mb" type="number" min="1">
+            </div>
+            <div>
+              <label for="settings_upload_retry_max_attempts">Upload Retry Attempts</label>
+              <input id="settings_upload_retry_max_attempts" type="number" min="1">
+            </div>
+          </div>
+
+          <div class="split-row">
+            <div>
+              <label for="settings_upload_retry_base_delay_seconds">Retry Base Delay Seconds</label>
+              <input id="settings_upload_retry_base_delay_seconds" type="number" min="1">
+            </div>
+            <div>
+              <label for="settings_upload_retry_max_delay_seconds">Retry Max Delay Seconds</label>
+              <input id="settings_upload_retry_max_delay_seconds" type="number" min="1">
+            </div>
+          </div>
+
+          <div class="split-row">
+            <div>
+              <label for="settings_upload_connect_timeout_seconds">Connect Timeout Seconds</label>
+              <input id="settings_upload_connect_timeout_seconds" type="number" min="1">
+            </div>
+            <div>
+              <label for="settings_upload_read_timeout_padding_seconds">Read Timeout Padding Seconds</label>
+              <input id="settings_upload_read_timeout_padding_seconds" type="number" min="5">
+            </div>
+          </div>
+
+          <div class="split-row">
+            <div>
+              <label for="settings_upload_min_throughput_bytes_per_second">Min Throughput Bytes/Second</label>
+              <input id="settings_upload_min_throughput_bytes_per_second" type="number" min="1024">
+            </div>
+            <div>
+              <label for="settings_circuit_breaker_failure_threshold">Circuit Breaker Failure Threshold</label>
+              <input id="settings_circuit_breaker_failure_threshold" type="number" min="1">
+            </div>
+          </div>
+
+          <label for="settings_circuit_breaker_cooldown_seconds">Circuit Breaker Cooldown Seconds</label>
+          <input id="settings_circuit_breaker_cooldown_seconds" type="number" min="1">
+        </details>
+
+        <div class="toolbar">
+          <button type="button" onclick="saveSettings()">Save Edge Settings</button>
+          <span class="hint" id="settings-status"></span>
+        </div>
+
+        <div class="section-head compact">
           <h2>Job Editor</h2>
           <p class="hint">Saving writes or updates the <code>.upload_dir</code> file for the selected directory.</p>
         </div>

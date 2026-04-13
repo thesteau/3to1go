@@ -29,13 +29,9 @@ Name: "desktopicon"; Description: "Create a desktop icon"; Flags: unchecked
 
 [Dirs]
 Name: "{commonappdata}\RelayCentralizerEdge"
-Name: "{commonappdata}\RelayCentralizerEdge\state"
-Name: "{commonappdata}\RelayCentralizerEdge\spool"
 
 [Files]
 Source: "{#EdgeSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#EdgeRepoRoot}\edge\packaging\windows\edge.env.sample"; DestDir: "{commonappdata}\RelayCentralizerEdge"; DestName: "edge.env.sample"; Flags: onlyifdoesntexist
-Source: "{#EdgeRepoRoot}\edge\packaging\windows\edge.env.sample"; DestDir: "{commonappdata}\RelayCentralizerEdge"; DestName: "edge.env"; Flags: onlyifdoesntexist
 Source: "{#EdgeRepoRoot}\edge\packaging\windows\Start-RelayCentralizerEdge.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#EdgeRepoRoot}\edge\packaging\windows\Install-RelayCentralizerEdgeTask.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#EdgeRepoRoot}\edge\packaging\windows\Uninstall-RelayCentralizerEdgeTask.ps1"; DestDir: "{app}"; Flags: ignoreversion

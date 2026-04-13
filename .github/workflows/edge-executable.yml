@@ -100,11 +100,9 @@ jobs:
         run: |
           rm -rf package/linux
           mkdir -p package/linux/root/opt/relaycentralizer-edge
-          mkdir -p package/linux/root/etc/relaycentralizer-edge
           mkdir -p package/linux/root/lib/systemd/system
           mkdir -p package/linux/DEBIAN
           cp -R dist/relaycentralizer-edge/. package/linux/root/opt/relaycentralizer-edge/
-          cp edge/packaging/linux/edge.env.sample package/linux/root/etc/relaycentralizer-edge/edge.env.sample
           cp edge/packaging/linux/relaycentralizer-edge.service package/linux/root/lib/systemd/system/relaycentralizer-edge.service
           install -m 0755 edge/packaging/linux/postinst package/linux/DEBIAN/postinst
           install -m 0755 edge/packaging/linux/prerm package/linux/DEBIAN/prerm
@@ -128,10 +126,8 @@ jobs:
         run: |
           rm -rf package/macos
           mkdir -p package/macos/root/usr/local/lib/relaycentralizer-edge
-          mkdir -p package/macos/root/usr/local/etc/relaycentralizer-edge
           mkdir -p package/macos/root/Library/LaunchDaemons
           cp -R dist/relaycentralizer-edge/. package/macos/root/usr/local/lib/relaycentralizer-edge/
-          cp edge/packaging/macos/edge.env.sample package/macos/root/usr/local/etc/relaycentralizer-edge/edge.env.sample
           cp edge/packaging/macos/com.relaycentralizer.edge.plist package/macos/root/Library/LaunchDaemons/com.relaycentralizer.edge.plist
           pkgbuild \
             --root package/macos/root \

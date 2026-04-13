@@ -1,14 +1,6 @@
 #!/bin/sh
 set -e
 
-mkdir -p /etc/relaycentralizer-edge
-mkdir -p /var/lib/relaycentralizer-edge/state
-mkdir -p /var/cache/relaycentralizer-edge/spool
-
-if [ ! -f /etc/relaycentralizer-edge/edge.env ] && [ -f /etc/relaycentralizer-edge/edge.env.sample ]; then
-    cp /etc/relaycentralizer-edge/edge.env.sample /etc/relaycentralizer-edge/edge.env
-fi
-
 ln -sf /opt/relaycentralizer-edge/relaycentralizer-edge /usr/local/bin/relaycentralizer-edge
 systemctl daemon-reload >/dev/null 2>&1 || true
 

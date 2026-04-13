@@ -29,17 +29,45 @@ function statusBadge(entry) {
 function fillMeta(data) {
   const scheduler = data.scheduler || {};
   const uploadCircuit = data.upload_circuit || {};
+  const settingsStatus = data.settings_status || {};
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${escapeHtml(data.edge_id)}</div>
     <div><strong>Scan Root</strong><br>${escapeHtml(data.scan_root)}</div>
     <div><strong>Central URL</strong><br>${escapeHtml(data.central_url)}</div>
     <div><strong>Edge UI</strong><br>${escapeHtml(data.http_url)}</div>
+    <div><strong>Settings File</strong><br>${escapeHtml(data.settings_path || "n/a")}</div>
     <div><strong>Cron Schedule</strong><br><code>${escapeHtml(data.cron_schedule)}</code></div>
     <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
     <div><strong>Scheduler</strong><br>${escapeHtml(scheduler.state || "idle")}</div>
     <div><strong>Next Run</strong><br>${escapeHtml(scheduler.next_run_at || "waiting for first cycle")}</div>
     <div><strong>Upload Circuit</strong><br>${escapeHtml(uploadCircuit.state || "closed")}</div>
+    <div><strong>Auth Token</strong><br>${escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing")}</div>
   `;
+}
+
+function fillSettings(settings) {
+  const data = settings || {};
+  document.getElementById("settings_edge_id").value = data.edge_id || "";
+  document.getElementById("settings_scan_root").value = data.scan_root || "";
+  document.getElementById("settings_central_url").value = data.central_url || "";
+  document.getElementById("settings_auth_token").value = data.auth_token || "";
+  document.getElementById("settings_cron_schedule").value = data.cron_schedule || "";
+  document.getElementById("settings_state_dir").value = data.state_dir || "";
+  document.getElementById("settings_spool_dir").value = data.spool_dir || "";
+  document.getElementById("settings_log_level").value = data.log_level || "INFO";
+  document.getElementById("settings_max_depth").value = data.max_depth ?? 10;
+  document.getElementById("settings_keep_local_pending").checked = data.keep_local_pending ?? true;
+  document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
+  document.getElementById("settings_min_upload_chunk_size_mb").value = data.min_upload_chunk_size_mb ?? 1;
+  document.getElementById("settings_max_upload_chunk_size_mb").value = data.max_upload_chunk_size_mb ?? 16;
+  document.getElementById("settings_upload_retry_max_attempts").value = data.upload_retry_max_attempts ?? 5;
+  document.getElementById("settings_upload_retry_base_delay_seconds").value = data.upload_retry_base_delay_seconds ?? 5;
+  document.getElementById("settings_upload_retry_max_delay_seconds").value = data.upload_retry_max_delay_seconds ?? 300;
+  document.getElementById("settings_upload_connect_timeout_seconds").value = data.upload_connect_timeout_seconds ?? 10;
+  document.getElementById("settings_upload_read_timeout_padding_seconds").value = data.upload_read_timeout_padding_seconds ?? 30;
+  document.getElementById("settings_upload_min_throughput_bytes_per_second").value = data.upload_min_throughput_bytes_per_second ?? 262144;
+  document.getElementById("settings_circuit_breaker_failure_threshold").value = data.circuit_breaker_failure_threshold ?? 5;
+  document.getElementById("settings_circuit_breaker_cooldown_seconds").value = data.circuit_breaker_cooldown_seconds ?? 300;
 }
 
 function renderDirectories(data) {
@@ -113,9 +141,49 @@ async function loadData() {
   const response = await fetch("/api/directories");
   latestData = await response.json();
   fillMeta(latestData);
+  fillSettings(latestData.settings || {});
   renderDirectories(latestData);
   if (!document.getElementById("relative_path").value) {
     resetForm();
+  }
+}
+
+async function saveSettings() {
+  const payload = {
+    edge_id: document.getElementById("settings_edge_id").value.trim(),
+    scan_root: document.getElementById("settings_scan_root").value.trim(),
+    central_url: document.getElementById("settings_central_url").value.trim(),
+    auth_token: document.getElementById("settings_auth_token").value,
+    cron_schedule: document.getElementById("settings_cron_schedule").value.trim(),
+    state_dir: document.getElementById("settings_state_dir").value.trim(),
+    spool_dir: document.getElementById("settings_spool_dir").value.trim(),
+    log_level: document.getElementById("settings_log_level").value,
+    max_depth: Number(document.getElementById("settings_max_depth").value || 0),
+    keep_local_pending: document.getElementById("settings_keep_local_pending").checked,
+    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
+    min_upload_chunk_size_mb: Number(document.getElementById("settings_min_upload_chunk_size_mb").value || 1),
+    max_upload_chunk_size_mb: Number(document.getElementById("settings_max_upload_chunk_size_mb").value || 1),
+    upload_retry_max_attempts: Number(document.getElementById("settings_upload_retry_max_attempts").value || 1),
+    upload_retry_base_delay_seconds: Number(document.getElementById("settings_upload_retry_base_delay_seconds").value || 1),
+    upload_retry_max_delay_seconds: Number(document.getElementById("settings_upload_retry_max_delay_seconds").value || 1),
+    upload_connect_timeout_seconds: Number(document.getElementById("settings_upload_connect_timeout_seconds").value || 1),
+    upload_read_timeout_padding_seconds: Number(document.getElementById("settings_upload_read_timeout_padding_seconds").value || 5),
+    upload_min_throughput_bytes_per_second: Number(document.getElementById("settings_upload_min_throughput_bytes_per_second").value || 1024),
+    circuit_breaker_failure_threshold: Number(document.getElementById("settings_circuit_breaker_failure_threshold").value || 1),
+    circuit_breaker_cooldown_seconds: Number(document.getElementById("settings_circuit_breaker_cooldown_seconds").value || 1),
+  };
+
+  const response = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  document.getElementById("settings-status").textContent = response.ok
+    ? "Settings saved."
+    : (body.detail || "Settings save failed.");
+  if (response.ok) {
+    await loadData();
   }
 }
 

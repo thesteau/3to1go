@@ -22,18 +22,10 @@ You can run Edge directly with Python, with a packaged executable, or with an in
 For local Python development:
 
 ```powershell
-Copy-Item .env.example .env
-```
-
-`AUTH_TOKEN_FILE` must point to an existing file on the Edge host. Edge reads that file at startup and uses its contents to authenticate upload requests to Central.
-
-Then start Edge:
-
-```powershell
 python -m app.main
 ```
 
-Edge loads configuration from environment variables, from a local `.env` in the current working directory, or from `edge.env` in its platform config directory.
+Edge now boots with built-in defaults and stores its local configuration in a local `settings.json` file managed through the web UI.
 
 Open the UI at `http://localhost:8080/`.
 
@@ -45,16 +37,15 @@ Each release publishes both installer packages and raw bundles. Installers are t
 
 Before starting Edge on any platform:
 
-1. Put the same shared token used by Central at the `AUTH_TOKEN_FILE` path in the Edge environment file.
-2. Set `CENTRAL_URL` to the reachable Central address.
-3. Set `SCAN_ROOT` to the directory tree Edge should scan.
+1. Start Edge and open `http://localhost:8080/`.
+2. Put the same shared token used by Central into the Edge Settings section.
+3. Set `CENTRAL_URL` to the reachable Central address.
+4. Set `SCAN_ROOT` to the directory tree Edge should scan.
 
 Linux `.deb`:
 
 ```bash
 sudo dpkg -i relaycentralizer-edge-linux.deb
-sudo nano /etc/relaycentralizer-edge/edge.env
-sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /etc/relaycentralizer-edge/auth_token'
 sudo systemctl enable --now relaycentralizer-edge
 ```
 
@@ -63,8 +54,6 @@ Linux raw bundle `.tar.gz`:
 ```bash
 tar -xzf relaycentralizer-edge-linux.tar.gz
 cd relaycentralizer-edge
-cp /path/to/edge.env ./edge.env
-printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
 ./relaycentralizer-edge
 ```
 
@@ -72,8 +61,6 @@ macOS `.pkg`:
 
 ```bash
 sudo installer -pkg relaycentralizer-edge-macos.pkg -target /
-sudo nano /usr/local/etc/relaycentralizer-edge/edge.env
-sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /usr/local/etc/relaycentralizer-edge/auth_token'
 sudo launchctl bootstrap system /Library/LaunchDaemons/com.relaycentralizer.edge.plist
 sudo launchctl kickstart -k system/com.relaycentralizer.edge
 ```
@@ -83,8 +70,6 @@ macOS raw bundle `.tar.gz`:
 ```bash
 tar -xzf relaycentralizer-edge-macos.tar.gz
 cd relaycentralizer-edge
-cp /path/to/edge.env ./edge.env
-printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
 ./relaycentralizer-edge
 ```
 
@@ -92,9 +77,8 @@ Windows installer `.exe`:
 
 1. Run `relaycentralizer-edge-windows-installer.exe`.
 2. Optionally keep the startup-task option enabled.
-3. Edit `C:\ProgramData\RelayCentralizerEdge\edge.env`.
-4. Put the shared token in `C:\ProgramData\RelayCentralizerEdge\auth_token`.
-5. If needed, register startup manually:
+3. Open `http://localhost:8080/` and save the Edge settings there.
+4. If needed, register startup manually:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "C:\Program Files\RelayCentralizer Edge\Install-RelayCentralizerEdgeTask.ps1"
@@ -105,8 +89,6 @@ Windows raw bundle `.zip`:
 ```powershell
 Expand-Archive .\relaycentralizer-edge-windows.zip -DestinationPath .
 cd .\relaycentralizer-edge
-Copy-Item C:\path\to\edge.env .\edge.env
-Set-Content -Path .\auth_token -Value "YOUR_SHARED_TOKEN" -NoNewline
 .\relaycentralizer-edge.exe
 ```
 
@@ -122,14 +104,11 @@ Set `CENTRAL_URL` to whatever address the Edge runtime can actually reach:
 
 ## Auth Token Behavior
 
-Edge uses filesystem-based auth configuration only.
+Edge stores its auth token in its own local `settings.json` file.
 
-- `AUTH_TOKEN_FILE` is required.
-- The file must already exist before Edge starts.
-- Edge reads the token from its own local filesystem.
+- The token is set in the Edge Settings section of the local web UI.
 - The token value must match the token file configured on Central.
-
-Edge never reads secrets from Central's filesystem and does not depend on a shared auth folder.
+- Edge does not read secrets from Central's filesystem.
 
 ## How Job Discovery Works
 
@@ -198,14 +177,16 @@ When `is_docker_composed: true` is enabled for a job, Edge expects the host `doc
 - The schedule may not be more frequent than every 5 minutes.
 - The UI's `Run Backup Cycle Now` action goes through the same scheduler controls and also clears any manual-intervention blocks for one explicit retry attempt.
 
-## Environment
+## Settings Defaults
 
-| Variable | Default | Purpose |
+Edge starts with built-in defaults and saves any changes you make from the web UI into its local `settings.json` file.
+
+| Setting | Default | Purpose |
 | --- | --- | --- |
 | `EDGE_ID` | `edge-01` | Namespace sent to Central |
-| `SCAN_ROOT` | `Path.home()` | Root directory Edge scans for `.upload_dir` files |
+| `SCAN_ROOT` | `/home`, `/Users`, or `C:\Users` | Root directory Edge scans for `.upload_dir` files, depending on platform |
 | `CENTRAL_URL` | `http://127.0.0.1:8000` | Base URL for Central |
-| `AUTH_TOKEN_FILE` | Platform config dir + `auth_token` | File containing the bearer token on the Edge host |
+| `AUTH_TOKEN` | empty | Shared bearer token configured in the Edge settings UI |
 | `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule inside the Edge runtime |
 | `STATE_DIR` | Platform state dir | Persistent job state and retry metadata |
 | `SPOOL_DIR` | Platform cache dir + `spool` | Temporary archive storage before successful upload |
@@ -231,6 +212,7 @@ When `is_docker_composed: true` is enabled for a job, Edge expects the host `doc
 - `GET /` - HTML job-management UI
 - `GET /health` - health check
 - `GET /api/directories` - scan-root view, job configs, job state, and scheduler status
+- `POST /api/settings` - save local Edge settings from the UI
 - `POST /api/jobs` - create or update a `.upload_dir`
 - `DELETE /api/jobs?relative_path=...` - remove a `.upload_dir`
 - `POST /api/run-now` - request an immediate backup cycle
@@ -243,7 +225,7 @@ Release builds include:
 - macOS `.pkg` installers with a `launchd` plist at `com.relaycentralizer.edge.plist`
 - Windows installer executables that can register a startup scheduled task
 
-The installer packages place a sample Edge environment file on the target host, but they do not create your auth token for you. Populate the token file path referenced by that environment file before starting the installed service. The service definitions are installed with the package, but you should review the sample environment file before enabling them.
+The installer packages start Edge with built-in defaults so the local UI is available immediately. Open that UI, save the settings you want, and then leave the installed service running.
 
 ## Running Compose Support On The Edge Host
 

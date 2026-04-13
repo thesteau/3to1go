@@ -32,6 +32,9 @@ class JobProcessor:
         self.lock_manager = lock_manager
 
     def run_cycle(self) -> bool:
+        if not self.settings.auth_token.strip():
+            self.logger.warning("cycle_skipped reason=auth_token_missing")
+            return False
         for job in discover_jobs(self.settings.scan_root, self.settings.max_depth, self.logger):
             self.process_job(job)
         self.cleanup_stale_archives()

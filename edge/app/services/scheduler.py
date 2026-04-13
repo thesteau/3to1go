@@ -62,6 +62,14 @@ class SchedulerController:
                 "run_now_requested": self._run_now_requested,
             }
 
+    def reload_settings(self) -> None:
+        schedule = CronSchedule.from_expression(self.runner.settings.cron_schedule)
+        with self._status_lock:
+            self.schedule = schedule
+            if self._state != "running":
+                self._next_run_at = None
+        self._wake_event.set()
+
     def _loop(self) -> None:
         while not self._stop_event.is_set():
             if self._consume_run_request():
