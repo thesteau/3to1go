@@ -33,11 +33,11 @@ class DirectoryService:
 
             relative_path = "." if directory == scan_root else directory.relative_to(scan_root).as_posix()
             marker_path = directory / UPLOAD_DIR_FILENAME
-            has_marker = marker_path.is_file()
+            selected = marker_path.is_file()
             config_error: str | None = None
             config: dict[str, Any] | None = None
 
-            if has_marker:
+            if selected:
                 config, config_error = self._read_directory_config(directory)
 
             state = self.state_store.get(str(directory.resolve()))
@@ -45,7 +45,7 @@ class DirectoryService:
                 {
                     "relative_path": relative_path,
                     "absolute_path": str(directory),
-                    "selected": has_marker,
+                    "selected": selected,
                     "blocked_by_parent": blocked_by,
                     "config": config,
                     "config_error": config_error,
@@ -61,7 +61,7 @@ class DirectoryService:
             except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
                 return
 
-            child_blocked_by = relative_path if has_marker else blocked_by
+            child_blocked_by = relative_path if selected else blocked_by
             for child in children:
                 walk(child, depth + 1, child_blocked_by)
 

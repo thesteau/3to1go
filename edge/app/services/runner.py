@@ -23,7 +23,6 @@ class EdgeRunner:
         self._cycle_lock = threading.Lock()
         self.settings.state_dir.mkdir(parents=True, exist_ok=True)
         self.settings.spool_dir.mkdir(parents=True, exist_ok=True)
-        self.settings.scan_root.mkdir(parents=True, exist_ok=True)
         self.directory_service = DirectoryService(settings, self.logger, self.state_store)
         self.job_processor = JobProcessor(
             settings=settings,

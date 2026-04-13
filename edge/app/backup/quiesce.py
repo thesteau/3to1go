@@ -19,7 +19,6 @@ class QuiesceContext:
 class DockerComposeQuiescer:
     def __init__(self, logger) -> None:
         self.logger = logger
-        self._scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
 
     def prepare(self, job: JobDefinition) -> QuiesceContext | None:
         if not job.is_docker_composed:
@@ -46,15 +45,15 @@ class DockerComposeQuiescer:
                 )
             return None
 
-        self._run_script(job, "stop", job.root_path)
+        self._run_action(job, "stop", job.root_path)
         return QuiesceContext(compose_file=compose_file)
 
     def restore(self, job: JobDefinition, context: QuiesceContext | None) -> None:
         if context is None:
             return
         if job.update_container_on_packup:
-            self._run_script(job, "pull", job.root_path)
-        self._run_script(job, "up", job.root_path)
+            self._run_action(job, "pull", job.root_path)
+        self._run_action(job, "up", job.root_path)
 
     def _find_compose_file(self, directory: Path) -> Path | None:
         for filename in COMPOSE_FILENAMES:
@@ -63,20 +62,20 @@ class DockerComposeQuiescer:
                 return candidate
         return None
 
-    def _run_script(self, job: JobDefinition, action: str, working_dir: Path) -> None:
-        script_path = self._script_for_action(action)
+    def _run_action(self, job: JobDefinition, action: str, working_dir: Path) -> None:
         if shutil.which("docker") is None:
-            raise RuntimeError("docker CLI is not available inside the Edge runtime")
+            raise RuntimeError("docker CLI is not available on this Edge host")
 
         self.logger.info(
-            "docker_compose_action job_name=%s action=%s project_dir=%s via=script",
+            "docker_compose_action job_name=%s action=%s project_dir=%s",
             job.job_name,
             action,
             working_dir,
         )
+        command = self._command_for_action(action)
         try:
             completed = subprocess.run(
-                ["/bin/sh", str(script_path)],
+                command,
                 cwd=working_dir,
                 check=True,
                 capture_output=True,
@@ -98,13 +97,13 @@ class DockerComposeQuiescer:
                 output.replace("\n", " | "),
             )
 
-    def _script_for_action(self, action: str) -> Path:
+    def _command_for_action(self, action: str) -> list[str]:
         targets = {
-            "stop": self._scripts_dir / "docker_compose_stop.sh",
-            "up": self._scripts_dir / "docker_compose_up.sh",
-            "pull": self._scripts_dir / "docker_compose_pull.sh",
-            "down": self._scripts_dir / "docker_compose_down.sh",
-            "start": self._scripts_dir / "docker_compose_start.sh",
+            "stop": ["docker", "compose", "stop"],
+            "up": ["docker", "compose", "up", "-d"],
+            "pull": ["docker", "compose", "pull"],
+            "down": ["docker", "compose", "down"],
+            "start": ["docker", "compose", "start"],
         }
         try:
             return targets[action]

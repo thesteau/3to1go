@@ -6,7 +6,7 @@ It also serves a small UI for creating, editing, and deleting `.upload_dir` mark
 
 ## What Edge Is Responsible For
 
-- scanning `SCAN_ROOT` for `.upload_dir` markers
+- breadth-first scanning `SCAN_ROOT` for `.upload_dir` markers
 - building job definitions from those marker files
 - skipping unchanged jobs by comparing fingerprints
 - keeping failed uploads in the spool for retry when configured
@@ -17,33 +17,108 @@ It also serves a small UI for creating, editing, and deleting `.upload_dir` mark
 
 ## Starting Edge
 
-You can run Edge with the published image, directly with Python, or with the bundled [`docker-compose.yml`](docker-compose.yml) for local development.
+You can run Edge directly with Python, with a packaged executable, or with an installer package from a GitHub release.
 
-Local development example:
+For local Python development:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-`AUTH_TOKEN_FILE` must point to an existing file on the Edge device or inside the Edge container. Edge reads that file at startup and uses its contents to authenticate upload requests to Central.
+`AUTH_TOKEN_FILE` must point to an existing file on the Edge host. Edge reads that file at startup and uses its contents to authenticate upload requests to Central.
 
 Then start Edge:
 
 ```powershell
-docker compose up --build
+python -m app.main
 ```
 
+Edge loads configuration from environment variables, from a local `.env` in the current working directory, or from `edge.env` in its platform config directory.
+
 Open the UI at `http://localhost:8080/`.
+
+GitHub Actions builds Linux, macOS, and Windows artifacts through [`.github/workflows/edge-executable.yml`](../.github/workflows/edge-executable.yml), including installable `.deb`, `.pkg`, and Windows installer outputs.
+
+## Running Release Builds
+
+Each release publishes both installer packages and raw bundles. Installers are the recommended path for normal users.
+
+Before starting Edge on any platform:
+
+1. Put the same shared token used by Central at the `AUTH_TOKEN_FILE` path in the Edge environment file.
+2. Set `CENTRAL_URL` to the reachable Central address.
+3. Set `SCAN_ROOT` to the directory tree Edge should scan.
+
+Linux `.deb`:
+
+```bash
+sudo dpkg -i relaycentralizer-edge-linux.deb
+sudo nano /etc/relaycentralizer-edge/edge.env
+sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /etc/relaycentralizer-edge/auth_token'
+sudo systemctl enable --now relaycentralizer-edge
+```
+
+Linux raw bundle `.tar.gz`:
+
+```bash
+tar -xzf relaycentralizer-edge-linux.tar.gz
+cd relaycentralizer-edge
+cp /path/to/edge.env ./edge.env
+printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
+./relaycentralizer-edge
+```
+
+macOS `.pkg`:
+
+```bash
+sudo installer -pkg relaycentralizer-edge-macos.pkg -target /
+sudo nano /usr/local/etc/relaycentralizer-edge/edge.env
+sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /usr/local/etc/relaycentralizer-edge/auth_token'
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.relaycentralizer.edge.plist
+sudo launchctl kickstart -k system/com.relaycentralizer.edge
+```
+
+macOS raw bundle `.tar.gz`:
+
+```bash
+tar -xzf relaycentralizer-edge-macos.tar.gz
+cd relaycentralizer-edge
+cp /path/to/edge.env ./edge.env
+printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
+./relaycentralizer-edge
+```
+
+Windows installer `.exe`:
+
+1. Run `relaycentralizer-edge-windows-installer.exe`.
+2. Optionally keep the startup-task option enabled.
+3. Edit `C:\ProgramData\RelayCentralizerEdge\edge.env`.
+4. Put the shared token in `C:\ProgramData\RelayCentralizerEdge\auth_token`.
+5. If needed, register startup manually:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\Program Files\RelayCentralizer Edge\Install-RelayCentralizerEdgeTask.ps1"
+```
+
+Windows raw bundle `.zip`:
+
+```powershell
+Expand-Archive .\relaycentralizer-edge-windows.zip -DestinationPath .
+cd .\relaycentralizer-edge
+Copy-Item C:\path\to\edge.env .\edge.env
+Set-Content -Path .\auth_token -Value "YOUR_SHARED_TOKEN" -NoNewline
+.\relaycentralizer-edge.exe
+```
+
+After startup, open `http://localhost:8080/` and use the UI while Edge scans from `SCAN_ROOT`.
 
 ## Choosing `CENTRAL_URL`
 
 Set `CENTRAL_URL` to whatever address the Edge runtime can actually reach:
 
+- If Edge runs directly on the same host as a Central container that publishes port `8000`, use `http://127.0.0.1:8000`.
 - If Edge and Central run in the same Compose project or shared Docker network, use `http://central:8000`.
-- If Edge runs in a different Compose project on the same Docker Desktop host as Central, `http://host.docker.internal:8000` is often the simplest choice.
-- If Central runs on a different machine, use that machine's hostname or IP instead.
-
-`http://host.docker.internal:8000` is a same-host convenience for Docker Desktop. It is not the universal default and may not exist on all Linux Docker setups.
+- If Edge runs on a different machine, use Central's hostname or IP instead.
 
 ## Auth Token Behavior
 
@@ -58,8 +133,9 @@ Edge never reads secrets from Central's filesystem and does not depend on a shar
 
 ## How Job Discovery Works
 
-- Edge scans `SCAN_ROOT` for directories containing a `.upload_dir` file.
-- The first `.upload_dir` found on a path becomes the backup job root.
+- Edge performs a breadth-first scan starting at `SCAN_ROOT`.
+- Every directory containing a `.upload_dir` file becomes a backup job root.
+- Once a parent directory is selected as a job, nested `.upload_dir` files under that parent are ignored.
 - Nested jobs under an already selected parent are blocked.
 - If a job's fingerprint has not changed since the last successful upload, Edge skips it.
 - If an upload fails and `KEEP_LOCAL_PENDING=true`, the archive is kept in the spool directory and retried later.
@@ -110,11 +186,9 @@ If `is_docker_composed: true` but neither Compose file is present, Edge logs the
 
 If `update_container_on_packup: true` while `is_docker_composed` is `false` or not set, Edge logs that contradiction and skips the update step.
 
-## Shell Script Wrapper
+## Host Docker CLI Requirement
 
-Edge runs its Compose operations through the bundled scripts in [`edge/app/scripts/`](app/scripts/) so the Python quiesce logic stays small and the operational commands are easy to extend later.
-
-The Edge image installs Docker client tooling only: the Docker CLI plus the Compose plugin used by `docker compose ...`. It does not run its own Docker daemon.
+When `is_docker_composed: true` is enabled for a job, Edge expects the host `docker` CLI with Compose support to be available on that machine. Edge invokes `docker compose ...` directly from the host runtime and does not run its own Docker daemon.
 
 ## Scheduler Behavior
 
@@ -129,12 +203,12 @@ The Edge image installs Docker client tooling only: the Docker CLI plus the Comp
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `EDGE_ID` | `edge-01` | Namespace sent to Central |
-| `SCAN_ROOT` | `/scan` | Root directory Edge scans for `.upload_dir` files |
-| `CENTRAL_URL` | `http://central:8000` | Base URL for Central |
-| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token on the Edge host or container |
+| `SCAN_ROOT` | `Path.home()` | Root directory Edge scans for `.upload_dir` files |
+| `CENTRAL_URL` | `http://127.0.0.1:8000` | Base URL for Central |
+| `AUTH_TOKEN_FILE` | Platform config dir + `auth_token` | File containing the bearer token on the Edge host |
 | `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule inside the Edge runtime |
-| `STATE_DIR` | `/data/state` | Persistent job state and retry metadata |
-| `SPOOL_DIR` | `/data/spool` | Temporary archive storage before successful upload |
+| `STATE_DIR` | Platform state dir | Persistent job state and retry metadata |
+| `SPOOL_DIR` | Platform cache dir + `spool` | Temporary archive storage before successful upload |
 | `LOG_LEVEL` | `INFO` | Application log level |
 | `MAX_DEPTH` | `10` | Maximum recursion depth under `SCAN_ROOT` |
 | `KEEP_LOCAL_PENDING` | `true` | Keep failed-upload archives for retry |
@@ -149,7 +223,7 @@ The Edge image installs Docker client tooling only: the Docker CLI plus the Comp
 | `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` | Minimum expected throughput used to derive per-chunk read timeouts |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive transient failures before Edge opens the Central circuit breaker |
 | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` | How long Edge waits before probing Central again after the circuit opens |
-| `HTTP_HOST` | `0.0.0.0` | Bind address |
+| `HTTP_HOST` | `127.0.0.1` | Bind address |
 | `HTTP_PORT` | `8080` | Listen port |
 
 ## HTTP Surface
@@ -161,28 +235,18 @@ The Edge image installs Docker client tooling only: the Docker CLI plus the Comp
 - `DELETE /api/jobs?relative_path=...` - remove a `.upload_dir`
 - `POST /api/run-now` - request an immediate backup cycle
 
-## Local Compose Notes
+## Installer Notes
 
-The provided [`docker-compose.yml`](docker-compose.yml) mounts:
+Release builds include:
 
-- `./data/scan_root` -> `/scan`
-- `./data/state` -> `/data/state`
-- `./data/spool` -> `/data/spool`
-- `./secrets/relay_auth_token` -> `/run/secrets/relay_auth_token` (read-only)
+- Linux `.deb` packages with a `systemd` service unit at `relaycentralizer-edge.service`
+- macOS `.pkg` installers with a `launchd` plist at `com.relaycentralizer.edge.plist`
+- Windows installer executables that can register a startup scheduled task
 
-`/scan` is mounted read-write because the UI needs to create and delete `.upload_dir` files.
+The installer packages place a sample Edge environment file on the target host, but they do not create your auth token for you. Populate the token file path referenced by that environment file before starting the installed service. The service definitions are installed with the package, but you should review the sample environment file before enabling them.
 
-Create `./secrets/relay_auth_token` on the host before you start the Compose stack, and keep `AUTH_TOKEN_FILE` pointed at that in-container path.
-
-If Edge is in a separate Compose project from Central but both are on the same Docker Desktop host, set `CENTRAL_URL=http://host.docker.internal:8000`.
-
-## Running Compose Support Inside The Edge Container
+## Running Compose Support On The Edge Host
 
 If you enable `is_docker_composed: true`, the Edge runtime must be able to reach the Docker CLI and the selected directory's Compose file.
 
-That usually means mounting:
-
-- the Docker socket
-- the Compose project directory itself into the Edge container
-
-The bundled `docker-compose.yml` leaves the Docker socket mount commented out by default because normal file backups do not need it. Uncomment that socket mount only when you want Edge to manage same-host Compose workloads during backup.
+That usually means installing Edge on the same host that owns the Compose project and making sure `docker compose` works for the user or service context running Edge.

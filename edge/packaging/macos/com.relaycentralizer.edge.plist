@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.relaycentralizer.edge</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/lib/relaycentralizer-edge/relaycentralizer-edge</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>EDGE_ENV_FILE</key>
+    <string>/usr/local/etc/relaycentralizer-edge/edge.env</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/usr/local/lib/relaycentralizer-edge</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/usr/local/var/log/relaycentralizer-edge.log</string>
+  <key>StandardErrorPath</key>
+  <string>/usr/local/var/log/relaycentralizer-edge.log</string>
+</dict>
+</plist>

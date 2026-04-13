@@ -4,10 +4,13 @@ import os
 from pathlib import Path
 
 
-def load_auth_token() -> str:
+def load_auth_token(path: Path | None = None) -> str:
+    if path is not None:
+        return _load_auth_token_from_file(path)
+
     raw_path = os.getenv("AUTH_TOKEN_FILE")
     if raw_path and raw_path.strip():
-        return _load_auth_token_from_file(Path(raw_path.strip()))
+        return _load_auth_token_from_file(Path(raw_path.strip()).expanduser())
 
     raise RuntimeError("AUTH_TOKEN_FILE environment variable is not set or empty.")
 

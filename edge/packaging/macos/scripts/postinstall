@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+mkdir -p /usr/local/etc/relaycentralizer-edge
+mkdir -p /usr/local/var/lib/relaycentralizer-edge/state
+mkdir -p /usr/local/var/cache/relaycentralizer-edge/spool
+mkdir -p /usr/local/var/log
+
+if [ ! -f /usr/local/etc/relaycentralizer-edge/edge.env ] && [ -f /usr/local/etc/relaycentralizer-edge/edge.env.sample ]; then
+    cp /usr/local/etc/relaycentralizer-edge/edge.env.sample /usr/local/etc/relaycentralizer-edge/edge.env
+fi
+
+ln -sf /usr/local/lib/relaycentralizer-edge/relaycentralizer-edge /usr/local/bin/relaycentralizer-edge
+
+exit 0

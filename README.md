@@ -1,11 +1,11 @@
 # RelayCentralizer
 
-RelayCentralizer is a two-image backup workflow:
+RelayCentralizer is a backup workflow with a containerized receiver and a host-native edge agent:
 
 - `central/` is the receiving service. It accepts snapshot uploads from Edge, stages them safely, stores them by `edge_id/job_name`, and applies retention.
-- `edge/` is the device-side agent. It scans a configured root for `.upload_dir` markers, builds `tar.zst` archives for changed jobs, and uploads them to Central.
+- `edge/` is the device-side agent. It runs directly on the source host, breadth-first scans a configured root for `.upload_dir` markers, builds `tar.zst` archives for changed jobs, and uploads them to Central.
 
-The two images are meant to run separately:
+The two components are meant to run separately:
 
 - Central runs wherever you want backups collected and retained.
 - Edge runs on each device or host that should produce backups.
@@ -13,7 +13,7 @@ The two images are meant to run separately:
 ## End-To-End Flow
 
 1. An operator creates a `.upload_dir` file in a directory under the Edge scan root.
-2. Edge discovers that directory as a backup job.
+2. Edge breadth-first scans from that root and discovers every matching job directory.
 3. Edge builds a fingerprint of the selected files.
 4. If nothing changed since the last successful upload, the job is skipped.
 5. If `is_docker_composed: true` and that same directory contains `docker-compose.yml` or `compose.yml`, Edge stops the stack before archiving it, optionally pulls updates, and brings it back up afterward.
@@ -41,7 +41,7 @@ Edge never reads auth data from Central's filesystem. Central only bootstraps it
 
 A `.upload_dir` file is the marker that tells Edge: back up this directory.
 
-With the default settings shown in [`edge/.env.example`](edge/.env.example), Edge scans under `SCAN_ROOT=/scan`. That means you place a `.upload_dir` file inside the directory you want backed up somewhere under `/scan` inside the Edge runtime.
+With the default settings shown in [`edge/.env.example`](edge/.env.example), Edge scans under `SCAN_ROOT=~`. That means the host-native agent starts browsing from the current user's home directory unless you point it somewhere broader.
 
 Default example:
 
@@ -85,18 +85,98 @@ That tells Edge to treat `/scan/photos` as a backup job root.
 
 ## Running The Services
 
-You can run each service with its Docker image, directly with Python, or with the bundled `docker-compose.yml` files during local development.
+You can run Central with its Docker image or bundled Compose file. Edge is intended to run as a host-native packaged executable or installer.
+
+GitHub Actions builds packaged Edge artifacts for Linux, macOS, and Windows through [`.github/workflows/edge-executable.yml`](.github/workflows/edge-executable.yml). Release tags publish both raw bundles and installable packages such as `.deb`, `.pkg`, and Windows installer executables.
+
+## Running Edge Releases
+
+Each Edge release publishes two asset types per platform:
+
+- installer package: best for normal users
+- raw bundle: best for manual testing or custom service setup
+
+Before starting Edge on any platform:
+
+1. Create the same auth token value used by Central.
+2. Put that token at the `AUTH_TOKEN_FILE` path from the Edge environment file.
+3. Set `CENTRAL_URL` so Edge can reach Central.
+4. Set `SCAN_ROOT` to the home directory, root directory, or other path you want Edge to scan.
+
+Linux `.deb`:
+
+```bash
+sudo dpkg -i relaycentralizer-edge-linux.deb
+sudo nano /etc/relaycentralizer-edge/edge.env
+sudo mkdir -p /etc/relaycentralizer-edge
+sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /etc/relaycentralizer-edge/auth_token'
+sudo systemctl enable --now relaycentralizer-edge
+```
+
+Linux raw bundle `.tar.gz`:
+
+```bash
+tar -xzf relaycentralizer-edge-linux.tar.gz
+cd relaycentralizer-edge
+cp /path/to/your/edge.env ./edge.env
+printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
+./relaycentralizer-edge
+```
+
+macOS `.pkg`:
+
+```bash
+sudo installer -pkg relaycentralizer-edge-macos.pkg -target /
+sudo nano /usr/local/etc/relaycentralizer-edge/edge.env
+sudo sh -c 'printf "%s" "YOUR_SHARED_TOKEN" > /usr/local/etc/relaycentralizer-edge/auth_token'
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.relaycentralizer.edge.plist
+sudo launchctl kickstart -k system/com.relaycentralizer.edge
+```
+
+macOS raw bundle `.tar.gz`:
+
+```bash
+tar -xzf relaycentralizer-edge-macos.tar.gz
+cd relaycentralizer-edge
+cp /path/to/your/edge.env ./edge.env
+printf "%s" "YOUR_SHARED_TOKEN" > ./auth_token
+./relaycentralizer-edge
+```
+
+Windows installer `.exe`:
+
+1. Run `relaycentralizer-edge-windows-installer.exe`.
+2. Leave the startup-task option enabled if you want Edge to start automatically.
+3. Edit `C:\ProgramData\RelayCentralizerEdge\edge.env`.
+4. Put the shared token in `C:\ProgramData\RelayCentralizerEdge\auth_token`.
+5. If you did not enable auto-start in the installer, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\Program Files\RelayCentralizer Edge\Install-RelayCentralizerEdgeTask.ps1"
+```
+
+Windows raw bundle `.zip`:
+
+```powershell
+Expand-Archive .\relaycentralizer-edge-windows.zip -DestinationPath .
+cd .\relaycentralizer-edge
+Copy-Item C:\path\to\edge.env .\edge.env
+Set-Content -Path .\auth_token -Value "YOUR_SHARED_TOKEN" -NoNewline
+.\relaycentralizer-edge.exe
+```
+
+After Edge starts, open `http://localhost:8080/`, create `.upload_dir` markers in the directories you want backed up, and confirm uploads arrive in Central.
 
 For local development only:
 
 1. Start Central from [`central/`](central/).
-2. Create the same token value in `central/secrets/relay_auth_token` and `edge/secrets/relay_auth_token`.
-3. Start Edge from [`edge/`](edge/).
-4. Leave `AUTH_TOKEN_FILE` pointed at the token file path for that service.
-5. If you run in containers, mount each service's token file into that service container read-only.
+2. Create the token value for Central in `central/secrets/relay_auth_token`.
+3. Create the same token value at the Edge `AUTH_TOKEN_FILE` path configured for that host.
+4. Start Edge from [`edge/`](edge/) or install a packaged Edge release on the host.
+5. If you run Central in a container, mount Central's token file into that container read-only.
 6. Point Edge `CENTRAL_URL` at the Central service it can reach.
 
-The bundled compose files are convenience wrappers for local setup, not the core backup workflow.
+The bundled Central compose file is a convenience wrapper for local setup, not the core backup workflow.
 
 ## Where To Start
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,16 +31,18 @@ class JobDefinition:
 
 def discover_jobs(scan_root: Path, max_depth: int, logger) -> list[JobDefinition]:
     jobs: list[JobDefinition] = []
+    queue: deque[tuple[Path, int]] = deque([(scan_root, 0)])
 
-    def walk(directory: Path, depth: int) -> None:
+    while queue:
+        directory, depth = queue.popleft()
         if depth > max_depth:
-            return
+            continue
 
         try:
             entries = list(os.scandir(directory))
         except (FileNotFoundError, NotADirectoryError, PermissionError, OSError) as exc:
             logger.warning("skipped_missing path=%s detail=%s", directory, exc)
-            return
+            continue
 
         marker = next(
             (
@@ -55,17 +58,18 @@ def discover_jobs(scan_root: Path, max_depth: int, logger) -> list[JobDefinition
             if job is not None:
                 jobs.append(job)
                 logger.info("job_discovered job_name=%s path=%s", job.job_name, job.root_path)
-            return
+            continue
 
         if depth == max_depth:
-            return
+            continue
 
-        for entry in entries:
-            if not entry.is_dir(follow_symlinks=False):
-                continue
-            walk(Path(entry.path), depth + 1)
+        child_directories = sorted(
+            (Path(entry.path) for entry in entries if entry.is_dir(follow_symlinks=False)),
+            key=lambda item: item.name.lower(),
+        )
+        for child in child_directories:
+            queue.append((child, depth + 1))
 
-    walk(scan_root, 0)
     return jobs
 
 

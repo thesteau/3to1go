@@ -11,3 +11,6 @@ edge/.env
 data/
 .auth_token
 relay_auth_token
+build/
+dist/
+package/
