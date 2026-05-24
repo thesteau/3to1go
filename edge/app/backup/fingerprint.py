@@ -7,7 +7,7 @@ from app.backup.filters import DiscoveredFile
 
 def build_manifest(files: list[DiscoveredFile]) -> str:
     lines = [
-        f"{file.archive_path}\t{file.size}\t{file.mtime_ns}"
+        f"{file.archive_path}\t{file.size}"
         for file in sorted(files, key=lambda item: item.archive_path)
     ]
     return "\n".join(lines)

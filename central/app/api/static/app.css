@@ -6,11 +6,11 @@
   --accent: #8a3b12;
   --border: #e3d8ca;
   --shadow: 0 14px 32px rgba(36, 48, 59, 0.09);
+  --green: #2a7a4b;
+  --red: #b91c1c;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -19,12 +19,6 @@ body {
   background:
     radial-gradient(circle at top left, rgba(138, 59, 18, 0.08), transparent 28%),
     linear-gradient(160deg, #ede4d7 0%, #f9f7f2 58%, #edf3f0 100%);
-}
-
-code {
-  padding: 0.12rem 0.38rem;
-  border-radius: 0.45rem;
-  background: #f3ece3;
 }
 
 .page-shell {
@@ -38,10 +32,6 @@ code {
   border: 1px solid var(--border);
   border-radius: 20px;
   box-shadow: var(--shadow);
-}
-
-.hero,
-.panel {
   padding: 24px;
 }
 
@@ -49,10 +39,7 @@ code {
   margin-bottom: 22px;
 }
 
-.hero h1,
-h2 {
-  margin: 0;
-}
+h1, h2 { margin: 0; }
 
 .eyebrow {
   margin: 0.4rem 0 0;
@@ -62,56 +49,170 @@ h2 {
   letter-spacing: 0.08em;
 }
 
-.lede,
-.hint,
-.job-detail {
+.lede, .hint, .no-snapshots {
   color: var(--muted);
+}
+
+.no-snapshots {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
 }
 
 .meta-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-top: 18px;
 }
 
-.meta-grid > div,
-.job-card {
+.meta-grid > div {
   padding: 12px;
   border-radius: 14px;
   background: #faf4ec;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
-.section-head {
-  margin-bottom: 14px;
-}
+.status-ok   { color: var(--green); font-weight: bold; }
+.status-degraded { color: var(--red); font-weight: bold; }
 
-.toolbar {
-  margin-top: 16px;
-}
+.toolbar { margin-top: 16px; }
 
-button {
+.section-head { margin-bottom: 14px; }
+
+button, .btn {
   border: 0;
-  border-radius: 11px;
-  padding: 10px 14px;
+  border-radius: 10px;
+  padding: 7px 13px;
   cursor: pointer;
   font: inherit;
+  font-size: 0.85rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.toolbar button {
   background: var(--accent);
   color: #fff;
+  padding: 10px 16px;
+  font-size: 1rem;
 }
 
-.job-list {
-  display: grid;
+/* Edge cards */
+.namespaces-list { display: grid; gap: 14px; }
+
+.edge-card {
+  background: #faf4ec;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.edge-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.edge-id {
+  font-size: 1.05rem;
+  font-weight: bold;
+}
+
+.edge-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Job blocks */
+.job-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+
+.job-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.job-name {
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.job-count {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Snapshot rows */
+.snapshot-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
-.job-card strong {
-  display: inline-block;
-  margin-bottom: 6px;
+.snapshot-meta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
+
+.snapshot-date {
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.snapshot-fp {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: #f0e9df;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.snapshot-size {
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
+.snapshot-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-dl {
+  background: #e8f4ee;
+  color: var(--green);
+}
+
+.btn-dl:hover { background: #d4eddf; }
+
+.btn-del {
+  background: #fde8e8;
+  color: var(--red);
+}
+
+.btn-del:hover  { background: #fbd5d5; }
+.btn-del:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 640px) {
-  .page-shell {
-    padding: 14px;
-  }
+  .page-shell { padding: 14px; }
+  .snapshot-size { display: none; }
 }

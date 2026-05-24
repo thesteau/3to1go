@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes_overview import router as overview_router
+from app.api.routes_snapshots import router as snapshots_router
 from app.api.routes_uploads import router as uploads_router
 from app.api.views import STATIC_DIR
 from app.core.config import Settings, load_settings
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.ingest_service = ingest_service
     app.state.cleanup_task = None
     app.include_router(overview_router)
+    app.include_router(snapshots_router)
     app.include_router(uploads_router)
 
     @app.on_event("startup")

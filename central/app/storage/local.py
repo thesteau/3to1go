@@ -59,6 +59,7 @@ class LocalFilesystemBackend(StorageBackend):
                     "filename": entry.name,
                     "path": str(entry),
                     "mtime": stat_result.st_mtime,
+                    "size_bytes": stat_result.st_size,
                 }
             )
 
