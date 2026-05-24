@@ -125,3 +125,7 @@ If you want off-site copies, the expected pattern is:
 
 - Read [`central/README.md`](central/README.md) if you are setting up the receiving server.
 - Read [`edge/README.md`](edge/README.md) if you are setting up a machine that will produce backups.
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for the full text, including the "as is" warranty and liability disclaimer.
