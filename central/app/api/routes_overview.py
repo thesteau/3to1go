@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 
-from app.api.dependencies import get_settings, get_storage_backend
+from app.api.dependencies import get_ingest_service, get_settings, get_storage_backend
 from app.api.models import HealthResponse
 from app.api.views import templates
 from app.core.config import Settings
+from app.services.ingest import IngestService
 from app.services.overview import build_overview
 from app.storage.local import LocalFilesystemBackend
 
@@ -27,8 +28,9 @@ async def ui(request: Request) -> HTMLResponse:
 async def overview(
     settings: Settings = Depends(get_settings),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
+    ingest_service: IngestService = Depends(get_ingest_service),
 ) -> dict:
-    return build_overview(settings, storage_backend)
+    return build_overview(settings, storage_backend, ingest_service)
 
 
 @router.get("/health/ready")

@@ -1,87 +1,96 @@
 # RelayCentralizer Central
 
-Central is the receiving service. It accepts backup uploads from Edge, stages them to disk, atomically commits them into local storage, and prunes older snapshots per job namespace.
+Central is the machine that receives and keeps backups.
 
-## What Central Is Responsible For
+Think of it as the storage side of the system:
 
-- authenticating uploads from Edge with the configured bearer token
-- staging incoming archives before commit
-- keeping resumable upload-session metadata in `STAGING_DIR/uploads/`
-- rejecting already-committed duplicate archives within the same `edge_id/job_name` namespace by checksum
+- Edge makes encrypted backup archives.
+- Central accepts those uploads.
+- Central stores them on disk.
+- Central gives you a web UI to browse, download, and delete snapshots.
+
+## What Central Does
+
+Central is responsible for:
+
+- checking the shared auth token on incoming uploads
+- staging uploads safely before commit
+- verifying archive checksums
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
-- pruning older snapshots according to `RETENTION_KEEP_LAST`
-- exposing a web UI to browse, download, and delete stored snapshots per edge and job
+- pruning old snapshots according to retention settings
+- showing the stored snapshots in a simple web UI
 
-Central stores whatever Edge sends. If Edge has encryption enabled (the default), Central holds encrypted blobs and never sees plaintext. Decryption happens in the browser at download time using the key from the Edge UI.
+Central stores what Edge sends. If Edge encryption is enabled, Central stores encrypted blobs and never sees plaintext.
 
-## Storage Scope
+## First-Time Setup
 
-Central intentionally stores backups in local filesystem storage rooted at `BACKUP_ROOT`.
+The easiest way to start is with Docker Compose.
 
-If you want a second copy in S3, Google Drive, Dropbox, or another external system, the recommended approach is to sync `BACKUP_ROOT` outward with a separate service, scheduled task, or host-level script.
+### 1. Prepare the token file
 
-That keeps Central focused on receiving, committing, and retaining backups without mixing in cloud-provider-specific sync logic.
+Central expects `AUTH_TOKEN_FILE` to point to a file that contains the shared bearer token.
 
-## Starting Central
+If the file does not exist yet, Central creates it on startup. That token must then be copied into each Edge that should talk to this Central.
 
-You can run Central with the published image, directly with Python, or with the bundled [`docker-compose.yml`](docker-compose.yml) for local development.
+### 2. Start the service
 
-Local development example:
+For local development:
 
 ```powershell
 Copy-Item .env.example .env
-```
-
-`AUTH_TOKEN_FILE` points to Central's local token file path. For the bundled Docker Compose setup, create that file on the host first so the container can mount it read-only.
-
-Then start Central:
-
-```powershell
 docker compose up --build
 ```
 
 Open the UI at `http://localhost:8000/`.
 
-## Same-Host Edge Note
+The bundled [`docker-compose.yml`](docker-compose.yml) is a local starting point, not a required production layout.
 
-If you also run an Edge container on this same Docker Desktop host, but in a separate Compose project, that Edge container will often reach Central with:
+## If Edge Runs In Docker On The Same Host
+
+If Edge is in a separate Docker Desktop project on the same machine, it will often reach Central at:
 
 ```text
 http://host.docker.internal:8000
 ```
 
-## Auth Token Behavior
+## What The Central UI Is For
 
-Central uses filesystem-based auth configuration only.
+The UI is for operators, not for configuring Edge.
 
-- `AUTH_TOKEN_FILE` is required.
-- If the file already exists, Central reuses it.
-- If the file is missing, Central creates it at startup.
-- Central only manages its own local token file.
-- Central does not write token files for Edge devices.
+You use it to:
 
-Each Edge device must be configured with its own local token file containing the same token value.
+- see which Edges and jobs have uploaded snapshots
+- download a stored snapshot
+- paste and verify an Edge decryption key in the browser
+- delete individual snapshots
 
-## Environment
+If Central knows an Edge's key fingerprint, the browser can warn you before decryption if you pasted the wrong key for that Edge.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the bearer token for upload authentication |
-| `STORAGE_BACKEND` | `local` | Storage backend selector; only `local` is implemented |
-| `BACKUP_ROOT` | `/backups` | Final snapshot storage location |
-| `RETENTION_KEEP_LAST` | `3` | Number of snapshots to keep per `edge_id/job_name` |
-| `LOG_LEVEL` | `INFO` | Application log level |
-| `MAX_UPLOAD_SIZE_MB` | `2048` | Maximum accepted upload size |
-| `UPLOAD_CHUNK_SIZE_MB` | `8` | Recommended chunk size returned to Edge for resumable uploads |
-| `UPLOAD_SESSION_TTL_HOURS` | `24` | How long incomplete or completed upload-session metadata is retained before cleanup |
-| `UPLOAD_CLEANUP_INTERVAL_SECONDS` | `300` | How often Central runs its background cleanup loop for expired upload sessions |
-| `STAGING_DIR` | `/staging` | Temporary staging area before commit |
-| `HTTP_HOST` | `0.0.0.0` | Bind address |
-| `HTTP_PORT` | `8000` | Listen port |
+## Important Limits And Design Choices
+
+### Shared auth token
+
+Central and all connected Edges share one bearer token.
+
+- Every Edge must use the same token value.
+- Rotating the token means updating every Edge.
+- There is no per-edge revocation yet.
+
+### Local storage only
+
+Central writes to the local filesystem rooted at `BACKUP_ROOT`.
+
+If you want off-site or cloud copies, the intended pattern is to sync `BACKUP_ROOT` with a separate tool after Central writes it.
+
+### Edge identity protection
+
+Newer Edge builds send a stable `edge_instance_id`.
+
+Central uses that to reserve each `edge_id` to one real Edge installation. If a second machine tries to reuse the same `edge_id`, Central rejects the upload instead of letting them silently share one namespace.
 
 ## Storage Layout
 
-Snapshots are stored as:
+Snapshots are stored like this:
 
 ```text
 <BACKUP_ROOT>/<edge_id>/<job_name>/<job_name>__<timestamp>__<fingerprint>.tar.zst
@@ -93,39 +102,59 @@ Example:
 /backups/edge-01/photos/photos__2026-03-29T09-00-00Z__1a2b3c4d.tar.zst
 ```
 
-Uploads are first written to `STAGING_DIR`, then moved into final storage only after the write completes successfully.
+Uploads are written to `STAGING_DIR` first and moved into final storage only after verification succeeds.
 
-## HTTP Surface
+## Main Settings
 
-- `GET /` - web UI for browsing, downloading, and deleting snapshots by edge and job
-- `GET /api/overview` - JSON summary of storage paths, retention, and stored snapshots with size and mtime per snapshot
-- `GET /health/ready` - lightweight readiness check for container healthchecks
-- `GET /health` - health check; returns `503` if the storage backend is unavailable
-- `GET /api/snapshots/{edge_id}/{job_name}/{filename}` - stream a snapshot archive for download
-- `DELETE /api/snapshots/{edge_id}/{job_name}/{filename}` - delete a specific snapshot (requires bearer token)
-- `POST /backup/uploads/initiate` - create or resume an idempotent upload session
-- `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append one chunk at the declared byte offset
-- `POST /backup/uploads/{upload_id}/finalize` - atomically commit a completed upload into final storage
+These are the ones most people care about first:
 
-### Downloading Encrypted Snapshots
+| Variable | Default | What it means |
+| --- | --- | --- |
+| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the shared bearer token |
+| `BACKUP_ROOT` | `/backups` | Where final snapshots are stored |
+| `RETENTION_KEEP_LAST` | `3` | How many snapshots to keep per `edge_id/job_name` |
+| `STAGING_DIR` | `/staging` | Temporary upload staging area |
+| `HTTP_PORT` | `8000` | Port for the Central web UI and API |
 
-The Central UI detects encrypted archives automatically by checking a magic header. When a download is initiated for an encrypted archive, the browser prompts for the Edge encryption key. Decryption happens entirely in-browser using the Web Crypto API — the key is never sent to Central.
+Full settings table:
 
-The resumable upload flow expects:
+| Variable | Default |
+| --- | --- |
+| `STORAGE_BACKEND` | `local` |
+| `LOG_LEVEL` | `INFO` |
+| `MAX_UPLOAD_SIZE_MB` | `2048` |
+| `UPLOAD_CHUNK_SIZE_MB` | `8` |
+| `UPLOAD_SESSION_TTL_HOURS` | `24` |
+| `UPLOAD_CLEANUP_INTERVAL_SECONDS` | `300` |
+| `HTTP_HOST` | `0.0.0.0` |
 
-- `Authorization: Bearer <token from AUTH_TOKEN_FILE>`
-- an initiate payload containing `edge_id`, `job_name`, `fingerprint`, `timestamp`, `archive_format`, `archive_size_bytes`, `archive_sha256`, and `idempotency_key`
-- chunk bodies sent as raw `application/octet-stream`
-- finalize after the last acknowledged offset reaches the declared archive size; Central verifies the final archive checksum before commit
+## API Surface
 
-## Local Compose Notes
+Useful endpoints:
 
-The provided [`docker-compose.yml`](docker-compose.yml) mounts:
+- `GET /` - Central web UI
+- `GET /api/overview` - JSON summary of stored snapshots
+- `GET /health/ready` - lightweight readiness check
+- `GET /health` - health check
+- `GET /api/snapshots/{edge_id}/{job_name}/{filename}` - download a snapshot
+- `DELETE /api/snapshots/{edge_id}/{job_name}/{filename}` - delete a snapshot
+- `POST /backup/uploads/initiate` - start or resume an upload
+- `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append upload bytes
+- `POST /backup/uploads/{upload_id}/finalize` - finalize and commit the upload
 
-- `./data/backups` -> `/backups`
-- `./data/staging` -> `/staging`
-- `./secrets/relay_auth_token` -> `/run/secrets/relay_auth_token` (read-only)
+Newer Edge clients also send:
 
-Create `./secrets/relay_auth_token` on the host before you start the Compose stack.
+- `edge_instance_id`
+- `encryption_key_fingerprint`
 
-If an Edge container runs separately on this same Docker Desktop machine, point that Edge instance at `http://host.docker.internal:8000`.
+Central uses those fields to protect `edge_id` ownership and improve decryption-key verification in the UI.
+
+## Compose Mounts
+
+The bundled Compose example mounts:
+
+- `./data/backups` to `/backups`
+- `./data/staging` to `/staging`
+- `./secrets/relay_auth_token` to `/run/secrets/relay_auth_token` read-only
+
+Create `./secrets/relay_auth_token` on the host before starting the stack if you do not want Central to generate it inside the container setup flow.

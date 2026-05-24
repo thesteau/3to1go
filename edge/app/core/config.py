@@ -133,6 +133,10 @@ def encryption_key_path() -> Path:
     return _default_config_dir() / "encryption.key"
 
 
+def installation_id_path() -> Path:
+    return _default_config_dir() / "installation.id"
+
+
 def settings_to_payload(settings: Settings) -> dict[str, Any]:
     return {
         "edge_id": settings.edge_id,

@@ -111,8 +111,15 @@ button, .btn {
 .edge-header {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.edge-header-main {
+  display: grid;
+  gap: 6px;
 }
 
 .edge-id {
@@ -120,9 +127,83 @@ button, .btn {
   font-weight: bold;
 }
 
+.edge-submeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edge-detail {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: #f0e9df;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: monospace;
+}
+
+.edge-detail-warn {
+  color: #8a5200;
+  background: #fff1d6;
+}
+
 .edge-count {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.edge-key-panel {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 253, 249, 0.8);
+}
+
+.edge-key-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.edge-key-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.edge-key-controls input {
+  min-width: 0;
+}
+
+.btn-key {
+  background: #e8f4ee;
+  color: var(--green);
+}
+
+.btn-clear {
+  background: #f0e9df;
+  color: var(--ink);
+}
+
+.key-status {
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+
+.key-status.ok {
+  color: var(--green);
+}
+
+.key-status.warn {
+  color: #8a5200;
+}
+
+.key-status.error {
+  color: var(--red);
 }
 
 /* Job blocks */
@@ -215,4 +296,7 @@ button, .btn {
 @media (max-width: 640px) {
   .page-shell { padding: 14px; }
   .snapshot-size { display: none; }
+  .edge-key-controls {
+    grid-template-columns: 1fr;
+  }
 }

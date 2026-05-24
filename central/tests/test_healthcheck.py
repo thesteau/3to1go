@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import sys
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -20,20 +21,20 @@ from app.core.config import Settings  # noqa: E402
 
 class HealthcheckTests(unittest.TestCase):
     def setUp(self) -> None:
-        root = PROJECT_ROOT / ".tmp-test-healthcheck" / uuid4().hex
-        root.mkdir(parents=True, exist_ok=True)
-        self.temp_dir = root
+        temp_root = WORKSPACE_ROOT / ".tmp-test-healthcheck"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
         self.settings = Settings(
             auth_token="secret",
             storage_backend="local",
-            backup_root=root / "backups",
+            backup_root=self.temp_dir / "backups",
             retention_keep_last=3,
             log_level="INFO",
             max_upload_size_mb=16,
             upload_chunk_size_mb=2,
             upload_session_ttl_hours=24,
             upload_cleanup_interval_seconds=60,
-            staging_dir=root / "staging",
+            staging_dir=self.temp_dir / "staging",
             http_host="127.0.0.1",
             http_port=8000,
         )

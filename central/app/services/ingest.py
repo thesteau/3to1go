@@ -45,6 +45,15 @@ class UploadSession:
     pruned: int = 0
 
 
+@dataclass(slots=True)
+class EdgeRegistration:
+    edge_id: str
+    edge_instance_id: str
+    encryption_key_fingerprint: str | None
+    first_seen_at: str
+    last_seen_at: str
+
+
 class IngestService:
     def __init__(
         self,
@@ -70,10 +79,13 @@ class IngestService:
         self.key_root = self.upload_root / "keys"
         backup_root = getattr(self.storage_backend, "backup_root", None)
         self.index_root = backup_root / ".relay_index" if backup_root is not None else None
+        self.registry_root = backup_root / ".relay_registry" / "edges" if backup_root is not None else None
         self.upload_root.mkdir(parents=True, exist_ok=True)
         self.key_root.mkdir(parents=True, exist_ok=True)
         if self.index_root is not None:
             self.index_root.mkdir(parents=True, exist_ok=True)
+        if self.registry_root is not None:
+            self.registry_root.mkdir(parents=True, exist_ok=True)
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_manager_lock = asyncio.Lock()
 
@@ -87,6 +99,9 @@ class IngestService:
         idempotency_key: str,
     ) -> UploadSessionResponse:
         self.cleanup_stale_uploads()
+        registration_lock = await self.lock_manager.get_lock(f"edge-registry:{metadata.edge_id}")
+        async with registration_lock:
+            self._register_edge(metadata)
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
@@ -378,6 +393,15 @@ class IngestService:
             duplicate=False,
         )
 
+    def get_edge_registration(self, edge_id: str) -> dict | None:
+        try:
+            registration = self._load_edge_registration(edge_id)
+        except OSError:
+            return None
+        if registration is None:
+            return None
+        return asdict(registration)
+
     def _build_committed_duplicate_response(self, *, archive_size_bytes: int, stored_as: str) -> UploadSessionResponse:
         return UploadSessionResponse(
             upload_id=f"committed-{stored_as}",
@@ -402,6 +426,11 @@ class IngestService:
     def _key_mapping_path(self, idempotency_key: str) -> Path:
         digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
         return self.key_root / f"{digest}.json"
+
+    def _registration_path(self, edge_id: str) -> Path | None:
+        if self.registry_root is None:
+            return None
+        return self.registry_root / f"{edge_id}.json"
 
     def _index_dir(self, namespace: str) -> Path | None:
         if self.index_root is None:
@@ -539,6 +568,73 @@ class IngestService:
 
     def _session_from_json(self, payload: dict) -> UploadSession:
         return UploadSession(**payload)
+
+    def _register_edge(self, metadata: UploadMetadata) -> None:
+        edge_instance_id = (metadata.edge_instance_id or "").strip()
+        if not edge_instance_id:
+            return
+
+        now = _utc_now_text()
+        existing = self._load_edge_registration(metadata.edge_id)
+        if existing is not None and existing.edge_instance_id != edge_instance_id:
+            message = (
+                f'edge_id "{metadata.edge_id}" is already registered to another Edge instance '
+                f'({existing.edge_instance_id[:12]}...). Update one of the Edge IDs so they do not share a namespace.'
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "status": "edge_id_conflict",
+                    "message": message,
+                    "edge_id": metadata.edge_id,
+                    "registered_instance_id": existing.edge_instance_id,
+                    "incoming_instance_id": edge_instance_id,
+                },
+            )
+
+        registration = existing or EdgeRegistration(
+            edge_id=metadata.edge_id,
+            edge_instance_id=edge_instance_id,
+            encryption_key_fingerprint=metadata.encryption_key_fingerprint,
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+        registration.last_seen_at = now
+        if metadata.encryption_key_fingerprint:
+            registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
+        self._save_edge_registration(registration)
+
+    def _load_edge_registration(self, edge_id: str) -> EdgeRegistration | None:
+        path = self._registration_path(edge_id)
+        if path is None or not path.exists():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict):
+            return None
+        try:
+            return EdgeRegistration(**payload)
+        except TypeError:
+            return None
+
+    def _save_edge_registration(self, registration: EdgeRegistration) -> None:
+        path = self._registration_path(registration.edge_id)
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            suffix=".tmp",
+        ) as handle:
+            json.dump(asdict(registration), handle, indent=2, sort_keys=True)
+            handle.flush()
+            temp_path = Path(handle.name)
+        temp_path.replace(path)
 
     def _current_upload_size(self, upload_id: str) -> int:
         data_path = self._upload_data_path(upload_id)

@@ -12,7 +12,9 @@ import requests
 from requests import Response
 from requests.exceptions import RequestException, Timeout
 
-from app.core.config import Settings
+from app.core.config import Settings, encryption_key_path, installation_id_path
+from app.core.encryption import key_fingerprint, load_or_create_key
+from app.core.identity import load_or_create_installation_id
 
 
 ProgressCallback = Callable[[str, int, int], None]
@@ -88,6 +90,8 @@ class UploadClient:
     def __init__(self, settings: Settings) -> None:
         self.central_url = settings.central_url.rstrip("/")
         self.auth_token = settings.auth_token
+        self.edge_instance_id = load_or_create_installation_id(installation_id_path())
+        self.encryption_key_fingerprint = key_fingerprint(load_or_create_key(encryption_key_path()))
         self.chunk_size_bytes = settings.upload_chunk_size_bytes
         self.min_chunk_size_bytes = settings.min_upload_chunk_size_bytes
         self.max_chunk_size_bytes = max(settings.max_upload_chunk_size_bytes, settings.upload_chunk_size_bytes)
@@ -253,6 +257,7 @@ class UploadClient:
             phase="initiate",
             json={
                 "edge_id": edge_id,
+                "edge_instance_id": self.edge_instance_id,
                 "job_name": job_name,
                 "fingerprint": fingerprint,
                 "timestamp": timestamp,
@@ -260,6 +265,7 @@ class UploadClient:
                 "archive_size_bytes": archive_size,
                 "archive_sha256": archive_sha256,
                 "idempotency_key": idempotency_key,
+                "encryption_key_fingerprint": self.encryption_key_fingerprint,
             },
             timeout=(self.connect_timeout_seconds, self._timeout_for_bytes(self.chunk_size_bytes)),
         )
@@ -467,6 +473,9 @@ def _detail_message(detail) -> str | None:
     if isinstance(detail, str):
         return detail
     if isinstance(detail, dict):
+        message = detail.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()
         status = detail.get("status")
         next_offset = detail.get("next_offset")
         if isinstance(status, str) and next_offset is not None:

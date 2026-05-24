@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
+from hashlib import sha256
 from pathlib import Path
 
 MAGIC = b"RCENC1\x00\x00"
@@ -29,6 +30,10 @@ def load_or_create_key(path: Path) -> bytes:
 
 def key_as_base64(key: bytes) -> str:
     return base64.urlsafe_b64encode(key).decode()
+
+
+def key_fingerprint(key: bytes) -> str:
+    return sha256(key).hexdigest()
 
 
 def encrypt_file(key: bytes, src: Path, dst: Path) -> None:

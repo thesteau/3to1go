@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import sys
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -20,20 +21,20 @@ from app.core.config import Settings  # noqa: E402
 
 class ResumableUploadTests(unittest.TestCase):
     def setUp(self) -> None:
-        root = PROJECT_ROOT / ".tmp-test-resumable-upload" / uuid4().hex
-        root.mkdir(parents=True, exist_ok=True)
-        self.temp_dir = root
+        temp_root = WORKSPACE_ROOT / ".tmp-test-resumable-upload"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
         self.settings = Settings(
             auth_token="secret",
             storage_backend="local",
-            backup_root=root / "backups",
+            backup_root=self.temp_dir / "backups",
             retention_keep_last=3,
             log_level="INFO",
             max_upload_size_mb=16,
             upload_chunk_size_mb=2,
             upload_session_ttl_hours=24,
             upload_cleanup_interval_seconds=60,
-            staging_dir=root / "staging",
+            staging_dir=self.temp_dir / "staging",
             http_host="127.0.0.1",
             http_port=8000,
         )
@@ -49,6 +50,7 @@ class ResumableUploadTests(unittest.TestCase):
         archive_sha256 = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         init_payload = {
             "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
             "job_name": "photos",
             "fingerprint": "abcdef1234567890",
             "timestamp": "2026-04-05T12:00:00Z",
@@ -56,6 +58,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_size_bytes": len(archive_bytes),
             "archive_sha256": archive_sha256,
             "idempotency_key": "idem-12345678",
+            "encryption_key_fingerprint": "f" * 64,
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=init_payload, headers=self.headers)
@@ -113,6 +116,7 @@ class ResumableUploadTests(unittest.TestCase):
         ingest_service = self.client.app.state.ingest_service
         payload_one = {
             "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
             "job_name": "photos",
             "fingerprint": "abcdef1234567890",
             "timestamp": "2026-04-05T12:00:00Z",
@@ -120,9 +124,11 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_size_bytes": 6,
             "archive_sha256": "e9c0f8b575cbfcb42ab3b78ecc87efa3b011d9a5d10b09fa4e96f240bf6a82f5",
             "idempotency_key": "idem-a1234567",
+            "encryption_key_fingerprint": "a" * 64,
         }
         payload_two = {
             "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
             "job_name": "videos",
             "fingerprint": "12345678abcdef90",
             "timestamp": "2026-04-05T12:05:00Z",
@@ -130,6 +136,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_size_bytes": self.settings.max_upload_size_bytes,
             "archive_sha256": "3ec42f5dd09802311d4460e6cdf43d736d35d15eb0b90043956ff0bcae71d6e3",
             "idempotency_key": "idem-b1234567",
+            "encryption_key_fingerprint": "a" * 64,
         }
 
         with patch.object(ingest_service, "_free_space_bytes", return_value=self.settings.max_upload_size_bytes + 5):
@@ -138,6 +145,67 @@ class ResumableUploadTests(unittest.TestCase):
 
             second = self.client.post("/backup/uploads/initiate", json=payload_two, headers=self.headers)
             self.assertEqual(second.status_code, 507, second.text)
+
+    def test_rejects_edge_id_collision_from_different_instance(self) -> None:
+        payload = {
+            "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
+            "job_name": "photos",
+            "fingerprint": "abcdef1234567890",
+            "timestamp": "2026-04-05T12:00:00Z",
+            "archive_format": "tar.zst",
+            "archive_size_bytes": 6,
+            "archive_sha256": "e9c0f8b575cbfcb42ab3b78ecc87efa3b011d9a5d10b09fa4e96f240bf6a82f5",
+            "idempotency_key": "idem-a1234567",
+            "encryption_key_fingerprint": "a" * 64,
+        }
+        first = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        self.assertEqual(first.status_code, 200, first.text)
+
+        conflicting = dict(payload)
+        conflicting["edge_instance_id"] = "edgeinstance9999"
+        conflicting["idempotency_key"] = "idem-c1234567"
+        conflict = self.client.post("/backup/uploads/initiate", json=conflicting, headers=self.headers)
+        self.assertEqual(conflict.status_code, 409, conflict.text)
+        detail = conflict.json()["detail"]
+        self.assertEqual(detail["status"], "edge_id_conflict")
+        self.assertEqual(detail["edge_id"], "edge-01")
+        self.assertEqual(detail["registered_instance_id"], "edgeinstance0001")
+        self.assertEqual(detail["incoming_instance_id"], "edgeinstance9999")
+
+    def test_overview_includes_edge_registration_metadata(self) -> None:
+        archive_bytes = b"hello world"
+        payload = {
+            "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
+            "job_name": "photos",
+            "fingerprint": "abcdef1234567890",
+            "timestamp": "2026-04-05T12:00:00Z",
+            "archive_format": "tar.zst",
+            "archive_size_bytes": len(archive_bytes),
+            "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            "idempotency_key": "idem-overview1",
+            "encryption_key_fingerprint": "c" * 64,
+        }
+
+        init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        self.assertEqual(init_response.status_code, 200, init_response.text)
+        upload_id = init_response.json()["upload_id"]
+        chunk = self.client.put(
+            f"/backup/uploads/{upload_id}/chunk?offset=0",
+            content=archive_bytes,
+            headers=self.headers,
+        )
+        self.assertEqual(chunk.status_code, 200, chunk.text)
+        finalize = self.client.post(f"/backup/uploads/{upload_id}/finalize", headers=self.headers)
+        self.assertEqual(finalize.status_code, 200, finalize.text)
+
+        overview = self.client.get("/api/overview")
+        self.assertEqual(overview.status_code, 200, overview.text)
+        namespace = overview.json()["namespaces"][0]
+        self.assertEqual(namespace["edge_id"], "edge-01")
+        self.assertEqual(namespace["edge_instance_id"], "edgeinstance0001")
+        self.assertEqual(namespace["encryption_key_fingerprint"], "c" * 64)
 
 if __name__ == "__main__":
     unittest.main()

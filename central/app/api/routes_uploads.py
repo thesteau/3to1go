@@ -32,10 +32,12 @@ async def initiate_upload(
     try:
         metadata = UploadMetadata(
             edge_id=validate_namespace_component(payload.edge_id, "edge_id"),
+            edge_instance_id=payload.edge_instance_id,
             job_name=validate_namespace_component(payload.job_name, "job_name"),
             fingerprint=payload.fingerprint.strip(),
             timestamp=payload.timestamp.strip(),
             archive_format=payload.archive_format,
+            encryption_key_fingerprint=payload.encryption_key_fingerprint,
         )
     except ValueError as exc:
         logger.error("invalid_metadata detail=%s", exc)

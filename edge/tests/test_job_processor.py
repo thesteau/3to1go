@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import sys
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
-from uuid import uuid4
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -32,17 +33,17 @@ class _RetryableFailureUploadClient:
 
 class JobProcessorTests(unittest.TestCase):
     def setUp(self) -> None:
-        root = PROJECT_ROOT / ".tmp-test-job-processor" / uuid4().hex
-        root.mkdir(parents=True, exist_ok=True)
-        self.temp_dir = root
+        temp_root = WORKSPACE_ROOT / ".tmp-test-job-processor"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
         self.settings = Settings(
             edge_id="edge-01",
-            scan_root=root / "scan",
+            scan_root=self.temp_dir / "scan",
             central_url="http://central:8000",
             auth_token="secret",
             cron_schedule="0 2 * * *",
-            state_dir=root / "state",
-            spool_dir=root / "spool",
+            state_dir=self.temp_dir / "state",
+            spool_dir=self.temp_dir / "spool",
             log_level="INFO",
             max_depth=5,
             keep_local_pending=False,

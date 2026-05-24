@@ -26,12 +26,17 @@ function statusBadge(entry) {
   return '<span class="badge warn">available</span>';
 }
 
-function fillMeta(data, encKey) {
+function shortFingerprint(value) {
+  return value ? String(value).slice(0, 12) : "unknown";
+}
+
+function fillMeta(data, encKey, encFingerprint) {
   const scheduler = data.scheduler || {};
   const uploadCircuit = data.upload_circuit || {};
   const settingsStatus = data.settings_status || {};
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${escapeHtml(data.edge_id)}</div>
+    <div><strong>Instance ID</strong><br><code title="${escapeHtml(data.edge_instance_id || "")}">${escapeHtml((data.edge_instance_id || "—").slice(0, 12))}</code></div>
     <div><strong>Scan Root</strong><br>${escapeHtml(data.scan_root)}</div>
     <div><strong>Central URL</strong><br>${escapeHtml(data.central_url)}</div>
     <div><strong>Edge UI</strong><br>${escapeHtml(data.http_url)}</div>
@@ -48,7 +53,7 @@ function fillMeta(data, encKey) {
         <code id="enc-key-value">${escapeHtml(encKey || "—")}</code>
         <button type="button" class="secondary enc-key-copy" onclick="copyEncKey()">Copy</button>
       </div>
-      <span class="hint">Paste this into Central when downloading encrypted snapshots.</span>
+      <span class="hint">Fingerprint ${escapeHtml(shortFingerprint(encFingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.</span>
     </div>
   `;
 }
@@ -163,7 +168,7 @@ async function loadData() {
   ]);
   latestData = await dirRes.json();
   const keyData = await keyRes.json();
-  fillMeta(latestData, keyData.key || "");
+  fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
   fillSettings(latestData.settings || {});
   renderDirectories(latestData);
   if (!document.getElementById("relative_path").value) {

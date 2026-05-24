@@ -26,10 +26,12 @@ class UploadResponse(BaseModel):
 
 class UploadMetadata(BaseModel):
     edge_id: str = Field(min_length=1, max_length=128)
+    edge_instance_id: str | None = Field(default=None, min_length=8, max_length=128)
     job_name: str = Field(min_length=1, max_length=128)
     fingerprint: str = Field(min_length=8, max_length=128)
     timestamp: str = Field(min_length=1, max_length=64)
     archive_format: str
+    encryption_key_fingerprint: str | None = Field(default=None, min_length=16, max_length=128)
 
     @field_validator("archive_format")
     @classmethod
@@ -38,6 +40,14 @@ class UploadMetadata(BaseModel):
         if normalized != "tar.zst":
             raise ValueError("archive_format must be tar.zst")
         return normalized
+
+    @field_validator("edge_instance_id", "encryption_key_fingerprint")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
 
     @field_validator("timestamp")
     @classmethod
@@ -49,6 +59,7 @@ class UploadMetadata(BaseModel):
 
 class UploadInitRequest(BaseModel):
     edge_id: str = Field(min_length=1, max_length=128)
+    edge_instance_id: str | None = Field(default=None, min_length=8, max_length=128)
     job_name: str = Field(min_length=1, max_length=128)
     fingerprint: str = Field(min_length=8, max_length=128)
     timestamp: str = Field(min_length=1, max_length=64)
@@ -56,6 +67,7 @@ class UploadInitRequest(BaseModel):
     archive_size_bytes: int = Field(gt=0)
     archive_sha256: str = Field(min_length=64, max_length=64)
     idempotency_key: str = Field(min_length=8, max_length=256)
+    encryption_key_fingerprint: str | None = Field(default=None, min_length=16, max_length=128)
 
     @field_validator("archive_format")
     @classmethod
@@ -79,6 +91,14 @@ class UploadInitRequest(BaseModel):
         if len(normalized) != 64 or any(ch not in "0123456789abcdef" for ch in normalized):
             raise ValueError("archive_sha256 must be a 64-character lowercase hex digest")
         return normalized
+
+    @field_validator("edge_instance_id", "encryption_key_fingerprint")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
 
 
 class UploadSessionResponse(BaseModel):
