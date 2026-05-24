@@ -8,16 +8,34 @@ It also serves a small UI for creating, editing, and deleting `.upload_dir` mark
 
 - breadth-first scanning `SCAN_ROOT` for `.upload_dir` markers
 - building job definitions from those marker files
-- skipping unchanged jobs by comparing fingerprints
+- fingerprinting jobs by path and size — skipping unchanged jobs without creating or uploading anything
+- encrypting archives with AES-256-GCM before writing them to the upload spool
 - keeping failed uploads in the spool for retry when configured
 - resuming interrupted uploads by continuing from the last acknowledged byte offset
 - optionally stopping and starting Docker Compose-managed directories around archive creation
 - optionally pulling updated images before bringing a Compose stack back up
-- uploading successful archives to Central
+- uploading encrypted archives to Central
+
+## Encryption
+
+Edge generates an AES-256-GCM key on first run and stores it as `encryption.key` in its config directory alongside `settings.json`. The key is displayed in the Edge web UI under the meta grid with a one-click Copy button.
+
+Every archive is encrypted with this key before being written to the spool or uploaded. Central stores the encrypted blobs without seeing plaintext. To download and decrypt a snapshot from the Central UI, paste the key from this UI into the Central download prompt.
+
+The key path for each deployment method:
+
+| Method | Key location |
+| --- | --- |
+| Docker | `/config/RelayCentralizerEdge/encryption.key` inside the config volume |
+| Linux native | `~/.config/RelayCentralizerEdge/encryption.key` (or `$XDG_CONFIG_HOME`) |
+| macOS native | `~/Library/Application Support/RelayCentralizerEdge/encryption.key` |
+| Windows native | `%APPDATA%\RelayCentralizerEdge\encryption.key` |
+
+Back up this file. If it is lost, previously uploaded archives cannot be decrypted.
 
 ## Starting Edge
 
-You can run Edge directly with Python, with a packaged executable, or with an installer package from a GitHub release.
+You can run Edge directly with Python, with a packaged executable, with an installer package from a GitHub release, or as a Docker container.
 
 For local Python development:
 
@@ -72,7 +90,22 @@ Command meanings:
 - `status` shows whether the background Edge process is running
 - `clean` removes `.venv` and `.dev-runtime` when Edge is stopped
 
-GitHub Actions builds Linux, macOS, and Windows artifacts through [`.github/workflows/edge-executable.yml`](../.github/workflows/edge-executable.yml), including installable `.deb`, `.pkg`, and Windows installer outputs.
+GitHub Actions builds Linux, macOS, and Windows artifacts through [`.github/workflows/edge-executable.yml`](../.github/workflows/edge-executable.yml), including installable `.deb`, `.pkg`, and Windows installer outputs. A Docker image is also published to GHCR through [`.github/workflows/edge-docker-image.yml`](../.github/workflows/edge-docker-image.yml) on every push to `main`.
+
+### Docker
+
+A deploy example is provided at [`deploy-example/edge/`](../deploy-example/edge/). Copy `.env.example` to `.env`, fill in your values, and run:
+
+```bash
+docker compose up -d
+```
+
+Edge binds to port `6556` in the deploy example to avoid conflicts with Central on `6555`. The config directory (`/config`) is a volume mount — the encryption key persists there between restarts.
+
+```
+/config/RelayCentralizerEdge/encryption.key   ← back this up
+/config/RelayCentralizerEdge/settings.json    ← written by the UI
+```
 
 ## Running Release Builds
 
@@ -255,6 +288,7 @@ Edge starts with built-in defaults and saves any changes you make from the web U
 - `GET /` - HTML job-management UI
 - `GET /health` - health check
 - `GET /api/directories` - scan-root view, job configs, job state, and scheduler status
+- `GET /api/encryption-key` - returns the base64url-encoded AES-256-GCM encryption key
 - `POST /api/settings` - save local Edge settings from the UI
 - `POST /api/jobs` - create or update a `.upload_dir`
 - `DELETE /api/jobs?relative_path=...` - remove a `.upload_dir`

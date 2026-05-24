@@ -14,11 +14,12 @@ The two components are meant to run separately:
 
 1. An operator creates a `.upload_dir` file in a directory under the Edge scan root.
 2. Edge breadth-first scans from that root and discovers every matching job directory.
-3. Edge builds a fingerprint of the selected files.
-4. If nothing changed since the last successful upload, the job is skipped.
-5. If `is_docker_composed: true` and that same directory contains `docker-compose.yml` or `compose.yml`, Edge stops the stack before archiving it, optionally pulls updates, and brings it back up afterward.
-6. Edge uploads the archive to Central over HTTP.
-7. Central stages the upload, commits it into the backup store, and prunes older snapshots for that job.
+3. Edge builds a fingerprint of the selected files based on path and size. If nothing changed since the last successful upload, the job is skipped entirely.
+4. If `is_docker_composed: true` and that same directory contains `docker-compose.yml` or `compose.yml`, Edge stops the stack before archiving it, optionally pulls updates, and brings it back up afterward.
+5. Edge creates a `tar.zst` archive and encrypts it with AES-256-GCM before writing it to the upload spool.
+6. Edge uploads the encrypted archive to Central over HTTP.
+7. Central stages the upload, verifies the checksum, commits it into the backup store, and prunes older snapshots for that job.
+8. Operators browse, download, and delete snapshots from the Central web UI. Encrypted archives are decrypted in-browser using the Edge encryption key.
 
 ## Storage Philosophy
 
@@ -78,18 +79,33 @@ Example path:
 
 That tells Edge to treat `/scan/photos` as a backup job root.
 
+## Encryption
+
+Every Edge generates an AES-256-GCM key on first run and stores it in its config directory (`encryption.key` alongside `settings.json`). The key is displayed in the Edge web UI with a one-click copy button.
+
+Archives are encrypted before upload. Central stores and serves the encrypted blobs without ever seeing plaintext. When downloading a snapshot from the Central UI, the browser detects the encrypted format automatically and prompts for the key. Decryption happens entirely in-browser — the key never leaves the browser or travels over the network.
+
+If the key file is lost, previously uploaded archives cannot be recovered. Back up `encryption.key` alongside other critical configuration.
+
 ## Repo Layout
 
-- [`central/`](central/) - receiver API, storage, retention, and Central status UI
-- [`edge/`](edge/) - scan agent, scheduler, upload pipeline, Compose-aware backup hooks, and Edge job-management UI
+- [`central/`](central/) - receiver API, storage, retention, web UI for browsing and downloading snapshots
+- [`edge/`](edge/) - scan agent, scheduler, upload pipeline, encryption, Compose-aware backup hooks, and Edge job-management UI
+- [`deploy-example/central/`](deploy-example/central/) - production Compose example for Central
+- [`deploy-example/edge/`](deploy-example/edge/) - production Compose example for Edge
 
 ## Running The Services
 
-You can run Central with its Docker image or bundled Compose file. Edge is intended to run as a host-native packaged executable or installer.
+Central runs as a Docker container. Edge can run as a host-native packaged executable, installer, or Docker container.
 
-GitHub Actions builds packaged Edge artifacts for Linux, macOS, and Windows through [`.github/workflows/edge-executable.yml`](.github/workflows/edge-executable.yml). Release tags publish both raw bundles and installable packages such as `.deb`, `.pkg`, and Windows installer executables.
+GitHub Actions builds:
+- [`edge-executable.yml`](.github/workflows/edge-executable.yml) — Linux `.deb`, macOS `.pkg`, and Windows `.exe` installer packages published on release tags
+- [`docker-image.yml`](.github/workflows/docker-image.yml) — Central Docker image pushed to GHCR on every push to `main`
+- [`edge-docker-image.yml`](.github/workflows/edge-docker-image.yml) — Edge Docker image pushed to GHCR on every push to `main`
 
-Edge no longer requires a separate env file. It starts with built-in defaults, exposes its local web UI on `http://localhost:8080/`, and saves user changes there.
+Edge starts with built-in defaults and exposes its local web UI on `http://localhost:8080/`. Settings are saved there.
+
+If running Edge and Central as Docker containers on the same host, use the deploy examples in [`deploy-example/`](deploy-example/). Central binds to port `6555` and Edge to port `6556` in those examples to avoid conflicts.
 
 ## Running Edge Releases
 

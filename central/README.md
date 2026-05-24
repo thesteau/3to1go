@@ -10,7 +10,9 @@ Central is the receiving service. It accepts backup uploads from Edge, stages th
 - rejecting already-committed duplicate archives within the same `edge_id/job_name` namespace by checksum
 - storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
 - pruning older snapshots according to `RETENTION_KEEP_LAST`
-- exposing a small UI and JSON overview of stored backups
+- exposing a web UI to browse, download, and delete stored snapshots per edge and job
+
+Central stores whatever Edge sends. If Edge has encryption enabled (the default), Central holds encrypted blobs and never sees plaintext. Decryption happens in the browser at download time using the key from the Edge UI.
 
 ## Storage Scope
 
@@ -95,13 +97,19 @@ Uploads are first written to `STAGING_DIR`, then moved into final storage only a
 
 ## HTTP Surface
 
-- `GET /` - HTML status page
-- `GET /api/overview` - JSON summary of storage paths, retention, and stored snapshots
+- `GET /` - web UI for browsing, downloading, and deleting snapshots by edge and job
+- `GET /api/overview` - JSON summary of storage paths, retention, and stored snapshots with size and mtime per snapshot
 - `GET /health/ready` - lightweight readiness check for container healthchecks
 - `GET /health` - health check; returns `503` if the storage backend is unavailable
+- `GET /api/snapshots/{edge_id}/{job_name}/{filename}` - stream a snapshot archive for download
+- `DELETE /api/snapshots/{edge_id}/{job_name}/{filename}` - delete a specific snapshot (requires bearer token)
 - `POST /backup/uploads/initiate` - create or resume an idempotent upload session
 - `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append one chunk at the declared byte offset
 - `POST /backup/uploads/{upload_id}/finalize` - atomically commit a completed upload into final storage
+
+### Downloading Encrypted Snapshots
+
+The Central UI detects encrypted archives automatically by checking a magic header. When a download is initiated for an encrypted archive, the browser prompts for the Edge encryption key. Decryption happens entirely in-browser using the Web Crypto API — the key is never sent to Central.
 
 The resumable upload flow expects:
 
