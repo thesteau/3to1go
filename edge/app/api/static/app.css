@@ -82,6 +82,29 @@ h3 {
   background: #f8f4eb;
 }
 
+.enc-key-cell {
+  grid-column: 1 / -1;
+}
+
+.enc-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.enc-key-row code {
+  flex: 1;
+  word-break: break-all;
+  font-size: 0.82rem;
+}
+
+.enc-key-copy {
+  white-space: nowrap;
+  padding: 5px 10px !important;
+  font-size: 0.82rem !important;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 1.3fr 0.9fr;

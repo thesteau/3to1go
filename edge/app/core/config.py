@@ -129,6 +129,10 @@ def settings_storage_path() -> Path:
     return _settings_path()
 
 
+def encryption_key_path() -> Path:
+    return _default_config_dir() / "encryption.key"
+
+
 def settings_to_payload(settings: Settings) -> dict[str, Any]:
     return {
         "edge_id": settings.edge_id,

@@ -1,3 +1,82 @@
+const ENC_MAGIC = new Uint8Array([82, 67, 69, 78, 67, 49, 0, 0]); // "RCENC1\x00\x00"
+const ENC_MAGIC_LEN = 8;
+const ENC_IV_LEN = 12;
+
+function isEncrypted(buffer) {
+  if (buffer.byteLength < ENC_MAGIC_LEN + ENC_IV_LEN) return false;
+  const view = new Uint8Array(buffer, 0, ENC_MAGIC_LEN);
+  return ENC_MAGIC.every((b, i) => b === view[i]);
+}
+
+function base64UrlToBytes(b64) {
+  const std = b64.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(std), (c) => c.charCodeAt(0));
+}
+
+async function decryptBuffer(buffer, keyB64) {
+  const keyBytes = base64UrlToBytes(keyB64.trim());
+  const iv = new Uint8Array(buffer, ENC_MAGIC_LEN, ENC_IV_LEN);
+  const ciphertext = buffer.slice(ENC_MAGIC_LEN + ENC_IV_LEN);
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+}
+
+function triggerBlobDownload(buffer, filename) {
+  const url = URL.createObjectURL(new Blob([buffer]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const _encKeys = {};
+
+function getEncKey(edgeId) {
+  if (_encKeys[edgeId]) return _encKeys[edgeId];
+  const stored = sessionStorage.getItem(`relay_enc_${edgeId}`);
+  if (stored) { _encKeys[edgeId] = stored; return stored; }
+  return null;
+}
+
+function setEncKey(edgeId, key) {
+  _encKeys[edgeId] = key;
+  sessionStorage.setItem(`relay_enc_${edgeId}`, key);
+}
+
+async function downloadSnapshot(edgeId, jobName, filename, btn) {
+  const url = `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
+  btn.disabled = true;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) { alert("Download failed."); return; }
+    const buffer = await res.arrayBuffer();
+
+    if (!isEncrypted(buffer)) {
+      triggerBlobDownload(buffer, filename);
+      return;
+    }
+
+    let key = getEncKey(edgeId);
+    if (!key) {
+      key = prompt(`Snapshot is encrypted.\nEnter the encryption key for edge "${escapeHtml(edgeId)}":`);
+      if (!key) return;
+    }
+
+    try {
+      const decrypted = await decryptBuffer(buffer, key);
+      setEncKey(edgeId, key);
+      triggerBlobDownload(decrypted, filename);
+    } catch {
+      delete _encKeys[edgeId];
+      sessionStorage.removeItem(`relay_enc_${edgeId}`);
+      alert("Decryption failed — wrong key or corrupted archive.");
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -90,7 +169,8 @@ function renderSnapshots(edgeId, jobName, snapshots) {
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
         <div class="snapshot-actions">
-          <a class="btn btn-dl" href="${escapeHtml(dlUrl)}" download="${escapeHtml(name)}">Download</a>
+          <button class="btn btn-dl"
+            onclick="downloadSnapshot('${escapeHtml(edgeId)}','${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
           <button class="btn btn-del"
             onclick="deleteSnapshot('${escapeHtml(edgeId)}','${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Delete</button>
         </div>

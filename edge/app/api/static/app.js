@@ -26,7 +26,7 @@ function statusBadge(entry) {
   return '<span class="badge warn">available</span>';
 }
 
-function fillMeta(data) {
+function fillMeta(data, encKey) {
   const scheduler = data.scheduler || {};
   const uploadCircuit = data.upload_circuit || {};
   const settingsStatus = data.settings_status || {};
@@ -42,7 +42,26 @@ function fillMeta(data) {
     <div><strong>Next Run</strong><br>${escapeHtml(scheduler.next_run_at || "waiting for first cycle")}</div>
     <div><strong>Upload Circuit</strong><br>${escapeHtml(uploadCircuit.state || "closed")}</div>
     <div><strong>Auth Token</strong><br>${escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing")}</div>
+    <div class="enc-key-cell">
+      <strong>Encryption Key</strong>
+      <div class="enc-key-row">
+        <code id="enc-key-value">${escapeHtml(encKey || "—")}</code>
+        <button type="button" class="secondary enc-key-copy" onclick="copyEncKey()">Copy</button>
+      </div>
+      <span class="hint">Paste this into Central when downloading encrypted snapshots.</span>
+    </div>
   `;
+}
+
+async function copyEncKey() {
+  const key = document.getElementById("enc-key-value")?.textContent;
+  if (!key || key === "—") return;
+  await navigator.clipboard.writeText(key);
+  const btn = document.querySelector(".enc-key-copy");
+  if (btn) {
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+  }
 }
 
 function fillSettings(settings) {
@@ -138,9 +157,13 @@ function resetForm() {
 }
 
 async function loadData() {
-  const response = await fetch("/api/directories");
-  latestData = await response.json();
-  fillMeta(latestData);
+  const [dirRes, keyRes] = await Promise.all([
+    fetch("/api/directories"),
+    fetch("/api/encryption-key"),
+  ]);
+  latestData = await dirRes.json();
+  const keyData = await keyRes.json();
+  fillMeta(latestData, keyData.key || "");
   fillSettings(latestData.settings || {});
   renderDirectories(latestData);
   if (!document.getElementById("relative_path").value) {

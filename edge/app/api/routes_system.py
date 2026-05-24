@@ -7,6 +7,8 @@ from fastapi.responses import HTMLResponse
 from app.api.dependencies import get_runner, get_scheduler, get_start_scheduler
 from app.api.models import EdgeSettingsInput
 from app.api.views import templates
+from app.core.config import encryption_key_path
+from app.core.encryption import key_as_base64, load_or_create_key
 from app.services.overview import build_directory_response
 from app.services.runner import EdgeRunner
 from app.services.scheduler import SchedulerController
@@ -60,6 +62,12 @@ async def save_settings(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "settings": build_directory_response(runner)["settings"]}
+
+
+@router.get("/api/encryption-key")
+async def get_encryption_key() -> dict:
+    key = load_or_create_key(encryption_key_path())
+    return {"key": key_as_base64(key)}
 
 
 @router.get("/", response_class=HTMLResponse)

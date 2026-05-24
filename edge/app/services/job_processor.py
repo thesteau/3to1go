@@ -8,7 +8,8 @@ from app.backup.discovery import JobDefinition, discover_jobs
 from app.backup.filters import build_file_list
 from app.backup.fingerprint import compute_fingerprint
 from app.backup.quiesce import DockerComposeQuiescer, QuiesceContext
-from app.core.config import Settings
+from app.core.config import Settings, encryption_key_path
+from app.core.encryption import encrypt_file, load_or_create_key
 from app.services.job_locks import JobLockManager
 from app.services.state import JobState, StateStore
 from app.services.upload import UploadClient, UploadFailure, sha256_path
@@ -142,6 +143,12 @@ class JobProcessor:
         finally:
             self.quiescer.restore(job, quiesce_context)
 
+        key = load_or_create_key(encryption_key_path())
+        tmp_path = archive_path.with_suffix(".enc.tmp")
+        encrypt_file(key, archive_path, tmp_path)
+        archive_path.unlink()
+        tmp_path.rename(archive_path)
+
         self.logger.info("archive_created job_name=%s archive=%s", job.job_name, archive_name)
         return archive_path, timestamp
 
@@ -168,7 +175,9 @@ class JobProcessor:
             self._clear_pending_archive(state)
             state.last_status = "skipped_missing"
             self.state_store.set(job.state_key, state)
-            self.logger.warning("skipped_missing job_name=%s pending_archive=%s", state.job_name or job.job_name, pending_path)
+            self.logger.warning(
+                "skipped_missing job_name=%s pending_archive=%s", state.job_name or job.job_name, pending_path
+            )
             return False
 
         if retry_at is not None and retry_at > datetime.now(timezone.utc):
@@ -243,7 +252,9 @@ class JobProcessor:
             state.last_error_category = exc.category
             if exc.retryable:
                 state.last_status = "circuit_open" if exc.category == "circuit_open" else "retry_scheduled"
-                state.next_retry_at = _utc_after_seconds_text(self._retry_delay_seconds(state.upload_attempt_count, exc))
+                state.next_retry_at = _utc_after_seconds_text(
+                    self._retry_delay_seconds(state.upload_attempt_count, exc)
+                )
                 state.manual_intervention_required = False
             else:
                 state.last_status = "manual_intervention_required"
@@ -255,7 +266,9 @@ class JobProcessor:
             self.state_store.set(job.state_key, state)
             return False
         except Exception as exc:
-            self.logger.error("upload_failure job_name=%s archive=%s detail=%s", upload_job_name, archive_path.name, exc)
+            self.logger.error(
+                "upload_failure job_name=%s archive=%s detail=%s", upload_job_name, archive_path.name, exc
+            )
             state.upload_attempt_count += 1
             state.last_error_detail = str(exc)
             state.last_error_category = "unexpected"
