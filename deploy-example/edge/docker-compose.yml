@@ -6,6 +6,7 @@ services:
     ports:
       - "6556:8080"
     volumes:
+      - ./config:/config
       - ./data/scan_root:/scan
       - ./data/state:/data/state
       - ./data/spool:/data/spool
