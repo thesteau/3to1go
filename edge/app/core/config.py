@@ -189,15 +189,49 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     )
 
 
+def _env_overrides() -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    env_map = {
+        "EDGE_ID": "edge_id",
+        "SCAN_ROOT": "scan_root",
+        "CENTRAL_URL": "central_url",
+        "CRON_SCHEDULE": "cron_schedule",
+        "STATE_DIR": "state_dir",
+        "SPOOL_DIR": "spool_dir",
+        "LOG_LEVEL": "log_level",
+        "MAX_DEPTH": "max_depth",
+        "KEEP_LOCAL_PENDING": "keep_local_pending",
+        "HTTP_HOST": "http_host",
+        "HTTP_PORT": "http_port",
+    }
+    for env_key, setting_key in env_map.items():
+        value = os.getenv(env_key)
+        if value is not None:
+            overrides[setting_key] = value
+
+    auth_token_file = os.getenv("AUTH_TOKEN_FILE")
+    if auth_token_file:
+        try:
+            overrides["auth_token"] = Path(auth_token_file).read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    elif os.getenv("AUTH_TOKEN"):
+        overrides["auth_token"] = os.getenv("AUTH_TOKEN")
+
+    return overrides
+
+
 def load_settings() -> Settings:
     path = _settings_path()
-    if not path.exists():
-        return build_settings()
+    payload: dict[str, Any] = {}
 
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return build_settings()
-    if not isinstance(payload, dict):
-        return build_settings()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                payload = data
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    payload.update(_env_overrides())
     return build_settings(payload)

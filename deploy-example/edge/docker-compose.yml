@@ -1,0 +1,27 @@
+services:
+  edge:
+    build: .
+    env_file:
+      - ./.env
+    ports:
+      - "6556:8080"
+    volumes:
+      - ./data/scan_root:/scan
+      - ./data/state:/data/state
+      - ./data/spool:/data/spool
+      - ./secrets/relay_auth_token:/run/secrets/relay_auth_token:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
