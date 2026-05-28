@@ -3,13 +3,14 @@ from __future__ import annotations
 import errno
 import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from uuid import uuid4
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -18,8 +19,9 @@ from app.storage.local import LocalFilesystemBackend  # noqa: E402
 
 class LocalFilesystemBackendTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = PROJECT_ROOT / ".tmp-test-local-storage" / uuid4().hex
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        temp_root = WORKSPACE_ROOT / ".tmp-test-local-storage"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
 
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)

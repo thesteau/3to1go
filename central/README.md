@@ -32,6 +32,8 @@ Central expects `AUTH_TOKEN_FILE` to point to a file that contains the shared be
 
 If the file does not exist yet, Central creates it on startup. That token must then be copied into each Edge that should talk to this Central.
 
+The bundled Central Compose file mounts `./secrets` as a directory at `/run/secrets` so first-boot token generation works automatically.
+
 ### 2. Start the service
 
 For local development:
@@ -155,6 +157,8 @@ The bundled Compose example mounts:
 
 - `./data/backups` to `/backups`
 - `./data/staging` to `/staging`
-- `./secrets/relay_auth_token` to `/run/secrets/relay_auth_token` read-only
+- `./secrets` to `/run/secrets`
 
-Create `./secrets/relay_auth_token` on the host before starting the stack if you do not want Central to generate it inside the container setup flow.
+After the first start, Central writes the generated token to `./secrets/relay_auth_token`.
+
+If you prefer mounting a single token file instead of the whole directory, create that host file before starting the stack. Otherwise Docker may create a directory at that path and Central will refuse to start with a configuration error.

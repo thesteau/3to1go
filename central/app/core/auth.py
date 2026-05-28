@@ -14,6 +14,7 @@ def load_auth_token() -> str:
 
 
 def _load_or_create_auth_token(path: Path) -> str:
+    _validate_auth_token_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     existing = _read_auth_token(path)
@@ -39,6 +40,7 @@ def _load_or_create_auth_token(path: Path) -> str:
 def _read_auth_token(path: Path) -> str | None:
     if not path.exists():
         return None
+    _validate_auth_token_path(path)
     token = path.read_text(encoding="utf-8").strip()
     return token or None
 
@@ -48,3 +50,13 @@ def _set_owner_only_permissions(path: Path) -> None:
         os.chmod(path, 0o600)
     except OSError:
         pass
+
+
+def _validate_auth_token_path(path: Path) -> None:
+    if path.is_dir():
+        raise RuntimeError(
+            "AUTH_TOKEN_FILE must point to a file, but "
+            f"'{path}' is a directory. If you are using Docker bind mounts, "
+            "the host path likely did not exist and Docker created a directory instead. "
+            "Mount './secrets:/run/secrets' for auto-generation, or create the token file on the host first."
+        )
