@@ -8,6 +8,10 @@ __pycache__/
 .data/
 central/.env
 edge/.env
+edge/config/
+edge/scan/
+edge/state/
+edge/spool/
 data/
 .auth_token
 relay_auth_token

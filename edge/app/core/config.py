@@ -11,6 +11,7 @@ from app.core.schedule import CronSchedule
 
 
 APP_DIR_NAME = "RelayCentralizerEdge"
+DEFAULT_SECRET_DIR = Path("/run/secrets")
 
 
 def _default_scan_root() -> Path:
@@ -137,6 +138,18 @@ def installation_id_path() -> Path:
     return _default_config_dir() / "installation.id"
 
 
+def _resolve_auth_token_file_path(value: str) -> Path:
+    candidate = Path(value.strip())
+    if candidate.is_absolute():
+        return candidate
+
+    # In the bundled Docker layouts, bare filenames live under /run/secrets.
+    if len(candidate.parts) == 1:
+        return DEFAULT_SECRET_DIR / candidate
+
+    return candidate
+
+
 def settings_to_payload(settings: Settings) -> dict[str, Any]:
     return {
         "edge_id": settings.edge_id,
@@ -220,7 +233,8 @@ def _env_overrides() -> dict[str, Any]:
     auth_token_file = os.getenv("AUTH_TOKEN_FILE")
     if auth_token_file:
         try:
-            overrides["auth_token"] = Path(auth_token_file).read_text(encoding="utf-8").strip()
+            token_path = _resolve_auth_token_file_path(auth_token_file)
+            overrides["auth_token"] = token_path.read_text(encoding="utf-8").strip()
         except OSError:
             pass
     elif os.getenv("AUTH_TOKEN"):

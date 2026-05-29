@@ -2,4 +2,7 @@
 /central/secrets/
 /edge/config/
 /edge/data/
+/edge/scan/
+/edge/state/
+/edge/spool/
 /edge/secrets/

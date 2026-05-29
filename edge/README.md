@@ -106,7 +106,10 @@ Key locations by install type:
 
 ### Shared token
 
-Edge stores the auth token in its own local `settings.json`.
+Edge can get the shared auth token in two ways:
+
+- entered in the Edge UI and stored in local `settings.json`
+- preloaded from `AUTH_TOKEN_FILE`, which is how the bundled Docker examples work
 
 - The token must match Central's token.
 - Edge does not read secrets from Central's filesystem.
@@ -174,13 +177,28 @@ chmod +x ./dev-edge.sh
 
 ### Docker
 
-A deploy example lives in [`deploy-example/edge/`](../deploy-example/edge/).
+If you want to build Edge from this repo directly, use the bundled files in [`edge/`](./):
 
-Typical flow:
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Open the UI at `http://localhost:8080/`.
+
+Place the shared token file at `./secrets/relay_auth_token` before starting the stack.
+In the bundled Docker examples, `AUTH_TOKEN_FILE` can be just the filename, such as `relay_auth_token`.
+If you prefer a different filename, update `AUTH_TOKEN_FILE` in `.env` to match it.
+
+A deploy example that uses the published image lives in [`deploy-example/edge/`](../deploy-example/edge/).
+
+For that deploy example:
 
 ```bash
 docker compose up -d
 ```
+
+Open the UI at `http://localhost:6556/`.
 
 In that example, Edge binds to port `6556` so it does not conflict with Central on `6555`.
 
@@ -243,7 +261,8 @@ Most people care about these first:
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
 | `SCAN_ROOT` | platform-dependent | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://127.0.0.1:8000` | Address of Central |
-| `AUTH_TOKEN` | empty | Shared bearer token |
+| `AUTH_TOKEN_FILE` | unset | Optional token file path, or just a filename under `/run/secrets` in the Docker examples |
+| `AUTH_TOKEN` | empty | Shared bearer token when not using `AUTH_TOKEN_FILE` |
 | `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule |
 | `HTTP_PORT` | `8080` | Local Edge UI port |
 
