@@ -58,8 +58,10 @@ def _directory_usage(path: Path) -> int:
 
 
 def _disk_usage(path: Path) -> tuple[int, int, int]:
-    path.mkdir(parents=True, exist_ok=True)
-    usage = shutil.disk_usage(path)
+    target = path
+    while not target.exists() and target != target.parent:
+        target = target.parent
+    usage = shutil.disk_usage(target)
     return usage.total, usage.used, usage.free
 
 

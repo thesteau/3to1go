@@ -46,6 +46,7 @@ class HealthcheckTests(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_health_ready_avoids_directory_walk(self) -> None:
+        self.settings.backup_root.mkdir(parents=True, exist_ok=True)
         with patch("app.api.routes_overview._directory_usage", side_effect=AssertionError("directory walk should not run")):
             response = self.client.get("/health/ready")
 
@@ -53,7 +54,9 @@ class HealthcheckTests(unittest.TestCase):
         self.assertEqual(response.json(), {"status": "ok"})
 
     def test_storage_healthcheck_reuses_probe_file(self) -> None:
-        backend = LocalFilesystemBackend(self.settings.backup_root)
+        self.settings.backup_root.mkdir(parents=True, exist_ok=True)
+        probe_root = self.temp_dir / ".container-runtime" / "healthchecks"
+        backend = LocalFilesystemBackend(self.settings.backup_root, probe_root=probe_root)
 
         self.assertTrue(backend.healthcheck())
         first_stat = backend.probe_path.stat()
@@ -61,6 +64,8 @@ class HealthcheckTests(unittest.TestCase):
         self.assertTrue(backend.healthcheck())
         second_stat = backend.probe_path.stat()
 
+        self.assertEqual(backend.probe_path.parent, probe_root)
+        self.assertFalse((self.settings.backup_root / ".healthcheck").exists())
         self.assertTrue(backend.probe_path.exists())
         self.assertGreaterEqual(second_stat.st_mtime_ns, first_stat.st_mtime_ns)
 
