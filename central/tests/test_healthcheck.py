@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core.config import Settings  # noqa: E402
+from app.storage.local import LocalFilesystemBackend  # noqa: E402
 
 
 class HealthcheckTests(unittest.TestCase):
@@ -50,6 +51,18 @@ class HealthcheckTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_storage_healthcheck_reuses_probe_file(self) -> None:
+        backend = LocalFilesystemBackend(self.settings.backup_root)
+
+        self.assertTrue(backend.healthcheck())
+        first_stat = backend.probe_path.stat()
+
+        self.assertTrue(backend.healthcheck())
+        second_stat = backend.probe_path.stat()
+
+        self.assertTrue(backend.probe_path.exists())
+        self.assertGreaterEqual(second_stat.st_mtime_ns, first_stat.st_mtime_ns)
 
 
 if __name__ == "__main__":

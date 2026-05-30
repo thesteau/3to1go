@@ -12,6 +12,7 @@ from app.storage.base import StorageBackend
 class LocalFilesystemBackend(StorageBackend):
     def __init__(self, backup_root: Path) -> None:
         self.backup_root = backup_root
+        self.probe_path = self.backup_root / ".healthcheck"
         self.backup_root.mkdir(parents=True, exist_ok=True)
 
     def store(self, namespace: str, filename: str, staged_path: Path) -> dict:
@@ -73,12 +74,13 @@ class LocalFilesystemBackend(StorageBackend):
     def healthcheck(self) -> bool:
         try:
             self.backup_root.mkdir(parents=True, exist_ok=True)
-            probe_path = self.backup_root / ".healthcheck"
-            with probe_path.open("w", encoding="utf-8") as handle:
-                handle.write("ok")
+            mode = "r+b" if self.probe_path.exists() else "w+b"
+            with self.probe_path.open(mode) as handle:
+                handle.seek(0)
+                handle.write(b"ok\n")
+                handle.truncate()
                 handle.flush()
                 os.fsync(handle.fileno())
-            probe_path.unlink(missing_ok=True)
             return True
         except OSError:
             return False
