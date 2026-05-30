@@ -60,6 +60,57 @@ function escapeSelectorValue(value) {
   return String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
+function clipMiddle(value, maxLength = 28) {
+  const text = String(value ?? "");
+  if (text.length <= maxLength) return text;
+  const head = Math.max(8, Math.floor((maxLength - 1) / 2));
+  const tail = Math.max(6, maxLength - head - 1);
+  return `${text.slice(0, head)}…${text.slice(-tail)}`;
+}
+
+function renderClipValue(label, value, { className = "", clipLength = 28 } = {}) {
+  const full = String(value ?? "").trim();
+  if (!full) return "";
+
+  const short = clipMiddle(full, clipLength);
+  const classes = className ? ` ${className}` : "";
+  if (short === full) {
+    return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(full)}</span></span>`;
+  }
+
+  return `
+    <button
+      type="button"
+      class="clip-toggle${classes}"
+      data-clip-toggle="true"
+      data-clip-label="${escapeHtml(label || "")}"
+      data-clip-short="${escapeHtml(short)}"
+      data-clip-full="${escapeHtml(full)}"
+      aria-expanded="false"
+      title="${escapeHtml(full)}">
+      ${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}
+      <span class="clip-value">${escapeHtml(short)}</span>
+      <span class="clip-cue">Expand</span>
+    </button>
+  `;
+}
+
+function setClipToggleExpanded(button, expanded) {
+  const value = button.querySelector(".clip-value");
+  const cue = button.querySelector(".clip-cue");
+  if (!value || !cue) return;
+  value.textContent = expanded ? (button.dataset.clipFull || "") : (button.dataset.clipShort || "");
+  cue.textContent = expanded ? "Collapse" : "Expand";
+  button.setAttribute("aria-expanded", expanded ? "true" : "false");
+  button.classList.toggle("expanded", expanded);
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-clip-toggle='true']");
+  if (!button) return;
+  setClipToggleExpanded(button, button.getAttribute("aria-expanded") !== "true");
+});
+
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
 
@@ -331,7 +382,7 @@ function renderSnapshots(edgeId, jobName, snapshots) {
       <div class="snapshot-row">
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
-          <span class="snapshot-fp">${escapeHtml(fp)}</span>
+          ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
         <div class="snapshot-actions">
@@ -351,9 +402,7 @@ function renderKeyManager(ns) {
     <div class="edge-key-panel">
       <div class="edge-key-head">
         <strong>Decryption Key</strong>
-        <span class="edge-detail" title="${escapeHtml(expectedFingerprint || "unknown")}">
-          Expected key fingerprint: ${escapeHtml(shortFingerprint(expectedFingerprint))}
-        </span>
+        ${renderClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
       </div>
       <div class="edge-key-controls">
         <input
@@ -391,9 +440,9 @@ async function loadOverview() {
             <div class="edge-header-main">
               <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
               <div class="edge-submeta">
-                ${ns.edge_instance_id ? `<span class="edge-detail" title="${escapeHtml(ns.edge_instance_id)}">Instance ${escapeHtml(ns.edge_instance_id.slice(0, 12))}</span>` : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
-                ${ns.last_seen_source ? `<span class="edge-detail" title="${escapeHtml(ns.last_seen_source)}">Source ${escapeHtml(ns.last_seen_source)}</span>` : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
-                <span class="edge-detail" title="${escapeHtml(ns.encryption_key_fingerprint || "unknown")}">Key FP ${escapeHtml(shortFingerprint(ns.encryption_key_fingerprint))}</span>
+                ${ns.edge_instance_id ? renderClipValue("Instance", ns.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
+                ${ns.last_seen_source ? renderClipValue("Source", ns.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
+                ${renderClipValue("Key FP", ns.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
               </div>
             </div>
             <span class="edge-count">${(ns.jobs || []).length} job${ns.jobs.length !== 1 ? "s" : ""}</span>

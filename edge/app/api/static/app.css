@@ -105,6 +105,60 @@ h3 {
   font-size: 0.82rem !important;
 }
 
+.clip-toggle,
+.clip-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.clip-toggle {
+  border: 0;
+  cursor: pointer;
+  background: none;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.clip-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.clip-cue {
+  font-size: 0.68rem;
+  opacity: 0.72;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.clip-code {
+  padding: 0.12rem 0.38rem;
+  border-radius: 0.45rem;
+  background: #f2ece3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: left;
+}
+
+.clip-title {
+  font-weight: 700;
+}
+
+.clip-hint {
+  color: inherit;
+  text-align: left;
+}
+
+.clip-toggle.expanded {
+  white-space: normal;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 1.3fr 0.9fr;
@@ -241,6 +295,10 @@ th {
   border-radius: 14px;
   border: 1px solid #ece4d6;
   background: #fffaf2;
+}
+
+.job-card-title {
+  margin-bottom: 4px;
 }
 
 .badge {

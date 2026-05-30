@@ -30,17 +30,67 @@ function shortFingerprint(value) {
   return value ? String(value).slice(0, 12) : "unknown";
 }
 
+function clipMiddle(value, maxLength = 32) {
+  const text = String(value ?? "");
+  if (text.length <= maxLength) return text;
+  const head = Math.max(10, Math.floor((maxLength - 1) / 2));
+  const tail = Math.max(8, maxLength - head - 1);
+  return `${text.slice(0, head)}…${text.slice(-tail)}`;
+}
+
+function renderClipValue(label, value, { className = "", clipLength = 32 } = {}) {
+  const full = String(value ?? "").trim();
+  if (!full) return "—";
+
+  const short = clipMiddle(full, clipLength);
+  const classes = className ? ` ${className}` : "";
+  if (short === full) {
+    return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(full)}</span></span>`;
+  }
+
+  return `
+    <button
+      type="button"
+      class="clip-toggle${classes}"
+      data-clip-toggle="true"
+      data-clip-short="${escapeHtml(short)}"
+      data-clip-full="${escapeHtml(full)}"
+      aria-expanded="false"
+      title="${escapeHtml(full)}">
+      ${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}
+      <span class="clip-value">${escapeHtml(short)}</span>
+      <span class="clip-cue">Expand</span>
+    </button>
+  `;
+}
+
+function setClipToggleExpanded(button, expanded) {
+  const value = button.querySelector(".clip-value");
+  const cue = button.querySelector(".clip-cue");
+  if (!value || !cue) return;
+  value.textContent = expanded ? (button.dataset.clipFull || "") : (button.dataset.clipShort || "");
+  cue.textContent = expanded ? "Collapse" : "Expand";
+  button.setAttribute("aria-expanded", expanded ? "true" : "false");
+  button.classList.toggle("expanded", expanded);
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-clip-toggle='true']");
+  if (!button) return;
+  setClipToggleExpanded(button, button.getAttribute("aria-expanded") !== "true");
+});
+
 function fillMeta(data, encKey, encFingerprint) {
   const scheduler = data.scheduler || {};
   const uploadCircuit = data.upload_circuit || {};
   const settingsStatus = data.settings_status || {};
   document.getElementById("meta").innerHTML = `
-    <div><strong>Edge ID</strong><br>${escapeHtml(data.edge_id)}</div>
-    <div><strong>Instance ID</strong><br><code title="${escapeHtml(data.edge_instance_id || "")}">${escapeHtml((data.edge_instance_id || "—").slice(0, 12))}</code></div>
-    <div><strong>Scan Root</strong><br>${escapeHtml(data.scan_root)}</div>
-    <div><strong>Central URL</strong><br>${escapeHtml(data.central_url)}</div>
-    <div><strong>Edge UI</strong><br>${escapeHtml(data.http_url)}</div>
-    <div><strong>Settings File</strong><br>${escapeHtml(data.settings_path || "n/a")}</div>
+    <div><strong>Edge ID</strong><br>${renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 })}</div>
+    <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
+    <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
+    <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
+    <div><strong>Edge UI</strong><br>${renderClipValue("", data.http_url, { className: "clip-code", clipLength: 30 })}</div>
+    <div><strong>Settings File</strong><br>${renderClipValue("", data.settings_path || "n/a", { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Cron Schedule</strong><br><code>${escapeHtml(data.cron_schedule)}</code></div>
     <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
     <div><strong>Scheduler</strong><br>${escapeHtml(scheduler.state || "idle")}</div>
@@ -102,7 +152,7 @@ function renderDirectories(data) {
       : "n/a";
     return `
       <tr>
-        <td><code>${escapeHtml(entry.relative_path)}</code><br><span class="hint">${escapeHtml(entry.absolute_path)}</span></td>
+        <td>${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 30 })}<br><span class="hint">${renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 44 })}</span></td>
         <td>${statusBadge(entry)}</td>
         <td>${escapeHtml(state)}<br><span class="hint">${escapeHtml(progress)}</span></td>
         <td><button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button></td>
@@ -115,14 +165,14 @@ function renderDirectories(data) {
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => `
       <div class="job-card">
-        <strong>${escapeHtml(entry.config?.job_name || entry.relative_path)}</strong>
-        <div class="hint"><code>${escapeHtml(entry.relative_path)}</code></div>
+        <div class="job-card-title">${renderClipValue("", entry.config?.job_name || entry.relative_path, { className: "clip-title", clipLength: 34 })}</div>
+        <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
         <div class="hint">Last state: ${escapeHtml(entry.state?.last_status || "none")}</div>
         ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
         ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
-        ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${escapeHtml(entry.state.last_error_detail)}</div>` : ""}
-        ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job <code>${escapeHtml(entry.blocked_by_parent)}</code></div>` : ""}
-        ${entry.config_error ? `<div class="hint" style="color:#b42318;">${escapeHtml(entry.config_error)}</div>` : ""}
+        ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
+        ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
+        ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
         <div class="toolbar">
           <button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
           <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>

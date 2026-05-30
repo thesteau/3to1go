@@ -147,6 +147,45 @@ button, .btn {
   background: #fff1d6;
 }
 
+.clip-toggle,
+.clip-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.clip-toggle {
+  border: 0;
+  cursor: pointer;
+  background: none;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.clip-label {
+  white-space: nowrap;
+}
+
+.clip-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.clip-cue {
+  font-size: 0.68rem;
+  opacity: 0.72;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.clip-toggle.expanded {
+  white-space: normal;
+}
+
 .edge-count {
   font-size: 0.85rem;
   color: var(--muted);
