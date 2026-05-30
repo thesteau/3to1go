@@ -55,7 +55,7 @@ class CircuitBreaker:
             raise UploadFailure(
                 message="central circuit breaker is open",
                 category="circuit_open",
-                retryable=False,
+                retryable=True,
                 retry_after_seconds=retry_after,
             )
 

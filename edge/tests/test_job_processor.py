@@ -31,6 +31,16 @@ class _RetryableFailureUploadClient:
         )
 
 
+class _CircuitOpenUploadClient:
+    def upload_archive(self, **_kwargs):
+        raise UploadFailure(
+            message="central circuit breaker is open",
+            category="circuit_open",
+            retryable=True,
+            retry_after_seconds=120,
+        )
+
+
 class JobProcessorTests(unittest.TestCase):
     def setUp(self) -> None:
         temp_root = WORKSPACE_ROOT / ".tmp-test-job-processor"
@@ -116,6 +126,40 @@ class JobProcessorTests(unittest.TestCase):
         self.assertEqual(waiting.last_status, "waiting_retry")
         self.assertIsNone(waiting.pending_archive)
         self.assertEqual(waiting.pending_fingerprint, "abcdef1234567890")
+
+    def test_circuit_open_failure_schedules_retry_without_manual_intervention(self) -> None:
+        self.processor.upload_client = _CircuitOpenUploadClient()
+        job_root = self.settings.scan_root / "photos"
+        job_root.mkdir(parents=True, exist_ok=True)
+        job = JobDefinition(
+            root_path=job_root,
+            job_name="photos",
+            exclude_patterns=[],
+            include_hidden=True,
+            follow_symlinks=False,
+        )
+
+        archive_path = self.settings.spool_dir / "photos__pending.tar.zst"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        archive_path.write_bytes(b"archive-bytes")
+
+        state = JobState(
+            job_name="photos",
+            pending_archive=str(archive_path),
+            pending_archive_size=archive_path.stat().st_size,
+            pending_archive_sha256=sha256_path(archive_path),
+            pending_fingerprint="abcdef1234567890",
+            pending_timestamp="2026-04-05T12:00:00Z",
+        )
+
+        self.assertFalse(self.processor._upload_pending_archive(job, state))
+
+        saved = self.state_store.get(job.state_key)
+        self.assertEqual(saved.last_status, "circuit_open")
+        self.assertEqual(saved.last_error_category, "circuit_open")
+        self.assertEqual(saved.last_error_detail, "central circuit breaker is open")
+        self.assertFalse(saved.manual_intervention_required)
+        self.assertIsNotNone(saved.next_retry_at)
 
 
 if __name__ == "__main__":

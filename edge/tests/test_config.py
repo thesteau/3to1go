@@ -31,6 +31,25 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(overrides["auth_token"], "secret")
         read_text.assert_called_once_with(Path("/run/secrets/relay_auth_token"), encoding="utf-8")
 
+    def test_load_settings_applies_upload_and_circuit_breaker_env_overrides(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "UPLOAD_RETRY_MAX_ATTEMPTS": "7",
+                "UPLOAD_RETRY_BASE_DELAY_SECONDS": "11",
+                "CIRCUIT_BREAKER_FAILURE_THRESHOLD": "3",
+                "CIRCUIT_BREAKER_COOLDOWN_SECONDS": "45",
+            },
+            clear=True,
+        ):
+            with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
+                settings = config.load_settings()
+
+        self.assertEqual(settings.upload_retry_max_attempts, 7)
+        self.assertEqual(settings.upload_retry_base_delay_seconds, 11)
+        self.assertEqual(settings.circuit_breaker_failure_threshold, 3)
+        self.assertEqual(settings.circuit_breaker_cooldown_seconds, 45)
+
 
 if __name__ == "__main__":
     unittest.main()
