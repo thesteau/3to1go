@@ -108,6 +108,11 @@ button, .btn {
   padding: 16px;
 }
 
+.edge-card-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
 .edge-header {
   display: flex;
   align-items: baseline;
@@ -131,6 +136,7 @@ button, .btn {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 8px;
 }
 
 .edge-detail {
@@ -142,27 +148,31 @@ button, .btn {
   font-family: monospace;
 }
 
+.edge-card-summary {
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
+  padding: 16px;
+}
+
+.edge-card-summary::-webkit-details-marker {
+  display: none;
+}
+
+.edge-card-body {
+  padding: 0 16px 16px;
+}
+
 .edge-detail-warn {
   color: #8a5200;
   background: #fff1d6;
 }
 
-.clip-toggle,
 .clip-static {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.clip-toggle {
-  border: 0;
-  cursor: pointer;
-  background: none;
-  color: inherit;
-  padding: 0;
-  font: inherit;
-  text-align: left;
 }
 
 .clip-label {
@@ -174,25 +184,25 @@ button, .btn {
   overflow-wrap: anywhere;
 }
 
-.clip-cue {
-  font-size: 0.68rem;
-  opacity: 0.72;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.clip-toggle.expanded {
-  white-space: normal;
-}
-
 .edge-count {
   font-size: 0.85rem;
   color: var(--muted);
 }
 
+.edge-expand-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.edge-card-collapsible[open] .edge-expand-label {
+  visibility: hidden;
+}
+
 .edge-key-panel {
   margin-bottom: 12px;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(255, 253, 249, 0.8);
@@ -204,36 +214,6 @@ button, .btn {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.collapsible-card {
-  overflow: hidden;
-}
-
-.collapsible-summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 12px;
-}
-
-.collapsible-summary::-webkit-details-marker {
-  display: none;
-}
-
-.collapsible-summary::after {
-  content: "+";
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.collapsible-card[open] > .collapsible-summary::after {
-  content: "−";
-}
-
-.collapsible-body {
-  padding: 0 12px 12px;
 }
 
 .edge-key-controls {
@@ -279,6 +259,7 @@ button, .btn {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
+  padding: 12px 14px;
   margin-top: 10px;
 }
 
@@ -286,7 +267,7 @@ button, .btn {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin: 0;
+  margin-bottom: 8px;
 }
 
 .job-name {

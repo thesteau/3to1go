@@ -71,28 +71,7 @@ function clipMiddle(value, maxLength = 28) {
 function renderClipValue(label, value, { className = "", clipLength = 28 } = {}) {
   const full = String(value ?? "").trim();
   if (!full) return "";
-
-  const short = clipMiddle(full, clipLength);
-  const classes = className ? ` ${className}` : "";
-  if (short === full) {
-    return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(full)}</span></span>`;
-  }
-
-  return `
-    <button
-      type="button"
-      class="clip-toggle${classes}"
-      data-clip-toggle="true"
-      data-clip-label="${escapeHtml(label || "")}"
-      data-clip-short="${escapeHtml(short)}"
-      data-clip-full="${escapeHtml(full)}"
-      aria-expanded="false"
-      title="${escapeHtml(full)}">
-      ${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}
-      <span class="clip-value">${escapeHtml(short)}</span>
-      <span class="clip-cue">Expand</span>
-    </button>
-  `;
+  return renderStaticClipValue(label, full, { className, clipLength });
 }
 
 function renderStaticClipValue(label, value, { className = "", clipLength = 28 } = {}) {
@@ -102,22 +81,6 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 28 }
   const classes = className ? ` ${className}` : "";
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
 }
-
-function setClipToggleExpanded(button, expanded) {
-  const value = button.querySelector(".clip-value");
-  const cue = button.querySelector(".clip-cue");
-  if (!value || !cue) return;
-  value.textContent = expanded ? (button.dataset.clipFull || "") : (button.dataset.clipShort || "");
-  cue.textContent = expanded ? "Collapse" : "Expand";
-  button.setAttribute("aria-expanded", expanded ? "true" : "false");
-  button.classList.toggle("expanded", expanded);
-}
-
-document.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-clip-toggle='true']");
-  if (!button) return;
-  setClipToggleExpanded(button, button.getAttribute("aria-expanded") !== "true");
-});
 
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
@@ -407,23 +370,21 @@ function renderKeyManager(ns) {
   const edgeId = ns.edge_id;
   const expectedFingerprint = ns.encryption_key_fingerprint || "";
   return `
-    <details class="edge-key-panel collapsible-card">
-      <summary class="collapsible-summary edge-key-head">
+    <div class="edge-key-panel">
+      <div class="edge-key-head">
         <strong>Decryption Key</strong>
         ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
-      </summary>
-      <div class="collapsible-body">
-        <div class="edge-key-controls">
+      </div>
+      <div class="edge-key-controls">
         <input
           type="password"
           placeholder="Paste the Edge encryption key"
           data-edge-key-input="${escapeHtml(edgeId)}">
         <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}')">Save Key</button>
         <button class="btn btn-clear" type="button" onclick="clearEncKey('${escapeHtml(edgeId)}')">Clear</button>
-        </div>
-        <div class="key-status info" data-edge-key-status="${escapeHtml(edgeId)}"></div>
       </div>
-    </details>
+      <div class="key-status info" data-edge-key-status="${escapeHtml(edgeId)}"></div>
+    </div>
   `;
 }
 
@@ -445,8 +406,8 @@ async function loadOverview() {
 
   document.getElementById("namespaces").innerHTML = namespaces.length
     ? namespaces.map((ns) => `
-        <div class="edge-card">
-          <div class="edge-header">
+        <details class="edge-card edge-card-collapsible">
+          <summary class="edge-header edge-card-summary">
             <div class="edge-header-main">
               <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
               <div class="edge-submeta">
@@ -454,22 +415,25 @@ async function loadOverview() {
                 ${ns.last_seen_source ? renderClipValue("Source", ns.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
                 ${renderClipValue("Key FP", ns.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
               </div>
+              <span class="edge-expand-label">Expand</span>
             </div>
             <span class="edge-count">${(ns.jobs || []).length} job${ns.jobs.length !== 1 ? "s" : ""}</span>
-          </div>
-          ${renderKeyManager(ns)}
-          ${(ns.jobs || []).map((job) => `
-            <details class="job-block collapsible-card">
-              <summary class="job-header collapsible-summary">
-                <span class="job-name">${escapeHtml(job.job_name)}</span>
-                <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
-              </summary>
-              <div class="snapshot-list collapsible-body">
-                ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
+          </summary>
+          <div class="edge-card-body">
+            ${renderKeyManager(ns)}
+            ${(ns.jobs || []).map((job) => `
+              <div class="job-block">
+                <div class="job-header">
+                  <span class="job-name">${escapeHtml(job.job_name)}</span>
+                  <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+                </div>
+                <div class="snapshot-list">
+                  ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
+                </div>
               </div>
-            </details>
-          `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
-        </div>
+            `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
+          </div>
+        </details>
       `).join("")
     : '<p class="hint">No snapshots have been stored yet.</p>';
 
