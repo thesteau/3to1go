@@ -7,7 +7,7 @@ services:
       - "8080:8080"
     volumes:
       - ./config:/config
-      - ./scan:/scan
+      - ${SCAN_DIR:-./scan}:/scan
       - ./state:/data/state
       - ./spool:/data/spool
       - ./secrets:/run/secrets:ro
