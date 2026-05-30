@@ -291,14 +291,57 @@ th {
 }
 
 .job-card {
-  padding: 12px;
   border-radius: 14px;
   border: 1px solid #ece4d6;
   background: #fffaf2;
 }
 
+.collapsible-card {
+  overflow: hidden;
+}
+
+.collapsible-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.collapsible-card[open] > .collapsible-summary::after {
+  content: "−";
+}
+
+.collapsible-body {
+  padding: 0 12px 12px;
+}
+
 .job-card-title {
-  margin-bottom: 4px;
+  min-width: 0;
+}
+
+.job-card-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px;
+  margin: 0;
+}
+
+.job-card-summary-meta {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .badge {
@@ -327,6 +370,11 @@ th {
 @media (max-width: 960px) {
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .job-card-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }
 

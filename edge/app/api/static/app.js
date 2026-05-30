@@ -64,6 +64,14 @@ function renderClipValue(label, value, { className = "", clipLength = 32 } = {})
   `;
 }
 
+function renderStaticClipValue(label, value, { className = "", clipLength = 32 } = {}) {
+  const full = String(value ?? "").trim();
+  if (!full) return "—";
+  const short = clipMiddle(full, clipLength);
+  const classes = className ? ` ${className}` : "";
+  return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
+}
+
 function setClipToggleExpanded(button, expanded) {
   const value = button.querySelector(".clip-value");
   const cue = button.querySelector(".clip-cue");
@@ -164,20 +172,27 @@ function renderDirectories(data) {
   const selected = data.directories.filter((entry) => entry.selected);
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => `
-      <div class="job-card">
-        <div class="job-card-title">${renderClipValue("", entry.config?.job_name || entry.relative_path, { className: "clip-title", clipLength: 34 })}</div>
-        <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
-        <div class="hint">Last state: ${escapeHtml(entry.state?.last_status || "none")}</div>
-        ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
-        ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
-        ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
-        ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
-        ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
-        <div class="toolbar">
-          <button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
-          <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>
+      <details class="job-card collapsible-card">
+        <summary class="job-card-summary collapsible-summary">
+          <div class="job-card-title">${renderStaticClipValue("", entry.config?.job_name || entry.relative_path, { className: "clip-title", clipLength: 34 })}</div>
+          <div class="job-card-summary-meta">
+            <span class="hint">Last state: ${escapeHtml(entry.state?.last_status || "none")}</span>
+            ${entry.state?.pending_archive_size ? `<span class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size}`)}</span>` : ""}
+          </div>
+        </summary>
+        <div class="collapsible-body">
+          <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+          ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
+          ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
+          ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
+          ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
+          ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
+          <div class="toolbar">
+            <button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
+            <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>
+          </div>
         </div>
-      </div>
+      </details>
     `).join("")
     : '<p class="hint">No directories are selected yet.</p>';
 }

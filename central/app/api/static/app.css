@@ -193,7 +193,6 @@ button, .btn {
 
 .edge-key-panel {
   margin-bottom: 12px;
-  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(255, 253, 249, 0.8);
@@ -205,6 +204,36 @@ button, .btn {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.collapsible-card {
+  overflow: hidden;
+}
+
+.collapsible-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px;
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.collapsible-card[open] > .collapsible-summary::after {
+  content: "−";
+}
+
+.collapsible-body {
+  padding: 0 12px 12px;
 }
 
 .edge-key-controls {
@@ -250,7 +279,6 @@ button, .btn {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px 14px;
   margin-top: 10px;
 }
 
@@ -258,7 +286,7 @@ button, .btn {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 8px;
+  margin: 0;
 }
 
 .job-name {

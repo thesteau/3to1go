@@ -95,6 +95,14 @@ function renderClipValue(label, value, { className = "", clipLength = 28 } = {})
   `;
 }
 
+function renderStaticClipValue(label, value, { className = "", clipLength = 28 } = {}) {
+  const full = String(value ?? "").trim();
+  if (!full) return "";
+  const short = clipMiddle(full, clipLength);
+  const classes = className ? ` ${className}` : "";
+  return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
+}
+
 function setClipToggleExpanded(button, expanded) {
   const value = button.querySelector(".clip-value");
   const cue = button.querySelector(".clip-cue");
@@ -399,21 +407,23 @@ function renderKeyManager(ns) {
   const edgeId = ns.edge_id;
   const expectedFingerprint = ns.encryption_key_fingerprint || "";
   return `
-    <div class="edge-key-panel">
-      <div class="edge-key-head">
+    <details class="edge-key-panel collapsible-card">
+      <summary class="collapsible-summary edge-key-head">
         <strong>Decryption Key</strong>
-        ${renderClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
-      </div>
-      <div class="edge-key-controls">
+        ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
+      </summary>
+      <div class="collapsible-body">
+        <div class="edge-key-controls">
         <input
           type="password"
           placeholder="Paste the Edge encryption key"
           data-edge-key-input="${escapeHtml(edgeId)}">
         <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}')">Save Key</button>
         <button class="btn btn-clear" type="button" onclick="clearEncKey('${escapeHtml(edgeId)}')">Clear</button>
+        </div>
+        <div class="key-status info" data-edge-key-status="${escapeHtml(edgeId)}"></div>
       </div>
-      <div class="key-status info" data-edge-key-status="${escapeHtml(edgeId)}"></div>
-    </div>
+    </details>
   `;
 }
 
@@ -449,15 +459,15 @@ async function loadOverview() {
           </div>
           ${renderKeyManager(ns)}
           ${(ns.jobs || []).map((job) => `
-            <div class="job-block">
-              <div class="job-header">
+            <details class="job-block collapsible-card">
+              <summary class="job-header collapsible-summary">
                 <span class="job-name">${escapeHtml(job.job_name)}</span>
                 <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
-              </div>
-              <div class="snapshot-list">
+              </summary>
+              <div class="snapshot-list collapsible-body">
                 ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
               </div>
-            </div>
+            </details>
           `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
         </div>
       `).join("")
