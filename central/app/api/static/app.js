@@ -302,22 +302,14 @@ function getToken() {
 }
 
 async function deleteSnapshot(edgeId, jobName, filename, btn) {
-  const token = getToken();
-  if (!token) return;
   if (!confirm(`Delete ${filename}?\nThis cannot be undone.`)) return;
 
   btn.disabled = true;
   try {
     const res = await fetch(
       `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`,
-      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      { method: "DELETE" },
     );
-    if (res.status === 401) {
-      _token = "";
-      sessionStorage.removeItem("relay_token");
-      alert("Invalid token - cleared. Try again.");
-      return;
-    }
     if (!res.ok) {
       alert("Delete failed.");
       return;

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from app.api.auth import authorize_request
-from app.api.dependencies import get_logger, get_settings, get_storage_backend
+from app.api.dependencies import get_ingest_service, get_settings, get_storage_backend
 from app.core.config import Settings
+from app.services.ingest import IngestService
 from app.storage.local import LocalFilesystemBackend
 from app.utils.paths import validate_namespace_component
 
@@ -44,13 +44,10 @@ async def delete_snapshot(
     edge_id: str,
     job_name: str,
     filename: str,
-    authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
-    logger=Depends(get_logger),
+    ingest_service: IngestService = Depends(get_ingest_service),
 ) -> dict:
-    authorize_request(authorization, settings, logger)
-
     try:
         validate_namespace_component(edge_id, "edge_id")
         validate_namespace_component(job_name, "job_name")
@@ -66,5 +63,7 @@ async def delete_snapshot(
     if not target.is_file():
         raise HTTPException(status_code=404, detail="snapshot not found")
 
-    storage_backend.delete(f"{edge_id}/{job_name}", filename)
+    namespace = f"{edge_id}/{job_name}"
+    storage_backend.delete(namespace, filename)
+    ingest_service.reconcile_namespace(namespace)
     return {"status": "deleted", "filename": filename}

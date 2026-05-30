@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import shutil
 import tempfile
@@ -206,6 +207,84 @@ class ResumableUploadTests(unittest.TestCase):
         self.assertEqual(namespace["edge_id"], "edge-01")
         self.assertEqual(namespace["edge_instance_id"], "edgeinstance0001")
         self.assertEqual(namespace["encryption_key_fingerprint"], "c" * 64)
+
+    def test_reuses_idempotency_key_after_manual_snapshot_deletion(self) -> None:
+        archive_bytes = b"hello world"
+        payload = {
+            "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
+            "job_name": "photos",
+            "fingerprint": "abcdef1234567890",
+            "timestamp": "2026-04-05T12:00:00Z",
+            "archive_format": "tar.zst",
+            "archive_size_bytes": len(archive_bytes),
+            "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            "idempotency_key": "idem-deleted1",
+            "encryption_key_fingerprint": "d" * 64,
+        }
+
+        init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        self.assertEqual(init_response.status_code, 200, init_response.text)
+        first_upload_id = init_response.json()["upload_id"]
+
+        chunk = self.client.put(
+            f"/backup/uploads/{first_upload_id}/chunk?offset=0",
+            content=archive_bytes,
+            headers=self.headers,
+        )
+        self.assertEqual(chunk.status_code, 200, chunk.text)
+
+        finalize = self.client.post(f"/backup/uploads/{first_upload_id}/finalize", headers=self.headers)
+        self.assertEqual(finalize.status_code, 200, finalize.text)
+
+        stored_path = self.settings.backup_root / "edge-01" / "photos" / finalize.json()["stored_as"]
+        stored_path.unlink()
+
+        restarted = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        self.assertEqual(restarted.status_code, 200, restarted.text)
+        self.assertEqual(restarted.json()["status"], "initiated")
+        self.assertEqual(restarted.json()["next_offset"], 0)
+        self.assertNotEqual(restarted.json()["upload_id"], first_upload_id)
+
+    def test_delete_snapshot_api_reconciles_committed_index(self) -> None:
+        archive_bytes = b"hello world"
+        payload = {
+            "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
+            "job_name": "photos",
+            "fingerprint": "abcdef1234567890",
+            "timestamp": "2026-04-05T12:00:00Z",
+            "archive_format": "tar.zst",
+            "archive_size_bytes": len(archive_bytes),
+            "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            "idempotency_key": "idem-delete-api1",
+            "encryption_key_fingerprint": "e" * 64,
+        }
+
+        init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        self.assertEqual(init_response.status_code, 200, init_response.text)
+        upload_id = init_response.json()["upload_id"]
+
+        chunk = self.client.put(
+            f"/backup/uploads/{upload_id}/chunk?offset=0",
+            content=archive_bytes,
+            headers=self.headers,
+        )
+        self.assertEqual(chunk.status_code, 200, chunk.text)
+
+        finalize = self.client.post(f"/backup/uploads/{upload_id}/finalize", headers=self.headers)
+        self.assertEqual(finalize.status_code, 200, finalize.text)
+        stored_as = finalize.json()["stored_as"]
+
+        index_path = self.settings.backup_root / ".relay_index" / "edge-01" / "photos" / "committed.json"
+        index_entries = json.loads(index_path.read_text(encoding="utf-8"))
+        self.assertEqual([entry["stored_as"] for entry in index_entries], [stored_as])
+
+        delete_response = self.client.delete(f"/api/snapshots/edge-01/photos/{stored_as}")
+        self.assertEqual(delete_response.status_code, 200, delete_response.text)
+
+        updated_entries = json.loads(index_path.read_text(encoding="utf-8"))
+        self.assertEqual(updated_entries, [])
 
 if __name__ == "__main__":
     unittest.main()

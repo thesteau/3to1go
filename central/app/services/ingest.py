@@ -105,6 +105,10 @@ class IngestService:
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
+            if self._session_references_missing_snapshot(existing):
+                self._discard_session(existing)
+                existing = None
+        if existing is not None:
             if existing.archive_sha256 != archive_sha256:
                 raise HTTPException(status_code=409, detail="idempotency key reused with different archive checksum")
             existing.uploaded_bytes = self._current_upload_size(existing.upload_id)
@@ -206,6 +210,9 @@ class IngestService:
     async def finalize_upload(self, upload_id: str) -> dict:
         session = self._load_session(upload_id)
         if session.status == "completed":
+            if self._session_references_missing_snapshot(session):
+                self._discard_session(session)
+                raise HTTPException(status_code=409, detail="stored snapshot missing; re-initiate upload")
             return {
                 "status": "ok",
                 "stored_as": session.stored_as or session.filename,
@@ -393,6 +400,19 @@ class IngestService:
             duplicate=False,
         )
 
+    def _session_references_missing_snapshot(self, session: UploadSession) -> bool:
+        if session.status != "completed":
+            return False
+        stored_name = session.stored_as or session.filename
+        return not self._snapshot_exists(session.namespace, stored_name)
+
+    def _snapshot_exists(self, namespace: str, filename: str) -> bool:
+        return any(item.get("filename") == filename for item in self.storage_backend.list(namespace))
+
+    def _discard_session(self, session: UploadSession) -> None:
+        self._key_mapping_path(session.idempotency_key).unlink(missing_ok=True)
+        shutil.rmtree(self._session_dir(session.upload_id), ignore_errors=True)
+
     def get_edge_registration(self, edge_id: str) -> dict | None:
         try:
             registration = self._load_edge_registration(edge_id)
@@ -401,6 +421,9 @@ class IngestService:
         if registration is None:
             return None
         return asdict(registration)
+
+    def reconcile_namespace(self, namespace: str) -> None:
+        self._sync_committed_index(namespace)
 
     def _build_committed_duplicate_response(self, *, archive_size_bytes: int, stored_as: str) -> UploadSessionResponse:
         return UploadSessionResponse(
