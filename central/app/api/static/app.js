@@ -392,6 +392,7 @@ async function loadOverview() {
               <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
               <div class="edge-submeta">
                 ${ns.edge_instance_id ? `<span class="edge-detail" title="${escapeHtml(ns.edge_instance_id)}">Instance ${escapeHtml(ns.edge_instance_id.slice(0, 12))}</span>` : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
+                ${ns.last_seen_source ? `<span class="edge-detail" title="${escapeHtml(ns.last_seen_source)}">Source ${escapeHtml(ns.last_seen_source)}</span>` : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
                 <span class="edge-detail" title="${escapeHtml(ns.encryption_key_fingerprint || "unknown")}">Key FP ${escapeHtml(shortFingerprint(ns.encryption_key_fingerprint))}</span>
               </div>
             </div>

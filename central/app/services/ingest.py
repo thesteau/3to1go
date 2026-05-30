@@ -52,6 +52,7 @@ class EdgeRegistration:
     encryption_key_fingerprint: str | None
     first_seen_at: str
     last_seen_at: str
+    last_seen_source: str | None = None
 
 
 class IngestService:
@@ -97,11 +98,12 @@ class IngestService:
         archive_size_bytes: int,
         archive_sha256: str,
         idempotency_key: str,
+        source_address: str | None = None,
     ) -> UploadSessionResponse:
         self.cleanup_stale_uploads()
         registration_lock = await self.lock_manager.get_lock(f"edge-registry:{metadata.edge_id}")
         async with registration_lock:
-            self._register_edge(metadata)
+            self._register_edge(metadata, source_address=source_address)
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
@@ -592,7 +594,7 @@ class IngestService:
     def _session_from_json(self, payload: dict) -> UploadSession:
         return UploadSession(**payload)
 
-    def _register_edge(self, metadata: UploadMetadata) -> None:
+    def _register_edge(self, metadata: UploadMetadata, source_address: str | None = None) -> None:
         edge_instance_id = (metadata.edge_instance_id or "").strip()
         if not edge_instance_id:
             return
@@ -612,6 +614,8 @@ class IngestService:
                     "edge_id": metadata.edge_id,
                     "registered_instance_id": existing.edge_instance_id,
                     "incoming_instance_id": edge_instance_id,
+                    "registered_source_address": existing.last_seen_source,
+                    "incoming_source_address": source_address,
                 },
             )
 
@@ -625,6 +629,8 @@ class IngestService:
         registration.last_seen_at = now
         if metadata.encryption_key_fingerprint:
             registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
+        if source_address:
+            registration.last_seen_source = source_address
         self._save_edge_registration(registration)
 
     def _load_edge_registration(self, edge_id: str) -> EdgeRegistration | None:

@@ -34,6 +34,7 @@ def build_overview(settings: Settings, storage_backend: LocalFilesystemBackend, 
                     "encryption_key_fingerprint": registration.get("encryption_key_fingerprint"),
                     "first_seen_at": registration.get("first_seen_at"),
                     "last_seen_at": registration.get("last_seen_at"),
+                    "last_seen_source": registration.get("last_seen_source"),
                     "jobs": jobs,
                 }
             )

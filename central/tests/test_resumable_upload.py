@@ -160,19 +160,29 @@ class ResumableUploadTests(unittest.TestCase):
             "idempotency_key": "idem-a1234567",
             "encryption_key_fingerprint": "a" * 64,
         }
-        first = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        first = self.client.post(
+            "/backup/uploads/initiate",
+            json=payload,
+            headers={**self.headers, "X-Forwarded-For": "192.168.1.120"},
+        )
         self.assertEqual(first.status_code, 200, first.text)
 
         conflicting = dict(payload)
         conflicting["edge_instance_id"] = "edgeinstance9999"
         conflicting["idempotency_key"] = "idem-c1234567"
-        conflict = self.client.post("/backup/uploads/initiate", json=conflicting, headers=self.headers)
+        conflict = self.client.post(
+            "/backup/uploads/initiate",
+            json=conflicting,
+            headers={**self.headers, "X-Forwarded-For": "192.168.1.121"},
+        )
         self.assertEqual(conflict.status_code, 409, conflict.text)
         detail = conflict.json()["detail"]
         self.assertEqual(detail["status"], "edge_id_conflict")
         self.assertEqual(detail["edge_id"], "edge-01")
         self.assertEqual(detail["registered_instance_id"], "edgeinstance0001")
         self.assertEqual(detail["incoming_instance_id"], "edgeinstance9999")
+        self.assertEqual(detail["registered_source_address"], "192.168.1.120")
+        self.assertEqual(detail["incoming_source_address"], "192.168.1.121")
 
     def test_overview_includes_edge_registration_metadata(self) -> None:
         archive_bytes = b"hello world"
@@ -189,7 +199,11 @@ class ResumableUploadTests(unittest.TestCase):
             "encryption_key_fingerprint": "c" * 64,
         }
 
-        init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
+        init_response = self.client.post(
+            "/backup/uploads/initiate",
+            json=payload,
+            headers={**self.headers, "X-Forwarded-For": "192.168.1.120"},
+        )
         self.assertEqual(init_response.status_code, 200, init_response.text)
         upload_id = init_response.json()["upload_id"]
         chunk = self.client.put(
@@ -207,6 +221,7 @@ class ResumableUploadTests(unittest.TestCase):
         self.assertEqual(namespace["edge_id"], "edge-01")
         self.assertEqual(namespace["edge_instance_id"], "edgeinstance0001")
         self.assertEqual(namespace["encryption_key_fingerprint"], "c" * 64)
+        self.assertEqual(namespace["last_seen_source"], "192.168.1.120")
 
     def test_reuses_idempotency_key_after_manual_snapshot_deletion(self) -> None:
         archive_bytes = b"hello world"

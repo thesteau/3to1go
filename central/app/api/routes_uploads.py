@@ -19,8 +19,44 @@ from app.utils.paths import build_snapshot_filename, validate_namespace_componen
 router = APIRouter()
 
 
+def _forwarded_source_address(request: Request) -> str | None:
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        candidate = x_forwarded_for.split(",", 1)[0].strip()
+        return candidate or None
+
+    forwarded = request.headers.get("forwarded")
+    if not forwarded:
+        return None
+
+    first_hop = forwarded.split(",", 1)[0]
+    for item in first_hop.split(";"):
+        entry = item.strip()
+        if not entry.lower().startswith("for="):
+            continue
+        candidate = entry[4:].strip().strip('"')
+        if candidate.startswith("[") and candidate.endswith("]"):
+            candidate = candidate[1:-1]
+        if candidate.startswith("_"):
+            return None
+        return candidate or None
+    return None
+
+
+def _request_source_address(request: Request) -> str | None:
+    forwarded = _forwarded_source_address(request)
+    if forwarded:
+        return forwarded
+
+    client = request.client
+    if client is None:
+        return None
+    return client.host or None
+
+
 @router.post("/backup/uploads/initiate", response_model=UploadSessionResponse)
 async def initiate_upload(
+    request: Request,
     payload: UploadInitRequest,
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
@@ -68,6 +104,7 @@ async def initiate_upload(
         archive_size_bytes=payload.archive_size_bytes,
         archive_sha256=payload.archive_sha256,
         idempotency_key=payload.idempotency_key.strip(),
+        source_address=_request_source_address(request),
     )
     return result
 
