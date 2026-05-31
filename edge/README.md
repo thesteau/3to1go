@@ -128,7 +128,7 @@ Use the address Edge can actually reach:
 - same host as Central container with published port: `http://127.0.0.1:8000`
 - same Docker network as Central: `http://central:8000`
 - different machine: use Central's hostname or IP
-- separate Docker Desktop projects on the same host: often `http://host.docker.internal:8000`
+- separate Docker Desktop projects on the same host: often `http://host.docker.internal:8000` for the contributor build, or `http://host.docker.internal:6555` if Central is running from `deploy-example/central/`
 
 ## Running Edge
 
@@ -177,7 +177,17 @@ chmod +x ./dev-edge.sh
 
 ### Docker
 
-If you want to build Edge from this repo directly, use the bundled files in [`edge/`](./):
+For normal deployment with the published image, use [`deploy-example/edge/`](../deploy-example/edge/):
+
+```bash
+docker compose up -d
+```
+
+Open the UI at `http://localhost:6556/`.
+
+In that example, Edge binds to port `6556` so it does not conflict with Central on `6555`.
+
+If you are contributing and want to build Edge from this repo directly, use the bundled files in [`edge/`](./):
 
 ```powershell
 Copy-Item .env.example .env
@@ -189,18 +199,6 @@ Open the UI at `http://localhost:8080/`.
 Place the shared token file at `./secrets/relay_auth_token` before starting the stack.
 In the bundled Docker examples, `AUTH_TOKEN_FILE` can be just the filename, such as `relay_auth_token`.
 If you prefer a different filename, update `AUTH_TOKEN_FILE` in `.env` to match it.
-
-A deploy example that uses the published image lives in [`deploy-example/edge/`](../deploy-example/edge/).
-
-For that deploy example:
-
-```bash
-docker compose up -d
-```
-
-Open the UI at `http://localhost:6556/`.
-
-In that example, Edge binds to port `6556` so it does not conflict with Central on `6555`.
 
 ## Release Builds
 

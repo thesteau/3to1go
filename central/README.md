@@ -40,7 +40,22 @@ The bundled Central Compose file mounts `./secrets` as a directory at `/run/secr
 
 ### 2. Start the service
 
-For local development:
+For normal deployment with the published image, use [`deploy-example/central/`](../deploy-example/central/):
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d
+```
+
+Open the UI at `http://localhost:6555/`.
+
+That deploy example already includes:
+
+- a PostgreSQL sidecar for Central metadata
+- mounted storage for backups, staging, metadata, secrets, and Central's saved UI config
+- the user-facing `.env.example` with only the essentials
+
+If you are contributing and want to build from this repo instead, use the bundled files in [`central/`](./):
 
 ```powershell
 Copy-Item .env.example .env
@@ -49,15 +64,17 @@ docker compose up --build
 
 Open the UI at `http://localhost:8000/`.
 
-The bundled [`docker-compose.yml`](docker-compose.yml) is a local starting point, not a required production layout.
+The bundled [`docker-compose.yml`](docker-compose.yml) is the contributor/developer starting point, not the main user deployment path.
 
 ## If Edge Runs In Docker On The Same Host
 
 If Edge is in a separate Docker Desktop project on the same machine, it will often reach Central at:
 
 ```text
-http://host.docker.internal:8000
+http://host.docker.internal:6555
 ```
+
+If you are using the contributor build from [`central/`](./) instead of the deploy example, that same pattern is usually `http://host.docker.internal:8000`.
 
 ## What The Central UI Is For
 
@@ -132,18 +149,26 @@ Uploads are written to `STAGING_DIR` first and moved into final storage only aft
 
 ## Main Settings
 
-These are the ones most people care about first:
+These are the environment variables most people care about first:
 
 | Variable | Default | What it means |
 | --- | --- | --- |
-| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` | File containing the shared bearer token |
-| `BACKUP_ROOT` | `/backups` | Where final snapshots are stored |
-| `RETENTION_KEEP_LAST` | `3` | How many snapshots to keep per `edge_id/job_name` |
-| `STAGING_DIR` | `/staging` | Temporary upload staging area |
+| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` in the contributor Compose, `relay_auth_token` in the deploy example | File containing the shared bearer token |
 | `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata |
 | `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata |
 
-Full settings table:
+These Central values are edited in the Central UI and saved in Central's config file instead of `.env`:
+
+| Setting in Central UI | Default |
+| --- | --- |
+| Retention Keep Last | `3` |
+| Log Level | `INFO` |
+| Max Upload Size MB | `2048` |
+| Upload Chunk Size MB | `8` |
+| Upload Session TTL Hours | `24` |
+| Upload Cleanup Interval Seconds | `300` |
+
+Advanced environment and layout details:
 
 | Variable | Default |
 | --- | --- |
@@ -152,6 +177,10 @@ Full settings table:
 | `INDEX_DATABASE_PORT` | `5432` |
 | `INDEX_DATABASE_NAME` | `relaycentral` |
 | `POSTGRES_DB` | `relaycentral` |
+| `BACKUP_ROOT` | `/backups` |
+| `STAGING_DIR` | `/staging` |
+| `HTTP_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise |
+| `HTTP_PORT` | `8000` |
 
 ## API Surface
 

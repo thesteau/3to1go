@@ -40,10 +40,11 @@ Central never needs your plaintext files in order to store them. Decryption happ
 
 Central is usually the always-on receiver.
 
-- Use [`deploy-example/central/`](deploy-example/central/) if you want a Docker Compose starting point.
+- For normal Docker deployment, use [`deploy-example/central/`](deploy-example/central/).
+- Use [`central/`](central/) if you are contributing and want to build from this repo.
 - Create the auth token file Central expects.
 - Start the container.
-- Open the Central UI.
+- Open the Central UI at `http://localhost:6555/` for the deploy example, or `http://localhost:8000/` for the contributor build.
 
 More detail: [`central/README.md`](central/README.md)
 
@@ -51,8 +52,9 @@ More detail: [`central/README.md`](central/README.md)
 
 Edge runs on the machine that owns the files.
 
-- Start Edge on the host or in Docker.
-- Open the local Edge UI at `http://localhost:8080/`.
+- For normal Docker deployment, use [`deploy-example/edge/`](deploy-example/edge/).
+- Use [`edge/`](edge/) if you are contributing and want to build from this repo.
+- Open the local Edge UI at `http://localhost:6556/` for the deploy example, or `http://localhost:8080/` for the contributor build.
 - Set `CENTRAL_URL`.
 - Enter the same auth token Central uses.
 - Pick a unique `EDGE_ID`.
@@ -116,10 +118,10 @@ If you want off-site copies, the expected pattern is:
 
 ## Repo Layout
 
+- [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image
+- [`deploy-example/edge/`](deploy-example/edge/) - user-facing Edge Compose setup with the published image
 - [`central/`](central/) - receiver API, storage logic, and Central web UI
 - [`edge/`](edge/) - scan agent, upload logic, encryption, and Edge web UI
-- [`deploy-example/central/`](deploy-example/central/) - sample Central Compose setup
-- [`deploy-example/edge/`](deploy-example/edge/) - sample Edge Compose setup
 
 ## Which README Should I Read Next?
 
