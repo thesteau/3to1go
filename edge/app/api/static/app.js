@@ -1,4 +1,8 @@
 let latestData = null;
+let directoryExpansionState = new Set(["."]);
+let autoRefreshTimer = null;
+let isLoadingData = false;
+const AUTO_REFRESH_INTERVAL_MS = 5000;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -50,6 +54,52 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 32 }
   const short = clipMiddle(full, clipLength);
   const classes = className ? ` ${className}` : "";
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
+}
+
+function setActionStatus(message, kind = "info") {
+  const element = document.getElementById("action-status");
+  if (!element) return;
+  element.textContent = message || "";
+  element.dataset.kind = kind;
+}
+
+function clearStatus(id) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = "";
+  }
+}
+
+function openDialog(id) {
+  const dialog = document.getElementById(id);
+  if (!dialog?.showModal) return;
+  if (dialog.open) return;
+  dialog.showModal();
+}
+
+function closeDialog(id) {
+  const dialog = document.getElementById(id);
+  if (dialog?.open) {
+    dialog.close();
+  }
+}
+
+function openSettingsDialog() {
+  fillSettings(latestData?.settings || {});
+  clearStatus("settings-status");
+  openDialog("settings-dialog");
+}
+
+function openJobDialog(relativePath = ".") {
+  editPath(relativePath);
+  openDialog("job-dialog");
+}
+
+function openJobDialogFromEvent(event, relativePath) {
+  event.preventDefault();
+  event.stopPropagation();
+  openJobDialog(relativePath);
+  return false;
 }
 
 function fillMeta(data, encKey, encFingerprint) {
@@ -116,23 +166,126 @@ function fillSettings(settings) {
   document.getElementById("settings_circuit_breaker_cooldown_seconds").value = data.circuit_breaker_cooldown_seconds ?? 300;
 }
 
-function renderDirectories(data) {
-  const rows = data.directories.map((entry) => {
-    const state = entry.state?.last_status || "none";
-    const progress = entry.state?.pending_archive_size
-      ? `${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size}`
-      : "n/a";
-    return `
-      <tr>
-        <td>${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 30 })}<br><span class="hint">${renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 44 })}</span></td>
-        <td>${statusBadge(entry)}</td>
-        <td>${escapeHtml(state)}<br><span class="hint">${escapeHtml(progress)}</span></td>
-        <td><button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button></td>
-      </tr>
-    `;
-  }).join("");
-  document.getElementById("directory-rows").innerHTML = rows;
+function rememberDirectoryExpansion() {
+  const openPaths = Array.from(document.querySelectorAll("#directory-tree details[data-path][open]"))
+    .map((element) => element.dataset.path)
+    .filter(Boolean);
+  directoryExpansionState = new Set(openPaths.length ? openPaths : ["."]);
+}
 
+function buildDirectoryIndex(directories) {
+  const entriesByPath = new Map();
+  const childrenByParent = new Map();
+
+  directories.forEach((entry) => {
+    entriesByPath.set(entry.relative_path, entry);
+    childrenByParent.set(entry.relative_path, []);
+  });
+
+  directories.forEach((entry) => {
+    if (entry.relative_path === ".") {
+      return;
+    }
+    const segments = entry.relative_path.split("/");
+    const parentPath = segments.length > 1 ? segments.slice(0, -1).join("/") : ".";
+    if (!childrenByParent.has(parentPath)) {
+      childrenByParent.set(parentPath, []);
+    }
+    childrenByParent.get(parentPath).push(entry.relative_path);
+  });
+
+  return { entriesByPath, childrenByParent };
+}
+
+function formatDirectoryProgress(entry) {
+  return entry.state?.pending_archive_size
+    ? `${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`
+    : "n/a";
+}
+
+function directoryDisplayName(entry) {
+  if (entry.relative_path === ".") {
+    return "Scan Root";
+  }
+  return entry.relative_path.split("/").pop() || entry.relative_path;
+}
+
+function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
+  const relativePath = entry.relative_path;
+  const lastState = entry.state?.last_status || "none";
+  const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
+  const pathValue = relativePath === "."
+    ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
+    : renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
+
+  return `
+    <div class="dir-row">
+      <div class="dir-main">
+        <div class="dir-title">
+          ${childCount ? '<span class="dir-caret" aria-hidden="true"></span>' : '<span class="dir-caret dir-caret-placeholder" aria-hidden="true"></span>'}
+          <span class="dir-name">${escapeHtml(directoryDisplayName(entry))}</span>
+          ${statusBadge(entry)}
+          ${childCount ? `<span class="dir-count">${escapeHtml(String(childCount))} nested</span>` : ""}
+          ${hasSelectedDescendant && !entry.selected ? '<span class="dir-count">contains selected job</span>' : ""}
+        </div>
+        <div class="hint">${pathValue}</div>
+        <div class="hint">${absolutePath}</div>
+        <div class="dir-state">Last state: ${escapeHtml(lastState)} <span class="hint">${escapeHtml(formatDirectoryProgress(entry))}</span></div>
+      </div>
+      <div class="dir-actions">
+        <button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDirectoryNode(relativePath, index) {
+  const entry = index.entriesByPath.get(relativePath);
+  if (!entry) {
+    return { html: "", hasSelectedDescendant: false };
+  }
+
+  const childPaths = index.childrenByParent.get(relativePath) || [];
+  const renderedChildren = childPaths.map((childPath) => renderDirectoryNode(childPath, index));
+  const hasSelectedDescendant = entry.selected || renderedChildren.some((child) => child.hasSelectedDescendant);
+  const header = renderDirectoryHeader(entry, childPaths.length, renderedChildren.some((child) => child.hasSelectedDescendant));
+
+  if (!childPaths.length) {
+    return {
+      hasSelectedDescendant,
+      html: `<div class="dir-leaf" data-path="${escapeHtml(relativePath)}">${header}</div>`,
+    };
+  }
+
+  const shouldOpen = directoryExpansionState.has(relativePath) || hasSelectedDescendant || relativePath === ".";
+  return {
+    hasSelectedDescendant,
+    html: `
+      <details class="dir-branch" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
+        <summary class="dir-summary">${header}</summary>
+        <div class="dir-children">
+          ${renderedChildren.map((child) => child.html).join("")}
+        </div>
+      </details>
+    `,
+  };
+}
+
+function bindDirectoryTreeEvents() {
+  document.querySelectorAll("#directory-tree details[data-path]").forEach((element) => {
+    element.addEventListener("toggle", () => {
+      const path = element.dataset.path;
+      if (!path) return;
+      if (element.open) {
+        directoryExpansionState.add(path);
+      } else {
+        directoryExpansionState.delete(path);
+      }
+    });
+  });
+}
+
+function renderDirectories(data) {
   const selected = data.directories.filter((entry) => entry.selected);
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => `
@@ -146,12 +299,17 @@ function renderDirectories(data) {
         ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
         ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
         <div class="toolbar">
-          <button type="button" class="secondary" onclick="editPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
+          <button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
           <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>
         </div>
       </div>
     `).join("")
     : '<p class="hint">No directories are selected yet.</p>';
+
+  rememberDirectoryExpansion();
+  const tree = renderDirectoryNode(".", buildDirectoryIndex(data.directories || []));
+  document.getElementById("directory-tree").innerHTML = tree.html || '<p class="hint">No directories were found under the scan root.</p>';
+  bindDirectoryTreeEvents();
 }
 
 function findEntry(relativePath) {
@@ -167,6 +325,7 @@ function editPath(relativePath) {
   document.getElementById("follow_symlinks").checked = entry?.config?.follow_symlinks ?? false;
   document.getElementById("is_docker_composed").checked = entry?.config?.is_docker_composed ?? false;
   document.getElementById("update_container_on_packup").checked = entry?.config?.update_container_on_packup ?? false;
+  clearStatus("form-status");
   document.getElementById("form-status").textContent = entry?.selected
     ? "Editing existing .upload_dir"
     : "Creating a new .upload_dir";
@@ -180,22 +339,64 @@ function resetForm() {
   document.getElementById("follow_symlinks").checked = false;
   document.getElementById("is_docker_composed").checked = false;
   document.getElementById("update_container_on_packup").checked = false;
-  document.getElementById("form-status").textContent = "Pick a directory from the list to edit it.";
+  document.getElementById("form-status").textContent = "Choose a directory to create or update its .upload_dir file.";
 }
 
-async function loadData() {
+function isDialogOpen(id) {
+  return Boolean(document.getElementById(id)?.open);
+}
+
+async function loadData({ silent = false } = {}) {
+  if (isLoadingData) {
+    return;
+  }
+
+  isLoadingData = true;
   const [dirRes, keyRes] = await Promise.all([
     fetch("/api/directories"),
     fetch("/api/encryption-key"),
   ]);
-  latestData = await dirRes.json();
-  const keyData = await keyRes.json();
-  fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
-  fillSettings(latestData.settings || {});
-  renderDirectories(latestData);
-  if (!document.getElementById("relative_path").value) {
-    resetForm();
+  try {
+    if (!dirRes.ok || !keyRes.ok) {
+      throw new Error("Refresh failed.");
+    }
+
+    latestData = await dirRes.json();
+    const keyData = await keyRes.json();
+    fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
+    if (!isDialogOpen("settings-dialog")) {
+      fillSettings(latestData.settings || {});
+    }
+    renderDirectories(latestData);
+    if (!silent) {
+      document.getElementById("run-status").textContent = "";
+    }
+  } catch (error) {
+    if (!silent) {
+      setActionStatus(error.message || "Refresh failed.", "error");
+    }
+  } finally {
+    isLoadingData = false;
   }
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.hidden) {
+      return;
+    }
+    loadData({ silent: true });
+  }, AUTO_REFRESH_INTERVAL_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      loadData({ silent: true });
+    }
+  });
 }
 
 async function saveSettings() {
@@ -234,6 +435,10 @@ async function saveSettings() {
     : (body.detail || "Settings save failed.");
   if (response.ok) {
     await loadData();
+    setActionStatus("Edge settings saved.", "success");
+    closeDialog("settings-dialog");
+  } else {
+    setActionStatus(body.detail || "Settings save failed.", "error");
   }
 }
 
@@ -260,6 +465,10 @@ async function saveJob() {
     : (body.detail || "Save failed.");
   if (response.ok) {
     await loadData();
+    setActionStatus(`Saved .upload_dir for ${relativePath}.`, "success");
+    closeDialog("job-dialog");
+  } else {
+    setActionStatus(body.detail || "Save failed.", "error");
   }
 }
 
@@ -276,6 +485,10 @@ async function deleteByPath(relativePath) {
     : (body.detail || "Delete failed.");
   if (response.ok) {
     await loadData();
+    setActionStatus(`Deleted .upload_dir from ${relativePath}.`, "success");
+    closeDialog("job-dialog");
+  } else {
+    setActionStatus(body.detail || "Delete failed.", "error");
   }
 }
 
@@ -292,6 +505,7 @@ async function runNow() {
     document.getElementById("run-status").textContent = cleared > 0
       ? `Backup cycle requested. ${cleared} manual block(s) cleared for retry.`
       : "Backup cycle requested.";
+    await loadData({ silent: true });
     return;
   }
   document.getElementById("run-status").textContent = "A cycle is already running.";
@@ -299,3 +513,4 @@ async function runNow() {
 
 resetForm();
 loadData();
+startAutoRefresh();

@@ -84,6 +84,10 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 28 }
 
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
+let _overviewRefreshTimer = null;
+let _overviewLoading = false;
+let _visibilityRefreshBound = false;
+const OVERVIEW_REFRESH_INTERVAL_MS = 5000;
 
 function getExpectedKeyFingerprint(edgeId) {
   return _edgeKeyFingerprints[edgeId] || null;
@@ -388,56 +392,130 @@ function renderKeyManager(ns) {
   `;
 }
 
-async function loadOverview() {
-  const res = await fetch("/api/overview");
-  const data = await res.json();
-
-  document.getElementById("meta").innerHTML = `
-    <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
-    <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_root)}</div>
-    <div><strong>Staging Dir</strong><br>${escapeHtml(data.staging_dir)}</div>
-    <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
-  `;
-
-  const namespaces = data.namespaces || [];
-  _edgeKeyFingerprints = Object.fromEntries(
-    namespaces.map((ns) => [ns.edge_id, ns.encryption_key_fingerprint || ""]),
+function captureOverviewUiState() {
+  const expandedEdges = Array.from(document.querySelectorAll("#namespaces details[data-edge-id][open]"))
+    .map((element) => element.dataset.edgeId)
+    .filter(Boolean);
+  const keyDrafts = Object.fromEntries(
+    Array.from(document.querySelectorAll("[data-edge-key-input]"))
+      .map((input) => [input.dataset.edgeKeyInput, input.value])
+      .filter(([, value]) => value),
   );
+  return {
+    expandedEdges: new Set(expandedEdges),
+    keyDrafts,
+  };
+}
 
-  document.getElementById("namespaces").innerHTML = namespaces.length
-    ? namespaces.map((ns) => `
-        <details class="edge-card edge-card-collapsible">
-          <summary class="edge-header edge-card-summary">
-            <div class="edge-header-main">
-              <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
-              <div class="edge-submeta">
-                ${ns.edge_instance_id ? renderClipValue("Instance", ns.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
-                ${ns.last_seen_source ? renderClipValue("Source", ns.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
-                ${renderClipValue("Key FP", ns.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
+function shouldDeferOverviewRefresh() {
+  const activeElement = document.activeElement;
+  return Boolean(activeElement?.matches?.("[data-edge-key-input]"));
+}
+
+function restoreKeyDrafts(keyDrafts) {
+  Object.entries(keyDrafts || {}).forEach(([edgeId, value]) => {
+    const input = keyInputElement(edgeId);
+    if (input && !input.value) {
+      input.value = value;
+    }
+  });
+}
+
+async function loadOverview({ silent = false } = {}) {
+  if (_overviewLoading) {
+    return;
+  }
+  if (silent && shouldDeferOverviewRefresh()) {
+    return;
+  }
+
+  _overviewLoading = true;
+  const uiState = captureOverviewUiState();
+
+  try {
+    const res = await fetch("/api/overview");
+    if (!res.ok) {
+      throw new Error("Refresh failed.");
+    }
+    const data = await res.json();
+
+    document.getElementById("meta").innerHTML = `
+      <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
+      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_root)}</div>
+      <div><strong>Staging Dir</strong><br>${escapeHtml(data.staging_dir)}</div>
+      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
+    `;
+
+    const namespaces = data.namespaces || [];
+    _edgeKeyFingerprints = Object.fromEntries(
+      namespaces.map((ns) => [ns.edge_id, ns.encryption_key_fingerprint || ""]),
+    );
+
+    document.getElementById("namespaces").innerHTML = namespaces.length
+      ? namespaces.map((ns) => `
+          <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(ns.edge_id)}"${uiState.expandedEdges.has(ns.edge_id) ? " open" : ""}>
+            <summary class="edge-header edge-card-summary">
+              <div class="edge-header-main">
+                <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
+                <div class="edge-submeta">
+                  ${ns.edge_instance_id ? renderClipValue("Instance", ns.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
+                  ${ns.last_seen_source ? renderClipValue("Source", ns.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
+                  ${renderClipValue("Key FP", ns.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
+                </div>
+                <span class="edge-expand-label">Expand</span>
               </div>
-              <span class="edge-expand-label">Expand</span>
+              <span class="edge-count">${(ns.jobs || []).length} job${ns.jobs.length !== 1 ? "s" : ""}</span>
+            </summary>
+            <div class="edge-card-body">
+              ${renderKeyManager(ns)}
+              ${(ns.jobs || []).map((job) => `
+                <div class="job-block">
+                  <div class="job-header">
+                    <span class="job-name">${escapeHtml(job.job_name)}</span>
+                    <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div class="snapshot-list">
+                    ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
+                  </div>
+                </div>
+              `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
             </div>
-            <span class="edge-count">${(ns.jobs || []).length} job${ns.jobs.length !== 1 ? "s" : ""}</span>
-          </summary>
-          <div class="edge-card-body">
-            ${renderKeyManager(ns)}
-            ${(ns.jobs || []).map((job) => `
-              <div class="job-block">
-                <div class="job-header">
-                  <span class="job-name">${escapeHtml(job.job_name)}</span>
-                  <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
-                </div>
-                <div class="snapshot-list">
-                  ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
-                </div>
-              </div>
-            `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
-          </div>
-        </details>
-      `).join("")
-    : '<p class="hint">No snapshots have been stored yet.</p>';
+          </details>
+        `).join("")
+      : '<p class="hint">No snapshots have been stored yet.</p>';
 
-  await Promise.all(namespaces.map((ns) => refreshKeyPanel(ns.edge_id)));
+    restoreKeyDrafts(uiState.keyDrafts);
+    await Promise.all(namespaces.map((ns) => refreshKeyPanel(ns.edge_id)));
+  } catch (error) {
+    if (!silent) {
+      alert(error.message || "Refresh failed.");
+    }
+  } finally {
+    _overviewLoading = false;
+  }
+}
+
+function startOverviewAutoRefresh() {
+  if (_overviewRefreshTimer) {
+    clearInterval(_overviewRefreshTimer);
+  }
+
+  _overviewRefreshTimer = setInterval(() => {
+    if (document.hidden) {
+      return;
+    }
+    loadOverview({ silent: true });
+  }, OVERVIEW_REFRESH_INTERVAL_MS);
+
+  if (!_visibilityRefreshBound) {
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        loadOverview({ silent: true });
+      }
+    });
+    _visibilityRefreshBound = true;
+  }
 }
 
 loadOverview();
+startOverviewAutoRefresh();

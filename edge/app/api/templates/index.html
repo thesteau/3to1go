@@ -21,202 +21,203 @@
       <div class="toolbar">
         <button type="button" onclick="loadData()">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
+        <button type="button" class="secondary" onclick="openSettingsDialog()">Edit Edge Settings</button>
         <span class="hint" id="run-status"></span>
       </div>
+      <p class="hint status-line" id="action-status"></p>
     </section>
 
-    <section class="content-grid">
-      <section class="panel">
-        <div class="section-head">
-          <h2>Selected Jobs</h2>
-          <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically.</p>
-        </div>
-        <div id="selected-jobs" class="job-list"></div>
+    <section class="panel workspace-panel">
+      <div class="section-head">
+        <h2>Selected Jobs</h2>
+        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically.</p>
+      </div>
+      <div id="selected-jobs" class="job-list"></div>
 
-        <div class="section-head">
-          <h2>Directories Under Scan Root</h2>
-          <p class="hint">Nested directories under an existing selected parent are shown, but new nested jobs are blocked.</p>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Path</th>
-                <th>Status</th>
-                <th>Last State</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="directory-rows"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="section-head">
-          <h2>Edge Settings</h2>
-          <p class="hint">These settings are saved locally by Edge, so users do not need to manage an environment file.</p>
-        </div>
-
-        <label for="settings_edge_id">Edge ID</label>
-        <input id="settings_edge_id" placeholder="edge-01">
-        <p class="hint">Use a unique Edge ID per installation. Central now reserves each ID to one Edge instance to prevent namespace collisions.</p>
-
-        <label for="settings_scan_root">Scan Root</label>
-        <input id="settings_scan_root" placeholder="/home or C:/Users">
-
-        <label for="settings_central_url">Central URL</label>
-        <input id="settings_central_url" placeholder="http://127.0.0.1:8000">
-
-        <label for="settings_auth_token">Auth Token</label>
-        <input id="settings_auth_token" type="password" placeholder="Shared token with Central">
-
-        <label for="settings_cron_schedule">Cron Schedule</label>
-        <input id="settings_cron_schedule" placeholder="0 2 * * *">
-
-        <div class="split-row">
-          <div>
-            <label for="settings_max_depth">Max Depth</label>
-            <input id="settings_max_depth" type="number" min="0">
-          </div>
-          <div>
-            <label for="settings_log_level">Log Level</label>
-            <select id="settings_log_level">
-              <option value="DEBUG">DEBUG</option>
-              <option value="INFO">INFO</option>
-              <option value="WARNING">WARNING</option>
-              <option value="ERROR">ERROR</option>
-            </select>
-          </div>
-        </div>
-
-        <label class="checkbox">
-          <input type="checkbox" id="settings_keep_local_pending">
-          <span>Keep failed-upload archives for retry</span>
-        </label>
-
-        <details class="settings-advanced">
-          <summary>Advanced Settings</summary>
-
-          <label for="settings_state_dir">State Directory</label>
-          <input id="settings_state_dir">
-
-          <label for="settings_spool_dir">Spool Directory</label>
-          <input id="settings_spool_dir">
-
-          <div class="split-row">
-            <div>
-              <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
-              <input id="settings_upload_chunk_size_mb" type="number" min="1">
-            </div>
-            <div>
-              <label for="settings_min_upload_chunk_size_mb">Min Upload Chunk MB</label>
-              <input id="settings_min_upload_chunk_size_mb" type="number" min="1">
-            </div>
-          </div>
-
-          <div class="split-row">
-            <div>
-              <label for="settings_max_upload_chunk_size_mb">Max Upload Chunk MB</label>
-              <input id="settings_max_upload_chunk_size_mb" type="number" min="1">
-            </div>
-            <div>
-              <label for="settings_upload_retry_max_attempts">Upload Retry Attempts</label>
-              <input id="settings_upload_retry_max_attempts" type="number" min="1">
-            </div>
-          </div>
-
-          <div class="split-row">
-            <div>
-              <label for="settings_upload_retry_base_delay_seconds">Retry Base Delay Seconds</label>
-              <input id="settings_upload_retry_base_delay_seconds" type="number" min="1">
-            </div>
-            <div>
-              <label for="settings_upload_retry_max_delay_seconds">Retry Max Delay Seconds</label>
-              <input id="settings_upload_retry_max_delay_seconds" type="number" min="1">
-            </div>
-          </div>
-
-          <div class="split-row">
-            <div>
-              <label for="settings_upload_connect_timeout_seconds">Connect Timeout Seconds</label>
-              <input id="settings_upload_connect_timeout_seconds" type="number" min="1">
-            </div>
-            <div>
-              <label for="settings_upload_read_timeout_padding_seconds">Read Timeout Padding Seconds</label>
-              <input id="settings_upload_read_timeout_padding_seconds" type="number" min="5">
-            </div>
-          </div>
-
-          <div class="split-row">
-            <div>
-              <label for="settings_upload_min_throughput_bytes_per_second">Min Throughput Bytes/Second</label>
-              <input id="settings_upload_min_throughput_bytes_per_second" type="number" min="1024">
-            </div>
-            <div>
-              <label for="settings_circuit_breaker_failure_threshold">Circuit Breaker Failure Threshold</label>
-              <input id="settings_circuit_breaker_failure_threshold" type="number" min="1">
-            </div>
-          </div>
-
-          <label for="settings_circuit_breaker_cooldown_seconds">Circuit Breaker Cooldown Seconds</label>
-          <input id="settings_circuit_breaker_cooldown_seconds" type="number" min="1">
-        </details>
-
-        <div class="toolbar">
-          <button type="button" onclick="saveSettings()">Save Edge Settings</button>
-          <span class="hint" id="settings-status"></span>
-        </div>
-
-        <div class="section-head compact">
-          <h2>Job Editor</h2>
-          <p class="hint">Saving writes or updates the <code>.upload_dir</code> file for the selected directory.</p>
-        </div>
-
-        <label for="relative_path">Directory</label>
-        <input id="relative_path" readonly>
-
-        <label for="job_name">Job Name</label>
-        <input id="job_name" placeholder="Defaults to the folder name">
-
-        <label for="exclude">Exclude Patterns</label>
-        <textarea id="exclude" placeholder="One pattern per line"></textarea>
-
-        <div class="split-row">
-          <label class="checkbox">
-            <input type="checkbox" id="include_hidden" checked>
-            <span>Include hidden files</span>
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" id="follow_symlinks">
-            <span>Follow symlinks</span>
-          </label>
-        </div>
-
-        <div class="section-head compact">
-          <h3>Docker Compose Flags</h3>
-          <p class="hint">Only enable these if the selected directory itself contains `docker-compose.yml` or `compose.yml`.</p>
-        </div>
-
-        <label class="checkbox">
-          <input type="checkbox" id="is_docker_composed">
-          <span>Directory is Docker Compose-managed</span>
-        </label>
-
-        <label class="checkbox">
-          <input type="checkbox" id="update_container_on_packup">
-          <span>Pull updated images before bringing the stack back up</span>
-        </label>
-
-        <div class="toolbar">
-          <button type="button" onclick="saveJob()">Save Job</button>
-          <button type="button" class="secondary" onclick="resetForm()">New Selection</button>
-          <button type="button" class="danger" onclick="deleteJob()">Delete .upload_dir</button>
-        </div>
-        <p class="hint status-line" id="form-status"></p>
-      </section>
+      <div class="section-head compact">
+        <h2>Directories Under Scan Root</h2>
+        <p class="hint">Nested directories can be collapsed, but creating a new job under an already-selected parent still stays blocked.</p>
+      </div>
+      <div id="directory-tree" class="directory-tree"></div>
     </section>
   </main>
+
+  <dialog id="settings-dialog" class="modal" aria-labelledby="settings-dialog-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="settings-dialog-title">Edit Edge Settings</h2>
+          <p class="hint">These settings are saved locally by Edge, so users do not need to manage an environment file.</p>
+        </div>
+        <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
+      </div>
+
+      <label for="settings_edge_id">Edge ID</label>
+      <input id="settings_edge_id" placeholder="edge-01">
+      <p class="hint">Use a unique Edge ID per installation. Central now reserves each ID to one Edge instance to prevent namespace collisions.</p>
+
+      <label for="settings_scan_root">Scan Root</label>
+      <input id="settings_scan_root" placeholder="/home or C:/Users">
+
+      <label for="settings_central_url">Central URL</label>
+      <input id="settings_central_url" placeholder="http://127.0.0.1:8000">
+
+      <label for="settings_auth_token">Auth Token</label>
+      <input id="settings_auth_token" type="password" placeholder="Shared token with Central">
+
+      <label for="settings_cron_schedule">Cron Schedule</label>
+      <input id="settings_cron_schedule" placeholder="0 2 * * *">
+
+      <div class="split-row">
+        <div>
+          <label for="settings_max_depth">Max Depth</label>
+          <input id="settings_max_depth" type="number" min="0">
+        </div>
+        <div>
+          <label for="settings_log_level">Log Level</label>
+          <select id="settings_log_level">
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="checkbox">
+        <input type="checkbox" id="settings_keep_local_pending">
+        <span>Keep failed-upload archives for retry</span>
+      </label>
+
+      <details class="settings-advanced">
+        <summary>Advanced Settings</summary>
+
+        <label for="settings_state_dir">State Directory</label>
+        <input id="settings_state_dir">
+
+        <label for="settings_spool_dir">Spool Directory</label>
+        <input id="settings_spool_dir">
+
+        <div class="split-row">
+          <div>
+            <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
+            <input id="settings_upload_chunk_size_mb" type="number" min="1">
+          </div>
+          <div>
+            <label for="settings_min_upload_chunk_size_mb">Min Upload Chunk MB</label>
+            <input id="settings_min_upload_chunk_size_mb" type="number" min="1">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="settings_max_upload_chunk_size_mb">Max Upload Chunk MB</label>
+            <input id="settings_max_upload_chunk_size_mb" type="number" min="1">
+          </div>
+          <div>
+            <label for="settings_upload_retry_max_attempts">Upload Retry Attempts</label>
+            <input id="settings_upload_retry_max_attempts" type="number" min="1">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="settings_upload_retry_base_delay_seconds">Retry Base Delay Seconds</label>
+            <input id="settings_upload_retry_base_delay_seconds" type="number" min="1">
+          </div>
+          <div>
+            <label for="settings_upload_retry_max_delay_seconds">Retry Max Delay Seconds</label>
+            <input id="settings_upload_retry_max_delay_seconds" type="number" min="1">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="settings_upload_connect_timeout_seconds">Connect Timeout Seconds</label>
+            <input id="settings_upload_connect_timeout_seconds" type="number" min="1">
+          </div>
+          <div>
+            <label for="settings_upload_read_timeout_padding_seconds">Read Timeout Padding Seconds</label>
+            <input id="settings_upload_read_timeout_padding_seconds" type="number" min="5">
+          </div>
+        </div>
+
+        <div class="split-row">
+          <div>
+            <label for="settings_upload_min_throughput_bytes_per_second">Min Throughput Bytes/Second</label>
+            <input id="settings_upload_min_throughput_bytes_per_second" type="number" min="1024">
+          </div>
+          <div>
+            <label for="settings_circuit_breaker_failure_threshold">Circuit Breaker Failure Threshold</label>
+            <input id="settings_circuit_breaker_failure_threshold" type="number" min="1">
+          </div>
+        </div>
+
+        <label for="settings_circuit_breaker_cooldown_seconds">Circuit Breaker Cooldown Seconds</label>
+        <input id="settings_circuit_breaker_cooldown_seconds" type="number" min="1">
+      </details>
+
+      <div class="toolbar">
+        <button type="button" onclick="saveSettings()">Save Edge Settings</button>
+        <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
+        <span class="hint" id="settings-status"></span>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="job-dialog" class="modal" aria-labelledby="job-dialog-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="job-dialog-title">Job Editor</h2>
+          <p class="hint">Saving writes or updates the <code>.upload_dir</code> file for the selected directory.</p>
+        </div>
+        <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Close</button>
+      </div>
+
+      <label for="relative_path">Directory</label>
+      <input id="relative_path" readonly>
+
+      <label for="job_name">Job Name</label>
+      <input id="job_name" placeholder="Defaults to the folder name">
+
+      <label for="exclude">Exclude Patterns</label>
+      <textarea id="exclude" placeholder="One pattern per line"></textarea>
+
+      <div class="split-row">
+        <label class="checkbox">
+          <input type="checkbox" id="include_hidden" checked>
+          <span>Include hidden files</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="follow_symlinks">
+          <span>Follow symlinks</span>
+        </label>
+      </div>
+
+      <div class="section-head compact">
+        <h3>Docker Compose Flags</h3>
+        <p class="hint">Only enable these if the selected directory itself contains `docker-compose.yml` or `compose.yml`.</p>
+      </div>
+
+      <label class="checkbox">
+        <input type="checkbox" id="is_docker_composed">
+        <span>Directory is Docker Compose-managed</span>
+      </label>
+
+      <label class="checkbox">
+        <input type="checkbox" id="update_container_on_packup">
+        <span>Pull updated images before bringing the stack back up</span>
+      </label>
+
+      <div class="toolbar">
+        <button type="button" onclick="saveJob()">Save Job</button>
+        <button type="button" class="danger" onclick="deleteJob()">Delete .upload_dir</button>
+        <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Cancel</button>
+      </div>
+      <p class="hint status-line" id="form-status"></p>
+    </div>
+  </dialog>
 
   <script src="{{ request.scope.get('root_path', '') }}/static/app.js"></script>
 </body>
