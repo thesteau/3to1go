@@ -89,6 +89,49 @@ let _overviewLoading = false;
 let _visibilityRefreshBound = false;
 const OVERVIEW_REFRESH_INTERVAL_MS = 5000;
 
+function setActionStatus(message, kind = "info") {
+  const element = document.getElementById("action-status");
+  if (!element) return;
+  element.textContent = message || "";
+  element.className = kind === "error" ? "hint key-status error" : "hint";
+}
+
+function clearStatus(id) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = "";
+  }
+}
+
+function openDialog(id) {
+  const dialog = document.getElementById(id);
+  if (!dialog?.showModal || dialog.open) return;
+  dialog.showModal();
+}
+
+function closeDialog(id) {
+  const dialog = document.getElementById(id);
+  if (dialog?.open) {
+    dialog.close();
+  }
+}
+
+function fillSettings(settings) {
+  const data = settings || {};
+  document.getElementById("settings_retention_keep_last").value = data.retention_keep_last ?? 3;
+  document.getElementById("settings_log_level").value = data.log_level || "INFO";
+  document.getElementById("settings_max_upload_size_mb").value = data.max_upload_size_mb ?? 2048;
+  document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
+  document.getElementById("settings_upload_session_ttl_hours").value = data.upload_session_ttl_hours ?? 24;
+  document.getElementById("settings_upload_cleanup_interval_seconds").value = data.upload_cleanup_interval_seconds ?? 300;
+}
+
+function openSettingsDialog() {
+  fillSettings(window.__centralSettings || {});
+  clearStatus("settings-status");
+  openDialog("settings-dialog");
+}
+
 function getExpectedKeyFingerprint(edgeId) {
   return _edgeKeyFingerprints[edgeId] || null;
 }
@@ -409,7 +452,7 @@ function captureOverviewUiState() {
 
 function shouldDeferOverviewRefresh() {
   const activeElement = document.activeElement;
-  return Boolean(activeElement?.matches?.("[data-edge-key-input]"));
+  return Boolean(activeElement?.matches?.("[data-edge-key-input]")) || Boolean(document.getElementById("settings-dialog")?.open);
 }
 
 function restoreKeyDrafts(keyDrafts) {
@@ -438,12 +481,14 @@ async function loadOverview({ silent = false } = {}) {
       throw new Error("Refresh failed.");
     }
     const data = await res.json();
+    window.__centralSettings = data.settings || {};
 
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_root)}</div>
       <div><strong>Staging Dir</strong><br>${escapeHtml(data.staging_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
+      <div><strong>Settings File</strong><br>${escapeHtml(data.settings_path || "n/a")}</div>
     `;
 
     const namespaces = data.namespaces || [];
@@ -485,6 +530,9 @@ async function loadOverview({ silent = false } = {}) {
       : '<p class="hint">No snapshots have been stored yet.</p>';
 
     restoreKeyDrafts(uiState.keyDrafts);
+    if (!document.getElementById("settings-dialog")?.open) {
+      fillSettings(data.settings || {});
+    }
     await Promise.all(namespaces.map((ns) => refreshKeyPanel(ns.edge_id)));
   } catch (error) {
     if (!silent) {
@@ -492,6 +540,34 @@ async function loadOverview({ silent = false } = {}) {
     }
   } finally {
     _overviewLoading = false;
+  }
+}
+
+async function saveSettings() {
+  const payload = {
+    retention_keep_last: Number(document.getElementById("settings_retention_keep_last").value || 1),
+    log_level: document.getElementById("settings_log_level").value,
+    max_upload_size_mb: Number(document.getElementById("settings_max_upload_size_mb").value || 1),
+    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
+    upload_session_ttl_hours: Number(document.getElementById("settings_upload_session_ttl_hours").value || 1),
+    upload_cleanup_interval_seconds: Number(document.getElementById("settings_upload_cleanup_interval_seconds").value || 10),
+  };
+
+  const response = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  document.getElementById("settings-status").textContent = response.ok
+    ? "Settings saved."
+    : (body.detail || "Settings save failed.");
+  if (response.ok) {
+    await loadOverview({ silent: true });
+    setActionStatus("Central settings saved.");
+    closeDialog("settings-dialog");
+  } else {
+    setActionStatus(body.detail || "Settings save failed.", "error");
   }
 }
 

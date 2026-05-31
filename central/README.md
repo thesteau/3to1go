@@ -22,6 +22,10 @@ Central is responsible for:
 
 Central stores what Edge sends. If Edge encryption is enabled, Central stores encrypted blobs and never sees plaintext.
 
+Central can also keep its internal metadata in PostgreSQL on the Central machine. That metadata covers the snapshot index (`.relay_index`) and Edge registration registry (`.relay_registry`). Edge does not connect to that database directly.
+
+Central also keeps its own advanced runtime settings in a local config file. In the bundled Docker layout that file lives under the mounted `./config` volume, so values changed in the UI persist across `docker compose down` and `docker compose up`.
+
 ## First-Time Setup
 
 The easiest way to start is with Docker Compose.
@@ -84,6 +88,26 @@ Central writes to the local filesystem rooted at `BACKUP_ROOT`.
 
 If you want off-site or cloud copies, the intended pattern is to sync `BACKUP_ROOT` with a separate tool after Central writes it.
 
+### Metadata backend
+
+Final snapshot archives still live on disk under `BACKUP_ROOT`.
+
+Central's internal metadata can use either:
+
+- file-backed metadata under `.relay_index` and `.relay_registry`
+- PostgreSQL on the Central host for those same metadata records
+
+When PostgreSQL credentials are configured, Central imports existing file-backed metadata into PostgreSQL on startup so the UI and duplicate detection keep working with existing snapshots.
+
+### Settings precedence
+
+Central uses two different configuration sources on purpose:
+
+- Infrastructure settings come from the environment and Docker layout: auth token file, PostgreSQL credentials, backup root, staging dir, and the HTTP bind.
+- Operator settings come from Central's saved config file: retention, logging level, upload limits, upload session TTL, and cleanup interval.
+
+That means `docker compose down` and `docker compose up` do not reset the UI-edited Central settings, because those values are not being pulled from the env file anymore.
+
 ### Edge identity protection
 
 Newer Edge builds send a stable `edge_instance_id`.
@@ -116,19 +140,18 @@ These are the ones most people care about first:
 | `BACKUP_ROOT` | `/backups` | Where final snapshots are stored |
 | `RETENTION_KEEP_LAST` | `3` | How many snapshots to keep per `edge_id/job_name` |
 | `STAGING_DIR` | `/staging` | Temporary upload staging area |
-| `HTTP_PORT` | `8000` | Port for the Central web UI and API |
+| `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata |
+| `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata |
 
 Full settings table:
 
 | Variable | Default |
 | --- | --- |
-| `STORAGE_BACKEND` | `local` |
-| `LOG_LEVEL` | `INFO` |
-| `MAX_UPLOAD_SIZE_MB` | `2048` |
-| `UPLOAD_CHUNK_SIZE_MB` | `8` |
-| `UPLOAD_SESSION_TTL_HOURS` | `24` |
-| `UPLOAD_CLEANUP_INTERVAL_SECONDS` | `300` |
-| `HTTP_HOST` | `0.0.0.0` |
+| `INDEX_DATABASE_URL` | unset |
+| `INDEX_DATABASE_HOST` | `postgres` |
+| `INDEX_DATABASE_PORT` | `5432` |
+| `INDEX_DATABASE_NAME` | `relaycentral` |
+| `POSTGRES_DB` | `relaycentral` |
 
 ## API Surface
 
@@ -157,6 +180,7 @@ The bundled Compose example mounts:
 
 - `./data/backups` to `/backups`
 - `./data/staging` to `/staging`
+- `./data/postgres` for PostgreSQL metadata storage
 - `./secrets` to `/run/secrets`
 
 After the first start, Central writes the generated token to `./secrets/relay_auth_token`.

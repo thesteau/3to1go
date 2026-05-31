@@ -80,6 +80,28 @@ h1, h2 { margin: 0; }
 
 .section-head { margin-bottom: 14px; }
 
+label {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 0.94rem;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fff;
+  font: inherit;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 button, .btn {
   border: 0;
   border-radius: 10px;
@@ -96,6 +118,37 @@ button, .btn {
   color: #fff;
   padding: 10px 16px;
   font-size: 1rem;
+}
+
+.modal {
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.modal::backdrop {
+  background: rgba(36, 48, 59, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.modal-card {
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 12px;
 }
 
 /* Edge cards */
@@ -344,6 +397,11 @@ button, .btn {
 @media (max-width: 640px) {
   .page-shell { padding: 14px; }
   .snapshot-size { display: none; }
+  .split-row,
+  .modal-head {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
   .edge-key-controls {
     grid-template-columns: 1fr;
   }

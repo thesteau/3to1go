@@ -14,7 +14,13 @@ APP_DIR_NAME = "RelayCentralizerEdge"
 DEFAULT_SECRET_DIR = Path("/run/secrets")
 
 
+def _uses_container_layout() -> bool:
+    return os.getenv("XDG_CONFIG_HOME", "").strip() == "/config"
+
+
 def _default_scan_root() -> Path:
+    if _uses_container_layout():
+        return Path("/scan")
     if sys.platform == "win32":
         return Path("C:/Users")
     if sys.platform == "darwin":
@@ -85,6 +91,10 @@ def _coerce_int(value: Any, default: int, minimum: int) -> int:
     if value is None or value == "":
         return default
     return max(minimum, int(value))
+
+
+def _default_http_host() -> str:
+    return "0.0.0.0" if _uses_container_layout() else "127.0.0.1"
 
 
 @dataclass(slots=True)
@@ -180,7 +190,7 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
 
 def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     raw = payload or {}
-    cron_schedule = _coerce_text(raw.get("cron_schedule"), "0 2 * * *")
+    cron_schedule = _coerce_text(raw.get("cron_schedule"), "0 2 * * 0")
     CronSchedule.from_expression(cron_schedule)
 
     return Settings(
@@ -205,7 +215,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         upload_min_throughput_bytes_per_second=_coerce_int(raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024),
         circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
         circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
-        http_host=_coerce_text(raw.get("http_host"), "127.0.0.1"),
+        http_host=_coerce_text(raw.get("http_host"), _default_http_host()),
         http_port=_coerce_int(raw.get("http_port"), 8080, 1),
     )
 
@@ -216,7 +226,6 @@ def _env_overrides() -> dict[str, Any]:
         "EDGE_ID": "edge_id",
         "SCAN_ROOT": "scan_root",
         "CENTRAL_URL": "central_url",
-        "CRON_SCHEDULE": "cron_schedule",
         "STATE_DIR": "state_dir",
         "SPOOL_DIR": "spool_dir",
         "LOG_LEVEL": "log_level",

@@ -117,3 +117,20 @@ class UploadChunkResponse(BaseModel):
     status: str
     next_offset: int
     received_bytes: int
+
+
+class CentralSettingsInput(BaseModel):
+    retention_keep_last: int = Field(ge=1)
+    log_level: str = Field(min_length=4, max_length=16)
+    max_upload_size_mb: int = Field(ge=1)
+    upload_chunk_size_mb: int = Field(ge=1)
+    upload_session_ttl_hours: int = Field(ge=1)
+    upload_cleanup_interval_seconds: int = Field(ge=10)
+
+    @field_validator("log_level")
+    @classmethod
+    def normalize_log_level(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
+            raise ValueError("log_level must be one of DEBUG, INFO, WARNING, ERROR")
+        return normalized

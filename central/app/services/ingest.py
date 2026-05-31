@@ -14,6 +14,8 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from app.api.models import UploadMetadata, UploadSessionResponse
+from app.index.base import SnapshotIndexBackend
+from app.index.file import FileSnapshotIndexBackend
 from app.services.locks import NamespaceLockManager
 from app.services.retention import prune_old_snapshots
 from app.storage.base import StorageBackend
@@ -59,6 +61,7 @@ class IngestService:
     def __init__(
         self,
         storage_backend: StorageBackend,
+        snapshot_index: SnapshotIndexBackend,
         lock_manager: NamespaceLockManager,
         staging_dir: Path,
         max_upload_size_bytes: int,
@@ -68,6 +71,7 @@ class IngestService:
         logger,
     ) -> None:
         self.storage_backend = storage_backend
+        self.snapshot_index = snapshot_index
         self.lock_manager = lock_manager
         self.staging_dir = staging_dir
         self.max_upload_size_bytes = max_upload_size_bytes
@@ -78,15 +82,8 @@ class IngestService:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         self.upload_root = self.staging_dir / "uploads"
         self.key_root = self.upload_root / "keys"
-        backup_root = getattr(self.storage_backend, "backup_root", None)
-        self.index_root = backup_root / ".relay_index" if backup_root is not None else None
-        self.registry_root = backup_root / ".relay_registry" / "edges" if backup_root is not None else None
         self.upload_root.mkdir(parents=True, exist_ok=True)
         self.key_root.mkdir(parents=True, exist_ok=True)
-        if self.index_root is not None:
-            self.index_root.mkdir(parents=True, exist_ok=True)
-        if self.registry_root is not None:
-            self.registry_root.mkdir(parents=True, exist_ok=True)
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_manager_lock = asyncio.Lock()
 
@@ -108,6 +105,7 @@ class IngestService:
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
             if self._session_references_missing_snapshot(existing):
+                self.reconcile_namespace(existing.namespace)
                 self._discard_session(existing)
                 existing = None
         if existing is not None:
@@ -119,7 +117,7 @@ class IngestService:
             self._save_session(existing)
             return self._build_session_response(existing)
 
-        committed_duplicate = self._find_committed_duplicate(namespace, archive_sha256)
+        committed_duplicate = self.snapshot_index.find_duplicate(namespace, archive_sha256)
         if committed_duplicate is not None:
             return self._build_committed_duplicate_response(
                 archive_size_bytes=archive_size_bytes,
@@ -213,6 +211,7 @@ class IngestService:
         session = self._load_session(upload_id)
         if session.status == "completed":
             if self._session_references_missing_snapshot(session):
+                self.reconcile_namespace(session.namespace)
                 self._discard_session(session)
                 raise HTTPException(status_code=409, detail="stored snapshot missing; re-initiate upload")
             return {
@@ -259,7 +258,7 @@ class IngestService:
                     },
                 )
 
-            committed_duplicate = self._find_committed_duplicate(session.namespace, actual_sha256)
+            committed_duplicate = self.snapshot_index.find_duplicate(session.namespace, actual_sha256)
             if committed_duplicate is not None:
                 staged_path.unlink(missing_ok=True)
                 session.uploaded_bytes = session.archive_size_bytes
@@ -294,16 +293,23 @@ class IngestService:
                 )
                 raise
 
-            self._record_committed_snapshot(
+            current_snapshots = self.storage_backend.list(session.namespace)
+            current_snapshot = next(
+                (item for item in current_snapshots if item.get("filename") == storage_result["stored_as"]),
+                None,
+            )
+            self.snapshot_index.upsert_snapshot(
                 session.namespace,
                 {
                     "stored_as": storage_result["stored_as"],
                     "archive_sha256": actual_sha256,
                     "fingerprint": session.fingerprint,
                     "timestamp": session.timestamp,
+                    "size_bytes": (current_snapshot or {}).get("size_bytes", 0),
+                    "mtime": (current_snapshot or {}).get("mtime", 0),
                 },
             )
-            self._sync_committed_index(session.namespace)
+            self.snapshot_index.reconcile_namespace(session.namespace, current_snapshots)
             session.uploaded_bytes = session.archive_size_bytes
             session.status = "completed"
             session.stored_as = storage_result["stored_as"]
@@ -416,16 +422,27 @@ class IngestService:
         shutil.rmtree(self._session_dir(session.upload_id), ignore_errors=True)
 
     def get_edge_registration(self, edge_id: str) -> dict | None:
-        try:
-            registration = self._load_edge_registration(edge_id)
-        except OSError:
-            return None
-        if registration is None:
-            return None
-        return asdict(registration)
+        return self.snapshot_index.get_edge_registration(edge_id)
 
     def reconcile_namespace(self, namespace: str) -> None:
-        self._sync_committed_index(namespace)
+        self.snapshot_index.reconcile_namespace(namespace, self.storage_backend.list(namespace))
+
+    def migrate_legacy_snapshot_index(self) -> None:
+        if self.snapshot_index.backend_name != "postgres":
+            return
+        backup_root = getattr(self.storage_backend, "backup_root", None)
+        if backup_root is None:
+            return
+
+        legacy_index = FileSnapshotIndexBackend(backup_root)
+        for registration in legacy_index.list_edge_registrations():
+            self.snapshot_index.upsert_edge_registration(registration)
+        for namespace in legacy_index.list_namespaces():
+            for job in namespace["jobs"]:
+                full_namespace = f"{namespace['edge_id']}/{job['job_name']}"
+                for entry in legacy_index.list_namespace_entries(full_namespace):
+                    self.snapshot_index.upsert_snapshot(full_namespace, entry)
+                self.snapshot_index.reconcile_namespace(full_namespace, self.storage_backend.list(full_namespace))
 
     def _build_committed_duplicate_response(self, *, archive_size_bytes: int, stored_as: str) -> UploadSessionResponse:
         return UploadSessionResponse(
@@ -451,87 +468,6 @@ class IngestService:
     def _key_mapping_path(self, idempotency_key: str) -> Path:
         digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
         return self.key_root / f"{digest}.json"
-
-    def _registration_path(self, edge_id: str) -> Path | None:
-        if self.registry_root is None:
-            return None
-        return self.registry_root / f"{edge_id}.json"
-
-    def _index_dir(self, namespace: str) -> Path | None:
-        if self.index_root is None:
-            return None
-        return self.index_root / namespace
-
-    def _index_path(self, namespace: str) -> Path | None:
-        index_dir = self._index_dir(namespace)
-        if index_dir is None:
-            return None
-        return index_dir / "committed.json"
-
-    def _load_committed_index(self, namespace: str) -> list[dict]:
-        index_path = self._index_path(namespace)
-        if index_path is None or not index_path.exists():
-            return []
-        try:
-            payload = json.loads(index_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return []
-        if not isinstance(payload, list):
-            return []
-        entries: list[dict] = []
-        for item in payload:
-            if not isinstance(item, dict):
-                continue
-            stored_as = item.get("stored_as")
-            archive_sha256 = item.get("archive_sha256")
-            if not isinstance(stored_as, str) or not isinstance(archive_sha256, str):
-                continue
-            entries.append(item)
-        return entries
-
-    def _save_committed_index(self, namespace: str, entries: list[dict]) -> None:
-        index_dir = self._index_dir(namespace)
-        index_path = self._index_path(namespace)
-        if index_dir is None or index_path is None:
-            return
-        index_dir.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=index_dir,
-            delete=False,
-            suffix=".tmp",
-        ) as handle:
-            json.dump(entries, handle, indent=2, sort_keys=True)
-            handle.flush()
-            temp_path = Path(handle.name)
-        temp_path.replace(index_path)
-
-    def _record_committed_snapshot(self, namespace: str, entry: dict) -> None:
-        entries = self._load_committed_index(namespace)
-        updated = [item for item in entries if item.get("stored_as") != entry["stored_as"]]
-        updated.append(entry)
-        self._save_committed_index(namespace, updated)
-
-    def _sync_committed_index(self, namespace: str) -> None:
-        existing_files = {item["filename"] for item in self.storage_backend.list(namespace)}
-        entries = self._load_committed_index(namespace)
-        filtered = [item for item in entries if item.get("stored_as") in existing_files]
-        self._save_committed_index(namespace, filtered)
-
-    def _find_committed_duplicate(self, namespace: str, archive_sha256: str) -> dict | None:
-        entries = self._load_committed_index(namespace)
-        if not entries:
-            return None
-
-        existing_files = {item["filename"] for item in self.storage_backend.list(namespace)}
-        filtered = [item for item in entries if item.get("stored_as") in existing_files]
-        if len(filtered) != len(entries):
-            self._save_committed_index(namespace, filtered)
-        for item in filtered:
-            if item.get("archive_sha256") == archive_sha256:
-                return item
-        return None
 
     def _write_key_mapping(self, idempotency_key: str, upload_id: str) -> None:
         path = self._key_mapping_path(idempotency_key)
@@ -600,7 +536,8 @@ class IngestService:
             return
 
         now = _utc_now_text()
-        existing = self._load_edge_registration(metadata.edge_id)
+        existing_payload = self.snapshot_index.get_edge_registration(metadata.edge_id)
+        existing = EdgeRegistration(**existing_payload) if existing_payload else None
         if existing is not None and existing.edge_instance_id != edge_instance_id:
             message = (
                 f'edge_id "{metadata.edge_id}" is already registered to another Edge instance '
@@ -631,39 +568,7 @@ class IngestService:
             registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
         if source_address:
             registration.last_seen_source = source_address
-        self._save_edge_registration(registration)
-
-    def _load_edge_registration(self, edge_id: str) -> EdgeRegistration | None:
-        path = self._registration_path(edge_id)
-        if path is None or not path.exists():
-            return None
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        if not isinstance(payload, dict):
-            return None
-        try:
-            return EdgeRegistration(**payload)
-        except TypeError:
-            return None
-
-    def _save_edge_registration(self, registration: EdgeRegistration) -> None:
-        path = self._registration_path(registration.edge_id)
-        if path is None:
-            return
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            delete=False,
-            suffix=".tmp",
-        ) as handle:
-            json.dump(asdict(registration), handle, indent=2, sort_keys=True)
-            handle.flush()
-            temp_path = Path(handle.name)
-        temp_path.replace(path)
+        self.snapshot_index.upsert_edge_registration(asdict(registration))
 
     def _current_upload_size(self, upload_id: str) -> int:
         data_path = self._upload_data_path(upload_id)

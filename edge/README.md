@@ -215,7 +215,7 @@ After installing or unpacking Edge:
 2. Set `CENTRAL_URL`.
 3. Enter the shared auth token.
 4. Set a unique `EDGE_ID`.
-5. Point `SCAN_ROOT` at the directory tree you want scanned.
+5. In the Docker examples, Edge automatically starts with `SCAN_ROOT=/scan`. You can change that later in the Edge UI if needed.
 
 Windows installer startup can be registered manually with:
 
@@ -259,11 +259,11 @@ Most people care about these first:
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
-| `SCAN_ROOT` | platform-dependent | Root directory Edge scans for `.upload_dir` files |
+| `SCAN_ROOT` | `/scan` in Docker, platform-dependent otherwise | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://127.0.0.1:8000` | Address of Central |
 | `AUTH_TOKEN_FILE` | unset | Optional token file path, or just a filename under `/run/secrets` in the Docker examples |
 | `AUTH_TOKEN` | empty | Shared bearer token when not using `AUTH_TOKEN_FILE` |
-| `CRON_SCHEDULE` | `0 2 * * *` | Backup schedule |
+| Cron Schedule in the Edge UI | `0 2 * * 0` | Backup schedule, defaulting to Sunday at 2:00 AM |
 | `HTTP_PORT` | `8080` | Local Edge UI port |
 
 Additional settings:
@@ -286,7 +286,7 @@ Additional settings:
 | `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` |
 | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` |
-| `HTTP_HOST` | `127.0.0.1` |
+| `HTTP_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise |
 
 ## API Surface
 

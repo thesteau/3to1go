@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.core import config  # noqa: E402
+
+
+class ConfigTests(unittest.TestCase):
+    def test_build_index_database_url_prefers_explicit_url(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "INDEX_DATABASE_URL": "postgresql://custom:secret@db:5432/customdb",
+                "INDEX_DATABASE_USER": "relay",
+                "INDEX_DATABASE_PASSWORD": "ignored",
+            },
+            clear=True,
+        ):
+            url = config._build_index_database_url()
+
+        self.assertEqual(url, "postgresql://custom:secret@db:5432/customdb")
+
+    def test_build_index_database_url_uses_simple_credentials_defaults(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "POSTGRES_USER": "relay",
+                "POSTGRES_PASSWORD": "secret",
+            },
+            clear=True,
+        ):
+            url = config._build_index_database_url()
+
+        self.assertEqual(url, "postgresql://relay:secret@postgres:5432/relaycentral")
+
+    def test_build_index_database_url_prefers_index_specific_credentials_when_present(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "INDEX_DATABASE_USER": "relay-index",
+                "INDEX_DATABASE_PASSWORD": "secret-index",
+                "POSTGRES_USER": "relay",
+                "POSTGRES_PASSWORD": "secret",
+                "POSTGRES_DB": "relaycentral",
+            },
+            clear=True,
+        ):
+            url = config._build_index_database_url()
+
+        self.assertEqual(url, "postgresql://relay-index:secret-index@postgres:5432/relaycentral")
+
+    def test_build_index_database_url_returns_none_without_credentials(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            url = config._build_index_database_url()
+
+        self.assertIsNone(url)
+
+    def test_load_settings_reads_saved_config_and_ignores_env_for_ui_managed_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            settings_path = temp_path / "settings.json"
+            auth_token_path = temp_path / "relay_auth_token"
+            auth_token_path.write_text("secret\n", encoding="utf-8")
+            settings_path.write_text(
+                json.dumps(
+                    {
+                        "retention_keep_last": 9,
+                        "log_level": "ERROR",
+                        "max_upload_size_mb": 777,
+                        "upload_chunk_size_mb": 12,
+                        "upload_session_ttl_hours": 36,
+                        "upload_cleanup_interval_seconds": 900,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(config, "settings_storage_path", return_value=settings_path):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "AUTH_TOKEN_FILE": str(auth_token_path),
+                        "RETENTION_KEEP_LAST": "2",
+                        "LOG_LEVEL": "DEBUG",
+                        "MAX_UPLOAD_SIZE_MB": "100",
+                        "UPLOAD_CHUNK_SIZE_MB": "2",
+                        "UPLOAD_SESSION_TTL_HOURS": "12",
+                        "UPLOAD_CLEANUP_INTERVAL_SECONDS": "60",
+                    },
+                    clear=True,
+                ):
+                    settings = config.load_settings()
+
+        self.assertEqual(settings.retention_keep_last, 9)
+        self.assertEqual(settings.log_level, "ERROR")
+        self.assertEqual(settings.max_upload_size_mb, 777)
+        self.assertEqual(settings.upload_chunk_size_mb, 12)
+        self.assertEqual(settings.upload_session_ttl_hours, 36)
+        self.assertEqual(settings.upload_cleanup_interval_seconds, 900)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,9 +3,13 @@ services:
     build: .
     env_file:
       - ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
+      - ./config:/config
       - ./data/backups:/backups
       - ./data/staging:/staging
       - ./secrets:/run/secrets
@@ -24,3 +28,18 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  postgres:
+    image: postgres:17-alpine
+    env_file:
+      - ./.env
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped

@@ -32,7 +32,7 @@ class CronSchedule:
         normalized = " ".join(expression.split())
         parts = normalized.split(" ")
         if len(parts) != 5:
-            raise ValueError("CRON_SCHEDULE must use 5 fields like '0 2 * * *'")
+            raise ValueError("Cron schedule must use 5 fields like '0 2 * * 0'")
 
         parsed_fields: list[frozenset[int]] = []
         wildcard_flags: list[bool] = []
@@ -90,7 +90,7 @@ class CronSchedule:
             current = self.next_after(previous)
             if current - previous < _MINIMUM_SCHEDULE_GAP:
                 raise ValueError(
-                    f"CRON_SCHEDULE must not run more often than every {MINIMUM_SCHEDULE_MINUTES} minutes"
+                    f"Cron schedule must not run more often than every {MINIMUM_SCHEDULE_MINUTES} minutes"
                 )
             if current - previous > timedelta(days=7):
                 return

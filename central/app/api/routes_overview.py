@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 
-from app.api.dependencies import get_ingest_service, get_settings, get_storage_backend
-from app.api.models import HealthResponse
+from app.api.dependencies import get_ingest_service, get_settings, get_settings_store, get_snapshot_index, get_storage_backend
+from app.api.models import CentralSettingsInput, HealthResponse
 from app.api.views import templates
 from app.core.config import Settings
+from app.index.base import SnapshotIndexBackend
 from app.services.ingest import IngestService
 from app.services.overview import build_overview
+from app.services.settings_store import SettingsStore
 from app.storage.local import LocalFilesystemBackend
 
 
@@ -29,8 +31,29 @@ async def overview(
     settings: Settings = Depends(get_settings),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
     ingest_service: IngestService = Depends(get_ingest_service),
+    snapshot_index: SnapshotIndexBackend = Depends(get_snapshot_index),
 ) -> dict:
-    return build_overview(settings, storage_backend, ingest_service)
+    return build_overview(settings, storage_backend, ingest_service, snapshot_index)
+
+
+@router.post("/api/settings")
+async def save_settings(
+    config: CentralSettingsInput,
+    request: Request,
+    settings_store: SettingsStore = Depends(get_settings_store),
+) -> dict:
+    settings = settings_store.save(config.model_dump())
+    request.app.state.apply_settings(settings)
+    await request.app.state.restart_cleanup_task(settings.upload_cleanup_interval_seconds)
+    return {
+        "status": "ok",
+        "settings": build_overview(
+            request.app.state.settings,
+            request.app.state.storage_backend,
+            request.app.state.ingest_service,
+            request.app.state.snapshot_index,
+        )["settings"],
+    }
 
 
 @router.get("/health/ready")
