@@ -10,7 +10,7 @@ services:
       - "6555:6555"
     volumes:
       - ./config:/config
-      - ./data/backups:/backups
+      - ${BACKUP_DIR:-./data/backups}:/backups
       - ./data/staging:/staging
       - ./secrets:/run/secrets
     restart: unless-stopped
