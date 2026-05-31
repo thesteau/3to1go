@@ -5,12 +5,24 @@ import secrets
 from pathlib import Path
 
 
+_DEFAULT_SECRET_DIR = Path("/run/secrets")
+
+
 def load_auth_token() -> str:
     raw_path = os.getenv("AUTH_TOKEN_FILE")
     if raw_path and raw_path.strip():
-        return _load_or_create_auth_token(Path(raw_path.strip()))
+        return _load_or_create_auth_token(_resolve_auth_token_path(raw_path.strip()))
 
     raise RuntimeError("AUTH_TOKEN_FILE environment variable is not set or empty.")
+
+
+def _resolve_auth_token_path(value: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    if len(candidate.parts) == 1:
+        return _DEFAULT_SECRET_DIR / candidate
+    return candidate
 
 
 def _load_or_create_auth_token(path: Path) -> str:
