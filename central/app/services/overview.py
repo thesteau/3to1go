@@ -12,20 +12,64 @@ def build_overview(
     ingest_service: IngestService,
     snapshot_index: SnapshotIndexBackend,
 ) -> dict:
-    namespaces: list[dict] = []
-    for namespace in snapshot_index.list_namespaces():
-        registration = ingest_service.get_edge_registration(namespace["edge_id"]) or {}
-        namespaces.append(
-            {
-                "edge_id": namespace["edge_id"],
+    edges: list[dict] = []
+    edge_map: dict[str, dict] = {}
+    instance_map: dict[tuple[str, str | None], dict] = {}
+
+    for registration in snapshot_index.list_edge_registrations():
+        edge = edge_map.get(registration["edge_id"])
+        if edge is None:
+            edge = {"edge_id": registration["edge_id"], "instances": []}
+            edge_map[registration["edge_id"]] = edge
+            edges.append(edge)
+
+        key = (registration["edge_id"], registration.get("edge_instance_id"))
+        instance = instance_map.get(key)
+        if instance is None:
+            instance = {
                 "edge_instance_id": registration.get("edge_instance_id"),
+                "instance_label": registration.get("edge_instance_id") or "Legacy snapshots",
+                "advertised_url": registration.get("advertised_url"),
                 "encryption_key_fingerprint": registration.get("encryption_key_fingerprint"),
                 "first_seen_at": registration.get("first_seen_at"),
                 "last_seen_at": registration.get("last_seen_at"),
                 "last_seen_source": registration.get("last_seen_source"),
-                "jobs": namespace["jobs"],
+                "jobs": [],
             }
-        )
+            instance_map[key] = instance
+            edge["instances"].append(instance)
+        else:
+            if registration.get("advertised_url"):
+                instance["advertised_url"] = registration.get("advertised_url")
+            if registration.get("encryption_key_fingerprint"):
+                instance["encryption_key_fingerprint"] = registration.get("encryption_key_fingerprint")
+            instance["first_seen_at"] = registration.get("first_seen_at") or instance.get("first_seen_at")
+            instance["last_seen_at"] = registration.get("last_seen_at") or instance.get("last_seen_at")
+            instance["last_seen_source"] = registration.get("last_seen_source") or instance.get("last_seen_source")
+
+    for namespace in snapshot_index.list_namespaces():
+        edge = edge_map.get(namespace["edge_id"])
+        if edge is None:
+            edge = {"edge_id": namespace["edge_id"], "instances": []}
+            edge_map[namespace["edge_id"]] = edge
+            edges.append(edge)
+
+        key = (namespace["edge_id"], namespace.get("edge_instance_id"))
+        instance = instance_map.get(key)
+        if instance is None:
+            instance = {
+                "edge_instance_id": namespace.get("edge_instance_id"),
+                "instance_label": namespace.get("edge_instance_id") or "Legacy snapshots",
+                "advertised_url": None,
+                "encryption_key_fingerprint": None,
+                "first_seen_at": None,
+                "last_seen_at": None,
+                "last_seen_source": None,
+                "jobs": [],
+            }
+            instance_map[key] = instance
+            edge["instances"].append(instance)
+        instance["jobs"] = namespace["jobs"]
 
     return {
         "status": "ok" if storage_backend.healthcheck() else "degraded",
@@ -35,5 +79,5 @@ def build_overview(
         "settings_path": str(settings_storage_path()),
         "settings": settings_to_payload(settings),
         "http_url": f"http://localhost:{settings.http_port}",
-        "namespaces": namespaces,
+        "edges": edges,
     }

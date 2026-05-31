@@ -50,6 +50,7 @@ class JobProcessorTests(unittest.TestCase):
             edge_id="edge-01",
             scan_root=self.temp_dir / "scan",
             central_url="http://central:6555",
+            advertised_url="",
             auth_token="secret",
             cron_schedule="0 2 * * *",
             state_dir=self.temp_dir / "state",

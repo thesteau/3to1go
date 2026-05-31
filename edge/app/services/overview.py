@@ -18,6 +18,7 @@ def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
         "encryption_key_fingerprint": encryption_fingerprint,
         "scan_root": str(runner.settings.scan_root),
         "central_url": runner.settings.central_url,
+        "advertised_url": runner.settings.advertised_url,
         "cron_schedule": runner.settings.cron_schedule,
         "minimum_cycle_gap_minutes": MINIMUM_SCHEDULE_MINUTES,
         "http_url": f"http://localhost:{runner.settings.http_port}",

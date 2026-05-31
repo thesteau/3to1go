@@ -23,6 +23,7 @@ class ConfigTests(unittest.TestCase):
         settings = config.build_settings({})
         self.assertEqual(settings.http_port, 6556)
         self.assertEqual(settings.central_url, "http://127.0.0.1:6555")
+        self.assertEqual(settings.advertised_url, "")
 
     def test_build_settings_uses_docker_friendly_defaults_in_container_layout(self) -> None:
         with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/config"}, clear=True):

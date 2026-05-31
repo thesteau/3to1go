@@ -111,6 +111,7 @@ function fillMeta(data, encKey, encFingerprint) {
     <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
     <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
+    <div><strong>Advertised URL</strong><br>${renderClipValue("", data.advertised_url || "—", { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Edge UI</strong><br>${renderClipValue("", data.http_url, { className: "clip-code", clipLength: 30 })}</div>
     <div><strong>Settings File</strong><br>${renderClipValue("", data.settings_path || "n/a", { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Cron Schedule</strong><br><code>${escapeHtml(data.cron_schedule)}</code></div>
@@ -146,6 +147,7 @@ function fillSettings(settings) {
   document.getElementById("settings_edge_id").value = data.edge_id || "";
   document.getElementById("settings_scan_root").value = data.scan_root || "";
   document.getElementById("settings_central_url").value = data.central_url || "";
+  document.getElementById("settings_advertised_url").value = data.advertised_url || "";
   document.getElementById("settings_auth_token").value = data.auth_token || "";
   document.getElementById("settings_cron_schedule").value = data.cron_schedule || "";
   document.getElementById("settings_state_dir").value = data.state_dir || "";
@@ -404,6 +406,7 @@ async function saveSettings() {
     edge_id: document.getElementById("settings_edge_id").value.trim(),
     scan_root: document.getElementById("settings_scan_root").value.trim(),
     central_url: document.getElementById("settings_central_url").value.trim(),
+    advertised_url: document.getElementById("settings_advertised_url").value.trim(),
     auth_token: document.getElementById("settings_auth_token").value,
     cron_schedule: document.getElementById("settings_cron_schedule").value.trim(),
     state_dir: document.getElementById("settings_state_dir").value.trim(),

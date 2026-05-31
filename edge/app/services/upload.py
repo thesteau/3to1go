@@ -89,6 +89,7 @@ class CircuitBreaker:
 class UploadClient:
     def __init__(self, settings: Settings) -> None:
         self.central_url = settings.central_url.rstrip("/")
+        self.advertised_url = settings.advertised_url.rstrip("/") if settings.advertised_url else None
         self.auth_token = settings.auth_token
         self.edge_instance_id = load_or_create_installation_id(installation_id_path())
         self.encryption_key_fingerprint = key_fingerprint(load_or_create_key(encryption_key_path()))
@@ -266,6 +267,7 @@ class UploadClient:
                 "archive_sha256": archive_sha256,
                 "idempotency_key": idempotency_key,
                 "encryption_key_fingerprint": self.encryption_key_fingerprint,
+                "advertised_url": self.advertised_url,
             },
             timeout=(self.connect_timeout_seconds, self._timeout_for_bytes(self.chunk_size_bytes)),
         )

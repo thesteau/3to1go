@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -32,6 +33,7 @@ class UploadMetadata(BaseModel):
     timestamp: str = Field(min_length=1, max_length=64)
     archive_format: str
     encryption_key_fingerprint: str | None = Field(default=None, min_length=16, max_length=128)
+    advertised_url: str | None = Field(default=None, max_length=512)
 
     @field_validator("archive_format")
     @classmethod
@@ -48,6 +50,11 @@ class UploadMetadata(BaseModel):
             return None
         normalized = value.strip().lower()
         return normalized or None
+
+    @field_validator("advertised_url")
+    @classmethod
+    def normalize_optional_url(cls, value: str | None) -> str | None:
+        return _normalize_optional_url(value)
 
     @field_validator("timestamp")
     @classmethod
@@ -68,6 +75,7 @@ class UploadInitRequest(BaseModel):
     archive_sha256: str = Field(min_length=64, max_length=64)
     idempotency_key: str = Field(min_length=8, max_length=256)
     encryption_key_fingerprint: str | None = Field(default=None, min_length=16, max_length=128)
+    advertised_url: str | None = Field(default=None, max_length=512)
 
     @field_validator("archive_format")
     @classmethod
@@ -99,6 +107,11 @@ class UploadInitRequest(BaseModel):
             return None
         normalized = value.strip().lower()
         return normalized or None
+
+    @field_validator("advertised_url")
+    @classmethod
+    def normalize_optional_url(cls, value: str | None) -> str | None:
+        return _normalize_optional_url(value)
 
 
 class UploadSessionResponse(BaseModel):
@@ -134,3 +147,15 @@ class CentralSettingsInput(BaseModel):
         if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("log_level must be one of DEBUG, INFO, WARNING, ERROR")
         return normalized
+
+
+def _normalize_optional_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().rstrip("/")
+    if not normalized:
+        return None
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("advertised_url must be a full http or https URL")
+    return normalized

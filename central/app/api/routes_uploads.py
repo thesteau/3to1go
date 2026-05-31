@@ -17,6 +17,7 @@ from app.utils.paths import build_snapshot_filename, validate_namespace_componen
 
 
 router = APIRouter()
+LEGACY_INSTANCE_ID = "_legacy"
 
 
 def _forwarded_source_address(request: Request) -> str | None:
@@ -54,6 +55,12 @@ def _request_source_address(request: Request) -> str | None:
     return client.host or None
 
 
+def _storage_instance_id(edge_instance_id: str | None) -> str:
+    if not edge_instance_id:
+        return LEGACY_INSTANCE_ID
+    return validate_namespace_component(edge_instance_id, "edge_instance_id")
+
+
 @router.post("/backup/uploads/initiate", response_model=UploadSessionResponse)
 async def initiate_upload(
     request: Request,
@@ -74,6 +81,7 @@ async def initiate_upload(
             timestamp=payload.timestamp.strip(),
             archive_format=payload.archive_format,
             encryption_key_fingerprint=payload.encryption_key_fingerprint,
+            advertised_url=payload.advertised_url,
         )
     except ValueError as exc:
         logger.error("invalid_metadata detail=%s", exc)
@@ -87,10 +95,11 @@ async def initiate_upload(
         timestamp=metadata.timestamp,
         fingerprint=metadata.fingerprint,
     )
-    namespace = f"{metadata.edge_id}/{metadata.job_name}"
+    namespace = f"{metadata.edge_id}/{_storage_instance_id(metadata.edge_instance_id)}/{metadata.job_name}"
     logger.info(
-        "upload_session_requested edge_id=%s job_name=%s filename=%s fingerprint=%s size=%s",
+        "upload_session_requested edge_id=%s edge_instance_id=%s job_name=%s filename=%s fingerprint=%s size=%s",
         metadata.edge_id,
+        metadata.edge_instance_id or LEGACY_INSTANCE_ID,
         metadata.job_name,
         stored_name,
         metadata.fingerprint,

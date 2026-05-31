@@ -82,6 +82,14 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 28 }
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
 }
 
+function renderLinkValue(label, value, { className = "", clipLength = 28 } = {}) {
+  const full = String(value ?? "").trim();
+  if (!full) return "";
+  const short = clipMiddle(full, clipLength);
+  const classes = className ? ` ${className}` : "";
+  return `<a class="clip-static clip-link${classes}" href="${escapeHtml(full)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></a>`;
+}
+
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
 let _overviewRefreshTimer = null;
@@ -132,62 +140,70 @@ function openSettingsDialog() {
   openDialog("settings-dialog");
 }
 
-function getExpectedKeyFingerprint(edgeId) {
-  return _edgeKeyFingerprints[edgeId] || null;
+function buildEdgeKeyId(edgeId, edgeInstanceId) {
+  return `${edgeId}::${edgeInstanceId || "_legacy"}`;
 }
 
-function getEncKey(edgeId) {
-  if (_encKeys[edgeId]) return _encKeys[edgeId];
-  const stored = sessionStorage.getItem(`relay_enc_${edgeId}`);
+function getExpectedKeyFingerprint(edgeId, edgeInstanceId) {
+  return _edgeKeyFingerprints[buildEdgeKeyId(edgeId, edgeInstanceId)] || null;
+}
+
+function getEncKey(edgeId, edgeInstanceId) {
+  const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
+  if (_encKeys[keyId]) return _encKeys[keyId];
+  const stored = sessionStorage.getItem(`relay_enc_${keyId}`);
   if (stored) {
-    _encKeys[edgeId] = stored;
+    _encKeys[keyId] = stored;
     return stored;
   }
   return null;
 }
 
-function setEncKey(edgeId, key) {
-  _encKeys[edgeId] = key;
-  sessionStorage.setItem(`relay_enc_${edgeId}`, key);
+function setEncKey(edgeId, edgeInstanceId, key) {
+  const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
+  _encKeys[keyId] = key;
+  sessionStorage.setItem(`relay_enc_${keyId}`, key);
 }
 
-function clearStoredEncKey(edgeId) {
-  delete _encKeys[edgeId];
-  sessionStorage.removeItem(`relay_enc_${edgeId}`);
+function clearStoredEncKey(edgeId, edgeInstanceId) {
+  const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
+  delete _encKeys[keyId];
+  sessionStorage.removeItem(`relay_enc_${keyId}`);
 }
 
-function keyInputElement(edgeId) {
-  const selector = `[data-edge-key-input="${escapeSelectorValue(edgeId)}"]`;
+function keyInputElement(edgeId, edgeInstanceId) {
+  const selector = `[data-edge-key-input="${escapeSelectorValue(buildEdgeKeyId(edgeId, edgeInstanceId))}"]`;
   return document.querySelector(selector);
 }
 
-function keyStatusElement(edgeId) {
-  const selector = `[data-edge-key-status="${escapeSelectorValue(edgeId)}"]`;
+function keyStatusElement(edgeId, edgeInstanceId) {
+  const selector = `[data-edge-key-status="${escapeSelectorValue(buildEdgeKeyId(edgeId, edgeInstanceId))}"]`;
   return document.querySelector(selector);
 }
 
-function setKeyStatus(edgeId, message, kind = "info") {
-  const element = keyStatusElement(edgeId);
+function setKeyStatus(edgeId, edgeInstanceId, message, kind = "info") {
+  const element = keyStatusElement(edgeId, edgeInstanceId);
   if (!element) return;
   element.textContent = message;
   element.className = `key-status ${kind}`;
 }
 
-async function storeEncKey(edgeId, key, { alertOnError = false } = {}) {
+async function storeEncKey(edgeId, edgeInstanceId, key, { alertOnError = false } = {}) {
   try {
     const actualFingerprint = await fingerprintKey(key);
-    const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
+    const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
     if (expectedFingerprint && actualFingerprint !== expectedFingerprint) {
-      clearStoredEncKey(edgeId);
+      clearStoredEncKey(edgeId, edgeInstanceId);
       const message = `That key belongs to a different Edge. Expected ${shortFingerprint(expectedFingerprint)}, got ${shortFingerprint(actualFingerprint)}.`;
-      setKeyStatus(edgeId, message, "error");
+      setKeyStatus(edgeId, edgeInstanceId, message, "error");
       if (alertOnError) alert(message);
       return null;
     }
 
-    setEncKey(edgeId, key);
+    setEncKey(edgeId, edgeInstanceId, key);
     setKeyStatus(
       edgeId,
+      edgeInstanceId,
       expectedFingerprint
         ? `Key saved and verified for this browser session. Fingerprint ${shortFingerprint(actualFingerprint)}.`
         : `Key saved for this browser session. Fingerprint ${shortFingerprint(actualFingerprint)}.`,
@@ -195,21 +211,22 @@ async function storeEncKey(edgeId, key, { alertOnError = false } = {}) {
     );
     return key;
   } catch {
-    clearStoredEncKey(edgeId);
+    clearStoredEncKey(edgeId, edgeInstanceId);
     const message = "Encryption key was not valid base64url text.";
-    setKeyStatus(edgeId, message, "error");
+    setKeyStatus(edgeId, edgeInstanceId, message, "error");
     if (alertOnError) alert(message);
     return null;
   }
 }
 
-async function rememberEncKey(edgeId) {
-  const input = keyInputElement(edgeId);
+async function rememberEncKey(edgeId, edgeInstanceId) {
+  const input = keyInputElement(edgeId, edgeInstanceId);
   const key = input?.value.trim() || "";
   if (!key) {
-    const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
+    const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
     setKeyStatus(
       edgeId,
+      edgeInstanceId,
       expectedFingerprint
         ? `Paste the Edge key first. Expected fingerprint ${shortFingerprint(expectedFingerprint)}.`
         : "Paste the Edge key first.",
@@ -217,17 +234,18 @@ async function rememberEncKey(edgeId) {
     );
     return;
   }
-  const stored = await storeEncKey(edgeId, key);
+  const stored = await storeEncKey(edgeId, edgeInstanceId, key);
   if (stored && input) input.value = "";
 }
 
-function clearEncKey(edgeId) {
-  clearStoredEncKey(edgeId);
-  const input = keyInputElement(edgeId);
+function clearEncKey(edgeId, edgeInstanceId) {
+  clearStoredEncKey(edgeId, edgeInstanceId);
+  const input = keyInputElement(edgeId, edgeInstanceId);
   if (input) input.value = "";
-  const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
+  const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
   setKeyStatus(
     edgeId,
+    edgeInstanceId,
     expectedFingerprint
       ? `Cleared. Expected fingerprint ${shortFingerprint(expectedFingerprint)}.`
       : "Cleared saved key for this browser session.",
@@ -235,13 +253,14 @@ function clearEncKey(edgeId) {
   );
 }
 
-async function refreshKeyPanel(edgeId) {
-  const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
-  const key = getEncKey(edgeId);
+async function refreshKeyPanel(edgeId, edgeInstanceId) {
+  const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
+  const key = getEncKey(edgeId, edgeInstanceId);
 
   if (!key) {
     setKeyStatus(
       edgeId,
+      edgeInstanceId,
       expectedFingerprint
         ? `No key saved yet. Expected fingerprint ${shortFingerprint(expectedFingerprint)}.`
         : "No key saved yet. Central has not seen a key fingerprint for this Edge yet.",
@@ -253,9 +272,10 @@ async function refreshKeyPanel(edgeId) {
   try {
     const actualFingerprint = await fingerprintKey(key);
     if (expectedFingerprint && actualFingerprint !== expectedFingerprint) {
-      clearStoredEncKey(edgeId);
+      clearStoredEncKey(edgeId, edgeInstanceId);
       setKeyStatus(
         edgeId,
+        edgeInstanceId,
         `Saved key fingerprint ${shortFingerprint(actualFingerprint)} did not match expected ${shortFingerprint(expectedFingerprint)} and was cleared.`,
         "error",
       );
@@ -264,37 +284,42 @@ async function refreshKeyPanel(edgeId) {
 
     setKeyStatus(
       edgeId,
+      edgeInstanceId,
       expectedFingerprint
         ? `Saved key verified for this browser session. Expected fingerprint ${shortFingerprint(expectedFingerprint)}.`
         : `Saved key present for this browser session. Fingerprint ${shortFingerprint(actualFingerprint)}.`,
       "ok",
     );
   } catch {
-    clearStoredEncKey(edgeId);
-    setKeyStatus(edgeId, "Saved key was invalid and has been cleared.", "error");
+    clearStoredEncKey(edgeId, edgeInstanceId);
+    setKeyStatus(edgeId, edgeInstanceId, "Saved key was invalid and has been cleared.", "error");
   }
 }
 
-async function resolveEncKey(edgeId) {
-  const saved = getEncKey(edgeId);
+async function resolveEncKey(edgeId, edgeInstanceId) {
+  const saved = getEncKey(edgeId, edgeInstanceId);
   if (saved) return saved;
 
-  const typed = keyInputElement(edgeId)?.value.trim() || "";
+  const typed = keyInputElement(edgeId, edgeInstanceId)?.value.trim() || "";
   if (typed) {
-    return storeEncKey(edgeId, typed, { alertOnError: true });
+    return storeEncKey(edgeId, edgeInstanceId, typed, { alertOnError: true });
   }
 
-  const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
+  const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
+  const instanceLabel = edgeInstanceId || "legacy";
   const promptMessage = expectedFingerprint
-    ? `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}".\nExpected fingerprint: ${shortFingerprint(expectedFingerprint)}`
-    : `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}".`;
+    ? `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}" instance "${instanceLabel}".\nExpected fingerprint: ${shortFingerprint(expectedFingerprint)}`
+    : `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}" instance "${instanceLabel}".`;
   const prompted = (prompt(promptMessage) || "").trim();
   if (!prompted) return null;
-  return storeEncKey(edgeId, prompted, { alertOnError: true });
+  return storeEncKey(edgeId, edgeInstanceId, prompted, { alertOnError: true });
 }
 
-async function downloadSnapshot(edgeId, jobName, filename, btn) {
-  const url = `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
+async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
+  const basePath = edgeInstanceId
+    ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
+    : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
+  const url = basePath;
   btn.disabled = true;
   try {
     const res = await fetch(url);
@@ -309,16 +334,16 @@ async function downloadSnapshot(edgeId, jobName, filename, btn) {
       return;
     }
 
-    const key = await resolveEncKey(edgeId);
+    const key = await resolveEncKey(edgeId, edgeInstanceId);
     if (!key) return;
 
     try {
       const decrypted = await decryptBuffer(buffer, key);
       triggerBlobDownload(decrypted, filename);
     } catch {
-      clearStoredEncKey(edgeId);
-      await refreshKeyPanel(edgeId);
-      const expectedFingerprint = getExpectedKeyFingerprint(edgeId);
+      clearStoredEncKey(edgeId, edgeInstanceId);
+      await refreshKeyPanel(edgeId, edgeInstanceId);
+      const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
       alert(
         expectedFingerprint
           ? "Decryption failed after fingerprint verification. The archive may be corrupted, or the Edge key changed after this snapshot was uploaded."
@@ -370,13 +395,16 @@ function getToken() {
   return _token;
 }
 
-async function deleteSnapshot(edgeId, jobName, filename, btn) {
+async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
   if (!confirm(`Delete ${filename}?\nThis cannot be undone.`)) return;
 
   btn.disabled = true;
   try {
+    const url = edgeInstanceId
+      ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
+      : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
     const res = await fetch(
-      `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`,
+      url,
       { method: "DELETE" },
     );
     if (!res.ok) {
@@ -389,7 +417,7 @@ async function deleteSnapshot(edgeId, jobName, filename, btn) {
   }
 }
 
-function renderSnapshots(edgeId, jobName, snapshots) {
+function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
   if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
   return snapshots.map((snap) => {
     const name = snap.name;
@@ -405,9 +433,9 @@ function renderSnapshots(edgeId, jobName, snapshots) {
         <span class="snapshot-size">${escapeHtml(size)}</span>
         <div class="snapshot-actions">
           <button class="btn btn-dl"
-            onclick="downloadSnapshot('${escapeHtml(edgeId)}','${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
+            onclick="downloadSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
           <button class="btn btn-del"
-            onclick="deleteSnapshot('${escapeHtml(edgeId)}','${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Delete</button>
+            onclick="deleteSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Delete</button>
         </div>
       </div>`;
   }).join("");
@@ -415,6 +443,8 @@ function renderSnapshots(edgeId, jobName, snapshots) {
 
 function renderKeyManager(ns) {
   const edgeId = ns.edge_id;
+  const edgeInstanceId = ns.edge_instance_id;
+  const edgeKeyId = buildEdgeKeyId(edgeId, edgeInstanceId);
   const expectedFingerprint = ns.encryption_key_fingerprint || "";
   return `
     <div class="edge-key-panel">
@@ -426,12 +456,47 @@ function renderKeyManager(ns) {
         <input
           type="password"
           placeholder="Paste the Edge encryption key"
-          data-edge-key-input="${escapeHtml(edgeId)}">
-        <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}')">Save Key</button>
-        <button class="btn btn-clear" type="button" onclick="clearEncKey('${escapeHtml(edgeId)}')">Clear</button>
+          data-edge-key-input="${escapeHtml(edgeKeyId)}">
+        <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}','${escapeHtml(edgeInstanceId)}')">Save Key</button>
+        <button class="btn btn-clear" type="button" onclick="clearEncKey('${escapeHtml(edgeId)}','${escapeHtml(edgeInstanceId)}')">Clear</button>
       </div>
-      <div class="key-status info" data-edge-key-status="${escapeHtml(edgeId)}"></div>
+      <div class="key-status info" data-edge-key-status="${escapeHtml(edgeKeyId)}"></div>
     </div>
+  `;
+}
+
+function renderInstanceMeta(instance) {
+  return `
+    ${instance.edge_instance_id ? renderClipValue("Instance", instance.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy snapshot path</span>'}
+    ${instance.advertised_url ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 }) : ''}
+    ${instance.last_seen_source ? renderClipValue("Source", instance.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
+    ${renderClipValue("Key FP", instance.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
+  `;
+}
+
+function renderInstanceCard(edgeId, instance) {
+  return `
+    <section class="instance-card">
+      <div class="instance-head">
+        <div>
+          <div class="instance-title">${escapeHtml(instance.edge_instance_id || "Legacy snapshots")}</div>
+          <div class="edge-submeta">${renderInstanceMeta(instance)}</div>
+        </div>
+        <span class="edge-count">${(instance.jobs || []).length} job${instance.jobs.length !== 1 ? "s" : ""}</span>
+      </div>
+      ${instance.edge_instance_id ? renderKeyManager({ edge_id: edgeId, edge_instance_id: instance.edge_instance_id, encryption_key_fingerprint: instance.encryption_key_fingerprint }) : ""}
+      ${(instance.jobs || []).map((job) => `
+        <div class="job-block">
+          <div class="job-header">
+            <span class="job-name">${escapeHtml(job.job_name)}</span>
+            <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+          </div>
+          <div class="snapshot-list">
+            ${renderSnapshots(edgeId, instance.edge_instance_id, job.job_name, job.snapshots || [])}
+          </div>
+        </div>
+      `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
+    </section>
   `;
 }
 
@@ -456,8 +521,9 @@ function shouldDeferOverviewRefresh() {
 }
 
 function restoreKeyDrafts(keyDrafts) {
-  Object.entries(keyDrafts || {}).forEach(([edgeId, value]) => {
-    const input = keyInputElement(edgeId);
+  Object.entries(keyDrafts || {}).forEach(([edgeKeyId, value]) => {
+    const [edgeId, rawInstanceId] = String(edgeKeyId).split("::", 2);
+    const input = keyInputElement(edgeId, rawInstanceId === "_legacy" ? null : rawInstanceId);
     if (input && !input.value) {
       input.value = value;
     }
@@ -491,39 +557,27 @@ async function loadOverview({ silent = false } = {}) {
       <div><strong>Settings File</strong><br>${escapeHtml(data.settings_path || "n/a")}</div>
     `;
 
-    const namespaces = data.namespaces || [];
+    const edges = data.edges || [];
+    const allInstances = edges.flatMap((edge) => (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })));
     _edgeKeyFingerprints = Object.fromEntries(
-      namespaces.map((ns) => [ns.edge_id, ns.encryption_key_fingerprint || ""]),
+      allInstances
+        .filter(({ instance }) => instance.edge_instance_id)
+        .map(({ edgeId, instance }) => [buildEdgeKeyId(edgeId, instance.edge_instance_id), instance.encryption_key_fingerprint || ""]),
     );
 
-    document.getElementById("namespaces").innerHTML = namespaces.length
-      ? namespaces.map((ns) => `
-          <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(ns.edge_id)}"${uiState.expandedEdges.has(ns.edge_id) ? " open" : ""}>
+    document.getElementById("namespaces").innerHTML = edges.length
+      ? edges.map((edge) => `
+          <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(edge.edge_id)}"${uiState.expandedEdges.has(edge.edge_id) ? " open" : ""}>
             <summary class="edge-header edge-card-summary">
               <div class="edge-header-main">
-                <span class="edge-id">${escapeHtml(ns.edge_id)}</span>
-                <div class="edge-submeta">
-                  ${ns.edge_instance_id ? renderClipValue("Instance", ns.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy Edge metadata</span>'}
-                  ${ns.last_seen_source ? renderClipValue("Source", ns.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
-                  ${renderClipValue("Key FP", ns.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
-                </div>
+                <span class="edge-id">${escapeHtml(edge.edge_id)}</span>
+                <div class="edge-submeta">${escapeHtml(String((edge.instances || []).length))} instance${edge.instances.length !== 1 ? "s" : ""}</div>
                 <span class="edge-expand-label">Expand</span>
               </div>
-              <span class="edge-count">${(ns.jobs || []).length} job${ns.jobs.length !== 1 ? "s" : ""}</span>
+              <span class="edge-count">${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0)} job${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0) !== 1 ? "s" : ""}</span>
             </summary>
             <div class="edge-card-body">
-              ${renderKeyManager(ns)}
-              ${(ns.jobs || []).map((job) => `
-                <div class="job-block">
-                  <div class="job-header">
-                    <span class="job-name">${escapeHtml(job.job_name)}</span>
-                    <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div class="snapshot-list">
-                    ${renderSnapshots(ns.edge_id, job.job_name, job.snapshots || [])}
-                  </div>
-                </div>
-              `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
+              ${(edge.instances || []).map((instance) => renderInstanceCard(edge.edge_id, instance)).join("") || '<p class="no-snapshots">No instances registered yet.</p>'}
             </div>
           </details>
         `).join("")
@@ -533,7 +587,11 @@ async function loadOverview({ silent = false } = {}) {
     if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(data.settings || {});
     }
-    await Promise.all(namespaces.map((ns) => refreshKeyPanel(ns.edge_id)));
+    await Promise.all(
+      allInstances
+        .filter(({ instance }) => instance.edge_instance_id)
+        .map(({ edgeId, instance }) => refreshKeyPanel(edgeId, instance.edge_instance_id)),
+    );
   } catch (error) {
     if (!silent) {
       alert(error.message || "Refresh failed.");

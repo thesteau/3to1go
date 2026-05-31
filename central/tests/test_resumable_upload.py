@@ -60,6 +60,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": archive_sha256,
             "idempotency_key": "idem-12345678",
             "encryption_key_fingerprint": "f" * 64,
+            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=init_payload, headers=self.headers)
@@ -95,7 +96,7 @@ class ResumableUploadTests(unittest.TestCase):
         self.assertEqual(duplicate.json()["status"], "completed")
         self.assertEqual(duplicate.json()["next_offset"], len(archive_bytes))
 
-        stored_files = list((self.settings.backup_root / "edge-01" / "photos").glob("*.tar.zst"))
+        stored_files = list((self.settings.backup_root / "edge-01" / "edgeinstance0001" / "photos").glob("*.tar.zst"))
         self.assertEqual(len(stored_files), 1)
 
         committed_duplicate_payload = dict(init_payload)
@@ -147,7 +148,7 @@ class ResumableUploadTests(unittest.TestCase):
             second = self.client.post("/backup/uploads/initiate", json=payload_two, headers=self.headers)
             self.assertEqual(second.status_code, 507, second.text)
 
-    def test_rejects_edge_id_collision_from_different_instance(self) -> None:
+    def test_allows_same_edge_id_for_different_instances(self) -> None:
         payload = {
             "edge_id": "edge-01",
             "edge_instance_id": "edgeinstance0001",
@@ -159,6 +160,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "e9c0f8b575cbfcb42ab3b78ecc87efa3b011d9a5d10b09fa4e96f240bf6a82f5",
             "idempotency_key": "idem-a1234567",
             "encryption_key_fingerprint": "a" * 64,
+            "advertised_url": "https://edge-one.example.com",
         }
         first = self.client.post(
             "/backup/uploads/initiate",
@@ -167,22 +169,23 @@ class ResumableUploadTests(unittest.TestCase):
         )
         self.assertEqual(first.status_code, 200, first.text)
 
-        conflicting = dict(payload)
-        conflicting["edge_instance_id"] = "edgeinstance9999"
-        conflicting["idempotency_key"] = "idem-c1234567"
-        conflict = self.client.post(
+        second_instance = dict(payload)
+        second_instance["edge_instance_id"] = "edgeinstance9999"
+        second_instance["idempotency_key"] = "idem-c1234567"
+        second_instance["advertised_url"] = "http://192.168.1.121:6556"
+        second = self.client.post(
             "/backup/uploads/initiate",
-            json=conflicting,
+            json=second_instance,
             headers={**self.headers, "X-Forwarded-For": "192.168.1.121"},
         )
-        self.assertEqual(conflict.status_code, 409, conflict.text)
-        detail = conflict.json()["detail"]
-        self.assertEqual(detail["status"], "edge_id_conflict")
-        self.assertEqual(detail["edge_id"], "edge-01")
-        self.assertEqual(detail["registered_instance_id"], "edgeinstance0001")
-        self.assertEqual(detail["incoming_instance_id"], "edgeinstance9999")
-        self.assertEqual(detail["registered_source_address"], "192.168.1.120")
-        self.assertEqual(detail["incoming_source_address"], "192.168.1.121")
+        self.assertEqual(second.status_code, 200, second.text)
+
+        registrations = self.client.app.state.snapshot_index.list_edge_registrations("edge-01")
+        self.assertEqual(len(registrations), 2)
+        self.assertEqual(
+            sorted(registration["edge_instance_id"] for registration in registrations),
+            ["edgeinstance0001", "edgeinstance9999"],
+        )
 
     def test_overview_includes_edge_registration_metadata(self) -> None:
         archive_bytes = b"hello world"
@@ -197,6 +200,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-overview1",
             "encryption_key_fingerprint": "c" * 64,
+            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post(
@@ -217,11 +221,13 @@ class ResumableUploadTests(unittest.TestCase):
 
         overview = self.client.get("/api/overview")
         self.assertEqual(overview.status_code, 200, overview.text)
-        namespace = overview.json()["namespaces"][0]
-        self.assertEqual(namespace["edge_id"], "edge-01")
-        self.assertEqual(namespace["edge_instance_id"], "edgeinstance0001")
-        self.assertEqual(namespace["encryption_key_fingerprint"], "c" * 64)
-        self.assertEqual(namespace["last_seen_source"], "192.168.1.120")
+        edge = overview.json()["edges"][0]
+        self.assertEqual(edge["edge_id"], "edge-01")
+        instance = edge["instances"][0]
+        self.assertEqual(instance["edge_instance_id"], "edgeinstance0001")
+        self.assertEqual(instance["encryption_key_fingerprint"], "c" * 64)
+        self.assertEqual(instance["last_seen_source"], "192.168.1.120")
+        self.assertEqual(instance["advertised_url"], "https://edge-one.example.com")
 
     def test_reuses_idempotency_key_after_manual_snapshot_deletion(self) -> None:
         archive_bytes = b"hello world"
@@ -236,6 +242,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-deleted1",
             "encryption_key_fingerprint": "d" * 64,
+            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
@@ -252,7 +259,7 @@ class ResumableUploadTests(unittest.TestCase):
         finalize = self.client.post(f"/backup/uploads/{first_upload_id}/finalize", headers=self.headers)
         self.assertEqual(finalize.status_code, 200, finalize.text)
 
-        stored_path = self.settings.backup_root / "edge-01" / "photos" / finalize.json()["stored_as"]
+        stored_path = self.settings.backup_root / "edge-01" / "edgeinstance0001" / "photos" / finalize.json()["stored_as"]
         stored_path.unlink()
 
         restarted = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
@@ -274,6 +281,7 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-delete-api1",
             "encryption_key_fingerprint": "e" * 64,
+            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
@@ -291,11 +299,11 @@ class ResumableUploadTests(unittest.TestCase):
         self.assertEqual(finalize.status_code, 200, finalize.text)
         stored_as = finalize.json()["stored_as"]
 
-        index_path = self.settings.backup_root / ".relay_index" / "edge-01" / "photos" / "committed.json"
+        index_path = self.settings.backup_root / ".relay_index" / "edge-01" / "edgeinstance0001" / "photos" / "committed.json"
         index_entries = json.loads(index_path.read_text(encoding="utf-8"))
         self.assertEqual([entry["stored_as"] for entry in index_entries], [stored_as])
 
-        delete_response = self.client.delete(f"/api/snapshots/edge-01/photos/{stored_as}")
+        delete_response = self.client.delete(f"/api/snapshots/edge-01/edgeinstance0001/photos/{stored_as}")
         self.assertEqual(delete_response.status_code, 200, delete_response.text)
 
         updated_entries = json.loads(index_path.read_text(encoding="utf-8"))

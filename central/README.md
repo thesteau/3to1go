@@ -16,7 +16,7 @@ Central is responsible for:
 - checking the shared auth token on incoming uploads
 - staging uploads safely before commit
 - verifying archive checksums
-- storing snapshots under `<BACKUP_ROOT>/<edge_id>/<job_name>/`
+- storing snapshots under `<BACKUP_ROOT>/<edge_id>/<edge_instance_id>/<job_name>/`
 - pruning old snapshots according to retention settings
 - showing the stored snapshots in a simple web UI
 
@@ -127,14 +127,14 @@ That means `docker compose down` and `docker compose up` do not reset the UI-edi
 
 Newer Edge builds send a stable `edge_instance_id`.
 
-Central uses that to reserve each `edge_id` to one real Edge installation. If a second machine tries to reuse the same `edge_id`, Central rejects the upload instead of letting them silently share one namespace.
+Central uses that to keep each real Edge installation separate under a shared `edge_id` when needed. Multiple machines can intentionally reuse the same `edge_id`, but Central now isolates their snapshots and registrations per `edge_instance_id`.
 
 ## Storage Layout
 
 Snapshots are stored like this:
 
 ```text
-<BACKUP_ROOT>/<edge_id>/<job_name>/<job_name>__<timestamp>__<fingerprint>.tar.zst
+<BACKUP_ROOT>/<edge_id>/<edge_instance_id>/<job_name>/<job_name>__<timestamp>__<fingerprint>.tar.zst
 ```
 
 Example:
@@ -188,8 +188,8 @@ Useful endpoints:
 - `GET /api/overview` - JSON summary of stored snapshots
 - `GET /health/ready` - lightweight readiness check
 - `GET /health` - health check
-- `GET /api/snapshots/{edge_id}/{job_name}/{filename}` - download a snapshot
-- `DELETE /api/snapshots/{edge_id}/{job_name}/{filename}` - delete a snapshot
+- `GET /api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}` - download an instance-scoped snapshot
+- `DELETE /api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}` - delete an instance-scoped snapshot
 - `POST /backup/uploads/initiate` - start or resume an upload
 - `PUT /backup/uploads/{upload_id}/chunk?offset=...` - append upload bytes
 - `POST /backup/uploads/{upload_id}/finalize` - finalize and commit the upload
@@ -199,7 +199,7 @@ Newer Edge clients also send:
 - `edge_instance_id`
 - `encryption_key_fingerprint`
 
-Central uses those fields to protect `edge_id` ownership and improve decryption-key verification in the UI.
+Central uses those fields to keep registrations and snapshots separated per instance and improve decryption-key verification in the UI.
 
 ## Compose Mounts
 

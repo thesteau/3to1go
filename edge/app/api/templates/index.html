@@ -54,13 +54,17 @@
 
       <label for="settings_edge_id">Edge ID</label>
       <input id="settings_edge_id" placeholder="edge-01">
-      <p class="hint">Use a unique Edge ID per installation. Central now reserves each ID to one Edge instance to prevent namespace collisions.</p>
+      <p class="hint">Use the same Edge ID if you want Central to group multiple installations together. Central still keeps snapshots and registration metadata separated per instance.</p>
 
       <label for="settings_scan_root">Scan Root</label>
       <input id="settings_scan_root" placeholder="/home or C:/Users">
 
       <label for="settings_central_url">Central URL</label>
       <input id="settings_central_url" placeholder="http://127.0.0.1:6555">
+
+      <label for="settings_advertised_url">Advertised Edge URL</label>
+      <input id="settings_advertised_url" placeholder="https://edge.example.com or http://192.168.1.20:6556">
+      <p class="hint">Optional. Central will show this exact Edge URL as the preferred link back to this Edge.</p>
 
       <label for="settings_auth_token">Auth Token</label>
       <input id="settings_auth_token" type="password" placeholder="Shared token with Central">

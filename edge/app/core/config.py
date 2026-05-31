@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from app.core.schedule import CronSchedule
 
@@ -87,6 +88,16 @@ def _coerce_text(value: Any, default: str) -> str:
     return normalized or default
 
 
+def _coerce_url(value: Any, default: str = "") -> str:
+    normalized = _coerce_text(value, default).rstrip("/")
+    if not normalized:
+        return ""
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("url must be a full http or https URL")
+    return normalized
+
+
 def _coerce_int(value: Any, default: int, minimum: int) -> int:
     if value is None or value == "":
         return default
@@ -102,6 +113,7 @@ class Settings:
     edge_id: str
     scan_root: Path
     central_url: str
+    advertised_url: str
     auth_token: str
     cron_schedule: str
     state_dir: Path
@@ -165,6 +177,7 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
         "edge_id": settings.edge_id,
         "scan_root": str(settings.scan_root),
         "central_url": settings.central_url,
+        "advertised_url": settings.advertised_url,
         "auth_token": settings.auth_token,
         "cron_schedule": settings.cron_schedule,
         "state_dir": str(settings.state_dir),
@@ -196,7 +209,8 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     return Settings(
         edge_id=_coerce_text(raw.get("edge_id"), "edge-01"),
         scan_root=Path(_coerce_text(raw.get("scan_root"), str(_default_scan_root()))).expanduser().resolve(),
-        central_url=_coerce_text(raw.get("central_url"), "http://127.0.0.1:6555").rstrip("/"),
+        central_url=_coerce_url(raw.get("central_url"), "http://127.0.0.1:6555"),
+        advertised_url=_coerce_url(raw.get("advertised_url"), ""),
         auth_token=str(raw.get("auth_token") or "").strip(),
         cron_schedule=cron_schedule,
         state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),

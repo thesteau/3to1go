@@ -52,6 +52,7 @@ class EdgeRegistration:
     edge_id: str
     edge_instance_id: str
     encryption_key_fingerprint: str | None
+    advertised_url: str | None
     first_seen_at: str
     last_seen_at: str
     last_seen_source: str | None = None
@@ -421,8 +422,8 @@ class IngestService:
         self._key_mapping_path(session.idempotency_key).unlink(missing_ok=True)
         shutil.rmtree(self._session_dir(session.upload_id), ignore_errors=True)
 
-    def get_edge_registration(self, edge_id: str) -> dict | None:
-        return self.snapshot_index.get_edge_registration(edge_id)
+    def list_edge_registrations(self, edge_id: str | None = None) -> list[dict]:
+        return self.snapshot_index.list_edge_registrations(edge_id)
 
     def reconcile_namespace(self, namespace: str) -> None:
         self.snapshot_index.reconcile_namespace(namespace, self.storage_backend.list(namespace))
@@ -439,7 +440,10 @@ class IngestService:
             self.snapshot_index.upsert_edge_registration(registration)
         for namespace in legacy_index.list_namespaces():
             for job in namespace["jobs"]:
-                full_namespace = f"{namespace['edge_id']}/{job['job_name']}"
+                if namespace.get("edge_instance_id"):
+                    full_namespace = f"{namespace['edge_id']}/{namespace['edge_instance_id']}/{job['job_name']}"
+                else:
+                    full_namespace = f"{namespace['edge_id']}/{job['job_name']}"
                 for entry in legacy_index.list_namespace_entries(full_namespace):
                     self.snapshot_index.upsert_snapshot(full_namespace, entry)
                 self.snapshot_index.reconcile_namespace(full_namespace, self.storage_backend.list(full_namespace))
@@ -536,36 +540,22 @@ class IngestService:
             return
 
         now = _utc_now_text()
-        existing_payload = self.snapshot_index.get_edge_registration(metadata.edge_id)
+        existing_payload = self.snapshot_index.get_edge_registration(metadata.edge_id, edge_instance_id)
         existing = EdgeRegistration(**existing_payload) if existing_payload else None
-        if existing is not None and existing.edge_instance_id != edge_instance_id:
-            message = (
-                f'edge_id "{metadata.edge_id}" is already registered to another Edge instance '
-                f'({existing.edge_instance_id[:12]}...). Update one of the Edge IDs so they do not share a namespace.'
-            )
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "status": "edge_id_conflict",
-                    "message": message,
-                    "edge_id": metadata.edge_id,
-                    "registered_instance_id": existing.edge_instance_id,
-                    "incoming_instance_id": edge_instance_id,
-                    "registered_source_address": existing.last_seen_source,
-                    "incoming_source_address": source_address,
-                },
-            )
 
         registration = existing or EdgeRegistration(
             edge_id=metadata.edge_id,
             edge_instance_id=edge_instance_id,
             encryption_key_fingerprint=metadata.encryption_key_fingerprint,
+            advertised_url=metadata.advertised_url,
             first_seen_at=now,
             last_seen_at=now,
         )
         registration.last_seen_at = now
         if metadata.encryption_key_fingerprint:
             registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
+        if metadata.advertised_url is not None:
+            registration.advertised_url = metadata.advertised_url
         if source_address:
             registration.last_seen_source = source_address
         self.snapshot_index.upsert_edge_registration(asdict(registration))

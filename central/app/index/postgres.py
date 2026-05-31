@@ -13,17 +13,17 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         self._ensure_schema()
 
     def find_duplicate(self, namespace: str, archive_sha256: str) -> dict[str, Any] | None:
-        edge_id, job_name = _split_namespace(namespace)
+        edge_id, edge_instance_id, job_name = _split_namespace(namespace)
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT stored_as, archive_sha256, fingerprint, snapshot_timestamp, size_bytes, mtime
                 FROM snapshot_index
-                WHERE edge_id = %s AND job_name = %s AND archive_sha256 = %s
+                WHERE edge_id = %s AND edge_instance_id = %s AND job_name = %s AND archive_sha256 = %s
                 ORDER BY updated_at DESC
                 LIMIT 1
                 """,
-                (edge_id, job_name, archive_sha256),
+                (edge_id, edge_instance_id, job_name, archive_sha256),
             )
             row = cur.fetchone()
         if row is None:
@@ -38,12 +38,13 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         }
 
     def upsert_snapshot(self, namespace: str, entry: dict[str, Any]) -> None:
-        edge_id, job_name = _split_namespace(namespace)
+        edge_id, edge_instance_id, job_name = _split_namespace(namespace)
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO snapshot_index (
                     edge_id,
+                    edge_instance_id,
                     job_name,
                     stored_as,
                     archive_sha256,
@@ -52,8 +53,8 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     size_bytes,
                     mtime
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (edge_id, job_name, stored_as)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (edge_id, edge_instance_id, job_name, stored_as)
                 DO UPDATE SET
                     archive_sha256 = EXCLUDED.archive_sha256,
                     fingerprint = EXCLUDED.fingerprint,
@@ -64,6 +65,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 """,
                 (
                     edge_id,
+                    edge_instance_id,
                     job_name,
                     str(entry["stored_as"]),
                     str(entry["archive_sha256"]),
@@ -75,34 +77,34 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             )
 
     def reconcile_namespace(self, namespace: str, existing_snapshots: list[dict[str, Any]]) -> None:
-        edge_id, job_name = _split_namespace(namespace)
+        edge_id, edge_instance_id, job_name = _split_namespace(namespace)
         filenames = [str(item["filename"]) for item in existing_snapshots]
         with self._connect() as conn, conn.cursor() as cur:
             if filenames:
                 cur.execute(
                     """
                     DELETE FROM snapshot_index
-                    WHERE edge_id = %s AND job_name = %s AND NOT (stored_as = ANY(%s))
+                    WHERE edge_id = %s AND edge_instance_id = %s AND job_name = %s AND NOT (stored_as = ANY(%s))
                     """,
-                    (edge_id, job_name, filenames),
+                    (edge_id, edge_instance_id, job_name, filenames),
                 )
             else:
                 cur.execute(
-                    "DELETE FROM snapshot_index WHERE edge_id = %s AND job_name = %s",
-                    (edge_id, job_name),
+                    "DELETE FROM snapshot_index WHERE edge_id = %s AND edge_instance_id = %s AND job_name = %s",
+                    (edge_id, edge_instance_id, job_name),
                 )
 
     def list_namespace_entries(self, namespace: str) -> list[dict[str, Any]]:
-        edge_id, job_name = _split_namespace(namespace)
+        edge_id, edge_instance_id, job_name = _split_namespace(namespace)
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT stored_as, archive_sha256, fingerprint, snapshot_timestamp, size_bytes, mtime
                 FROM snapshot_index
-                WHERE edge_id = %s AND job_name = %s
+                WHERE edge_id = %s AND edge_instance_id = %s AND job_name = %s
                 ORDER BY mtime DESC, stored_as DESC
                 """,
-                (edge_id, job_name),
+                (edge_id, edge_instance_id, job_name),
             )
             rows = cur.fetchall()
         return [
@@ -121,44 +123,46 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT edge_id, job_name, stored_as, size_bytes, mtime
+                SELECT edge_id, edge_instance_id, job_name, stored_as, size_bytes, mtime
                 FROM snapshot_index
-                ORDER BY lower(edge_id), lower(job_name), mtime DESC, stored_as DESC
+                ORDER BY lower(edge_id), lower(edge_instance_id), lower(job_name), mtime DESC, stored_as DESC
                 """
             )
             rows = cur.fetchall()
 
-        edges: list[dict[str, Any]] = []
-        edge_map: dict[str, dict[str, Any]] = {}
-        for edge_id, job_name, stored_as, size_bytes, mtime in rows:
-            edge = edge_map.get(edge_id)
-            if edge is None:
-                edge = {"edge_id": edge_id, "jobs": [], "_job_map": {}}
-                edge_map[edge_id] = edge
-                edges.append(edge)
-            job = edge["_job_map"].get(job_name)
+        instances: list[dict[str, Any]] = []
+        instance_map: dict[tuple[str, str | None], dict[str, Any]] = {}
+        for edge_id, raw_instance_id, job_name, stored_as, size_bytes, mtime in rows:
+            edge_instance_id = None if raw_instance_id == "_legacy" else raw_instance_id
+            key = (edge_id, edge_instance_id)
+            instance = instance_map.get(key)
+            if instance is None:
+                instance = {"edge_id": edge_id, "edge_instance_id": edge_instance_id, "jobs": [], "_job_map": {}}
+                instance_map[key] = instance
+                instances.append(instance)
+            job = instance["_job_map"].get(job_name)
             if job is None:
                 job = {"job_name": job_name, "snapshot_count": 0, "snapshots": []}
-                edge["_job_map"][job_name] = job
-                edge["jobs"].append(job)
+                instance["_job_map"][job_name] = job
+                instance["jobs"].append(job)
             job["snapshot_count"] += 1
             job["snapshots"].append(
                 {"name": stored_as, "size_bytes": int(size_bytes or 0), "mtime": float(mtime or 0)}
             )
 
-        for edge in edges:
-            edge.pop("_job_map", None)
-        return edges
+        for instance in instances:
+            instance.pop("_job_map", None)
+        return instances
 
-    def get_edge_registration(self, edge_id: str) -> dict[str, Any] | None:
+    def get_edge_registration(self, edge_id: str, edge_instance_id: str) -> dict[str, Any] | None:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT edge_id, edge_instance_id, encryption_key_fingerprint, first_seen_at, last_seen_at, last_seen_source
+                SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
                 FROM edge_registration
-                WHERE edge_id = %s
+                WHERE edge_id = %s AND edge_instance_id = %s
                 """,
-                (edge_id,),
+                (edge_id, edge_instance_id),
             )
             row = cur.fetchone()
         if row is None:
@@ -167,9 +171,10 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             "edge_id": row[0],
             "edge_instance_id": row[1],
             "encryption_key_fingerprint": row[2],
-            "first_seen_at": row[3],
-            "last_seen_at": row[4],
-            "last_seen_source": row[5],
+            "advertised_url": row[3],
+            "first_seen_at": row[4],
+            "last_seen_at": row[5],
+            "last_seen_source": row[6],
         }
 
     def upsert_edge_registration(self, registration: dict[str, Any]) -> None:
@@ -180,15 +185,16 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     edge_id,
                     edge_instance_id,
                     encryption_key_fingerprint,
+                    advertised_url,
                     first_seen_at,
                     last_seen_at,
                     last_seen_source
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (edge_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (edge_id, edge_instance_id)
                 DO UPDATE SET
-                    edge_instance_id = EXCLUDED.edge_instance_id,
                     encryption_key_fingerprint = EXCLUDED.encryption_key_fingerprint,
+                    advertised_url = EXCLUDED.advertised_url,
                     first_seen_at = EXCLUDED.first_seen_at,
                     last_seen_at = EXCLUDED.last_seen_at,
                     last_seen_source = EXCLUDED.last_seen_source
@@ -197,30 +203,43 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     registration["edge_id"],
                     registration["edge_instance_id"],
                     registration.get("encryption_key_fingerprint"),
+                    registration.get("advertised_url"),
                     registration["first_seen_at"],
                     registration["last_seen_at"],
                     registration.get("last_seen_source"),
                 ),
             )
 
-    def list_edge_registrations(self) -> list[dict[str, Any]]:
+    def list_edge_registrations(self, edge_id: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT edge_id, edge_instance_id, encryption_key_fingerprint, first_seen_at, last_seen_at, last_seen_source
-                FROM edge_registration
-                ORDER BY lower(edge_id)
-                """
-            )
+            if edge_id is None:
+                cur.execute(
+                    """
+                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
+                    FROM edge_registration
+                    ORDER BY lower(edge_id), lower(edge_instance_id)
+                    """
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
+                    FROM edge_registration
+                    WHERE edge_id = %s
+                    ORDER BY lower(edge_instance_id)
+                    """,
+                    (edge_id,),
+                )
             rows = cur.fetchall()
         return [
             {
                 "edge_id": row[0],
-                "edge_instance_id": row[1],
+                "edge_instance_id": None if row[1] == "_legacy" else row[1],
                 "encryption_key_fingerprint": row[2],
-                "first_seen_at": row[3],
-                "last_seen_at": row[4],
-                "last_seen_source": row[5],
+                "advertised_url": row[3],
+                "first_seen_at": row[4],
+                "last_seen_at": row[5],
+                "last_seen_source": row[6],
             }
             for row in rows
         ]
@@ -231,6 +250,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 """
                 CREATE TABLE IF NOT EXISTS snapshot_index (
                     edge_id TEXT NOT NULL,
+                    edge_instance_id TEXT NOT NULL DEFAULT '_legacy',
                     job_name TEXT NOT NULL,
                     stored_as TEXT NOT NULL,
                     archive_sha256 TEXT NOT NULL,
@@ -239,33 +259,72 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     size_bytes BIGINT NOT NULL DEFAULT 0,
                     mtime DOUBLE PRECISION NOT NULL DEFAULT 0,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (edge_id, job_name, stored_as)
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
             cur.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_sha
-                ON snapshot_index (edge_id, job_name, archive_sha256)
+                ALTER TABLE snapshot_index
+                ADD COLUMN IF NOT EXISTS edge_instance_id TEXT
                 """
             )
             cur.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_mtime
-                ON snapshot_index (edge_id, job_name, mtime DESC, stored_as DESC)
+                UPDATE snapshot_index
+                SET edge_instance_id = '_legacy'
+                WHERE edge_instance_id IS NULL OR edge_instance_id = ''
+                """
+            )
+            cur.execute(
+                """
+                ALTER TABLE snapshot_index
+                ALTER COLUMN edge_instance_id SET NOT NULL
                 """
             )
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS edge_registration (
-                    edge_id TEXT PRIMARY KEY,
+                    edge_id TEXT NOT NULL,
                     edge_instance_id TEXT NOT NULL,
                     encryption_key_fingerprint TEXT,
+                    advertised_url TEXT,
                     first_seen_at TEXT NOT NULL,
                     last_seen_at TEXT NOT NULL,
                     last_seen_source TEXT
                 )
+                """
+            )
+            cur.execute(
+                """
+                ALTER TABLE edge_registration
+                ADD COLUMN IF NOT EXISTS advertised_url TEXT
+                """
+            )
+            cur.execute("ALTER TABLE snapshot_index DROP CONSTRAINT IF EXISTS snapshot_index_pkey")
+            cur.execute("ALTER TABLE edge_registration DROP CONSTRAINT IF EXISTS edge_registration_pkey")
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_index_namespace_pk
+                ON snapshot_index (edge_id, edge_instance_id, job_name, stored_as)
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_sha
+                ON snapshot_index (edge_id, edge_instance_id, job_name, archive_sha256)
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_mtime
+                ON snapshot_index (edge_id, edge_instance_id, job_name, mtime DESC, stored_as DESC)
+                """
+            )
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_edge_registration_instance
+                ON edge_registration (edge_id, edge_instance_id)
                 """
             )
 
@@ -277,8 +336,12 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         return psycopg.connect(self.database_url, autocommit=True)
 
 
-def _split_namespace(namespace: str) -> tuple[str, str]:
-    edge_id, _, job_name = namespace.partition("/")
-    if not edge_id or not job_name:
+def _split_namespace(namespace: str) -> tuple[str, str, str]:
+    parts = namespace.split("/")
+    if len(parts) == 2 and all(parts):
+        return parts[0], "_legacy", parts[1]
+    if len(parts) == 3 and all(parts):
+        return parts[0], parts[1], parts[2]
+    if len(parts) == 0:
         raise ValueError(f"invalid namespace: {namespace}")
-    return edge_id, job_name
+    raise ValueError(f"invalid namespace: {namespace}")

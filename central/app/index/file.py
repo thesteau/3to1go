@@ -10,6 +10,7 @@ from app.index.base import SnapshotIndexBackend
 
 class FileSnapshotIndexBackend(SnapshotIndexBackend):
     backend_name = "file"
+    LEGACY_INSTANCE_ID = "_legacy"
 
     def __init__(self, backup_root: Path) -> None:
         self.backup_root = backup_root
@@ -52,45 +53,66 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
         if not self.index_root.exists():
             return namespaces
 
-        edge_dirs = sorted(
-            [item for item in self.index_root.iterdir() if item.is_dir()],
-            key=lambda item: item.name.lower(),
-        )
-        for edge_dir in edge_dirs:
-            jobs: list[dict[str, Any]] = []
-            job_dirs = sorted(
-                [item for item in edge_dir.iterdir() if item.is_dir()],
-                key=lambda item: item.name.lower(),
-            )
-            for job_dir in job_dirs:
-                namespace = f"{edge_dir.name}/{job_dir.name}"
-                snapshots = [
-                    {
-                        "name": item["stored_as"],
-                        "size_bytes": item.get("size_bytes", 0),
-                        "mtime": item.get("mtime", 0),
-                    }
-                    for item in self.list_namespace_entries(namespace)
-                ]
-                if snapshots:
-                    jobs.append({"job_name": job_dir.name, "snapshot_count": len(snapshots), "snapshots": snapshots})
-            if jobs:
-                namespaces.append({"edge_id": edge_dir.name, "jobs": jobs})
+        instance_map: dict[tuple[str, str | None], dict[str, Any]] = {}
+        for index_path in sorted(self.index_root.rglob("committed.json"), key=lambda item: str(item).lower()):
+            parts = index_path.parent.relative_to(self.index_root).parts
+            if len(parts) == 2:
+                edge_id, job_name = parts
+                edge_instance_id = None
+                namespace = f"{edge_id}/{job_name}"
+            elif len(parts) == 3:
+                edge_id, stored_instance_id, job_name = parts
+                edge_instance_id = None if stored_instance_id == self.LEGACY_INSTANCE_ID else stored_instance_id
+                namespace = f"{edge_id}/{stored_instance_id}/{job_name}"
+            else:
+                continue
+
+            snapshots = [
+                {
+                    "name": item["stored_as"],
+                    "size_bytes": item.get("size_bytes", 0),
+                    "mtime": item.get("mtime", 0),
+                }
+                for item in self.list_namespace_entries(namespace)
+            ]
+            if not snapshots:
+                continue
+
+            key = (edge_id, edge_instance_id)
+            instance = instance_map.get(key)
+            if instance is None:
+                instance = {"edge_id": edge_id, "edge_instance_id": edge_instance_id, "jobs": []}
+                instance_map[key] = instance
+                namespaces.append(instance)
+            instance["jobs"].append({"job_name": job_name, "snapshot_count": len(snapshots), "snapshots": snapshots})
         return namespaces
 
-    def get_edge_registration(self, edge_id: str) -> dict[str, Any] | None:
-        path = self._registration_path(edge_id)
-        if not path.exists():
+    def get_edge_registration(self, edge_id: str, edge_instance_id: str) -> dict[str, Any] | None:
+        path = self._registration_instance_path(edge_id, edge_instance_id)
+        if path.exists():
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return None
+            return payload if isinstance(payload, dict) else None
+
+        legacy_path = self._legacy_registration_path(edge_id)
+        if not legacy_path.exists():
             return None
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(legacy_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return None
-        return payload if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            return None
+        if str(payload.get("edge_instance_id") or "").strip() != edge_instance_id:
+            return None
+        return payload
 
     def upsert_edge_registration(self, registration: dict[str, Any]) -> None:
         edge_id = str(registration["edge_id"])
-        path = self._registration_path(edge_id)
+        edge_instance_id = str(registration["edge_instance_id"])
+        path = self._registration_instance_path(edge_id, edge_instance_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             "w",
@@ -104,11 +126,17 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
             temp_path = Path(handle.name)
         temp_path.replace(path)
 
-    def list_edge_registrations(self) -> list[dict[str, Any]]:
+    def list_edge_registrations(self, edge_id: str | None = None) -> list[dict[str, Any]]:
         if not self.registry_root.exists():
             return []
+
         registrations: list[dict[str, Any]] = []
-        for path in sorted(self.registry_root.glob("*.json"), key=lambda item: item.name.lower()):
+        if edge_id:
+            registration_paths = list(self._iter_registration_paths(edge_id))
+        else:
+            registration_paths = sorted(self.registry_root.rglob("*.json"), key=lambda item: str(item).lower())
+
+        for path in registration_paths:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
@@ -123,8 +151,19 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
     def _index_path(self, namespace: str) -> Path:
         return self._index_dir(namespace) / "committed.json"
 
-    def _registration_path(self, edge_id: str) -> Path:
+    def _registration_instance_path(self, edge_id: str, edge_instance_id: str) -> Path:
+        return self.registry_root / edge_id / f"{edge_instance_id}.json"
+
+    def _legacy_registration_path(self, edge_id: str) -> Path:
         return self.registry_root / f"{edge_id}.json"
+
+    def _iter_registration_paths(self, edge_id: str):
+        edge_dir = self.registry_root / edge_id
+        if edge_dir.exists():
+            yield from sorted(edge_dir.glob("*.json"), key=lambda item: item.name.lower())
+        legacy_path = self._legacy_registration_path(edge_id)
+        if legacy_path.exists():
+            yield legacy_path
 
     def _load_committed_index(self, namespace: str) -> list[dict[str, Any]]:
         index_path = self._index_path(namespace)

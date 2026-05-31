@@ -29,7 +29,7 @@ The full flow looks like this:
 4. If something changed, Edge creates a `tar.zst` archive.
 5. Edge encrypts that archive locally.
 6. Edge uploads the encrypted archive to Central.
-7. Central verifies the upload, stores it by `edge_id/job_name`, and prunes old snapshots.
+7. Central verifies the upload, stores it by `edge_id/edge_instance_id/job_name`, and prunes old snapshots per instance.
 8. You browse and download snapshots from Central's web UI.
 
 Central never needs your plaintext files in order to store them. Decryption happens in the browser when you download an encrypted snapshot.
@@ -105,7 +105,7 @@ Central and Edge share one bearer token.
 
 Each Edge needs its own `EDGE_ID`.
 
-Central now reserves each `EDGE_ID` to one stable Edge instance. That prevents two machines from silently writing into the same namespace and pruning each other's snapshots.
+Central groups snapshots by `EDGE_ID`, but newer builds keep each Edge installation isolated underneath that by `edge_instance_id`. That prevents two machines sharing one `EDGE_ID` from silently writing into the same namespace and pruning each other's snapshots.
 
 ### Storage Scope
 

@@ -13,6 +13,46 @@ from app.utils.paths import validate_namespace_component
 router = APIRouter()
 
 
+def _validated_namespace(edge_id: str, job_name: str, edge_instance_id: str | None = None) -> str:
+    validate_namespace_component(edge_id, "edge_id")
+    validate_namespace_component(job_name, "job_name")
+    if edge_instance_id is None:
+        return f"{edge_id}/{job_name}"
+    validate_namespace_component(edge_instance_id, "edge_instance_id")
+    return f"{edge_id}/{edge_instance_id}/{job_name}"
+
+
+def _validated_target(settings: Settings, namespace: str, filename: str):
+    target = settings.backup_root / namespace / filename
+    try:
+        target.resolve().relative_to(settings.backup_root.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="invalid path") from exc
+    return target
+
+
+@router.get("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}")
+async def download_snapshot_for_instance(
+    edge_id: str,
+    edge_instance_id: str,
+    job_name: str,
+    filename: str,
+    settings: Settings = Depends(get_settings),
+    storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
+) -> FileResponse:
+    try:
+        namespace = _validated_namespace(edge_id, job_name, edge_instance_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    target = _validated_target(settings, namespace, filename)
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    return FileResponse(str(target), filename=filename, media_type="application/octet-stream")
+
+
 @router.get("/api/snapshots/{edge_id}/{job_name}/{filename}")
 async def download_snapshot(
     edge_id: str,
@@ -22,21 +62,41 @@ async def download_snapshot(
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
 ) -> FileResponse:
     try:
-        validate_namespace_component(edge_id, "edge_id")
-        validate_namespace_component(job_name, "job_name")
+        namespace = _validated_namespace(edge_id, job_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    target = settings.backup_root / edge_id / job_name / filename
-    try:
-        target.resolve().relative_to(settings.backup_root.resolve())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="invalid path")
+    target = _validated_target(settings, namespace, filename)
 
     if not target.is_file():
         raise HTTPException(status_code=404, detail="snapshot not found")
 
     return FileResponse(str(target), filename=filename, media_type="application/octet-stream")
+
+
+@router.delete("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}")
+async def delete_snapshot_for_instance(
+    edge_id: str,
+    edge_instance_id: str,
+    job_name: str,
+    filename: str,
+    settings: Settings = Depends(get_settings),
+    storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
+    ingest_service: IngestService = Depends(get_ingest_service),
+) -> dict:
+    try:
+        namespace = _validated_namespace(edge_id, job_name, edge_instance_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    target = _validated_target(settings, namespace, filename)
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    storage_backend.delete(namespace, filename)
+    ingest_service.reconcile_namespace(namespace)
+    return {"status": "deleted", "filename": filename}
 
 
 @router.delete("/api/snapshots/{edge_id}/{job_name}/{filename}")
@@ -49,21 +109,15 @@ async def delete_snapshot(
     ingest_service: IngestService = Depends(get_ingest_service),
 ) -> dict:
     try:
-        validate_namespace_component(edge_id, "edge_id")
-        validate_namespace_component(job_name, "job_name")
+        namespace = _validated_namespace(edge_id, job_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    target = settings.backup_root / edge_id / job_name / filename
-    try:
-        target.resolve().relative_to(settings.backup_root.resolve())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="invalid path")
+    target = _validated_target(settings, namespace, filename)
 
     if not target.is_file():
         raise HTTPException(status_code=404, detail="snapshot not found")
 
-    namespace = f"{edge_id}/{job_name}"
     storage_backend.delete(namespace, filename)
     ingest_service.reconcile_namespace(namespace)
     return {"status": "deleted", "filename": filename}

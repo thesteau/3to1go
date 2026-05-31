@@ -119,7 +119,7 @@ Edge can get the shared auth token in two ways:
 
 Each installation needs its own `EDGE_ID`.
 
-This matters because Central stores snapshots by `edge_id/job_name`. If two different machines reuse the same `EDGE_ID`, they would otherwise collide. Newer Central builds now reject that conflict instead of letting them silently share a namespace.
+This matters because Central groups by `edge_id`, but stores snapshots under each Edge installation's `edge_instance_id`. That means multiple machines can intentionally share one `EDGE_ID` for grouping while still keeping their snapshots separate.
 
 ## Choosing `CENTRAL_URL`
 
