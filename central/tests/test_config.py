@@ -17,6 +17,13 @@ from app.core import config  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
+    def test_build_settings_defaults_http_port_to_6555(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(config, "load_auth_token", return_value="secret"):
+                settings = config.build_settings({})
+
+        self.assertEqual(settings.http_port, 6555)
+
     def test_build_index_database_url_prefers_explicit_url(self) -> None:
         with patch.dict(
             os.environ,

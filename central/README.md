@@ -62,7 +62,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Open the UI at `http://localhost:8000/`.
+Open the UI at `http://localhost:6555/`.
 
 The bundled [`docker-compose.yml`](docker-compose.yml) is the contributor/developer starting point, not the main user deployment path.
 
@@ -73,8 +73,6 @@ If Edge is in a separate Docker Desktop project on the same machine, it will oft
 ```text
 http://host.docker.internal:6555
 ```
-
-If you are using the contributor build from [`central/`](./) instead of the deploy example, that same pattern is usually `http://host.docker.internal:8000`.
 
 ## What The Central UI Is For
 
@@ -180,7 +178,7 @@ Advanced environment and layout details:
 | `BACKUP_ROOT` | `/backups` |
 | `STAGING_DIR` | `/staging` |
 | `HTTP_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise |
-| `HTTP_PORT` | `8000` |
+| `HTTP_PORT` | `6555` |
 
 ## API Surface
 

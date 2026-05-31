@@ -26,6 +26,6 @@ RUN apt-get update \
 COPY --from=builder /install /usr/local
 COPY app ./app
 
-EXPOSE 8080
+EXPOSE 6556
 
 CMD ["python", "-m", "app.main"]

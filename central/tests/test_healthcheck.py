@@ -37,7 +37,7 @@ class HealthcheckTests(unittest.TestCase):
             upload_cleanup_interval_seconds=60,
             staging_dir=self.temp_dir / "staging",
             http_host="127.0.0.1",
-            http_port=8000,
+            http_port=6555,
         )
         self.client = TestClient(create_app(settings=self.settings))
 

@@ -86,7 +86,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         upload_cleanup_interval_seconds=_coerce_int(raw.get("upload_cleanup_interval_seconds"), 300, 10),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
-        http_port=max(1, int(os.getenv("HTTP_PORT", "8000"))),
+        http_port=max(1, int(os.getenv("HTTP_PORT", "6555"))),
     )
 
 

@@ -196,7 +196,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     return Settings(
         edge_id=_coerce_text(raw.get("edge_id"), "edge-01"),
         scan_root=Path(_coerce_text(raw.get("scan_root"), str(_default_scan_root()))).expanduser().resolve(),
-        central_url=_coerce_text(raw.get("central_url"), "http://127.0.0.1:8000").rstrip("/"),
+        central_url=_coerce_text(raw.get("central_url"), "http://127.0.0.1:6555").rstrip("/"),
         auth_token=str(raw.get("auth_token") or "").strip(),
         cron_schedule=cron_schedule,
         state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),
@@ -216,7 +216,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
         circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
         http_host=_coerce_text(raw.get("http_host"), _default_http_host()),
-        http_port=_coerce_int(raw.get("http_port"), 8080, 1),
+        http_port=_coerce_int(raw.get("http_port"), 6556, 1),
     )
 
 

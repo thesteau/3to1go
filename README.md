@@ -44,7 +44,7 @@ Central is usually the always-on receiver.
 - Use [`central/`](central/) if you are contributing and want to build from this repo.
 - Create the auth token file Central expects.
 - Start the container.
-- Open the Central UI at `http://localhost:6555/` for the deploy example, or `http://localhost:8000/` for the contributor build.
+- Open the Central UI at `http://localhost:6555/`.
 
 More detail: [`central/README.md`](central/README.md)
 
@@ -54,7 +54,7 @@ Edge runs on the machine that owns the files.
 
 - For normal Docker deployment, use [`deploy-example/edge/`](deploy-example/edge/).
 - Use [`edge/`](edge/) if you are contributing and want to build from this repo.
-- Open the local Edge UI at `http://localhost:6556/` for the deploy example, or `http://localhost:8080/` for the contributor build.
+- Open the local Edge UI at `http://localhost:6556/`.
 - Set `CENTRAL_URL`.
 - Enter the same auth token Central uses.
 - Pick a unique `EDGE_ID`.

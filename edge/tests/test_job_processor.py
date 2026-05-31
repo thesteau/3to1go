@@ -49,7 +49,7 @@ class JobProcessorTests(unittest.TestCase):
         self.settings = Settings(
             edge_id="edge-01",
             scan_root=self.temp_dir / "scan",
-            central_url="http://central:8000",
+            central_url="http://central:6555",
             auth_token="secret",
             cron_schedule="0 2 * * *",
             state_dir=self.temp_dir / "state",
@@ -69,7 +69,7 @@ class JobProcessorTests(unittest.TestCase):
             circuit_breaker_failure_threshold=5,
             circuit_breaker_cooldown_seconds=300,
             http_host="127.0.0.1",
-            http_port=8080,
+            http_port=6556,
         )
         self.settings.scan_root.mkdir(parents=True, exist_ok=True)
         self.state_store = StateStore(self.settings.state_dir)

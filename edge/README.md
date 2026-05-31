@@ -24,7 +24,7 @@ If you are seeing this for the first time, use this order:
 
 1. Start Central somewhere reachable.
 2. Start Edge on the machine you want to back up.
-3. Open the Edge UI at `http://localhost:8080/`.
+3. Open the Edge UI at `http://localhost:6556/`.
 4. Set `CENTRAL_URL`.
 5. Enter the same auth token Central uses.
 6. Pick a unique `EDGE_ID`.
@@ -125,10 +125,10 @@ This matters because Central stores snapshots by `edge_id/job_name`. If two diff
 
 Use the address Edge can actually reach:
 
-- same host as Central container with published port: `http://127.0.0.1:8000`
-- same Docker network as Central: `http://central:8000`
+- same host as Central container with published port: `http://127.0.0.1:6555`
+- same Docker network as Central: `http://central:6555`
 - different machine: use Central's hostname or IP
-- separate Docker Desktop projects on the same host: often `http://host.docker.internal:8000` for the contributor build, or `http://host.docker.internal:6555` if Central is running from `deploy-example/central/`
+- separate Docker Desktop projects on the same host: often `http://host.docker.internal:6555`
 
 ## Running Edge
 
@@ -138,7 +138,7 @@ Use the address Edge can actually reach:
 python -m app.main
 ```
 
-Edge starts with built-in defaults and exposes its UI on `http://localhost:8080/`.
+Edge starts with built-in defaults and exposes its UI on `http://localhost:6556/`.
 
 ### Dev helper scripts
 
@@ -194,7 +194,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Open the UI at `http://localhost:8080/`.
+Open the UI at `http://localhost:6556/`.
 
 Place the shared token file at `./secrets/relay_auth_token` before starting the stack.
 In the bundled Docker examples, `AUTH_TOKEN_FILE` can be just the filename, such as `relay_auth_token`.
@@ -209,7 +209,7 @@ Edge release assets come in two styles:
 
 After installing or unpacking Edge:
 
-1. Open `http://localhost:8080/`.
+1. Open `http://localhost:6556/`.
 2. Set `CENTRAL_URL`.
 3. Enter the shared auth token.
 4. Set a unique `EDGE_ID`.
@@ -258,11 +258,11 @@ Most people care about these first:
 | --- | --- | --- |
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
 | `SCAN_ROOT` | `/scan` in Docker, platform-dependent otherwise | Root directory Edge scans for `.upload_dir` files |
-| `CENTRAL_URL` | `http://127.0.0.1:8000` | Address of Central |
+| `CENTRAL_URL` | `http://127.0.0.1:6555` | Address of Central |
 | `AUTH_TOKEN_FILE` | unset | Optional token file path, or just a filename under `/run/secrets` in the Docker examples |
 | `AUTH_TOKEN` | empty | Shared bearer token when not using `AUTH_TOKEN_FILE` |
 | Cron Schedule in the Edge UI | `0 2 * * 0` | Backup schedule, defaulting to Sunday at 2:00 AM |
-| `HTTP_PORT` | `8080` | Local Edge UI port |
+| `HTTP_PORT` | `6556` | Local Edge UI port |
 
 Additional settings:
 
