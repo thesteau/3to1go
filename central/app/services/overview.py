@@ -28,7 +28,7 @@ def build_overview(
         if instance is None:
             instance = {
                 "edge_instance_id": registration.get("edge_instance_id"),
-                "instance_label": registration.get("edge_instance_id") or "Legacy snapshots",
+                "instance_label": registration.get("edge_instance_id", ""),
                 "advertised_url": registration.get("advertised_url"),
                 "encryption_key_fingerprint": registration.get("encryption_key_fingerprint"),
                 "first_seen_at": registration.get("first_seen_at"),
@@ -59,7 +59,7 @@ def build_overview(
         if instance is None:
             instance = {
                 "edge_instance_id": namespace.get("edge_instance_id"),
-                "instance_label": namespace.get("edge_instance_id") or "Legacy snapshots",
+                "instance_label": namespace.get("edge_instance_id", ""),
                 "advertised_url": None,
                 "encryption_key_fingerprint": None,
                 "first_seen_at": None,

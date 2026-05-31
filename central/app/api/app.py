@@ -77,7 +77,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.on_event("startup")
     async def on_startup() -> None:
-        ingest_service.migrate_legacy_snapshot_index()
         await restart_cleanup_task(settings.upload_cleanup_interval_seconds)
 
     @app.on_event("shutdown")

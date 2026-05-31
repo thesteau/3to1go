@@ -133,11 +133,10 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         instances: list[dict[str, Any]] = []
         instance_map: dict[tuple[str, str | None], dict[str, Any]] = {}
         for edge_id, raw_instance_id, job_name, stored_as, size_bytes, mtime in rows:
-            edge_instance_id = None if raw_instance_id == "_legacy" else raw_instance_id
-            key = (edge_id, edge_instance_id)
+            key = (edge_id, raw_instance_id)
             instance = instance_map.get(key)
             if instance is None:
-                instance = {"edge_id": edge_id, "edge_instance_id": edge_instance_id, "jobs": [], "_job_map": {}}
+                instance = {"edge_id": edge_id, "edge_instance_id": raw_instance_id, "jobs": [], "_job_map": {}}
                 instance_map[key] = instance
                 instances.append(instance)
             job = instance["_job_map"].get(job_name)
@@ -234,7 +233,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         return [
             {
                 "edge_id": row[0],
-                "edge_instance_id": None if row[1] == "_legacy" else row[1],
+                "edge_instance_id": row[1],
                 "encryption_key_fingerprint": row[2],
                 "advertised_url": row[3],
                 "first_seen_at": row[4],
@@ -250,7 +249,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 """
                 CREATE TABLE IF NOT EXISTS snapshot_index (
                     edge_id TEXT NOT NULL,
-                    edge_instance_id TEXT NOT NULL DEFAULT '_legacy',
+                    edge_instance_id TEXT NOT NULL,
                     job_name TEXT NOT NULL,
                     stored_as TEXT NOT NULL,
                     archive_sha256 TEXT NOT NULL,
@@ -261,25 +260,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
-                """
-            )
-            cur.execute(
-                """
-                ALTER TABLE snapshot_index
-                ADD COLUMN IF NOT EXISTS edge_instance_id TEXT
-                """
-            )
-            cur.execute(
-                """
-                UPDATE snapshot_index
-                SET edge_instance_id = '_legacy'
-                WHERE edge_instance_id IS NULL OR edge_instance_id = ''
-                """
-            )
-            cur.execute(
-                """
-                ALTER TABLE snapshot_index
-                ALTER COLUMN edge_instance_id SET NOT NULL
                 """
             )
             cur.execute(
@@ -295,14 +275,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 )
                 """
             )
-            cur.execute(
-                """
-                ALTER TABLE edge_registration
-                ADD COLUMN IF NOT EXISTS advertised_url TEXT
-                """
-            )
-            cur.execute("ALTER TABLE snapshot_index DROP CONSTRAINT IF EXISTS snapshot_index_pkey")
-            cur.execute("ALTER TABLE edge_registration DROP CONSTRAINT IF EXISTS edge_registration_pkey")
             cur.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_index_namespace_pk
@@ -338,10 +310,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
 
 def _split_namespace(namespace: str) -> tuple[str, str, str]:
     parts = namespace.split("/")
-    if len(parts) == 2 and all(parts):
-        return parts[0], "_legacy", parts[1]
     if len(parts) == 3 and all(parts):
         return parts[0], parts[1], parts[2]
-    if len(parts) == 0:
-        raise ValueError(f"invalid namespace: {namespace}")
     raise ValueError(f"invalid namespace: {namespace}")

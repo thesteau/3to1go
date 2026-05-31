@@ -17,7 +17,6 @@ from app.utils.paths import build_snapshot_filename, validate_namespace_componen
 
 
 router = APIRouter()
-LEGACY_INSTANCE_ID = "_legacy"
 
 
 def _forwarded_source_address(request: Request) -> str | None:
@@ -55,12 +54,6 @@ def _request_source_address(request: Request) -> str | None:
     return client.host or None
 
 
-def _storage_instance_id(edge_instance_id: str | None) -> str:
-    if not edge_instance_id:
-        return LEGACY_INSTANCE_ID
-    return validate_namespace_component(edge_instance_id, "edge_instance_id")
-
-
 @router.post("/backup/uploads/initiate", response_model=UploadSessionResponse)
 async def initiate_upload(
     request: Request,
@@ -75,7 +68,7 @@ async def initiate_upload(
     try:
         metadata = UploadMetadata(
             edge_id=validate_namespace_component(payload.edge_id, "edge_id"),
-            edge_instance_id=payload.edge_instance_id,
+            edge_instance_id=validate_namespace_component(payload.edge_instance_id, "edge_instance_id"),
             job_name=validate_namespace_component(payload.job_name, "job_name"),
             fingerprint=payload.fingerprint.strip(),
             timestamp=payload.timestamp.strip(),
@@ -95,11 +88,11 @@ async def initiate_upload(
         timestamp=metadata.timestamp,
         fingerprint=metadata.fingerprint,
     )
-    namespace = f"{metadata.edge_id}/{_storage_instance_id(metadata.edge_instance_id)}/{metadata.job_name}"
+    namespace = f"{metadata.edge_id}/{metadata.edge_instance_id}/{metadata.job_name}"
     logger.info(
         "upload_session_requested edge_id=%s edge_instance_id=%s job_name=%s filename=%s fingerprint=%s size=%s",
         metadata.edge_id,
-        metadata.edge_instance_id or LEGACY_INSTANCE_ID,
+        metadata.edge_instance_id,
         metadata.job_name,
         stored_name,
         metadata.fingerprint,

@@ -10,7 +10,6 @@ from app.index.base import SnapshotIndexBackend
 
 class FileSnapshotIndexBackend(SnapshotIndexBackend):
     backend_name = "file"
-    LEGACY_INSTANCE_ID = "_legacy"
 
     def __init__(self, backup_root: Path) -> None:
         self.backup_root = backup_root
@@ -56,16 +55,10 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
         instance_map: dict[tuple[str, str | None], dict[str, Any]] = {}
         for index_path in sorted(self.index_root.rglob("committed.json"), key=lambda item: str(item).lower()):
             parts = index_path.parent.relative_to(self.index_root).parts
-            if len(parts) == 2:
-                edge_id, job_name = parts
-                edge_instance_id = None
-                namespace = f"{edge_id}/{job_name}"
-            elif len(parts) == 3:
-                edge_id, stored_instance_id, job_name = parts
-                edge_instance_id = None if stored_instance_id == self.LEGACY_INSTANCE_ID else stored_instance_id
-                namespace = f"{edge_id}/{stored_instance_id}/{job_name}"
-            else:
+            if len(parts) != 3:
                 continue
+            edge_id, edge_instance_id, job_name = parts
+            namespace = f"{edge_id}/{edge_instance_id}/{job_name}"
 
             snapshots = [
                 {
@@ -96,18 +89,7 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
                 return None
             return payload if isinstance(payload, dict) else None
 
-        legacy_path = self._legacy_registration_path(edge_id)
-        if not legacy_path.exists():
-            return None
-        try:
-            payload = json.loads(legacy_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        if not isinstance(payload, dict):
-            return None
-        if str(payload.get("edge_instance_id") or "").strip() != edge_instance_id:
-            return None
-        return payload
+        return None
 
     def upsert_edge_registration(self, registration: dict[str, Any]) -> None:
         edge_id = str(registration["edge_id"])
@@ -154,16 +136,10 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
     def _registration_instance_path(self, edge_id: str, edge_instance_id: str) -> Path:
         return self.registry_root / edge_id / f"{edge_instance_id}.json"
 
-    def _legacy_registration_path(self, edge_id: str) -> Path:
-        return self.registry_root / f"{edge_id}.json"
-
     def _iter_registration_paths(self, edge_id: str):
         edge_dir = self.registry_root / edge_id
         if edge_dir.exists():
             yield from sorted(edge_dir.glob("*.json"), key=lambda item: item.name.lower())
-        legacy_path = self._legacy_registration_path(edge_id)
-        if legacy_path.exists():
-            yield legacy_path
 
     def _load_committed_index(self, namespace: str) -> list[dict[str, Any]]:
         index_path = self._index_path(namespace)

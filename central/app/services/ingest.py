@@ -15,7 +15,6 @@ from fastapi import HTTPException
 
 from app.api.models import UploadMetadata, UploadSessionResponse
 from app.index.base import SnapshotIndexBackend
-from app.index.file import FileSnapshotIndexBackend
 from app.services.locks import NamespaceLockManager
 from app.services.retention import prune_old_snapshots
 from app.storage.base import StorageBackend
@@ -427,26 +426,6 @@ class IngestService:
 
     def reconcile_namespace(self, namespace: str) -> None:
         self.snapshot_index.reconcile_namespace(namespace, self.storage_backend.list(namespace))
-
-    def migrate_legacy_snapshot_index(self) -> None:
-        if self.snapshot_index.backend_name != "postgres":
-            return
-        backup_root = getattr(self.storage_backend, "backup_root", None)
-        if backup_root is None:
-            return
-
-        legacy_index = FileSnapshotIndexBackend(backup_root)
-        for registration in legacy_index.list_edge_registrations():
-            self.snapshot_index.upsert_edge_registration(registration)
-        for namespace in legacy_index.list_namespaces():
-            for job in namespace["jobs"]:
-                if namespace.get("edge_instance_id"):
-                    full_namespace = f"{namespace['edge_id']}/{namespace['edge_instance_id']}/{job['job_name']}"
-                else:
-                    full_namespace = f"{namespace['edge_id']}/{job['job_name']}"
-                for entry in legacy_index.list_namespace_entries(full_namespace):
-                    self.snapshot_index.upsert_snapshot(full_namespace, entry)
-                self.snapshot_index.reconcile_namespace(full_namespace, self.storage_backend.list(full_namespace))
 
     def _build_committed_duplicate_response(self, *, archive_size_bytes: int, stored_as: str) -> UploadSessionResponse:
         return UploadSessionResponse(
