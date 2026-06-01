@@ -139,6 +139,14 @@ class CentralSettingsInput(BaseModel):
     upload_chunk_size_mb: int = Field(ge=1)
     upload_session_ttl_hours: int = Field(ge=1)
     upload_cleanup_interval_seconds: int = Field(ge=10)
+    ntfy_url: str = ""
+    ntfy_topic: str = ""
+    ntfy_message_template: str = ""
+    ntfy_match_edge_id: str = ""
+    ntfy_match_edge_instance_id: str = ""
+    ntfy_match_source: str = ""
+    hook_pre_command: str = ""
+    hook_post_command: str = ""
 
     @field_validator("log_level")
     @classmethod
@@ -147,6 +155,44 @@ class CentralSettingsInput(BaseModel):
         if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("log_level must be one of DEBUG, INFO, WARNING, ERROR")
         return normalized
+
+    @field_validator(
+        "ntfy_url",
+        "ntfy_topic",
+        "ntfy_message_template",
+        "ntfy_match_edge_id",
+        "ntfy_match_edge_instance_id",
+        "ntfy_match_source",
+        "hook_pre_command",
+        "hook_post_command",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class CentralNtfySettingsInput(BaseModel):
+    ntfy_url: str = ""
+    ntfy_topic: str = ""
+    ntfy_message_template: str = ""
+    ntfy_match_edge_id: str = ""
+    ntfy_match_edge_instance_id: str = ""
+    ntfy_match_source: str = ""
+
+    @field_validator("*")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class CentralHookCommandsInput(BaseModel):
+    pre_command: str = ""
+    post_command: str = ""
+
+    @field_validator("pre_command", "post_command")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
 
 
 def _normalize_optional_url(value: str | None) -> str | None:

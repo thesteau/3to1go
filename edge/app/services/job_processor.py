@@ -8,9 +8,12 @@ from app.backup.discovery import JobDefinition, discover_jobs
 from app.backup.filters import build_file_list
 from app.backup.fingerprint import compute_fingerprint
 from app.backup.quiesce import DockerComposeQuiescer, QuiesceContext
-from app.core.config import Settings, encryption_key_path
+from app.core.config import Settings, encryption_key_path, installation_id_path
 from app.core.encryption import encrypt_file, load_or_create_key
+from app.core.identity import load_or_create_installation_id
+from app.services.hooks import HookManager
 from app.services.job_locks import JobLockManager
+from app.services.ntfy import NtfyPublisher
 from app.services.state import JobState, StateStore
 from app.services.upload import UploadClient, UploadFailure, sha256_path
 
@@ -24,6 +27,8 @@ class JobProcessor:
         upload_client: UploadClient,
         quiescer: DockerComposeQuiescer,
         lock_manager: JobLockManager,
+        hook_manager: HookManager,
+        ntfy_publisher: NtfyPublisher,
     ) -> None:
         self.settings = settings
         self.logger = logger
@@ -31,6 +36,8 @@ class JobProcessor:
         self.upload_client = upload_client
         self.quiescer = quiescer
         self.lock_manager = lock_manager
+        self.hook_manager = hook_manager
+        self.ntfy_publisher = ntfy_publisher
 
     def run_cycle(self) -> bool:
         if not self.settings.auth_token.strip():
@@ -48,6 +55,13 @@ class JobProcessor:
             return
 
         try:
+            pre_state = self.state_store.get(job.state_key)
+            pre_state.job_name = job.job_name
+            self.hook_manager.run_command(
+                self.settings.hook_pre_command,
+                phase="pre",
+                context=self._hook_context(job, pre_state),
+            )
             self._process_job_locked(job)
         except Exception as exc:
             self.logger.exception("unexpected_exception job_name=%s path=%s", job.job_name, job.root_path)
@@ -58,6 +72,12 @@ class JobProcessor:
             current_state.last_error_detail = str(exc)
             self.state_store.set(job.state_key, current_state)
         finally:
+            final_state = self.state_store.get(job.state_key)
+            final_state.job_name = job.job_name
+            hook_context = self._hook_context(job, final_state)
+            self.hook_manager.run_command(self.settings.hook_post_command, phase="post", context=hook_context)
+            if final_state.last_status == "success":
+                self.ntfy_publisher.publish_best_effort(self.settings, hook_context)
             lock.release()
 
     def _process_job_locked(self, job: JobDefinition) -> None:
@@ -119,6 +139,9 @@ class JobProcessor:
         state.next_retry_at = None
         state.last_error_detail = None
         state.last_error_category = None
+        state.last_stored_as = None
+        state.last_pruned = 0
+        state.last_duplicate = False
         state.last_upload_started_at = None
         state.last_upload_updated_at = None
         state.manual_intervention_required = False
@@ -288,6 +311,9 @@ class JobProcessor:
         state.last_error_category = None
         state.upload_attempt_count = 0
         state.last_status = "success"
+        state.last_stored_as = str(response.get("stored_as") or "")
+        state.last_pruned = int(response.get("pruned") or 0)
+        state.last_duplicate = bool(response.get("duplicate", False))
         state.next_retry_at = None
         state.manual_intervention_required = False
         self._clear_pending_archive(state)
@@ -340,6 +366,27 @@ class JobProcessor:
         for path in self.settings.spool_dir.glob("*.tar.zst"):
             if str(path) not in referenced:
                 path.unlink(missing_ok=True)
+
+    def _hook_context(self, job: JobDefinition, state: JobState) -> dict[str, str | int | bool | None]:
+        return {
+            "edge_id": self.settings.edge_id,
+            "edge_instance_id": load_or_create_installation_id(installation_id_path()),
+            "job_name": job.job_name,
+            "job_root": str(job.root_path),
+            "state_key": job.state_key,
+            "last_status": state.last_status,
+            "last_error_category": state.last_error_category,
+            "last_error_detail": state.last_error_detail,
+            "stored_as": state.last_stored_as,
+            "pruned": state.last_pruned,
+            "duplicate": state.last_duplicate,
+            "pending_archive": state.pending_archive,
+            "pending_fingerprint": state.pending_fingerprint,
+            "pending_timestamp": state.pending_timestamp,
+            "upload_id": state.upload_id,
+            "upload_offset": state.upload_offset,
+            "next_retry_at": state.next_retry_at,
+        }
 
 
 def _parse_utc_text(value: str | None) -> datetime | None:

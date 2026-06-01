@@ -40,11 +40,15 @@ async def overview(
 async def save_settings(
     config: CentralSettingsInput,
     request: Request,
+    settings: Settings = Depends(get_settings),
     settings_store: SettingsStore = Depends(get_settings_store),
 ) -> dict:
-    settings = settings_store.save(config.model_dump())
-    request.app.state.apply_settings(settings)
-    await request.app.state.restart_cleanup_task(settings.upload_cleanup_interval_seconds)
+    try:
+        saved_settings = settings_store.save({**settings_store.snapshot(settings), **config.model_dump()})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    request.app.state.apply_settings(saved_settings)
+    await request.app.state.restart_cleanup_task(saved_settings.upload_cleanup_interval_seconds)
     return {
         "status": "ok",
         "settings": build_overview(

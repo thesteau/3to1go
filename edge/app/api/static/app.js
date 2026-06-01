@@ -2,6 +2,10 @@ let latestData = null;
 let directoryExpansionState = new Set(["."]);
 let autoRefreshTimer = null;
 let isLoadingData = false;
+let hooksRefreshTimer = null;
+let edgeNtfyConfig = null;
+let edgeHookConfig = null;
+let hookDraftDirty = { pre: false, post: false };
 const AUTO_REFRESH_INTERVAL_MS = 5000;
 
 function escapeHtml(value) {
@@ -82,12 +86,240 @@ function closeDialog(id) {
   if (dialog?.open) {
     dialog.close();
   }
+  if (id === "hooks-dialog" && hooksRefreshTimer) {
+    clearInterval(hooksRefreshTimer);
+    hooksRefreshTimer = null;
+  }
 }
 
 function openSettingsDialog() {
   fillSettings(latestData?.settings || {});
   clearStatus("settings-status");
   openDialog("settings-dialog");
+}
+
+function fillNtfyForm(config) {
+  const data = config || {};
+  document.getElementById("ntfy_url").value = data.ntfy_url || "";
+  document.getElementById("ntfy_topic").value = data.ntfy_topic || "";
+  document.getElementById("ntfy_message_template").value = data.ntfy_message_template || data.default_message_template || "";
+}
+
+async function loadNtfyConfig() {
+  const response = await fetch("/api/ntfy");
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.detail || "Failed to load ntfy settings.");
+  }
+  edgeNtfyConfig = body;
+  fillNtfyForm(body);
+  return body;
+}
+
+async function openNtfyDialog() {
+  clearStatus("ntfy-status");
+  try {
+    await loadNtfyConfig();
+    openDialog("ntfy-dialog");
+  } catch (error) {
+    alert(error.message || "Failed to load ntfy settings.");
+  }
+}
+
+function collectNtfyPayload() {
+  return {
+    ntfy_url: document.getElementById("ntfy_url").value.trim(),
+    ntfy_topic: document.getElementById("ntfy_topic").value.trim(),
+    ntfy_message_template: document.getElementById("ntfy_message_template").value.trim(),
+  };
+}
+
+function resetNtfyDefaults() {
+  document.getElementById("ntfy_url").value = "";
+  document.getElementById("ntfy_topic").value = "";
+  document.getElementById("ntfy_message_template").value = edgeNtfyConfig?.default_message_template || "";
+}
+
+async function saveNtfyConfig() {
+  const response = await fetch("/api/ntfy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(collectNtfyPayload()),
+  });
+  const body = await response.json();
+  document.getElementById("ntfy-status").textContent = response.ok ? "Saved." : (body.detail || "Save failed.");
+  if (response.ok) {
+    await loadData({ silent: true });
+    await loadNtfyConfig();
+    setActionStatus("Edge ntfy settings saved.", "success");
+  } else {
+    setActionStatus(body.detail || "ntfy save failed.", "error");
+  }
+}
+
+async function testNtfyConfig() {
+  const response = await fetch("/api/ntfy/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(collectNtfyPayload()),
+  });
+  const body = await response.json();
+  document.getElementById("ntfy-status").textContent = response.ok
+    ? "Connection test succeeded."
+    : (body.detail || "Test failed.");
+  if (!response.ok) {
+    setActionStatus(body.detail || "ntfy test failed.", "error");
+  }
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function renderHookFiles(files) {
+  const items = files || [];
+  if (!items.length) {
+    return '<p class="hint">No files saved yet.</p>';
+  }
+  return items.map((file) => `
+    <div class="hook-file-row">
+      <div class="hook-file-main">
+        <strong>${escapeHtml(file.name)}</strong>
+        <span class="hint">${escapeHtml(formatBytes(file.size_bytes))}</span>
+      </div>
+      <div class="hook-file-actions">
+        <button type="button" class="secondary" onclick="viewHookFile(decodeURIComponent('${encodeURIComponent(file.name)}'), ${file.viewable ? "true" : "false"})">View</button>
+        <button type="button" class="danger" onclick="deleteHookFile(decodeURIComponent('${encodeURIComponent(file.name)}'))">Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function fillHookForm(config, { preserveDrafts = true } = {}) {
+  const data = config || {};
+  document.getElementById("hook-script-dir").textContent = data.script_dir || "n/a";
+  if (!preserveDrafts || !hookDraftDirty.pre) {
+    document.getElementById("hook_pre_command").value = data.pre_command || "";
+    hookDraftDirty.pre = false;
+  }
+  if (!preserveDrafts || !hookDraftDirty.post) {
+    document.getElementById("hook_post_command").value = data.post_command || "";
+    hookDraftDirty.post = false;
+  }
+  document.getElementById("hook-files").innerHTML = renderHookFiles(data.files || []);
+}
+
+async function loadHookConfig({ preserveDrafts = true } = {}) {
+  const response = await fetch("/api/hooks");
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.detail || "Failed to load hook settings.");
+  }
+  edgeHookConfig = body;
+  fillHookForm(body, { preserveDrafts });
+  return body;
+}
+
+async function openHooksDialog() {
+  clearStatus("hooks-status");
+  try {
+    await loadHookConfig({ preserveDrafts: false });
+    openDialog("hooks-dialog");
+  } catch (error) {
+    alert(error.message || "Failed to load hook settings.");
+    return;
+  }
+  if (hooksRefreshTimer) {
+    clearInterval(hooksRefreshTimer);
+  }
+  hooksRefreshTimer = setInterval(() => {
+    if (document.getElementById("hooks-dialog")?.open) {
+      loadHookConfig({ preserveDrafts: true }).catch(() => {});
+    }
+  }, AUTO_REFRESH_INTERVAL_MS);
+}
+
+function clearHookCommand(kind) {
+  const input = document.getElementById(kind === "pre" ? "hook_pre_command" : "hook_post_command");
+  if (!input) return;
+  input.value = "";
+  hookDraftDirty[kind] = true;
+}
+
+async function saveHookCommands() {
+  const payload = {
+    pre_command: document.getElementById("hook_pre_command").value.trim(),
+    post_command: document.getElementById("hook_post_command").value.trim(),
+  };
+  const response = await fetch("/api/hooks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  document.getElementById("hooks-status").textContent = response.ok ? "Commands saved." : (body.detail || "Save failed.");
+  if (response.ok) {
+    hookDraftDirty = { pre: false, post: false };
+    await loadData({ silent: true });
+    await loadHookConfig({ preserveDrafts: false });
+    setActionStatus("Edge hook commands saved.", "success");
+  } else {
+    setActionStatus(body.detail || "Hook save failed.", "error");
+  }
+}
+
+async function uploadHookFile() {
+  const input = document.getElementById("hook_file_input");
+  const file = input?.files?.[0];
+  if (!file) {
+    document.getElementById("hooks-status").textContent = "Choose a file first.";
+    return;
+  }
+  const formData = new FormData();
+  formData.append("hook_file", file);
+  const response = await fetch("/api/hooks/files", { method: "POST", body: formData });
+  const body = await response.json();
+  document.getElementById("hooks-status").textContent = response.ok ? "File uploaded." : (body.detail || "Upload failed.");
+  if (response.ok) {
+    input.value = "";
+    await loadHookConfig({ preserveDrafts: true });
+  } else {
+    setActionStatus(body.detail || "Hook upload failed.", "error");
+  }
+}
+
+async function viewHookFile(filename, viewable) {
+  if (!viewable) {
+    alert("This file cannot be viewed.");
+    return;
+  }
+  const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`);
+  const body = await response.json();
+  if (!response.ok) {
+    alert(body.detail || "View failed.");
+    return;
+  }
+  document.getElementById("hook-view-filename").textContent = body.filename || filename;
+  document.getElementById("hook-view-content").value = body.content || "";
+  openDialog("hook-view-dialog");
+}
+
+async function deleteHookFile(filename) {
+  if (!confirm(`Delete ${filename}?`)) {
+    return;
+  }
+  const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  const body = await response.json();
+  document.getElementById("hooks-status").textContent = response.ok ? "File deleted." : (body.detail || "Delete failed.");
+  if (response.ok) {
+    await loadHookConfig({ preserveDrafts: true });
+  } else {
+    setActionStatus(body.detail || "Hook delete failed.", "error");
+  }
 }
 
 function openJobDialog(relativePath = ".") {
@@ -425,6 +657,11 @@ async function saveSettings() {
     upload_min_throughput_bytes_per_second: Number(document.getElementById("settings_upload_min_throughput_bytes_per_second").value || 1024),
     circuit_breaker_failure_threshold: Number(document.getElementById("settings_circuit_breaker_failure_threshold").value || 1),
     circuit_breaker_cooldown_seconds: Number(document.getElementById("settings_circuit_breaker_cooldown_seconds").value || 1),
+    ntfy_url: latestData?.settings?.ntfy_url || "",
+    ntfy_topic: latestData?.settings?.ntfy_topic || "",
+    ntfy_message_template: latestData?.settings?.ntfy_message_template || "",
+    hook_pre_command: latestData?.settings?.hook_pre_command || "",
+    hook_post_command: latestData?.settings?.hook_post_command || "",
   };
 
   const response = await fetch("/api/settings", {
@@ -513,6 +750,13 @@ async function runNow() {
   }
   document.getElementById("run-status").textContent = "A cycle is already running.";
 }
+
+document.getElementById("hook_pre_command")?.addEventListener("input", () => {
+  hookDraftDirty.pre = true;
+});
+document.getElementById("hook_post_command")?.addEventListener("input", () => {
+  hookDraftDirty.post = true;
+});
 
 resetForm();
 loadData();

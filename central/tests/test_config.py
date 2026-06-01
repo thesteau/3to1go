@@ -116,6 +116,59 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.upload_session_ttl_hours, 36)
         self.assertEqual(settings.upload_cleanup_interval_seconds, 900)
 
+    def test_build_settings_uses_ntfy_and_hook_env_defaults_when_config_is_blank(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "NTFY_URL": "https://ntfy.example.com",
+                "NTFY_TOPIC": "uploads",
+                "NTFY_MESSAGE_TEMPLATE": "Hello {{ edge_id }}",
+                "NTFY_MATCH_EDGE_ID": "edge-01",
+                "NTFY_MATCH_EDGE_INSTANCE_ID": "edgeinstance0001",
+                "NTFY_MATCH_SOURCE": "192.168.1.10",
+                "HOOK_PRE_COMMAND": "pre.sh",
+                "HOOK_POST_COMMAND": "post.sh",
+            },
+            clear=True,
+        ):
+            with patch.object(config, "load_auth_token", return_value="secret"):
+                settings = config.build_settings({})
+
+        self.assertEqual(settings.ntfy_url, "https://ntfy.example.com")
+        self.assertEqual(settings.ntfy_topic, "uploads")
+        self.assertEqual(settings.ntfy_message_template, "Hello {{ edge_id }}")
+        self.assertEqual(settings.ntfy_match_edge_id, "edge-01")
+        self.assertEqual(settings.ntfy_match_edge_instance_id, "edgeinstance0001")
+        self.assertEqual(settings.ntfy_match_source, "192.168.1.10")
+        self.assertEqual(settings.hook_pre_command, "pre.sh")
+        self.assertEqual(settings.hook_post_command, "post.sh")
+
+    def test_build_settings_prefers_saved_ntfy_and_hook_values_over_env_defaults(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "NTFY_URL": "https://ntfy.example.com",
+                "NTFY_TOPIC": "uploads",
+                "HOOK_PRE_COMMAND": "pre.sh",
+                "HOOK_POST_COMMAND": "post.sh",
+            },
+            clear=True,
+        ):
+            with patch.object(config, "load_auth_token", return_value="secret"):
+                settings = config.build_settings(
+                    {
+                        "ntfy_url": "https://saved.example.com",
+                        "ntfy_topic": "saved-topic",
+                        "hook_pre_command": "saved-pre.sh",
+                        "hook_post_command": "saved-post.sh",
+                    }
+                )
+
+        self.assertEqual(settings.ntfy_url, "https://saved.example.com")
+        self.assertEqual(settings.ntfy_topic, "saved-topic")
+        self.assertEqual(settings.hook_pre_command, "saved-pre.sh")
+        self.assertEqual(settings.hook_post_command, "saved-post.sh")
+
 
 if __name__ == "__main__":
     unittest.main()

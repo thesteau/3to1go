@@ -3,11 +3,13 @@ from __future__ import annotations
 import threading
 
 from app.backup.quiesce import DockerComposeQuiescer
-from app.core.config import Settings
+from app.core.config import Settings, hook_scripts_dir
 from app.core.logging import configure_logging
 from app.services.directories import DirectoryService
+from app.services.hooks import HookManager
 from app.services.job_locks import JobLockManager
 from app.services.job_processor import JobProcessor
+from app.services.ntfy import NtfyPublisher
 from app.services.settings_store import SettingsStore
 from app.services.state import StateStore
 from app.services.upload import UploadClient
@@ -22,6 +24,8 @@ class EdgeRunner:
         self.upload_client = UploadClient(settings)
         self.quiescer = DockerComposeQuiescer(self.logger)
         self.lock_manager = JobLockManager()
+        self.hook_manager = HookManager(hook_scripts_dir(), self.logger)
+        self.ntfy_publisher = NtfyPublisher(self.logger)
         self._cycle_lock = threading.Lock()
         self._apply_settings(settings)
 
@@ -69,6 +73,8 @@ class EdgeRunner:
         self.upload_client = UploadClient(settings)
         self.quiescer = DockerComposeQuiescer(self.logger)
         self.directory_service = DirectoryService(settings, self.logger, self.state_store)
+        self.hook_manager.logger = self.logger
+        self.ntfy_publisher.logger = self.logger
         self.job_processor = JobProcessor(
             settings=settings,
             logger=self.logger,
@@ -76,4 +82,6 @@ class EdgeRunner:
             upload_client=self.upload_client,
             quiescer=self.quiescer,
             lock_manager=self.lock_manager,
+            hook_manager=self.hook_manager,
+            ntfy_publisher=self.ntfy_publisher,
         )

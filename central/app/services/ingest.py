@@ -31,12 +31,14 @@ class UploadSession:
     namespace: str
     filename: str
     edge_id: str
+    edge_instance_id: str
     job_name: str
     fingerprint: str
     timestamp: str
     archive_format: str
     archive_size_bytes: int
     archive_sha256: str
+    source_address: str | None
     uploaded_bytes: int
     status: str
     created_at: str
@@ -60,6 +62,7 @@ class EdgeRegistration:
 class IngestService:
     def __init__(
         self,
+        settings,
         storage_backend: StorageBackend,
         snapshot_index: SnapshotIndexBackend,
         lock_manager: NamespaceLockManager,
@@ -69,7 +72,10 @@ class IngestService:
         upload_session_ttl_hours: int,
         retention_keep_last: int,
         logger,
+        hook_manager,
+        ntfy_publisher,
     ) -> None:
+        self.settings = settings
         self.storage_backend = storage_backend
         self.snapshot_index = snapshot_index
         self.lock_manager = lock_manager
@@ -79,6 +85,8 @@ class IngestService:
         self.upload_session_ttl = timedelta(hours=upload_session_ttl_hours)
         self.retention_keep_last = retention_keep_last
         self.logger = logger
+        self.hook_manager = hook_manager
+        self.ntfy_publisher = ntfy_publisher
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         self.upload_root = self.staging_dir / "uploads"
         self.key_root = self.upload_root / "keys"
@@ -133,12 +141,14 @@ class IngestService:
             namespace=namespace,
             filename=filename,
             edge_id=metadata.edge_id,
+            edge_instance_id=metadata.edge_instance_id or "",
             job_name=metadata.job_name,
             fingerprint=metadata.fingerprint,
             timestamp=metadata.timestamp,
             archive_format=metadata.archive_format,
             archive_size_bytes=archive_size_bytes,
             archive_sha256=archive_sha256,
+            source_address=source_address,
             uploaded_bytes=0,
             status="initiated",
             created_at=created_at,
@@ -217,8 +227,8 @@ class IngestService:
             return {
                 "status": "ok",
                 "stored_as": session.stored_as or session.filename,
-                "pruned": session.pruned,
-            }
+                    "pruned": session.pruned,
+                }
 
         lock = await self.lock_manager.get_lock(session.namespace)
         async with lock:
@@ -258,80 +268,112 @@ class IngestService:
                     },
                 )
 
+            hook_context = self._hook_context(session, staged_path=staged_path)
+            self.hook_manager.run_command(self.settings.hook_pre_command, phase="pre", context=hook_context)
+            hook_status = "error"
+            hook_stored_as = session.filename
+            hook_pruned = 0
+            hook_duplicate = False
+
             committed_duplicate = self.snapshot_index.find_duplicate(session.namespace, actual_sha256)
-            if committed_duplicate is not None:
-                staged_path.unlink(missing_ok=True)
-                session.uploaded_bytes = session.archive_size_bytes
-                session.status = "completed"
-                session.stored_as = committed_duplicate["stored_as"]
-                session.pruned = 0
-                session.updated_at = _utc_now_text()
-                session.expires_at = _utc_text_after(self.upload_session_ttl)
-                self._save_session(session)
-                self.logger.info(
-                    "duplicate_upload_rejected edge_id=%s job_name=%s upload_id=%s stored_as=%s",
-                    session.edge_id,
-                    session.job_name,
-                    session.upload_id,
-                    committed_duplicate["stored_as"],
-                )
-                return {"status": "ok", "stored_as": committed_duplicate["stored_as"], "pruned": 0, "duplicate": True}
-
             try:
-                storage_result = self.storage_backend.store(session.namespace, session.filename, staged_path)
-                pruned = prune_old_snapshots(
-                    self.storage_backend,
-                    namespace=session.namespace,
-                    keep_last=self.retention_keep_last,
-                )
-            except Exception:
-                self.logger.exception(
-                    "unexpected_exception edge_id=%s job_name=%s upload_id=%s",
-                    session.edge_id,
-                    session.job_name,
-                    session.upload_id,
-                )
-                raise
+                if committed_duplicate is not None:
+                    staged_path.unlink(missing_ok=True)
+                    session.uploaded_bytes = session.archive_size_bytes
+                    session.status = "completed"
+                    session.stored_as = committed_duplicate["stored_as"]
+                    session.pruned = 0
+                    session.updated_at = _utc_now_text()
+                    session.expires_at = _utc_text_after(self.upload_session_ttl)
+                    self._save_session(session)
+                    self.logger.info(
+                        "duplicate_upload_rejected edge_id=%s job_name=%s upload_id=%s stored_as=%s",
+                        session.edge_id,
+                        session.job_name,
+                        session.upload_id,
+                        committed_duplicate["stored_as"],
+                    )
+                    hook_status = "ok"
+                    hook_stored_as = committed_duplicate["stored_as"]
+                    hook_duplicate = True
+                    result = {
+                        "status": "ok",
+                        "stored_as": committed_duplicate["stored_as"],
+                        "pruned": 0,
+                        "duplicate": True,
+                    }
+                else:
+                    try:
+                        storage_result = self.storage_backend.store(session.namespace, session.filename, staged_path)
+                        pruned = prune_old_snapshots(
+                            self.storage_backend,
+                            namespace=session.namespace,
+                            keep_last=self.retention_keep_last,
+                        )
+                    except Exception:
+                        self.logger.exception(
+                            "unexpected_exception edge_id=%s job_name=%s upload_id=%s",
+                            session.edge_id,
+                            session.job_name,
+                            session.upload_id,
+                        )
+                        raise
 
-            current_snapshots = self.storage_backend.list(session.namespace)
-            current_snapshot = next(
-                (item for item in current_snapshots if item.get("filename") == storage_result["stored_as"]),
-                None,
-            )
-            self.snapshot_index.upsert_snapshot(
-                session.namespace,
-                {
-                    "stored_as": storage_result["stored_as"],
-                    "archive_sha256": actual_sha256,
-                    "fingerprint": session.fingerprint,
-                    "timestamp": session.timestamp,
-                    "size_bytes": (current_snapshot or {}).get("size_bytes", 0),
-                    "mtime": (current_snapshot or {}).get("mtime", 0),
-                },
-            )
-            self.snapshot_index.reconcile_namespace(session.namespace, current_snapshots)
-            session.uploaded_bytes = session.archive_size_bytes
-            session.status = "completed"
-            session.stored_as = storage_result["stored_as"]
-            session.pruned = pruned
-            session.updated_at = _utc_now_text()
-            session.expires_at = _utc_text_after(self.upload_session_ttl)
-            self._save_session(session)
-            self.logger.info(
-                "commit_success edge_id=%s job_name=%s upload_id=%s stored_as=%s",
-                session.edge_id,
-                session.job_name,
-                session.upload_id,
-                storage_result["stored_as"],
-            )
-            self.logger.info(
-                "prune_result edge_id=%s job_name=%s upload_id=%s pruned=%s",
-                session.edge_id,
-                session.job_name,
-                session.upload_id,
-                pruned,
-            )
-            return {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned, "duplicate": False}
+                    current_snapshots = self.storage_backend.list(session.namespace)
+                    current_snapshot = next(
+                        (item for item in current_snapshots if item.get("filename") == storage_result["stored_as"]),
+                        None,
+                    )
+                    self.snapshot_index.upsert_snapshot(
+                        session.namespace,
+                        {
+                            "stored_as": storage_result["stored_as"],
+                            "archive_sha256": actual_sha256,
+                            "fingerprint": session.fingerprint,
+                            "timestamp": session.timestamp,
+                            "size_bytes": (current_snapshot or {}).get("size_bytes", 0),
+                            "mtime": (current_snapshot or {}).get("mtime", 0),
+                        },
+                    )
+                    self.snapshot_index.reconcile_namespace(session.namespace, current_snapshots)
+                    session.uploaded_bytes = session.archive_size_bytes
+                    session.status = "completed"
+                    session.stored_as = storage_result["stored_as"]
+                    session.pruned = pruned
+                    session.updated_at = _utc_now_text()
+                    session.expires_at = _utc_text_after(self.upload_session_ttl)
+                    self._save_session(session)
+                    self.logger.info(
+                        "commit_success edge_id=%s job_name=%s upload_id=%s stored_as=%s",
+                        session.edge_id,
+                        session.job_name,
+                        session.upload_id,
+                        storage_result["stored_as"],
+                    )
+                    self.logger.info(
+                        "prune_result edge_id=%s job_name=%s upload_id=%s pruned=%s",
+                        session.edge_id,
+                        session.job_name,
+                        session.upload_id,
+                        pruned,
+                    )
+                    hook_status = "ok"
+                    hook_stored_as = storage_result["stored_as"]
+                    hook_pruned = pruned
+                    result = {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned, "duplicate": False}
+            finally:
+                final_hook_context = {
+                    **hook_context,
+                    "status": hook_status,
+                    "stored_as": hook_stored_as,
+                    "pruned": hook_pruned,
+                    "duplicate": hook_duplicate,
+                }
+                self.hook_manager.run_command(self.settings.hook_post_command, phase="post", context=final_hook_context)
+                if hook_status == "ok":
+                    self.ntfy_publisher.publish_best_effort(self.settings, final_hook_context)
+
+            return result
 
     async def cleanup_loop(self, interval_seconds: int) -> None:
         while True:
@@ -511,7 +553,10 @@ class IngestService:
         temp_path.replace(metadata_path)
 
     def _session_from_json(self, payload: dict) -> UploadSession:
-        return UploadSession(**payload)
+        normalized = dict(payload)
+        normalized.setdefault("edge_instance_id", "")
+        normalized.setdefault("source_address", None)
+        return UploadSession(**normalized)
 
     def _register_edge(self, metadata: UploadMetadata, source_address: str | None = None) -> None:
         edge_instance_id = (metadata.edge_instance_id or "").strip()
@@ -544,6 +589,22 @@ class IngestService:
         if not data_path.exists():
             return 0
         return data_path.stat().st_size
+
+    def _hook_context(self, session: UploadSession, *, staged_path: Path) -> dict[str, str | int | bool | None]:
+        return {
+            "edge_id": session.edge_id,
+            "edge_instance_id": session.edge_instance_id,
+            "job_name": session.job_name,
+            "upload_id": session.upload_id,
+            "namespace": session.namespace,
+            "filename": session.filename,
+            "fingerprint": session.fingerprint,
+            "timestamp": session.timestamp,
+            "archive_sha256": session.archive_sha256,
+            "archive_size_bytes": session.archive_size_bytes,
+            "source_address": session.source_address,
+            "staged_path": str(staged_path),
+        }
 
 
 def _sha256_path(path: Path) -> str:

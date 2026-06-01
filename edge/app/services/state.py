@@ -31,6 +31,9 @@ class JobState:
     last_upload_updated_at: str | None = None
     manual_intervention_required: bool = False
     last_status: str | None = None
+    last_stored_as: str | None = None
+    last_pruned: int = 0
+    last_duplicate: bool = False
 
 
 class StateStore:

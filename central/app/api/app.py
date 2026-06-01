@@ -8,15 +8,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.routes_automation import router as automation_router
 from app.api.routes_overview import router as overview_router
 from app.api.routes_snapshots import router as snapshots_router
 from app.api.routes_uploads import router as uploads_router
 from app.api.views import STATIC_DIR
-from app.core.config import Settings, load_settings
+from app.core.config import Settings, hook_scripts_dir, load_settings
 from app.core.logging import configure_logging
 from app.index.factory import build_snapshot_index_backend
+from app.services.hooks import HookManager
 from app.services.ingest import IngestService
 from app.services.locks import NamespaceLockManager
+from app.services.ntfy import NtfyPublisher
 from app.services.settings_store import SettingsStore
 from app.storage.factory import build_storage_backend
 
@@ -27,7 +30,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     storage_backend = build_storage_backend(settings)
     snapshot_index = build_snapshot_index_backend(settings)
     settings_store = SettingsStore()
+    hook_manager = HookManager(hook_scripts_dir(), logger)
+    ntfy_publisher = NtfyPublisher(logger)
     ingest_service = IngestService(
+        settings=settings,
         storage_backend=storage_backend,
         snapshot_index=snapshot_index,
         lock_manager=NamespaceLockManager(),
@@ -37,6 +43,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         upload_session_ttl_hours=settings.upload_session_ttl_hours,
         retention_keep_last=settings.retention_keep_last,
         logger=logger,
+        hook_manager=hook_manager,
+        ntfy_publisher=ntfy_publisher,
     )
 
     app = FastAPI(title="RelayCentralizer Central", version="0.1.0")
@@ -47,8 +55,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.snapshot_index = snapshot_index
     app.state.settings_store = settings_store
     app.state.ingest_service = ingest_service
+    app.state.hook_manager = hook_manager
+    app.state.ntfy_publisher = ntfy_publisher
     app.state.cleanup_task = None
     app.include_router(overview_router)
+    app.include_router(automation_router)
     app.include_router(snapshots_router)
     app.include_router(uploads_router)
 
@@ -66,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def apply_settings(new_settings: Settings) -> None:
         app.state.settings = new_settings
+        ingest_service.settings = new_settings
         ingest_service.retention_keep_last = new_settings.retention_keep_last
         ingest_service.max_upload_size_bytes = new_settings.max_upload_size_bytes
         ingest_service.recommended_chunk_size_bytes = new_settings.upload_chunk_size_bytes

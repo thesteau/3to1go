@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class JobConfigInput(BaseModel):
@@ -36,3 +36,49 @@ class EdgeSettingsInput(BaseModel):
     upload_min_throughput_bytes_per_second: int
     circuit_breaker_failure_threshold: int
     circuit_breaker_cooldown_seconds: int
+    ntfy_url: str = ""
+    ntfy_topic: str = ""
+    ntfy_message_template: str = ""
+    hook_pre_command: str = ""
+    hook_post_command: str = ""
+
+    @field_validator(
+        "edge_id",
+        "scan_root",
+        "central_url",
+        "advertised_url",
+        "auth_token",
+        "cron_schedule",
+        "state_dir",
+        "spool_dir",
+        "log_level",
+        "ntfy_url",
+        "ntfy_topic",
+        "ntfy_message_template",
+        "hook_pre_command",
+        "hook_post_command",
+    )
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class EdgeNtfySettingsInput(BaseModel):
+    ntfy_url: str = ""
+    ntfy_topic: str = ""
+    ntfy_message_template: str = ""
+
+    @field_validator("*")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class EdgeHookCommandsInput(BaseModel):
+    pre_command: str = ""
+    post_command: str = ""
+
+    @field_validator("pre_command", "post_command")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()

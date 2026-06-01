@@ -104,6 +104,15 @@ def _coerce_int(value: Any, default: int, minimum: int) -> int:
     return max(minimum, int(value))
 
 
+def _config_or_env(raw: dict[str, Any], key: str, env_key: str) -> Any:
+    value = raw.get(key)
+    if value is None:
+        return os.getenv(env_key)
+    if isinstance(value, str) and not value.strip():
+        return os.getenv(env_key)
+    return value
+
+
 def _default_http_host() -> str:
     return "0.0.0.0" if _uses_container_layout() else "127.0.0.1"
 
@@ -132,6 +141,11 @@ class Settings:
     upload_min_throughput_bytes_per_second: int
     circuit_breaker_failure_threshold: int
     circuit_breaker_cooldown_seconds: int
+    ntfy_url: str
+    ntfy_topic: str
+    ntfy_message_template: str
+    hook_pre_command: str
+    hook_post_command: str
     http_host: str
     http_port: int
 
@@ -150,6 +164,10 @@ class Settings:
 
 def settings_storage_path() -> Path:
     return _settings_path()
+
+
+def hook_scripts_dir() -> Path:
+    return _default_config_dir() / "hook-scripts"
 
 
 def encryption_key_path() -> Path:
@@ -196,6 +214,11 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
         "upload_min_throughput_bytes_per_second": settings.upload_min_throughput_bytes_per_second,
         "circuit_breaker_failure_threshold": settings.circuit_breaker_failure_threshold,
         "circuit_breaker_cooldown_seconds": settings.circuit_breaker_cooldown_seconds,
+        "ntfy_url": settings.ntfy_url,
+        "ntfy_topic": settings.ntfy_topic,
+        "ntfy_message_template": settings.ntfy_message_template,
+        "hook_pre_command": settings.hook_pre_command,
+        "hook_post_command": settings.hook_post_command,
         "http_host": settings.http_host,
         "http_port": settings.http_port,
     }
@@ -229,6 +252,11 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         upload_min_throughput_bytes_per_second=_coerce_int(raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024),
         circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
         circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
+        ntfy_url=_coerce_url(_config_or_env(raw, "ntfy_url", "NTFY_URL")),
+        ntfy_topic=_coerce_text(_config_or_env(raw, "ntfy_topic", "NTFY_TOPIC"), ""),
+        ntfy_message_template=_coerce_text(_config_or_env(raw, "ntfy_message_template", "NTFY_MESSAGE_TEMPLATE"), ""),
+        hook_pre_command=_coerce_text(_config_or_env(raw, "hook_pre_command", "HOOK_PRE_COMMAND"), ""),
+        hook_post_command=_coerce_text(_config_or_env(raw, "hook_post_command", "HOOK_POST_COMMAND"), ""),
         http_host=_coerce_text(raw.get("http_host"), _default_http_host()),
         http_port=_coerce_int(raw.get("http_port"), 6556, 1),
     )

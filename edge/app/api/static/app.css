@@ -386,6 +386,70 @@ textarea {
   margin-bottom: 12px;
 }
 
+.hook-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ece4d6;
+}
+
+.hook-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.hook-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hook-inline-actions,
+.hook-file-actions,
+.hook-upload-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.hook-upload-row input[type="file"] {
+  flex: 1;
+  min-width: 240px;
+}
+
+.hook-files {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.hook-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ece4d6;
+  border-radius: 12px;
+  background: #fffaf2;
+  flex-wrap: wrap;
+}
+
+.hook-file-main {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.hook-viewer {
+  min-height: 360px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .badge {
   display: inline-block;
   padding: 0.24rem 0.62rem;
@@ -429,6 +493,11 @@ textarea {
   .dir-row,
   .modal-head {
     flex-direction: column;
+  }
+
+  .hook-file-row,
+  .hook-section-head {
+    align-items: flex-start;
   }
 
   .dir-actions {

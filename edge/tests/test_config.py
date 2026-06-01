@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.api.app import create_app  # noqa: E402
 from app.core import config  # noqa: E402
 
 
@@ -74,6 +75,59 @@ class ConfigTests(unittest.TestCase):
                 settings = config.load_settings()
 
         self.assertEqual(settings.cron_schedule, "0 2 * * 0")
+
+    def test_build_settings_uses_ntfy_and_hook_env_defaults_when_config_is_blank(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "NTFY_URL": "https://ntfy.example.com",
+                "NTFY_TOPIC": "uploads",
+                "NTFY_MESSAGE_TEMPLATE": "Edge {{ edge_id }}",
+                "HOOK_PRE_COMMAND": "pre.sh",
+                "HOOK_POST_COMMAND": "post.sh",
+            },
+            clear=True,
+        ):
+            with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
+                settings = config.build_settings({})
+
+        self.assertEqual(settings.ntfy_url, "https://ntfy.example.com")
+        self.assertEqual(settings.ntfy_topic, "uploads")
+        self.assertEqual(settings.ntfy_message_template, "Edge {{ edge_id }}")
+        self.assertEqual(settings.hook_pre_command, "pre.sh")
+        self.assertEqual(settings.hook_post_command, "post.sh")
+
+    def test_build_settings_prefers_saved_ntfy_and_hook_values_over_env_defaults(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "NTFY_URL": "https://ntfy.example.com",
+                "NTFY_TOPIC": "uploads",
+                "HOOK_PRE_COMMAND": "pre.sh",
+                "HOOK_POST_COMMAND": "post.sh",
+            },
+            clear=True,
+        ):
+            with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
+                settings = config.build_settings(
+                    {
+                        "ntfy_url": "https://saved.example.com",
+                        "ntfy_topic": "saved-topic",
+                        "hook_pre_command": "saved-pre.sh",
+                        "hook_post_command": "saved-post.sh",
+                    }
+                )
+
+        self.assertEqual(settings.ntfy_url, "https://saved.example.com")
+        self.assertEqual(settings.ntfy_topic, "saved-topic")
+        self.assertEqual(settings.hook_pre_command, "saved-pre.sh")
+        self.assertEqual(settings.hook_post_command, "saved-post.sh")
+
+    def test_create_app_initializes_new_routes_without_starting_scheduler(self) -> None:
+        with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
+            app = create_app(start_scheduler=False)
+
+        self.assertEqual(app.title, "RelayCentralizer Edge")
 
 
 if __name__ == "__main__":

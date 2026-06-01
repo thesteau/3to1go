@@ -69,6 +69,11 @@ class JobProcessorTests(unittest.TestCase):
             upload_min_throughput_bytes_per_second=262144,
             circuit_breaker_failure_threshold=5,
             circuit_breaker_cooldown_seconds=300,
+            ntfy_url="",
+            ntfy_topic="",
+            ntfy_message_template="",
+            hook_pre_command="",
+            hook_post_command="",
             http_host="127.0.0.1",
             http_port=6556,
         )
@@ -82,6 +87,8 @@ class JobProcessorTests(unittest.TestCase):
             upload_client=_RetryableFailureUploadClient(),
             quiescer=None,
             lock_manager=JobLockManager(),
+            hook_manager=Mock(),
+            ntfy_publisher=Mock(),
         )
 
     def tearDown(self) -> None:
