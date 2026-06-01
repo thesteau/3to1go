@@ -41,3 +41,19 @@ def encrypt_file(key: bytes, src: Path, dst: Path) -> None:
     iv = os.urandom(_IV_SIZE)
     ciphertext = AESGCM(key).encrypt(iv, src.read_bytes(), None)
     dst.write_bytes(MAGIC + iv + ciphertext)
+
+
+def decrypt_file(key: bytes, src: Path, dst: Path) -> None:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    payload = src.read_bytes()
+    if not payload.startswith(MAGIC):
+        dst.write_bytes(payload)
+        return
+    if len(payload) < len(MAGIC) + _IV_SIZE + 16:
+        raise ValueError("invalid encrypted archive format")
+
+    iv = payload[len(MAGIC) : len(MAGIC) + _IV_SIZE]
+    ciphertext = payload[len(MAGIC) + _IV_SIZE :]
+    plaintext = AESGCM(key).decrypt(iv, ciphertext, None)
+    dst.write_bytes(plaintext)

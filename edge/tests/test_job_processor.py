@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.backup.discovery import JobDefinition  # noqa: E402
 from app.core.config import Settings  # noqa: E402
 from app.services.job_locks import JobLockManager  # noqa: E402
+from app.services import job_processor as job_processor_module  # noqa: E402
 from app.services.job_processor import JobProcessor  # noqa: E402
 from app.services.state import JobState, StateStore  # noqa: E402
 from app.services.upload import UploadFailure, sha256_path  # noqa: E402
@@ -168,6 +169,46 @@ class JobProcessorTests(unittest.TestCase):
         self.assertEqual(saved.last_error_detail, "central circuit breaker is open")
         self.assertFalse(saved.manual_intervention_required)
         self.assertIsNotNone(saved.next_retry_at)
+
+    def test_force_send_rebuilds_even_when_fingerprint_is_unchanged(self) -> None:
+        job_root = self.settings.scan_root / "photos"
+        job_root.mkdir(parents=True, exist_ok=True)
+        job = JobDefinition(
+            root_path=job_root,
+            job_name="photos",
+            exclude_patterns=[],
+            include_hidden=True,
+            follow_symlinks=False,
+        )
+        archive_path = self.settings.spool_dir / "photos__forced.tar.zst"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        archive_path.write_bytes(b"archive-bytes")
+        self.state_store.set(
+            job.state_key,
+            JobState(
+                job_name="photos",
+                last_successful_fingerprint="abcdef1234567890",
+            ),
+        )
+
+        with (
+            patch.object(job_processor_module, "build_file_list", return_value=[object()]),
+            patch.object(job_processor_module, "compute_fingerprint", return_value="abcdef1234567890"),
+            patch.object(
+                self.processor,
+                "_create_pending_archive",
+                return_value=(archive_path, "2026-04-05T12:00:00Z"),
+            ) as create_archive,
+            patch.object(self.processor, "_upload_pending_archive", return_value=True) as upload_pending,
+        ):
+            self.processor._process_job_locked(job, force_send=True)
+
+        create_archive.assert_called_once()
+        upload_pending.assert_called_once()
+        saved = self.state_store.get(job.state_key)
+        self.assertEqual(saved.last_status, "archive_created")
+        self.assertEqual(saved.pending_archive, str(archive_path))
+        self.assertEqual(saved.pending_fingerprint, "abcdef1234567890")
 
 
 if __name__ == "__main__":

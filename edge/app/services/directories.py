@@ -85,6 +85,13 @@ class DirectoryService:
         self.state_store.delete(str(directory.resolve()))
         self.logger.info("ui_job_deleted path=%s", directory)
 
+    def load_job(self, relative_path: str):
+        directory = self.resolve_directory(relative_path)
+        marker_path = directory / UPLOAD_DIR_FILENAME
+        if not marker_path.exists():
+            raise ValueError("job not found")
+        return build_job_definition(directory, read_upload_dir_payload(marker_path))
+
     def serialize_directory(self, directory: Path) -> dict[str, Any]:
         marker_path = directory / UPLOAD_DIR_FILENAME
         config: dict[str, Any] | None = None

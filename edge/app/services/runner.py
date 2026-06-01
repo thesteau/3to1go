@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 
+from app.backup.discovery import discover_jobs
 from app.backup.quiesce import DockerComposeQuiescer
 from app.core.config import Settings, hook_scripts_dir
 from app.core.logging import configure_logging
@@ -10,6 +11,7 @@ from app.services.hooks import HookManager
 from app.services.job_locks import JobLockManager
 from app.services.job_processor import JobProcessor
 from app.services.ntfy import NtfyPublisher
+from app.services.recovery import RecoveryService
 from app.services.settings_store import SettingsStore
 from app.services.state import StateStore
 from app.services.upload import UploadClient
@@ -51,6 +53,47 @@ class EdgeRunner:
     def clear_manual_interventions(self) -> int:
         return self.state_store.clear_manual_interventions()
 
+    def force_send_job(self, job_name: str) -> dict[str, object]:
+        normalized_job_name = job_name.strip()
+        if not normalized_job_name:
+            raise ValueError("job_name is required")
+
+        jobs = [
+            job
+            for job in discover_jobs(self.settings.scan_root, self.settings.max_depth, self.logger)
+            if job.job_name == normalized_job_name
+        ]
+        if not jobs:
+            raise ValueError("job not found")
+        if len(jobs) > 1:
+            raise ValueError("multiple jobs share that job_name")
+        if not self._cycle_lock.acquire(blocking=False):
+            self.logger.info("job_force_send_skipped job_name=%s reason=cycle_already_running", normalized_job_name)
+            return {"status": "already_running", "job_name": normalized_job_name}
+
+        try:
+            cleared = self.state_store.clear_manual_intervention(jobs[0].state_key)
+            self.job_processor.process_job(jobs[0], force_send=True)
+            return {
+                "status": "started",
+                "job_name": normalized_job_name,
+                "manual_retry_cleared": cleared,
+            }
+        finally:
+            self._cycle_lock.release()
+
+    def recover_latest_job(self, relative_path: str) -> dict[str, object]:
+        job = self.directory_service.load_job(relative_path)
+        if not self._cycle_lock.acquire(blocking=False):
+            self.logger.info("job_recovery_skipped path=%s reason=cycle_already_running", relative_path)
+            return {"status": "already_running", "relative_path": relative_path}
+        try:
+            result = self.recovery_service.recover_latest(job)
+            result["relative_path"] = relative_path
+            return result
+        finally:
+            self._cycle_lock.release()
+
     def save_settings(self, payload: dict) -> Settings:
         settings = self.settings_store.save(payload)
         self.update_settings(settings)
@@ -84,4 +127,11 @@ class EdgeRunner:
             lock_manager=self.lock_manager,
             hook_manager=self.hook_manager,
             ntfy_publisher=self.ntfy_publisher,
+        )
+        self.recovery_service = RecoveryService(
+            settings=settings,
+            logger=self.logger,
+            state_store=self.state_store,
+            upload_client=self.upload_client,
+            quiescer=self.quiescer,
         )

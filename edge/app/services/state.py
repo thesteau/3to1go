@@ -88,6 +88,18 @@ class StateStore:
                 self._save_locked()
             return updated
 
+    def clear_manual_intervention(self, key: str) -> bool:
+        with self._lock:
+            item = self._data.get(key)
+            if not item or not item.get("manual_intervention_required"):
+                return False
+            item["manual_intervention_required"] = False
+            item["next_retry_at"] = None
+            item["last_status"] = "manual_retry_requested"
+            self._data[key] = item
+            self._save_locked()
+            return True
+
     def _save_locked(self) -> None:
         with tempfile.NamedTemporaryFile(
             "w",

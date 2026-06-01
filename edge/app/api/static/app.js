@@ -533,6 +533,11 @@ function renderDirectories(data) {
         ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
         ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
         <div class="toolbar">
+          <span class="hint-with-help">
+            <button type="button" class="secondary" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(entry.config?.job_name || entry.relative_path)}'), this)">Force Upload</button>
+            <span class="hover-hint" title="Use this when you want Edge to upload again even if the folder looks unchanged locally. Central may still reject the upload if it already has the same snapshot.">?</span>
+          </span>
+          <button type="button" class="secondary" onclick="recoverLatest(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(entry.config?.job_name || entry.relative_path)}'), this)">Recover Latest</button>
           <button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
           <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>
         </div>
@@ -729,6 +734,80 @@ async function deleteByPath(relativePath) {
     closeDialog("job-dialog");
   } else {
     setActionStatus(body.detail || "Delete failed.", "error");
+  }
+}
+
+async function forceUpload(jobName, btn) {
+  const label = jobName || "this job";
+  if (!confirm(
+    `Force an upload for ${label}?\n\nThis bypasses the unchanged check. Central may still reject it as a duplicate if that snapshot already exists.`,
+  )) {
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const response = await fetch(`/api/jobs/force-send?job_name=${encodeURIComponent(jobName)}`, {
+      method: "POST",
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      setActionStatus(body.detail || `Force upload failed for ${label}.`, "error");
+      return;
+    }
+    if (body.status === "already_running") {
+      setActionStatus("A backup or recovery operation is already running on this Edge.", "error");
+      return;
+    }
+
+    setActionStatus(
+      body.manual_retry_cleared
+        ? `Forced upload for ${label}. A manual block was cleared first.`
+        : `Forced upload for ${label}. Central may still reject it as a duplicate.`,
+      "success",
+    );
+    await loadData({ silent: true });
+  } catch (error) {
+    setActionStatus(error.message || `Force upload failed for ${label}.`, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function recoverLatest(relativePath, jobName, btn) {
+  const label = jobName || relativePath;
+  if (!confirm(
+    `Recover the latest Central backup for ${label}?\n\nFiles included in that backup will be overwritten in this folder. Files not present in the backup will stay untouched.`,
+  )) {
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const response = await fetch(`/api/jobs/recover-latest?relative_path=${encodeURIComponent(relativePath)}`, {
+      method: "POST",
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      setActionStatus(body.detail || `Recovery failed for ${label}.`, "error");
+      return;
+    }
+    if (body.status === "already_running") {
+      setActionStatus("A backup or recovery operation is already running on this Edge.", "error");
+      return;
+    }
+
+    const restoredFiles = Number(body.restored_files || 0);
+    const snapshotName = body.snapshot_filename || "latest snapshot";
+    setActionStatus(
+      `Recovered ${label} from ${snapshotName} and replaced ${restoredFiles} backed-up file${restoredFiles === 1 ? "" : "s"}.`,
+      "success",
+    );
+    await loadData({ silent: true });
+  } catch (error) {
+    setActionStatus(error.message || `Recovery failed for ${label}.`, "error");
+  } finally {
+    btn.disabled = false;
   }
 }
 

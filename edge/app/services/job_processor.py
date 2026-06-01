@@ -48,7 +48,7 @@ class JobProcessor:
         self.cleanup_stale_archives()
         return True
 
-    def process_job(self, job: JobDefinition) -> None:
+    def process_job(self, job: JobDefinition, force_send: bool = False) -> None:
         lock = self.lock_manager.acquire(job.state_key)
         if lock is None:
             self.logger.info("job_locked job_name=%s path=%s", job.job_name, job.root_path)
@@ -62,7 +62,7 @@ class JobProcessor:
                 phase="pre",
                 context=self._hook_context(job, pre_state),
             )
-            self._process_job_locked(job)
+            self._process_job_locked(job, force_send=force_send)
         except Exception as exc:
             self.logger.exception("unexpected_exception job_name=%s path=%s", job.job_name, job.root_path)
             current_state = self.state_store.get(job.state_key)
@@ -80,11 +80,26 @@ class JobProcessor:
                 self.ntfy_publisher.publish_best_effort(self.settings, hook_context)
             lock.release()
 
-    def _process_job_locked(self, job: JobDefinition) -> None:
+    def _process_job_locked(self, job: JobDefinition, force_send: bool = False) -> None:
         state = self.state_store.get(job.state_key)
         state.job_name = job.job_name
 
-        if not state.manual_intervention_required and self._retry_pending_if_needed(job, state):
+        if force_send and state.manual_intervention_required:
+            state.manual_intervention_required = False
+            state.next_retry_at = None
+            state.last_status = "manual_retry_requested"
+            self.state_store.set(job.state_key, state)
+
+        if not force_send and not state.manual_intervention_required and self._retry_pending_if_needed(job, state):
+            return
+
+        if force_send and state.pending_archive and Path(state.pending_archive).exists():
+            state.next_retry_at = None
+            state.manual_intervention_required = False
+            state.last_status = "force_send_requested"
+            self.state_store.set(job.state_key, state)
+            self.logger.info("force_send_pending job_name=%s archive=%s", job.job_name, Path(state.pending_archive).name)
+            self._upload_pending_archive(job, state)
             return
 
         files = build_file_list(job, self.logger)
@@ -99,7 +114,7 @@ class JobProcessor:
             return
 
         fingerprint = compute_fingerprint(files)
-        if fingerprint == state.last_successful_fingerprint:
+        if not force_send and fingerprint == state.last_successful_fingerprint:
             self._clear_pending_archive(state)
             state.last_status = "skipped_unchanged"
             state.last_error_category = None

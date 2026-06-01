@@ -651,6 +651,43 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
   }
 }
 
+async function forceSendJob(edgeId, edgeInstanceId, jobName, btn) {
+  if (!edgeInstanceId) {
+    setActionStatus("This Edge instance cannot be targeted from Central.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const response = await fetch(
+      `/api/edges/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/jobs/${encodeURIComponent(jobName)}/force-send`,
+      { method: "POST" },
+    );
+    const body = await response.json();
+    if (!response.ok) {
+      setActionStatus(body.detail || `Force send failed for ${jobName}.`, "error");
+      return;
+    }
+
+    if (body.status === "already_running") {
+      setActionStatus(`Edge ${edgeId} is already running a backup cycle.`);
+      return;
+    }
+
+    setActionStatus(
+      body.manual_retry_cleared
+        ? `Requested force send for ${jobName}. A manual block was cleared first.`
+        : `Requested force send for ${jobName}.`,
+      "info",
+    );
+    await loadOverview({ silent: true, force: true });
+  } catch (error) {
+    setActionStatus(error.message || `Force send failed for ${jobName}.`, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
   if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
   return snapshots.map((snap) => {
@@ -709,6 +746,7 @@ function renderInstanceMeta(instance) {
 }
 
 function renderInstanceCard(edgeId, instance) {
+  const canForceSend = Boolean(instance.edge_instance_id && instance.advertised_url);
   return `
     <section class="instance-card">
       <div class="instance-head">
@@ -722,8 +760,16 @@ function renderInstanceCard(edgeId, instance) {
       ${(instance.jobs || []).map((job) => `
         <div class="job-block">
           <div class="job-header">
-            <span class="job-name">${escapeHtml(job.job_name)}</span>
-            <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+            <div class="job-header-main">
+              <span class="job-name">${escapeHtml(job.job_name)}</span>
+              <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+            </div>
+            ${canForceSend ? `
+              <div class="job-header-actions">
+                <button class="btn btn-force" type="button"
+                  onclick="forceSendJob('${escapeHtml(edgeId)}','${escapeHtml(instance.edge_instance_id)}',decodeURIComponent('${encodeURIComponent(job.job_name)}'),this)">Force Send</button>
+              </div>
+            ` : ""}
           </div>
           <div class="snapshot-list">
             ${renderSnapshots(edgeId, instance.edge_instance_id, job.job_name, job.snapshots || [])}

@@ -169,6 +169,27 @@ h3 {
   margin-top: 16px;
 }
 
+.hint-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hover-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: #efe8db;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: help;
+  user-select: none;
+}
+
 button,
 input,
 textarea,

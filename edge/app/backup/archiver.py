@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tarfile
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,3 +47,56 @@ def create_archive(archive_path: Path, files: list[DiscoveredFile]) -> None:
 
         raw_handle.flush()
         os.fsync(raw_handle.fileno())
+
+
+def extract_archive(archive_path: Path, target_root: Path) -> int:
+    target_root = target_root.resolve()
+    extracted_count = 0
+    decompressor = zstandard.ZstdDecompressor()
+
+    with archive_path.open("rb") as raw_handle:
+        with decompressor.stream_reader(raw_handle) as decompressed_handle:
+            with tarfile.open(mode="r|", fileobj=decompressed_handle) as tar_handle:
+                for member in tar_handle:
+                    if member.isdir():
+                        continue
+                    if not member.isfile():
+                        raise ValueError(f"unsupported archive entry: {member.name}")
+
+                    destination = (target_root / member.name).resolve()
+                    try:
+                        destination.relative_to(target_root)
+                    except ValueError as exc:
+                        raise ValueError(f"invalid archive entry: {member.name}") from exc
+
+                    source_handle = tar_handle.extractfile(member)
+                    if source_handle is None:
+                        raise ValueError(f"unable to extract archive entry: {member.name}")
+
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb",
+                        dir=destination.parent,
+                        delete=False,
+                        suffix=".restore.tmp",
+                    ) as temp_handle:
+                        temp_path = Path(temp_handle.name)
+                        try:
+                            while True:
+                                chunk = source_handle.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                temp_handle.write(chunk)
+                            temp_handle.flush()
+                            os.fsync(temp_handle.fileno())
+                        finally:
+                            source_handle.close()
+
+                    try:
+                        os.replace(temp_path, destination)
+                        os.utime(destination, (member.mtime, member.mtime))
+                    finally:
+                        temp_path.unlink(missing_ok=True)
+                    extracted_count += 1
+
+    return extracted_count

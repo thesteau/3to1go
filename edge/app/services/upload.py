@@ -229,6 +229,26 @@ class UploadClient:
         finalize_response["upload_id"] = upload_id
         return finalize_response
 
+    def download_latest_snapshot(self, edge_id: str, job_name: str, destination: Path) -> dict[str, str]:
+        response = self._request(
+            "get",
+            f"/backup/recovery/{edge_id}/{self.edge_instance_id}/{job_name}/latest",
+            phase="recovery_download",
+            timeout=(self.connect_timeout_seconds, self._timeout_for_bytes(self.max_chunk_size_bytes)),
+            stream=True,
+        )
+        filename = response.headers.get("X-Relay-Snapshot-Filename") or destination.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with destination.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+        finally:
+            response.close()
+        return {"filename": filename, "path": str(destination)}
+
     def _retry_phase(self, phase: str, operation) -> dict:
         attempt = 0
         while True:

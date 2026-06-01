@@ -420,7 +420,17 @@ button, .btn {
   display: flex;
   align-items: baseline;
   gap: 10px;
+  justify-content: space-between;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.job-header-main,
+.job-header-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .job-name {
@@ -431,6 +441,15 @@ button, .btn {
 .job-count {
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.btn-force {
+  background: #f2e4d8;
+  color: var(--accent);
+}
+
+.btn-force:hover {
+  background: #ead4c2;
 }
 
 /* Snapshot rows */

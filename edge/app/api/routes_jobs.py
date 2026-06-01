@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies import get_runner
 from app.api.models import JobConfigInput
+from app.services.recovery import RecoveryError
 from app.services.runner import EdgeRunner
 
 
@@ -45,3 +46,36 @@ async def delete_job(
         status_code = 404 if detail == "directory not found" else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
     return {"status": "ok"}
+
+
+@router.post("/api/jobs/force-send")
+async def force_send_job(
+    job_name: str = Query(..., min_length=1),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        return runner.force_send_job(job_name)
+    except ValueError as exc:
+        detail = str(exc)
+        if detail == "job not found":
+            status_code = 404
+        elif detail == "multiple jobs share that job_name":
+            status_code = 409
+        else:
+            status_code = 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@router.post("/api/jobs/recover-latest")
+async def recover_latest_job(
+    relative_path: str = Query(..., min_length=1),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        return runner.recover_latest_job(relative_path)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "job not found" else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    except RecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
