@@ -730,7 +730,6 @@ function directoryDisplayName(entry) {
 function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   const relativePath = entry.relative_path;
   const progressLabel = formatDirectoryProgress(entry);
-  const lastStateLabel = formatLastState(entry);
   const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
   const pathValue = relativePath === "."
     ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
@@ -751,7 +750,6 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         </div>
         <div class="hint">${pathValue}</div>
         <div class="hint">${absolutePath}</div>
-        ${lastStateLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(lastStateLabel)}</span></div>` : ""}
         ${progressLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(progressLabel)}</span></div>` : ""}
       </div>
       <div class="dir-actions">
@@ -802,7 +800,9 @@ function renderDirectoryNode(relativePath, index) {
       <details class="dir-branch" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
         <summary class="dir-summary">${header}</summary>
         <div class="dir-children">
-          ${renderedChildren.map((child) => child.html).join("")}
+          <div class="dir-children-inner">
+            ${renderedChildren.map((child) => child.html).join("")}
+          </div>
         </div>
       </details>
     `,
@@ -905,18 +905,17 @@ async function loadData({ silent = false } = {}) {
     document.getElementById("selected-jobs").innerHTML = spinner;
     document.getElementById("directory-tree").innerHTML = spinner;
   }
+
+  const dirFetch = fetch("/api/directories");
+  const keyFetch = fetch("/api/encryption-key");
+
   try {
-    const [dirRes, keyRes] = await Promise.all([
-      fetch("/api/directories"),
-      fetch("/api/encryption-key"),
-    ]);
-    if (!dirRes.ok || !keyRes.ok) {
+    const dirRes = await dirFetch;
+    if (!dirRes.ok) {
       throw new Error("Refresh failed.");
     }
-
     latestData = await dirRes.json();
-    const keyData = await keyRes.json();
-    fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
+    fillMeta(latestData, "", latestData.encryption_key_fingerprint || "");
     if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(latestData.settings || {});
     }
@@ -928,6 +927,12 @@ async function loadData({ silent = false } = {}) {
   } finally {
     isLoadingData = false;
   }
+
+  keyFetch.then(async (keyRes) => {
+    if (!keyRes.ok || !latestData) return;
+    const keyData = await keyRes.json();
+    fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
+  }).catch(() => {});
 }
 
 async function saveSettings() {
