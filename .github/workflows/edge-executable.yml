@@ -4,6 +4,9 @@ on:
   push:
     branches: ["main"]
     tags: ["v*"]
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-executable.yml"
   workflow_dispatch:
 
 permissions:

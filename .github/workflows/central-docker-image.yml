@@ -3,6 +3,9 @@ name: Build Central Docker Image
 on:
   push:
     branches: ["main"]
+    paths:
+      - "central/**"
+      - ".github/workflows/central-docker-image.yml"
 
 permissions:
   contents: read

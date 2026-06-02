@@ -3,6 +3,9 @@ name: Build Edge Docker Image
 on:
   push:
     branches: ["main"]
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-docker-image.yml"
 
 permissions:
   contents: read
