@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from app.core.config import encryption_key_path, installation_id_path, settings_storage_path
@@ -9,9 +10,19 @@ from app.core.schedule import MINIMUM_SCHEDULE_MINUTES
 from app.services.runner import EdgeRunner
 
 
+@lru_cache(maxsize=1)
+def _installation_id() -> str:
+    return load_or_create_installation_id(installation_id_path())
+
+
+@lru_cache(maxsize=1)
+def _encryption_fingerprint() -> str:
+    return key_fingerprint(load_or_create_key(encryption_key_path()))
+
+
 def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
-    installation_id = load_or_create_installation_id(installation_id_path())
-    encryption_fingerprint = key_fingerprint(load_or_create_key(encryption_key_path()))
+    installation_id = _installation_id()
+    encryption_fingerprint = _encryption_fingerprint()
     return {
         "edge_id": runner.settings.edge_id,
         "edge_instance_id": installation_id,

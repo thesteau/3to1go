@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from pathlib import Path
@@ -59,24 +60,27 @@ async def force_send_edge_job(
     )
     req = request.Request(target_url, data=b"", method="POST")
 
-    try:
-        with request.urlopen(req, timeout=10) as response:
-            payload = response.read().decode("utf-8", errors="replace")
-            body = json.loads(payload) if payload else {}
-            if response.status >= 400:
-                raise HTTPException(status_code=response.status, detail=body.get("detail") or "edge force send failed")
-            return body
-    except error.HTTPError as exc:
-        payload = exc.read().decode("utf-8", errors="replace")
-        detail = ""
-        if payload:
-            try:
-                detail = json.loads(payload).get("detail") or ""
-            except json.JSONDecodeError:
-                detail = payload
-        raise HTTPException(status_code=exc.code, detail=detail or f"edge returned {exc.code}") from exc
-    except error.URLError as exc:
-        raise HTTPException(status_code=502, detail=str(exc.reason) or "unable to reach edge") from exc
+    def _do_request() -> dict:
+        try:
+            with request.urlopen(req, timeout=10) as response:
+                payload = response.read().decode("utf-8", errors="replace")
+                body = json.loads(payload) if payload else {}
+                if response.status >= 400:
+                    raise HTTPException(status_code=response.status, detail=body.get("detail") or "edge force send failed")
+                return body
+        except error.HTTPError as exc:
+            payload = exc.read().decode("utf-8", errors="replace")
+            detail = ""
+            if payload:
+                try:
+                    detail = json.loads(payload).get("detail") or ""
+                except json.JSONDecodeError:
+                    detail = payload
+            raise HTTPException(status_code=exc.code, detail=detail or f"edge returned {exc.code}") from exc
+        except error.URLError as exc:
+            raise HTTPException(status_code=502, detail=str(exc.reason) or "unable to reach edge") from exc
+
+    return await asyncio.to_thread(_do_request)
 
 
 @router.post("/api/settings")

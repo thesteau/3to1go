@@ -96,7 +96,7 @@ let _overviewLoading = false;
 let _centralNtfyConfig = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
-const TOAST_DURATION_MS = 3600;
+const TOAST_DURATION_MS = 8000;
 
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS } = {}) {
   if (!message) return;
@@ -191,9 +191,9 @@ async function loadNtfyConfig() {
 
 async function openNtfyDialog() {
   clearStatus("ntfy-status");
+  openDialog("ntfy-dialog");
   try {
     await loadNtfyConfig();
-    openDialog("ntfy-dialog");
   } catch (error) {
     setActionStatus(error.message || "Failed to load ntfy settings.", "error");
   }
@@ -303,12 +303,11 @@ async function loadHookConfig({ preserveDrafts = true } = {}) {
 
 async function openHooksDialog() {
   clearStatus("hooks-status");
+  openDialog("hooks-dialog");
   try {
     await loadHookConfig({ preserveDrafts: false });
-    openDialog("hooks-dialog");
   } catch (error) {
     setActionStatus(error.message || "Failed to load hook settings.", "error");
-    return;
   }
 }
 
@@ -676,7 +675,7 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
       setActionStatus("Delete failed.", "error");
       return;
     }
-    btn.closest(".snapshot-row").remove();
+    btn.closest(".snapshot-row")?.remove();
     setActionStatus(`Deleted snapshot ${filename}.`, "success");
   } finally {
     btn.disabled = false;
@@ -951,3 +950,4 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 });
 
 loadOverview({ force: true });
+

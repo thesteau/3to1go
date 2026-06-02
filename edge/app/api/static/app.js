@@ -4,7 +4,7 @@ let isLoadingData = false;
 let edgeNtfyConfig = null;
 let edgeHookConfig = null;
 let hookDraftDirty = { pre: false, post: false };
-const TOAST_DURATION_MS = 3600;
+const TOAST_DURATION_MS = 8000;
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
   settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
@@ -177,9 +177,9 @@ async function loadNtfyConfig() {
 
 async function openNtfyDialog() {
   clearStatus("ntfy-status");
+  openDialog("ntfy-dialog");
   try {
     await loadNtfyConfig();
-    openDialog("ntfy-dialog");
   } catch (error) {
     setActionStatus(error.message || "Failed to load ntfy settings.", "error");
   }
@@ -290,12 +290,11 @@ async function loadHookConfig({ preserveDrafts = true } = {}) {
 
 async function openHooksDialog() {
   clearStatus("hooks-status");
+  openDialog("hooks-dialog");
   try {
     await loadHookConfig({ preserveDrafts: false });
-    openDialog("hooks-dialog");
   } catch (error) {
     setActionStatus(error.message || "Failed to load hook settings.", "error");
-    return;
   }
 }
 
@@ -821,7 +820,7 @@ async function loadData({ silent = false } = {}) {
     latestData = await dirRes.json();
     const keyData = await keyRes.json();
     fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
-    if (!isDialogOpen("settings-dialog")) {
+    if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(latestData.settings || {});
     }
     renderDirectories(latestData);
@@ -1050,3 +1049,4 @@ resetForm();
 initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
 loadData();
+

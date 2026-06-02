@@ -339,10 +339,7 @@ class JobProcessor:
         if exc is not None and exc.retry_after_seconds is not None:
             return exc.retry_after_seconds
         delay = self.settings.upload_retry_base_delay_seconds * (2 ** max(0, attempt_count - 1))
-        delay = min(self.settings.upload_retry_max_delay_seconds, delay)
-        if exc is not None and not exc.retryable:
-            delay = max(delay, self.settings.upload_retry_base_delay_seconds * 6)
-        return delay
+        return min(self.settings.upload_retry_max_delay_seconds, delay)
 
     def _clear_pending_archive(self, state: JobState) -> None:
         if state.pending_archive:
