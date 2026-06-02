@@ -98,11 +98,6 @@ let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 const TOAST_DURATION_MS = 8000;
 
-function showLoading(active) {
-  const el = document.getElementById("loading-overlay");
-  if (el) el.hidden = !active;
-}
-
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
   const region = document.getElementById("toast-region");
@@ -845,7 +840,9 @@ async function loadOverview({ silent = false, force = false } = {}) {
   }
 
   _overviewLoading = true;
-  if (!silent) showLoading(true);
+  if (!silent) {
+    document.getElementById("namespaces").innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
+  }
   const uiState = captureOverviewUiState();
 
   try {
@@ -905,7 +902,6 @@ async function loadOverview({ silent = false, force = false } = {}) {
     }
   } finally {
     _overviewLoading = false;
-    showLoading(false);
   }
 }
 

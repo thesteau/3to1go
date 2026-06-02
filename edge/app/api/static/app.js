@@ -84,11 +84,6 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 32 }
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
 }
 
-function showLoading(active) {
-  const el = document.getElementById("loading-overlay");
-  if (el) el.hidden = !active;
-}
-
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
   const region = document.getElementById("toast-region");
@@ -841,7 +836,11 @@ async function loadData({ silent = false } = {}) {
   }
 
   isLoadingData = true;
-  if (!silent) showLoading(true);
+  if (!silent) {
+    const spinner = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
+    document.getElementById("selected-jobs").innerHTML = spinner;
+    document.getElementById("directory-tree").innerHTML = spinner;
+  }
   try {
     const [dirRes, keyRes] = await Promise.all([
       fetch("/api/directories"),
@@ -864,7 +863,6 @@ async function loadData({ silent = false } = {}) {
     }
   } finally {
     isLoadingData = false;
-    showLoading(false);
   }
 }
 
