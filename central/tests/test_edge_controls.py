@@ -82,6 +82,43 @@ class EdgeControlsTests(unittest.TestCase):
         self.assertEqual(response.content, b"newer")
         self.assertEqual(response.headers["x-relay-snapshot-filename"], newer.name)
 
+    def test_delete_instance_removes_registration_from_overview(self) -> None:
+        instance_dir = self.settings.backup_root / "edge-01" / "edgeinstance0001"
+        instance_dir.mkdir(parents=True, exist_ok=True)
+
+        before = self.client.get("/api/overview")
+        self.assertEqual(before.status_code, 200, before.text)
+        self.assertEqual(before.json()["edges"][0]["instances"][0]["edge_instance_id"], "edgeinstance0001")
+
+        response = self.client.delete("/api/instances/edge-01/edgeinstance0001")
+        self.assertEqual(response.status_code, 200, response.text)
+
+        after = self.client.get("/api/overview")
+        self.assertEqual(after.status_code, 200, after.text)
+        self.assertEqual(after.json()["edges"], [])
+        self.assertIsNone(self.client.app.state.snapshot_index.get_edge_registration("edge-01", "edgeinstance0001"))
+
+    def test_delete_missing_instance_requires_cleanup_confirmation(self) -> None:
+        response = self.client.delete("/api/instances/edge-01/edgeinstance0001")
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(
+            response.json()["detail"],
+            {
+                "message": "instance files not found",
+                "cleanup_available": True,
+            },
+        )
+        self.assertIsNotNone(self.client.app.state.snapshot_index.get_edge_registration("edge-01", "edgeinstance0001"))
+
+        cleanup = self.client.delete("/api/instances/edge-01/edgeinstance0001?cleanup_missing=true")
+        self.assertEqual(cleanup.status_code, 200, cleanup.text)
+        self.assertEqual(cleanup.json()["status"], "cleaned")
+        self.assertIsNone(self.client.app.state.snapshot_index.get_edge_registration("edge-01", "edgeinstance0001"))
+
+        overview = self.client.get("/api/overview")
+        self.assertEqual(overview.status_code, 200, overview.text)
+        self.assertEqual(overview.json()["edges"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

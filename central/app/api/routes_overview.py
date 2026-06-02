@@ -63,8 +63,10 @@ async def save_settings(
 async def delete_instance(
     edge_id: str,
     edge_instance_id: str,
+    cleanup_missing: bool = False,
     settings: Settings = Depends(get_settings),
     ingest_service: IngestService = Depends(get_ingest_service),
+    snapshot_index: SnapshotIndexBackend = Depends(get_snapshot_index),
 ) -> dict:
     try:
         validate_namespace_component(edge_id, "edge_id")
@@ -74,6 +76,17 @@ async def delete_instance(
 
     instance_dir = settings.backup_root / edge_id / edge_instance_id
     if not instance_dir.exists():
+        if snapshot_index.get_edge_registration(edge_id, edge_instance_id) is not None:
+            if cleanup_missing:
+                snapshot_index.delete_edge_registration(edge_id, edge_instance_id)
+                return {"status": "cleaned", "edge_id": edge_id, "edge_instance_id": edge_instance_id}
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "instance files not found",
+                    "cleanup_available": True,
+                },
+            )
         raise HTTPException(status_code=404, detail="instance not found")
 
     # Collect job namespaces before deleting so we can reconcile the index
@@ -87,6 +100,7 @@ async def delete_instance(
 
     for namespace in job_namespaces:
         ingest_service.reconcile_namespace(namespace)
+    snapshot_index.delete_edge_registration(edge_id, edge_instance_id)
 
     return {"status": "deleted", "edge_id": edge_id, "edge_instance_id": edge_instance_id}
 

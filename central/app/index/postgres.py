@@ -206,6 +206,13 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 ),
             )
 
+    def delete_edge_registration(self, edge_id: str, edge_instance_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM edge_registration WHERE edge_id = %s AND edge_instance_id = %s",
+                (edge_id, edge_instance_id),
+            )
+
     def list_edge_registrations(self, edge_id: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as conn, conn.cursor() as cur:
             if edge_id is None:

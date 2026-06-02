@@ -701,10 +701,10 @@ function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
       <div class="snapshot-row">
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
-          ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
           ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
+        ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
         <div class="snapshot-actions">
           <button class="btn btn-dl"
             onclick="downloadSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
@@ -815,14 +815,29 @@ async function deleteInstance(edgeId, edgeInstanceId, btn) {
     return;
   }
   btn.disabled = true;
+  const baseUrl = `/api/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`;
   try {
-    const res = await fetch(
-      `/api/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`,
-      { method: "DELETE" },
-    );
+    const res = await fetch(baseUrl, { method: "DELETE" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setActionStatus(body.detail || "Delete failed.", "error");
+      const detail = body.detail || {};
+      if (res.status === 409 && detail.cleanup_available) {
+        if (!confirm(`Central could not find backup files for instance "${label}".\n\nRemove this stale instance entry from the UI?`)) {
+          setActionStatus("Cleanup cancelled.", "info");
+          return;
+        }
+        const cleanupRes = await fetch(`${baseUrl}?cleanup_missing=true`, { method: "DELETE" });
+        if (!cleanupRes.ok) {
+          const cleanupBody = await cleanupRes.json().catch(() => ({}));
+          const cleanupDetail = cleanupBody.detail;
+          setActionStatus((typeof cleanupDetail === "string" ? cleanupDetail : cleanupDetail?.message) || "Cleanup failed.", "error");
+          return;
+        }
+        setActionStatus(`Removed stale instance entry ${label}.`, "success");
+        await loadOverview({ silent: true, force: true });
+        return;
+      }
+      setActionStatus((typeof detail === "string" ? detail : detail.message) || "Delete failed.", "error");
       return;
     }
     setActionStatus(`Deleted all snapshots for instance ${label}.`, "success");
@@ -856,7 +871,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
-      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
+      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
     `;
 
     const edges = data.edges || [];

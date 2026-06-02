@@ -36,5 +36,9 @@ class SnapshotIndexBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def delete_edge_registration(self, edge_id: str, edge_instance_id: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     def list_edge_registrations(self, edge_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError

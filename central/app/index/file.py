@@ -108,6 +108,17 @@ class FileSnapshotIndexBackend(SnapshotIndexBackend):
             temp_path = Path(handle.name)
         temp_path.replace(path)
 
+    def delete_edge_registration(self, edge_id: str, edge_instance_id: str) -> None:
+        path = self._registration_instance_path(edge_id, edge_instance_id)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            return
+        try:
+            path.parent.rmdir()
+        except OSError:
+            pass
+
     def list_edge_registrations(self, edge_id: str | None = None) -> list[dict[str, Any]]:
         if not self.registry_root.exists():
             return []
