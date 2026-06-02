@@ -21,8 +21,6 @@ class JobDefinition:
     exclude_patterns: list[str]
     include_hidden: bool
     follow_symlinks: bool
-    is_docker_composed: bool = False
-    update_container_on_packup: bool = False
 
     @property
     def state_key(self) -> str:
@@ -113,14 +111,8 @@ def build_job_definition(directory: Path, payload: dict[str, Any]) -> JobDefinit
 
     include_hidden = payload.get("include_hidden", True)
     follow_symlinks = payload.get("follow_symlinks", False)
-    is_docker_composed = payload.get("is_docker_composed", False)
-    update_container_on_packup = payload.get("update_container_on_packup", False)
     if not isinstance(include_hidden, bool) or not isinstance(follow_symlinks, bool):
         raise ValueError("boolean options must be true or false")
-    if not isinstance(is_docker_composed, bool):
-        raise ValueError("is_docker_composed must be true or false")
-    if not isinstance(update_container_on_packup, bool):
-        raise ValueError("update_container_on_packup must be true or false")
 
     return JobDefinition(
         root_path=directory.resolve(),
@@ -128,8 +120,6 @@ def build_job_definition(directory: Path, payload: dict[str, Any]) -> JobDefinit
         exclude_patterns=list(exclude),
         include_hidden=include_hidden,
         follow_symlinks=follow_symlinks,
-        is_docker_composed=is_docker_composed,
-        update_container_on_packup=update_container_on_packup,
     )
 
 
@@ -139,8 +129,6 @@ def job_definition_to_payload(job: JobDefinition) -> dict[str, Any]:
         "exclude": list(job.exclude_patterns),
         "include_hidden": job.include_hidden,
         "follow_symlinks": job.follow_symlinks,
-        "is_docker_composed": job.is_docker_composed,
-        "update_container_on_packup": job.update_container_on_packup,
     }
 
 

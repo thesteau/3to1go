@@ -7,7 +7,6 @@ from app.backup.archiver import build_archive_name, create_archive, timestamp_fo
 from app.backup.discovery import JobDefinition, discover_jobs
 from app.backup.filters import build_file_list
 from app.backup.fingerprint import compute_fingerprint
-from app.backup.quiesce import DockerComposeQuiescer, QuiesceContext
 from app.core.config import Settings, encryption_key_path, installation_id_path
 from app.core.encryption import encrypt_file, load_or_create_key
 from app.core.identity import load_or_create_installation_id
@@ -25,7 +24,6 @@ class JobProcessor:
         logger,
         state_store: StateStore,
         upload_client: UploadClient,
-        quiescer: DockerComposeQuiescer,
         lock_manager: JobLockManager,
         hook_manager: HookManager,
         ntfy_publisher: NtfyPublisher,
@@ -34,7 +32,6 @@ class JobProcessor:
         self.logger = logger
         self.state_store = state_store
         self.upload_client = upload_client
-        self.quiescer = quiescer
         self.lock_manager = lock_manager
         self.hook_manager = hook_manager
         self.ntfy_publisher = ntfy_publisher
@@ -174,13 +171,7 @@ class JobProcessor:
         archive_name = build_archive_name(job.job_name, now, fingerprint)
         archive_path = self.settings.spool_dir / archive_name
 
-        quiesce_context: QuiesceContext | None = None
-        try:
-            quiesce_context = self.quiescer.prepare(job)
-            create_archive(archive_path=archive_path, files=files)
-        finally:
-            self.quiescer.restore(job, quiesce_context)
-
+        create_archive(archive_path=archive_path, files=files)
         key = load_or_create_key(encryption_key_path())
         tmp_path = archive_path.with_suffix(".enc.tmp")
         encrypt_file(key, archive_path, tmp_path)

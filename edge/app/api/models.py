@@ -9,8 +9,6 @@ class JobConfigInput(BaseModel):
     exclude: list[str] = Field(default_factory=list)
     include_hidden: bool = True
     follow_symlinks: bool = False
-    is_docker_composed: bool = False
-    update_container_on_packup: bool = False
 
 
 class EdgeSettingsInput(BaseModel):

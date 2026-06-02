@@ -86,7 +86,6 @@ class JobProcessorTests(unittest.TestCase):
             logger=self.logger,
             state_store=self.state_store,
             upload_client=_RetryableFailureUploadClient(),
-            quiescer=None,
             lock_manager=JobLockManager(),
             hook_manager=Mock(),
             ntfy_publisher=Mock(),

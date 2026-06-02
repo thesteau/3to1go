@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.backup.discovery import UPLOAD_DIR_FILENAME, discover_jobs  # noqa: E402
+from app.backup.discovery import UPLOAD_DIR_FILENAME, build_job_definition, discover_jobs, job_definition_to_payload  # noqa: E402
 
 
 class _Logger:
@@ -50,6 +50,34 @@ class DiscoveryTests(unittest.TestCase):
         jobs = discover_jobs(self.scan_root, max_depth=5, logger=_Logger())
 
         self.assertEqual([job.root_path for job in jobs], [alpha.resolve(), beta.resolve()])
+
+    def test_legacy_docker_flags_are_ignored_when_serializing_jobs(self) -> None:
+        alpha = self.scan_root / "alpha"
+        alpha.mkdir(parents=True, exist_ok=True)
+
+        job = build_job_definition(
+            alpha,
+            {
+                "job_name": "alpha",
+                "exclude": ["cache/**"],
+                "include_hidden": True,
+                "follow_symlinks": False,
+                "is_docker_composed": True,
+                "update_container_on_packup": True,
+            },
+        )
+
+        payload = job_definition_to_payload(job)
+
+        self.assertEqual(
+            payload,
+            {
+                "job_name": "alpha",
+                "exclude": ["cache/**"],
+                "include_hidden": True,
+                "follow_symlinks": False,
+            },
+        )
 
 
 if __name__ == "__main__":

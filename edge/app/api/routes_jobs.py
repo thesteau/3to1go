@@ -21,8 +21,6 @@ async def save_job(
         "exclude": [item for item in config.exclude if item],
         "include_hidden": config.include_hidden,
         "follow_symlinks": config.follow_symlinks,
-        "is_docker_composed": config.is_docker_composed,
-        "update_container_on_packup": config.update_container_on_packup,
     }
 
     try:

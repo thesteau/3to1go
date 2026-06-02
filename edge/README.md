@@ -16,7 +16,6 @@ Edge is responsible for:
 - creating `tar.zst` archives when something changed
 - encrypting those archives before upload
 - retrying interrupted uploads
-- optionally stopping and restarting Docker Compose projects during backup
 
 ## First-Time Setup
 
@@ -68,8 +67,6 @@ exclude:
   - cache/**
 include_hidden: true
 follow_symlinks: false
-is_docker_composed: false
-update_container_on_packup: false
 ```
 
 ## Job Discovery Rules
@@ -220,27 +217,6 @@ Windows installer startup can be registered manually with:
 ```powershell
 powershell -ExecutionPolicy Bypass -File "C:\Program Files\RelayCentralizer Edge\Install-RelayCentralizerEdgeTask.ps1"
 ```
-
-## Docker Compose-Aware Backups
-
-If a job folder itself contains `docker-compose.yml` or `compose.yml`, you can tell Edge to treat it as a Compose-managed project:
-
-```yaml
-is_docker_composed: true
-update_container_on_packup: true
-```
-
-When enabled, Edge will:
-
-1. stop the stack
-2. create the archive
-3. optionally pull newer images
-4. start the stack again
-5. upload the archive
-
-Use this only when the selected backup folder is the Compose project directory itself.
-
-Edge expects the host `docker` CLI with Compose support to be available when this mode is enabled.
 
 ## Scheduler Behavior
 

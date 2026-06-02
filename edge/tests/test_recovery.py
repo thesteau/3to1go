@@ -71,8 +71,6 @@ class RecoveryServiceTests(unittest.TestCase):
         self.settings.scan_root.mkdir(parents=True, exist_ok=True)
         self.state_store = StateStore(self.settings.state_dir)
         self.logger = Mock()
-        self.quiescer = Mock()
-        self.quiescer.prepare.return_value = None
 
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -117,7 +115,6 @@ class RecoveryServiceTests(unittest.TestCase):
             logger=self.logger,
             state_store=self.state_store,
             upload_client=_StubUploadClient(encrypted_archive),
-            quiescer=self.quiescer,
         )
         job = JobDefinition(
             root_path=job_root,
@@ -138,8 +135,6 @@ class RecoveryServiceTests(unittest.TestCase):
         saved_state = self.state_store.get(job.state_key)
         self.assertEqual(saved_state.last_status, "recovered")
         self.assertIsNone(saved_state.last_error_detail)
-        self.quiescer.prepare.assert_called_once_with(job)
-        self.quiescer.restore.assert_called_once_with(job, None)
 
 
 if __name__ == "__main__":

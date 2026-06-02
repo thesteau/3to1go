@@ -12,14 +12,14 @@
       <h1>{{ title }}</h1>
       <p class="eyebrow">Filesystem-driven backup selection</p>
       <p class="lede">
-        Browse the scan root, inspect current pathing, and create, edit, or delete
+        Browse the scan root, inspect current pathing, and create or update
         <code>.upload_dir</code> markers without touching the terminal. Edge scans
         from the configured root, aggregates matching job directories, and uploads
         changed archives to Central.
       </p>
       <div class="meta-grid" id="meta"></div>
       <div class="toolbar">
-        <button type="button" onclick="loadData({ force: true })">Refresh</button>
+        <button type="button" onclick="loadData()">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
@@ -30,13 +30,13 @@
     <section class="panel workspace-panel">
       <div class="section-head">
         <h2>Selected Jobs</h2>
-        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to add, review, or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the edit screen.</p>
+        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to review or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the job editor.</p>
       </div>
       <div id="selected-jobs" class="job-list"></div>
 
       <div class="section-head compact">
         <h2>Directories Under Scan Root</h2>
-        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and cannot be edited separately here.</p>
+        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
       </div>
       <div id="directory-tree" class="directory-tree"></div>
     </section>
@@ -299,21 +299,6 @@
           <span>Follow symlinks</span>
         </label>
       </div>
-
-      <div class="section-head compact">
-        <h3>Docker Compose Flags</h3>
-        <p class="hint">Only enable these if the selected directory itself contains <code>docker-compose.yml</code> or <code>compose.yml</code>.</p>
-      </div>
-
-      <label class="checkbox">
-        <input type="checkbox" id="is_docker_composed">
-        <span>Directory is Docker Compose-managed</span>
-      </label>
-
-      <label class="checkbox">
-        <input type="checkbox" id="update_container_on_packup">
-        <span>Pull updated images before bringing the stack back up</span>
-      </label>
 
       <div class="toolbar">
         <button type="button" onclick="saveJob()">Save Job</button>

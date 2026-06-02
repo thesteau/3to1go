@@ -22,12 +22,11 @@ class RecoveryError(RuntimeError):
 
 
 class RecoveryService:
-    def __init__(self, settings: Settings, logger, state_store: StateStore, upload_client: UploadClient, quiescer) -> None:
+    def __init__(self, settings: Settings, logger, state_store: StateStore, upload_client: UploadClient) -> None:
         self.settings = settings
         self.logger = logger
         self.state_store = state_store
         self.upload_client = upload_client
-        self.quiescer = quiescer
 
     def recover_latest(self, job: JobDefinition) -> dict[str, object]:
         state = self.state_store.get(job.state_key)
@@ -39,7 +38,6 @@ class RecoveryService:
 
         download_path = self._temp_path(".download.tar.zst")
         decrypted_path = self._temp_path(".decrypted.tar.zst")
-        quiesce_context = None
 
         try:
             download = self.upload_client.download_latest_snapshot(
@@ -54,7 +52,6 @@ class RecoveryService:
             except Exception as exc:
                 raise RecoveryError("unable to decrypt latest snapshot with this Edge key", status_code=409) from exc
 
-            quiesce_context = self.quiescer.prepare(job)
             restored_files = extract_archive(decrypted_path, job.root_path)
 
             state.last_status = "recovered"
@@ -98,7 +95,6 @@ class RecoveryService:
             self.logger.exception("recovery_failed job_name=%s path=%s", job.job_name, job.root_path)
             raise RecoveryError(str(exc), status_code=500) from exc
         finally:
-            self.quiescer.restore(job, quiesce_context)
             download_path.unlink(missing_ok=True)
             decrypted_path.unlink(missing_ok=True)
 

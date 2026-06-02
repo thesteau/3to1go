@@ -209,7 +209,7 @@ async function saveNtfyConfig() {
   const body = await response.json();
   setStatus("ntfy-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
     await loadNtfyConfig();
     setActionStatus("Edge ntfy settings saved.", "success");
   } else {
@@ -321,7 +321,7 @@ async function saveHookCommands() {
   setStatus("hooks-status", response.ok ? "Commands saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     hookDraftDirty = { pre: false, post: false };
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
     await loadHookConfig({ preserveDrafts: false });
     setActionStatus("Edge hook commands saved.", "success");
   } else {
@@ -641,7 +641,18 @@ function buildDirectoryIndex(directories) {
 function formatDirectoryProgress(entry) {
   return entry.state?.pending_archive_size
     ? `${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`
-    : "n/a";
+    : "";
+}
+
+function describeDirectoryState(entry) {
+  const lastState = String(entry.state?.last_status || "").trim();
+  if (lastState) {
+    return `Last state: ${lastState}`;
+  }
+  if (entry.blocked_by_parent) {
+    return `Covered by parent job ${entry.blocked_by_parent}`;
+  }
+  return "No backup activity yet";
 }
 
 function directoryDisplayName(entry) {
@@ -653,13 +664,13 @@ function directoryDisplayName(entry) {
 
 function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   const relativePath = entry.relative_path;
-  const lastState = entry.state?.last_status || "none";
+  const progressLabel = formatDirectoryProgress(entry);
   const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
   const pathValue = relativePath === "."
     ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
     : renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
   const actionMarkup = entry.blocked_by_parent
-    ? `<span class="dir-action-note" title="Nested folders under an already-selected parent are backed up through that parent job instead of getting their own .upload_dir settings.">Managed by parent job</span>`
+    ? `<span class="dir-action-note" title="Nested folders under an already-selected parent are backed up through that parent job instead of getting their own .upload_dir settings.">Covered by parent job</span>`
     : `<button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>`;
 
   return `
@@ -674,7 +685,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         </div>
         <div class="hint">${pathValue}</div>
         <div class="hint">${absolutePath}</div>
-        <div class="dir-state">Last state: ${escapeHtml(lastState)} <span class="hint">${escapeHtml(formatDirectoryProgress(entry))}</span></div>
+        <div class="dir-state">${escapeHtml(describeDirectoryState(entry))}${progressLabel ? ` <span class="hint">${escapeHtml(progressLabel)}</span>` : ""}</div>
       </div>
       <div class="dir-actions">
         ${actionMarkup}
@@ -730,13 +741,13 @@ function bindDirectoryTreeEvents() {
 }
 
 function renderDirectories(data) {
-  const selected = data.directories.filter((entry) => entry.selected);
+  const selected = data.directories.filter((entry) => entry.selected && !entry.blocked_by_parent);
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => `
       <div class="job-card">
         <div class="job-card-title">${renderStaticClipValue("", entry.config?.job_name || entry.relative_path, { className: "clip-title", clipLength: 34 })}</div>
         <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
-        <div class="hint">Last state: ${escapeHtml(entry.state?.last_status || "none")}</div>
+        <div class="hint">${escapeHtml(describeDirectoryState(entry))}</div>
         ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
         ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
         ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
@@ -771,8 +782,6 @@ function editPath(relativePath) {
   document.getElementById("exclude").value = (entry?.config?.exclude || []).join("\n");
   document.getElementById("include_hidden").checked = entry?.config?.include_hidden ?? true;
   document.getElementById("follow_symlinks").checked = entry?.config?.follow_symlinks ?? false;
-  document.getElementById("is_docker_composed").checked = entry?.config?.is_docker_composed ?? false;
-  document.getElementById("update_container_on_packup").checked = entry?.config?.update_container_on_packup ?? false;
   clearStatus("form-status");
   setStatus(
     "form-status",
@@ -791,12 +800,10 @@ function resetForm() {
   document.getElementById("exclude").value = "";
   document.getElementById("include_hidden").checked = true;
   document.getElementById("follow_symlinks").checked = false;
-  document.getElementById("is_docker_composed").checked = false;
-  document.getElementById("update_container_on_packup").checked = false;
   setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-async function loadData({ silent = false, force = false } = {}) {
+async function loadData({ silent = false } = {}) {
   if (isLoadingData) {
     return;
   }
@@ -867,7 +874,7 @@ async function saveSettings() {
   const body = await response.json();
   setStatus("settings-status", response.ok ? "Settings saved. Closing..." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
     setActionStatus("Edge settings saved.", "success");
     await pause(450);
     closeDialog("settings-dialog");
@@ -885,8 +892,6 @@ async function saveJob() {
     exclude: document.getElementById("exclude").value.split("\n").map((value) => value.trim()).filter(Boolean),
     include_hidden: document.getElementById("include_hidden").checked,
     follow_symlinks: document.getElementById("follow_symlinks").checked,
-    is_docker_composed: document.getElementById("is_docker_composed").checked,
-    update_container_on_packup: document.getElementById("update_container_on_packup").checked,
   };
 
   const response = await fetch("/api/jobs", {
@@ -897,7 +902,7 @@ async function saveJob() {
   const body = await response.json();
   setStatus("form-status", response.ok ? "Saved. Closing..." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
     setActionStatus(`Saved .upload_dir for ${relativePath}.`, "success");
     await pause(450);
     closeDialog("job-dialog");
@@ -919,13 +924,13 @@ async function deleteByPath(relativePath) {
   const body = await response.json();
   setStatus("form-status", response.ok ? "This folder is no longer treated as its own backup job." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
     setActionStatus(`Edge will no longer back up ${relativePath} as its own job.`, "success");
     await pause(450);
     closeDialog("job-dialog");
   } else {
     if (response.status === 404 || body.detail === "directory not found") {
-      await loadData({ silent: true, force: true });
+      await loadData({ silent: true });
       closeDialog("job-dialog");
       setActionStatus(`That folder was already gone, so Edge refreshed the directory list.`, "info");
       return;
@@ -963,7 +968,7 @@ async function forceUpload(jobName, btn) {
         : `Forced upload for ${label}. Central may still reject it as a duplicate.`,
       "success",
     );
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
   } catch (error) {
     setActionStatus(error.message || `Force upload failed for ${label}.`, "error");
   } finally {
@@ -1000,7 +1005,7 @@ async function recoverLatest(relativePath, jobName, btn) {
       `Recovered ${label} from ${snapshotName} and replaced ${restoredFiles} backed-up file${restoredFiles === 1 ? "" : "s"}.`,
       "success",
     );
-    await loadData({ silent: true, force: true });
+    await loadData({ silent: true });
   } catch (error) {
     setActionStatus(error.message || `Recovery failed for ${label}.`, "error");
   } finally {
@@ -1025,7 +1030,7 @@ async function runNow() {
           : "Backup cycle requested.",
         "success",
       );
-      await loadData({ silent: true, force: true });
+      await loadData({ silent: true });
       return;
     }
     setActionStatus("A backup cycle is already running.", "info");
@@ -1044,4 +1049,4 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 resetForm();
 initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
-loadData({ force: true });
+loadData();
