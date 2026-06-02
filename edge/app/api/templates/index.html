@@ -19,7 +19,7 @@
       </p>
       <div class="meta-grid" id="meta"></div>
       <div class="toolbar">
-        <button type="button" onclick="loadData()">Refresh</button>
+        <button type="button" onclick="manualRefresh()">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
@@ -66,7 +66,7 @@
 
       <label for="settings_advertised_url">Advertised Edge URL</label>
       <input id="settings_advertised_url" placeholder="https://edge.example.com or http://192.168.1.20:6556">
-      <p class="hint">Optional. Central will show this exact Edge URL as the preferred link back to this Edge.</p>
+      <p class="hint">Optional. Central displays this URL as a link to this Edge instance.</p>
 
       <label for="settings_auth_token">Auth Token</label>
       <input id="settings_auth_token" type="password" placeholder="Shared token with Central">

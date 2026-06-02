@@ -56,7 +56,6 @@ class EdgeRegistration:
     advertised_url: str | None
     first_seen_at: str
     last_seen_at: str
-    last_seen_source: str | None = None
 
 
 class IngestService:
@@ -108,7 +107,7 @@ class IngestService:
         self.cleanup_stale_uploads()
         registration_lock = await self.lock_manager.get_lock(f"edge-registry:{metadata.edge_id}")
         async with registration_lock:
-            self._register_edge(metadata, source_address=source_address)
+            self._register_edge(metadata)
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
@@ -227,8 +226,8 @@ class IngestService:
             return {
                 "status": "ok",
                 "stored_as": session.stored_as or session.filename,
-                    "pruned": session.pruned,
-                }
+                "pruned": session.pruned,
+            }
 
         lock = await self.lock_manager.get_lock(session.namespace)
         async with lock:
@@ -360,7 +359,12 @@ class IngestService:
                     hook_status = "ok"
                     hook_stored_as = storage_result["stored_as"]
                     hook_pruned = pruned
-                    result = {"status": "ok", "stored_as": storage_result["stored_as"], "pruned": pruned, "duplicate": False}
+                    result = {
+                        "status": "ok",
+                        "stored_as": storage_result["stored_as"],
+                        "pruned": pruned,
+                        "duplicate": False,
+                    }
             finally:
                 final_hook_context = {
                     **hook_context,
@@ -558,7 +562,7 @@ class IngestService:
         normalized.setdefault("source_address", None)
         return UploadSession(**normalized)
 
-    def _register_edge(self, metadata: UploadMetadata, source_address: str | None = None) -> None:
+    def _register_edge(self, metadata: UploadMetadata) -> None:
         edge_instance_id = (metadata.edge_instance_id or "").strip()
         if not edge_instance_id:
             return
@@ -580,8 +584,6 @@ class IngestService:
             registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
         if metadata.advertised_url is not None:
             registration.advertised_url = metadata.advertised_url
-        if source_address:
-            registration.last_seen_source = source_address
         self.snapshot_index.upsert_edge_registration(asdict(registration))
 
     def _current_upload_size(self, upload_id: str) -> int:

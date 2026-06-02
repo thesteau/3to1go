@@ -157,7 +157,8 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
+                SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
+                       advertised_url, first_seen_at, last_seen_at
                 FROM edge_registration
                 WHERE edge_id = %s AND edge_instance_id = %s
                 """,
@@ -173,7 +174,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             "advertised_url": row[3],
             "first_seen_at": row[4],
             "last_seen_at": row[5],
-            "last_seen_source": row[6],
         }
 
     def upsert_edge_registration(self, registration: dict[str, Any]) -> None:
@@ -186,17 +186,15 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     encryption_key_fingerprint,
                     advertised_url,
                     first_seen_at,
-                    last_seen_at,
-                    last_seen_source
+                    last_seen_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (edge_id, edge_instance_id)
                 DO UPDATE SET
                     encryption_key_fingerprint = EXCLUDED.encryption_key_fingerprint,
                     advertised_url = EXCLUDED.advertised_url,
                     first_seen_at = EXCLUDED.first_seen_at,
-                    last_seen_at = EXCLUDED.last_seen_at,
-                    last_seen_source = EXCLUDED.last_seen_source
+                    last_seen_at = EXCLUDED.last_seen_at
                 """,
                 (
                     registration["edge_id"],
@@ -205,7 +203,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     registration.get("advertised_url"),
                     registration["first_seen_at"],
                     registration["last_seen_at"],
-                    registration.get("last_seen_source"),
                 ),
             )
 
@@ -214,7 +211,8 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             if edge_id is None:
                 cur.execute(
                     """
-                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
+                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
+                           advertised_url, first_seen_at, last_seen_at
                     FROM edge_registration
                     ORDER BY lower(edge_id), lower(edge_instance_id)
                     """
@@ -222,7 +220,8 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             else:
                 cur.execute(
                     """
-                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url, first_seen_at, last_seen_at, last_seen_source
+                    SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
+                           advertised_url, first_seen_at, last_seen_at
                     FROM edge_registration
                     WHERE edge_id = %s
                     ORDER BY lower(edge_instance_id)
@@ -238,7 +237,6 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 "advertised_url": row[3],
                 "first_seen_at": row[4],
                 "last_seen_at": row[5],
-                "last_seen_source": row[6],
             }
             for row in rows
         ]
@@ -270,8 +268,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     encryption_key_fingerprint TEXT,
                     advertised_url TEXT,
                     first_seen_at TEXT NOT NULL,
-                    last_seen_at TEXT NOT NULL,
-                    last_seen_source TEXT
+                    last_seen_at TEXT NOT NULL
                 )
                 """
             )

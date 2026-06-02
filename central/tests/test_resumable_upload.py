@@ -68,7 +68,6 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": archive_sha256,
             "idempotency_key": "idem-12345678",
             "encryption_key_fingerprint": "f" * 64,
-            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=init_payload, headers=self.headers)
@@ -168,7 +167,6 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "e9c0f8b575cbfcb42ab3b78ecc87efa3b011d9a5d10b09fa4e96f240bf6a82f5",
             "idempotency_key": "idem-a1234567",
             "encryption_key_fingerprint": "a" * 64,
-            "advertised_url": "https://edge-one.example.com",
         }
         first = self.client.post(
             "/backup/uploads/initiate",
@@ -180,7 +178,6 @@ class ResumableUploadTests(unittest.TestCase):
         second_instance = dict(payload)
         second_instance["edge_instance_id"] = "edgeinstance9999"
         second_instance["idempotency_key"] = "idem-c1234567"
-        second_instance["advertised_url"] = "http://192.168.1.121:6556"
         second = self.client.post(
             "/backup/uploads/initiate",
             json=second_instance,
@@ -208,7 +205,6 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-overview1",
             "encryption_key_fingerprint": "c" * 64,
-            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post(
@@ -234,8 +230,6 @@ class ResumableUploadTests(unittest.TestCase):
         instance = edge["instances"][0]
         self.assertEqual(instance["edge_instance_id"], "edgeinstance0001")
         self.assertEqual(instance["encryption_key_fingerprint"], "c" * 64)
-        self.assertEqual(instance["last_seen_source"], "192.168.1.120")
-        self.assertEqual(instance["advertised_url"], "https://edge-one.example.com")
 
     def test_reuses_idempotency_key_after_manual_snapshot_deletion(self) -> None:
         archive_bytes = b"hello world"
@@ -250,7 +244,6 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-deleted1",
             "encryption_key_fingerprint": "d" * 64,
-            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)
@@ -289,7 +282,6 @@ class ResumableUploadTests(unittest.TestCase):
             "archive_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             "idempotency_key": "idem-delete-api1",
             "encryption_key_fingerprint": "e" * 64,
-            "advertised_url": "https://edge-one.example.com",
         }
 
         init_response = self.client.post("/backup/uploads/initiate", json=payload, headers=self.headers)

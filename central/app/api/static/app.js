@@ -162,6 +162,11 @@ function fillSettings(settings) {
   document.getElementById("settings_upload_cleanup_interval_seconds").value = data.upload_cleanup_interval_seconds ?? 300;
 }
 
+async function manualRefresh() {
+  await loadOverview({ force: true });
+  setActionStatus("Refreshed.", "success");
+}
+
 function openSettingsDialog() {
   fillSettings(window.__centralSettings || {});
   clearStatus("settings-status");
@@ -682,42 +687,6 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
   }
 }
 
-async function forceSendJob(edgeId, edgeInstanceId, jobName, btn) {
-  if (!edgeInstanceId) {
-    setActionStatus("This Edge instance cannot be targeted from Central.", "error");
-    return;
-  }
-
-  btn.disabled = true;
-  try {
-    const response = await fetch(
-      `/api/edges/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/jobs/${encodeURIComponent(jobName)}/force-send`,
-      { method: "POST" },
-    );
-    const body = await response.json();
-    if (!response.ok) {
-      setActionStatus(body.detail || `Force send failed for ${jobName}.`, "error");
-      return;
-    }
-
-    if (body.status === "already_running") {
-      setActionStatus(`Edge ${edgeId} is already running a backup cycle.`);
-      return;
-    }
-
-    setActionStatus(
-      body.manual_retry_cleared
-        ? `Requested force send for ${jobName}. A manual block was cleared first.`
-        : `Requested force send for ${jobName}.`,
-      "info",
-    );
-    await loadOverview({ silent: true, force: true });
-  } catch (error) {
-    setActionStatus(error.message || `Force send failed for ${jobName}.`, "error");
-  } finally {
-    btn.disabled = false;
-  }
-}
 
 function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
   if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
@@ -772,14 +741,12 @@ function renderInstanceMeta(instance) {
     ${instance.edge_instance_id ? renderClipValue("Instance", instance.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy snapshot path</span>'}
     ${instance.advertised_url
       ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
-      : '<span class="edge-detail edge-detail-warn" title="This Edge is still uploading to Central, but it left its advertised URL blank so Central cannot send Force Send requests back to it yet.">Advertised URL not set</span>'}
-    ${instance.last_seen_source ? renderClipValue("Source", instance.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
+      : '<span class="edge-detail edge-detail-muted">No URL set</span>'}
     ${renderClipValue("Key FP", instance.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
   `;
 }
 
 function renderInstanceCard(edgeId, instance) {
-  const canForceSend = Boolean(instance.edge_instance_id && instance.advertised_url);
   return `
     <section class="instance-card">
       <div class="instance-head">
@@ -797,12 +764,6 @@ function renderInstanceCard(edgeId, instance) {
               <span class="job-name">${escapeHtml(job.job_name)}</span>
               <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
             </div>
-            ${canForceSend ? `
-              <div class="job-header-actions">
-                <button class="btn btn-force" type="button"
-                  onclick="forceSendJob('${escapeHtml(edgeId)}','${escapeHtml(instance.edge_instance_id)}',decodeURIComponent('${encodeURIComponent(job.job_name)}'),this)">Force Send</button>
-              </div>
-            ` : ""}
           </div>
           <div class="snapshot-list">
             ${renderSnapshots(edgeId, instance.edge_instance_id, job.job_name, job.snapshots || [])}

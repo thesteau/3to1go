@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from app.core.config import Settings, settings_storage_path, settings_to_payload
 from app.index.base import SnapshotIndexBackend
-from app.services.ingest import IngestService
 from app.storage.local import LocalFilesystemBackend
 
 
 def build_overview(
     settings: Settings,
     storage_backend: LocalFilesystemBackend,
-    ingest_service: IngestService,
     snapshot_index: SnapshotIndexBackend,
 ) -> dict:
     edges: list[dict] = []
@@ -33,7 +31,6 @@ def build_overview(
                 "encryption_key_fingerprint": registration.get("encryption_key_fingerprint"),
                 "first_seen_at": registration.get("first_seen_at"),
                 "last_seen_at": registration.get("last_seen_at"),
-                "last_seen_source": registration.get("last_seen_source"),
                 "jobs": [],
             }
             instance_map[key] = instance
@@ -43,9 +40,12 @@ def build_overview(
                 instance["advertised_url"] = registration.get("advertised_url")
             if registration.get("encryption_key_fingerprint"):
                 instance["encryption_key_fingerprint"] = registration.get("encryption_key_fingerprint")
-            instance["first_seen_at"] = registration.get("first_seen_at") or instance.get("first_seen_at")
-            instance["last_seen_at"] = registration.get("last_seen_at") or instance.get("last_seen_at")
-            instance["last_seen_source"] = registration.get("last_seen_source") or instance.get("last_seen_source")
+            instance["first_seen_at"] = (
+                registration.get("first_seen_at") or instance.get("first_seen_at")
+            )
+            instance["last_seen_at"] = (
+                registration.get("last_seen_at") or instance.get("last_seen_at")
+            )
 
     for namespace in snapshot_index.list_namespaces():
         edge = edge_map.get(namespace["edge_id"])
@@ -64,7 +64,6 @@ def build_overview(
                 "encryption_key_fingerprint": None,
                 "first_seen_at": None,
                 "last_seen_at": None,
-                "last_seen_source": None,
                 "jobs": [],
             }
             instance_map[key] = instance

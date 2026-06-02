@@ -9,7 +9,7 @@ const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
   settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
   settings_central_url: "The Central server URL Edge uploads backups to.",
-  settings_advertised_url: "An optional URL Central can use to call back into this Edge for actions like Force Send.",
+  settings_advertised_url: "Optional URL Central displays as a link to this Edge instance.",
   settings_auth_token: "Shared secret Edge includes when it talks to Central.",
   settings_cron_schedule: "Five cron fields: minute, hour, day of month, month, day of week.",
   settings_state_dir: "Where Edge keeps retry state, progress, and other local bookkeeping.",
@@ -149,6 +149,11 @@ function closeDialog(id) {
   if (dialog?.open) {
     dialog.close();
   }
+}
+
+async function manualRefresh() {
+  await loadData();
+  setActionStatus("Refreshed.", "success");
 }
 
 function openSettingsDialog() {
@@ -548,7 +553,7 @@ function fillMeta(data, encKey, encFingerprint) {
     <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
     <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
-    <div><strong>Advertised URL</strong> ${renderHelpHint("Optional. Central uses this exact URL when it needs to reach back into this Edge for actions like Force Send.")}<br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set yet. Central can still receive uploads, but it cannot call back into this Edge until you save a reachable URL.</span>'}</div>
+    <div><strong>Advertised URL</strong><br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>'}</div>
     <div><strong>Edge UI</strong><br>${renderClipValue("", data.http_url, { className: "clip-code", clipLength: 30 })}</div>
     <div><strong>Settings File</strong><br>${renderClipValue("", data.settings_path || "n/a", { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Cron Schedule</strong> ${renderHelpHint(cronDetails.help)}<br><code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div></div>
