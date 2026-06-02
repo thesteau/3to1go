@@ -856,9 +856,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_root)}</div>
-      <div><strong>Staging Dir</strong><br>${escapeHtml(data.staging_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
-      <div><strong>Settings File</strong><br>${escapeHtml(data.settings_path || "n/a")}</div>
     `;
 
     const edges = data.edges || [];

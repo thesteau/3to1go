@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.core.config import Settings, settings_storage_path, settings_to_payload
+import os
+
+from app.core.config import Settings, settings_to_payload
 from app.index.base import SnapshotIndexBackend
 from app.storage.local import LocalFilesystemBackend
 
@@ -72,10 +74,8 @@ def build_overview(
 
     return {
         "status": "ok" if storage_backend.healthcheck() else "degraded",
-        "backup_root": str(settings.backup_root),
-        "staging_dir": str(settings.staging_dir),
+        "backup_root": os.getenv("BACKUP_ROOT", "/backups"),
         "retention_keep_last": settings.retention_keep_last,
-        "settings_path": str(settings_storage_path()),
         "settings": settings_to_payload(settings),
         "http_url": f"http://localhost:{settings.http_port}",
         "edges": edges,
