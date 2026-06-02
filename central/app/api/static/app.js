@@ -822,11 +822,9 @@ function renderKeyManager(ns) {
 
 function renderInstanceMeta(instance) {
   return `
-    ${instance.edge_instance_id ? renderClipValue("Instance", instance.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy snapshot path</span>'}
     ${instance.advertised_url
       ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
       : '<span class="edge-detail edge-detail-muted">No URL set</span>'}
-    ${renderClipValue("Key FP", instance.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
   `;
 }
 
