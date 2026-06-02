@@ -855,7 +855,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
 
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
-      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_root)}</div>
+      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))}</div>
     `;
 

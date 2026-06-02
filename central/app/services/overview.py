@@ -74,9 +74,8 @@ def build_overview(
 
     return {
         "status": "ok" if storage_backend.healthcheck() else "degraded",
-        "backup_root": os.getenv("BACKUP_ROOT", "/backups"),
+        "backup_dir": os.getenv("BACKUP_DIR", "/backups"),
         "retention_keep_last": settings.retention_keep_last,
         "settings": settings_to_payload(settings),
-        "http_url": f"http://localhost:{settings.http_port}",
         "edges": edges,
     }

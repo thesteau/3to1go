@@ -230,6 +230,13 @@ class ResumableUploadTests(unittest.TestCase):
         instance = edge["instances"][0]
         self.assertEqual(instance["edge_instance_id"], "edgeinstance0001")
         self.assertEqual(instance["encryption_key_fingerprint"], "c" * 64)
+        self.assertEqual(overview.json()["backup_dir"], "/backups")
+
+        with patch.dict("os.environ", {"BACKUP_DIR": "./data/backups"}):
+            overview_with_env = self.client.get("/api/overview")
+
+        self.assertEqual(overview_with_env.status_code, 200, overview_with_env.text)
+        self.assertEqual(overview_with_env.json()["backup_dir"], "./data/backups")
 
     def test_reuses_idempotency_key_after_manual_snapshot_deletion(self) -> None:
         archive_bytes = b"hello world"
