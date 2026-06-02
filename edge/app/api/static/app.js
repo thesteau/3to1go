@@ -1,12 +1,34 @@
 let latestData = null;
 let directoryExpansionState = new Set(["."]);
-let autoRefreshTimer = null;
 let isLoadingData = false;
-let hooksRefreshTimer = null;
 let edgeNtfyConfig = null;
 let edgeHookConfig = null;
 let hookDraftDirty = { pre: false, post: false };
-const AUTO_REFRESH_INTERVAL_MS = 5000;
+const TOAST_DURATION_MS = 3600;
+const EDGE_SETTINGS_HELP = {
+  settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
+  settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
+  settings_central_url: "The Central server URL Edge uploads backups to.",
+  settings_advertised_url: "An optional URL Central can use to call back into this Edge for actions like Force Send.",
+  settings_auth_token: "Shared secret Edge includes when it talks to Central.",
+  settings_cron_schedule: "Five cron fields: minute, hour, day of month, month, day of week.",
+  settings_state_dir: "Where Edge keeps retry state, progress, and other local bookkeeping.",
+  settings_spool_dir: "Where Edge stages local archive files before and during upload.",
+  settings_log_level: "How chatty Edge logs should be.",
+  settings_max_depth: "How many nested folders below the scan root Edge will inspect.",
+  settings_keep_local_pending: "Keep unfinished local archives on disk so Edge can retry later after a failure.",
+  settings_upload_chunk_size_mb: "Preferred chunk size Edge asks Central to accept for each upload part.",
+  settings_min_upload_chunk_size_mb: "Smallest chunk Edge will shrink down to when adapting to network conditions.",
+  settings_max_upload_chunk_size_mb: "Largest chunk Edge will grow up to when uploads are healthy.",
+  settings_upload_retry_max_attempts: "How many times Edge retries a failed upload before requiring manual attention.",
+  settings_upload_retry_base_delay_seconds: "Starting delay before retry backoff grows.",
+  settings_upload_retry_max_delay_seconds: "Longest delay Edge will wait between upload retries.",
+  settings_upload_connect_timeout_seconds: "How long Edge waits to establish a connection to Central.",
+  settings_upload_read_timeout_padding_seconds: "Extra read timeout buffer added while upload chunks are streaming.",
+  settings_upload_min_throughput_bytes_per_second: "Minimum upload speed Edge expects before treating the connection as stalled.",
+  settings_circuit_breaker_failure_threshold: "How many consecutive upload failures cause Edge to pause uploads temporarily.",
+  settings_circuit_breaker_cooldown_seconds: "How long Edge waits before trying again after the upload circuit opens.",
+};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -25,11 +47,11 @@ function statusBadge(entry) {
   if (entry.config_error) {
     return '<span class="badge error">invalid config</span>';
   }
+  if (entry.blocked_by_parent) {
+    return `<span class="badge warn" title="Nested folders under an already-selected parent are backed up through that parent job instead of continuing as separate jobs.">managed by ${escapeHtml(entry.blocked_by_parent)}</span>`;
+  }
   if (entry.selected) {
     return '<span class="badge">selected</span>';
-  }
-  if (entry.blocked_by_parent) {
-    return `<span class="badge warn">nested under ${escapeHtml(entry.blocked_by_parent)}</span>`;
   }
   return '<span class="badge warn">available</span>';
 }
@@ -60,18 +82,59 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 32 }
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
 }
 
+function showToast(message, kind = "info", { duration = TOAST_DURATION_MS } = {}) {
+  if (!message) return;
+  const region = document.getElementById("toast-region");
+  if (!region) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${kind}`;
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(kind === "error" ? "Something needs attention" : kind === "success" ? "Saved" : "Notice")}</strong><span>${escapeHtml(message)}</span>`;
+  region.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("visible"));
+
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 180);
+  }, duration);
+}
+
 function setActionStatus(message, kind = "info") {
-  const element = document.getElementById("action-status");
+  showToast(message, kind);
+}
+
+function setStatus(id, message, kind = "info") {
+  const element = document.getElementById(id);
   if (!element) return;
   element.textContent = message || "";
-  element.dataset.kind = kind;
+  if (message) {
+    element.dataset.kind = kind;
+  } else {
+    delete element.dataset.kind;
+  }
 }
 
 function clearStatus(id) {
-  const element = document.getElementById(id);
-  if (element) {
-    element.textContent = "";
-  }
+  setStatus(id, "", "info");
+}
+
+function pause(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function renderHelpHint(message) {
+  return `<span class="hover-hint" tabindex="0" aria-label="${escapeHtml(message)}" title="${escapeHtml(message)}">?</span>`;
+}
+
+function initializeFieldHelp(helpEntries) {
+  Object.entries(helpEntries).forEach(([id, helpText]) => {
+    const label = document.querySelector(`label[for="${id}"]`);
+    if (!label || label.querySelector(".field-help")) {
+      return;
+    }
+    label.insertAdjacentHTML("beforeend", ` <span class="field-help hover-hint" tabindex="0" aria-label="${escapeHtml(helpText)}" title="${escapeHtml(helpText)}">?</span>`);
+  });
 }
 
 function openDialog(id) {
@@ -85,10 +148,6 @@ function closeDialog(id) {
   const dialog = document.getElementById(id);
   if (dialog?.open) {
     dialog.close();
-  }
-  if (id === "hooks-dialog" && hooksRefreshTimer) {
-    clearInterval(hooksRefreshTimer);
-    hooksRefreshTimer = null;
   }
 }
 
@@ -122,7 +181,7 @@ async function openNtfyDialog() {
     await loadNtfyConfig();
     openDialog("ntfy-dialog");
   } catch (error) {
-    alert(error.message || "Failed to load ntfy settings.");
+    setActionStatus(error.message || "Failed to load ntfy settings.", "error");
   }
 }
 
@@ -141,15 +200,16 @@ function resetNtfyDefaults() {
 }
 
 async function saveNtfyConfig() {
+  setStatus("ntfy-status", "Saving...", "info");
   const response = await fetch("/api/ntfy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(collectNtfyPayload()),
   });
   const body = await response.json();
-  document.getElementById("ntfy-status").textContent = response.ok ? "Saved." : (body.detail || "Save failed.");
+  setStatus("ntfy-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true });
+    await loadData({ silent: true, force: true });
     await loadNtfyConfig();
     setActionStatus("Edge ntfy settings saved.", "success");
   } else {
@@ -164,10 +224,14 @@ async function testNtfyConfig() {
     body: JSON.stringify(collectNtfyPayload()),
   });
   const body = await response.json();
-  document.getElementById("ntfy-status").textContent = response.ok
-    ? "Connection test succeeded."
-    : (body.detail || "Test failed.");
-  if (!response.ok) {
+  setStatus(
+    "ntfy-status",
+    response.ok ? "Connection test succeeded." : (body.detail || "Test failed."),
+    response.ok ? "success" : "error",
+  );
+  if (response.ok) {
+    setActionStatus("ntfy connection test succeeded.", "success");
+  } else {
     setActionStatus(body.detail || "ntfy test failed.", "error");
   }
 }
@@ -230,17 +294,9 @@ async function openHooksDialog() {
     await loadHookConfig({ preserveDrafts: false });
     openDialog("hooks-dialog");
   } catch (error) {
-    alert(error.message || "Failed to load hook settings.");
+    setActionStatus(error.message || "Failed to load hook settings.", "error");
     return;
   }
-  if (hooksRefreshTimer) {
-    clearInterval(hooksRefreshTimer);
-  }
-  hooksRefreshTimer = setInterval(() => {
-    if (document.getElementById("hooks-dialog")?.open) {
-      loadHookConfig({ preserveDrafts: true }).catch(() => {});
-    }
-  }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 function clearHookCommand(kind) {
@@ -251,6 +307,7 @@ function clearHookCommand(kind) {
 }
 
 async function saveHookCommands() {
+  setStatus("hooks-status", "Saving...", "info");
   const payload = {
     pre_command: document.getElementById("hook_pre_command").value.trim(),
     post_command: document.getElementById("hook_post_command").value.trim(),
@@ -261,10 +318,10 @@ async function saveHookCommands() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "Commands saved." : (body.detail || "Save failed.");
+  setStatus("hooks-status", response.ok ? "Commands saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     hookDraftDirty = { pre: false, post: false };
-    await loadData({ silent: true });
+    await loadData({ silent: true, force: true });
     await loadHookConfig({ preserveDrafts: false });
     setActionStatus("Edge hook commands saved.", "success");
   } else {
@@ -276,17 +333,18 @@ async function uploadHookFile() {
   const input = document.getElementById("hook_file_input");
   const file = input?.files?.[0];
   if (!file) {
-    document.getElementById("hooks-status").textContent = "Choose a file first.";
+    setStatus("hooks-status", "Choose a file first.", "error");
     return;
   }
   const formData = new FormData();
   formData.append("hook_file", file);
   const response = await fetch("/api/hooks/files", { method: "POST", body: formData });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "File uploaded." : (body.detail || "Upload failed.");
+  setStatus("hooks-status", response.ok ? "File uploaded." : (body.detail || "Upload failed."), response.ok ? "success" : "error");
   if (response.ok) {
     input.value = "";
     await loadHookConfig({ preserveDrafts: true });
+    setActionStatus(`Uploaded ${file.name}.`, "success");
   } else {
     setActionStatus(body.detail || "Hook upload failed.", "error");
   }
@@ -294,13 +352,13 @@ async function uploadHookFile() {
 
 async function viewHookFile(filename, viewable) {
   if (!viewable) {
-    alert("This file cannot be viewed.");
+    setActionStatus("This file cannot be viewed.", "error");
     return;
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`);
   const body = await response.json();
   if (!response.ok) {
-    alert(body.detail || "View failed.");
+    setActionStatus(body.detail || "View failed.", "error");
     return;
   }
   document.getElementById("hook-view-filename").textContent = body.filename || filename;
@@ -314,15 +372,24 @@ async function deleteHookFile(filename) {
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "File deleted." : (body.detail || "Delete failed.");
+  setStatus("hooks-status", response.ok ? "File deleted." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
   if (response.ok) {
     await loadHookConfig({ preserveDrafts: true });
+    setActionStatus(`Deleted ${filename}.`, "success");
   } else {
     setActionStatus(body.detail || "Hook delete failed.", "error");
   }
 }
 
 function openJobDialog(relativePath = ".") {
+  const entry = findEntry(relativePath);
+  if (entry?.blocked_by_parent) {
+    setActionStatus(
+      `That folder is nested under ${entry.blocked_by_parent}, so Edge follows the parent job instead of opening separate upload settings here.`,
+      "error",
+    );
+    return;
+  }
   editPath(relativePath);
   openDialog("job-dialog");
 }
@@ -334,23 +401,162 @@ function openJobDialogFromEvent(event, relativePath) {
   return false;
 }
 
+function formatLocalDateTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "—";
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    return text;
+  }
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatClock(hourText, minuteText) {
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    return null;
+  }
+  const parsed = new Date();
+  parsed.setHours(hour, minute, 0, 0);
+  return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function describeDayOfWeek(field) {
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  if (field === "1-5") return "weekdays";
+  if (/^\d$/.test(field)) return dayNames[Number(field) % 7];
+  if (/^\d-\d$/.test(field)) {
+    const [start, end] = field.split("-").map(Number);
+    return `${dayNames[start % 7]} through ${dayNames[end % 7]}`;
+  }
+  if (/^\d(?:,\d)+$/.test(field)) {
+    return field.split(",").map((value) => dayNames[Number(value) % 7]).join(", ");
+  }
+  return `day-of-week ${field}`;
+}
+
+function describeCronSchedule(expression) {
+  const normalized = String(expression || "").trim();
+  const fieldHelp = "Fields run in this order: minute hour day-of-month month day-of-week.";
+  if (!normalized) {
+    return {
+      summary: "No schedule set yet.",
+      help: `${fieldHelp} Example: 0 2 * * 0 means every Sunday at 2:00 AM.`,
+    };
+  }
+
+  const fields = normalized.split(/\s+/);
+  if (fields.length !== 5) {
+    return {
+      summary: "Use five cron fields separated by spaces.",
+      help: `${fieldHelp} Example: 0 2 * * 0 means every Sunday at 2:00 AM.`,
+    };
+  }
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+  const timeLabel = formatClock(hour, minute);
+  let summary = `Runs on cron schedule ${normalized}.`;
+  if (timeLabel) {
+    if (dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+      summary = `Runs every day at ${timeLabel}.`;
+    } else if (dayOfMonth === "*" && month === "*" && dayOfWeek !== "*") {
+      summary = `Runs every ${describeDayOfWeek(dayOfWeek)} at ${timeLabel}.`;
+    } else if (/^\d+$/.test(dayOfMonth) && month === "*" && dayOfWeek === "*") {
+      summary = `Runs on day ${dayOfMonth} of every month at ${timeLabel}.`;
+    } else if (dayOfMonth === "*" && /^\d+$/.test(month) && dayOfWeek === "*") {
+      summary = `Runs during month ${month} at ${timeLabel}.`;
+    } else if (dayOfMonth === "*" && month === "*" && dayOfWeek === "0") {
+      summary = `Runs every Sunday at ${timeLabel}.`;
+    }
+  }
+
+  return {
+    summary,
+    help: `${fieldHelp} Example: 0 2 * * 0 means every Sunday at 2:00 AM.`,
+  };
+}
+
+function updateCronScheduleHint() {
+  const input = document.getElementById("settings_cron_schedule");
+  const hint = document.getElementById("settings-cron-help");
+  if (!input || !hint) return;
+  const description = describeCronSchedule(input.value);
+  hint.textContent = description.summary;
+  input.title = `${description.summary} ${description.help}`;
+}
+
+function describeSchedulerState(scheduler) {
+  const state = String(scheduler?.state || "idle");
+  if (state === "running") {
+    return {
+      label: "Running a backup cycle",
+      help: "Edge is actively scanning, packing, or uploading right now.",
+    };
+  }
+  if (state === "waiting") {
+    return {
+      label: "Waiting for the next scheduled run",
+      help: "This is the normal idle state between backup cycles.",
+    };
+  }
+  if (state === "stopped") {
+    return {
+      label: "Scheduler stopped",
+      help: "The scheduler is not currently running.",
+    };
+  }
+  return {
+    label: "Ready",
+    help: "Edge is ready for the next run request.",
+  };
+}
+
+function describeUploadCircuit(uploadCircuit) {
+  const failures = Number(uploadCircuit?.consecutive_failures || 0);
+  const cooldown = Number(uploadCircuit?.cooldown_remaining_seconds || 0);
+  if (uploadCircuit?.state === "open") {
+    return {
+      label: `Paused after upload failures (${cooldown}s left)`,
+      help: "Edge temporarily pauses uploads after repeated failures, then retries automatically after the cooldown.",
+    };
+  }
+  return {
+    label: failures > 0 ? `Healthy, with ${failures} recent failure${failures === 1 ? "" : "s"}` : "Healthy",
+    help: "Uploads are allowed. Edge only pauses this circuit after repeated failures talking to Central.",
+  };
+}
+
 function fillMeta(data, encKey, encFingerprint) {
   const scheduler = data.scheduler || {};
   const uploadCircuit = data.upload_circuit || {};
   const settingsStatus = data.settings_status || {};
+  const cronDetails = describeCronSchedule(data.cron_schedule);
+  const schedulerDetails = describeSchedulerState(scheduler);
+  const uploadCircuitDetails = describeUploadCircuit(uploadCircuit);
+  const advertisedUrl = String(data.advertised_url || "").trim();
+  const nextRunText = scheduler.next_run_at
+    ? formatLocalDateTime(scheduler.next_run_at)
+    : (scheduler.state === "running" ? "A backup cycle is running now." : "Waiting for the next scheduled time.");
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 })}</div>
     <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
     <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
-    <div><strong>Advertised URL</strong><br>${renderClipValue("", data.advertised_url || "—", { className: "clip-code", clipLength: 34 })}</div>
+    <div><strong>Advertised URL</strong> ${renderHelpHint("Optional. Central uses this exact URL when it needs to reach back into this Edge for actions like Force Send.")}<br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set yet. Central can still receive uploads, but it cannot call back into this Edge until you save a reachable URL.</span>'}</div>
     <div><strong>Edge UI</strong><br>${renderClipValue("", data.http_url, { className: "clip-code", clipLength: 30 })}</div>
     <div><strong>Settings File</strong><br>${renderClipValue("", data.settings_path || "n/a", { className: "clip-code", clipLength: 34 })}</div>
-    <div><strong>Cron Schedule</strong><br><code>${escapeHtml(data.cron_schedule)}</code></div>
+    <div><strong>Cron Schedule</strong> ${renderHelpHint(cronDetails.help)}<br><code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div></div>
     <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
-    <div><strong>Scheduler</strong><br>${escapeHtml(scheduler.state || "idle")}</div>
-    <div><strong>Next Run</strong><br>${escapeHtml(scheduler.next_run_at || "waiting for first cycle")}</div>
-    <div><strong>Upload Circuit</strong><br>${escapeHtml(uploadCircuit.state || "closed")}</div>
+    <div><strong>Scheduler</strong> ${renderHelpHint(schedulerDetails.help)}<br>${escapeHtml(schedulerDetails.label)}</div>
+    <div><strong>Next Run</strong><br>${escapeHtml(nextRunText)}</div>
+    <div><strong>Upload Circuit</strong> ${renderHelpHint(uploadCircuitDetails.help)}<br>${escapeHtml(uploadCircuitDetails.label)}</div>
     <div><strong>Auth Token</strong><br>${escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing")}</div>
     <div class="enc-key-cell">
       <strong>Encryption Key</strong>
@@ -398,6 +604,7 @@ function fillSettings(settings) {
   document.getElementById("settings_upload_min_throughput_bytes_per_second").value = data.upload_min_throughput_bytes_per_second ?? 262144;
   document.getElementById("settings_circuit_breaker_failure_threshold").value = data.circuit_breaker_failure_threshold ?? 5;
   document.getElementById("settings_circuit_breaker_cooldown_seconds").value = data.circuit_breaker_cooldown_seconds ?? 300;
+  updateCronScheduleHint();
 }
 
 function rememberDirectoryExpansion() {
@@ -451,6 +658,9 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   const pathValue = relativePath === "."
     ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
     : renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
+  const actionMarkup = entry.blocked_by_parent
+    ? `<span class="dir-action-note" title="Nested folders under an already-selected parent are backed up through that parent job instead of getting their own .upload_dir settings.">Managed by parent job</span>`
+    : `<button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>`;
 
   return `
     <div class="dir-row">
@@ -467,7 +677,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         <div class="dir-state">Last state: ${escapeHtml(lastState)} <span class="hint">${escapeHtml(formatDirectoryProgress(entry))}</span></div>
       </div>
       <div class="dir-actions">
-        <button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>
+        ${actionMarkup}
       </div>
     </div>
   `;
@@ -530,7 +740,7 @@ function renderDirectories(data) {
         ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
         ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
         ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
-        ${entry.blocked_by_parent ? `<div class="hint">Nested under existing job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
+        ${entry.blocked_by_parent ? `<div class="hint">This folder sits under parent job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}, so Edge follows the parent path instead of treating this nested folder as its own active job.</div>` : ""}
         ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
         <div class="toolbar">
           <span class="hint-with-help">
@@ -538,8 +748,7 @@ function renderDirectories(data) {
             <span class="hover-hint" title="Use this when you want Edge to upload again even if the folder looks unchanged locally. Central may still reject the upload if it already has the same snapshot.">?</span>
           </span>
           <button type="button" class="secondary" onclick="recoverLatest(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(entry.config?.job_name || entry.relative_path)}'), this)">Recover Latest</button>
-          <button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>
-          <button type="button" class="danger" onclick="deleteByPath(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Delete</button>
+          ${entry.blocked_by_parent ? "" : `<button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
         </div>
       </div>
     `).join("")
@@ -565,9 +774,15 @@ function editPath(relativePath) {
   document.getElementById("is_docker_composed").checked = entry?.config?.is_docker_composed ?? false;
   document.getElementById("update_container_on_packup").checked = entry?.config?.update_container_on_packup ?? false;
   clearStatus("form-status");
-  document.getElementById("form-status").textContent = entry?.selected
-    ? "Editing existing .upload_dir"
-    : "Creating a new .upload_dir";
+  setStatus(
+    "form-status",
+    entry?.blocked_by_parent
+      ? `This folder sits under ${entry.blocked_by_parent}. Edge follows the parent job, so nested folders here should not have their own active upload settings.`
+      : entry?.selected
+        ? "You are editing the upload settings Edge already uses for this folder."
+        : "You are creating upload settings so Edge starts treating this folder as its own backup job.",
+    entry?.blocked_by_parent ? "error" : "info",
+  );
 }
 
 function resetForm() {
@@ -578,24 +793,20 @@ function resetForm() {
   document.getElementById("follow_symlinks").checked = false;
   document.getElementById("is_docker_composed").checked = false;
   document.getElementById("update_container_on_packup").checked = false;
-  document.getElementById("form-status").textContent = "Choose a directory to create or update its .upload_dir file.";
+  setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-function isDialogOpen(id) {
-  return Boolean(document.getElementById(id)?.open);
-}
-
-async function loadData({ silent = false } = {}) {
+async function loadData({ silent = false, force = false } = {}) {
   if (isLoadingData) {
     return;
   }
 
   isLoadingData = true;
-  const [dirRes, keyRes] = await Promise.all([
-    fetch("/api/directories"),
-    fetch("/api/encryption-key"),
-  ]);
   try {
+    const [dirRes, keyRes] = await Promise.all([
+      fetch("/api/directories"),
+      fetch("/api/encryption-key"),
+    ]);
     if (!dirRes.ok || !keyRes.ok) {
       throw new Error("Refresh failed.");
     }
@@ -607,9 +818,6 @@ async function loadData({ silent = false } = {}) {
       fillSettings(latestData.settings || {});
     }
     renderDirectories(latestData);
-    if (!silent) {
-      document.getElementById("run-status").textContent = "";
-    }
   } catch (error) {
     if (!silent) {
       setActionStatus(error.message || "Refresh failed.", "error");
@@ -619,26 +827,8 @@ async function loadData({ silent = false } = {}) {
   }
 }
 
-function startAutoRefresh() {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer);
-  }
-
-  autoRefreshTimer = setInterval(() => {
-    if (document.hidden) {
-      return;
-    }
-    loadData({ silent: true });
-  }, AUTO_REFRESH_INTERVAL_MS);
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      loadData({ silent: true });
-    }
-  });
-}
-
 async function saveSettings() {
+  setStatus("settings-status", "Saving...", "info");
   const payload = {
     edge_id: document.getElementById("settings_edge_id").value.trim(),
     scan_root: document.getElementById("settings_scan_root").value.trim(),
@@ -675,12 +865,11 @@ async function saveSettings() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  document.getElementById("settings-status").textContent = response.ok
-    ? "Settings saved."
-    : (body.detail || "Settings save failed.");
+  setStatus("settings-status", response.ok ? "Settings saved. Closing..." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData();
+    await loadData({ silent: true, force: true });
     setActionStatus("Edge settings saved.", "success");
+    await pause(450);
     closeDialog("settings-dialog");
   } else {
     setActionStatus(body.detail || "Settings save failed.", "error");
@@ -688,6 +877,7 @@ async function saveSettings() {
 }
 
 async function saveJob() {
+  setStatus("form-status", "Saving job settings...", "info");
   const relativePath = document.getElementById("relative_path").value || ".";
   const payload = {
     relative_path: relativePath,
@@ -705,12 +895,11 @@ async function saveJob() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  document.getElementById("form-status").textContent = response.ok
-    ? "Saved successfully."
-    : (body.detail || "Save failed.");
+  setStatus("form-status", response.ok ? "Saved. Closing..." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData();
+    await loadData({ silent: true, force: true });
     setActionStatus(`Saved .upload_dir for ${relativePath}.`, "success");
+    await pause(450);
     closeDialog("job-dialog");
   } else {
     setActionStatus(body.detail || "Save failed.", "error");
@@ -718,21 +907,29 @@ async function saveJob() {
 }
 
 async function deleteByPath(relativePath) {
-  if (!confirm(`Delete .upload_dir from ${relativePath}?`)) {
+  if (!confirm(
+    `Stop backing up ${relativePath}?\n\nThis only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Central.`,
+  )) {
     return;
   }
+  setStatus("form-status", "Removing this folder's upload settings...", "info");
   const response = await fetch(`/api/jobs?relative_path=${encodeURIComponent(relativePath)}`, {
     method: "DELETE",
   });
   const body = await response.json();
-  document.getElementById("form-status").textContent = response.ok
-    ? "Deleted successfully."
-    : (body.detail || "Delete failed.");
+  setStatus("form-status", response.ok ? "This folder is no longer treated as its own backup job." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData();
-    setActionStatus(`Deleted .upload_dir from ${relativePath}.`, "success");
+    await loadData({ silent: true, force: true });
+    setActionStatus(`Edge will no longer back up ${relativePath} as its own job.`, "success");
+    await pause(450);
     closeDialog("job-dialog");
   } else {
+    if (response.status === 404 || body.detail === "directory not found") {
+      await loadData({ silent: true, force: true });
+      closeDialog("job-dialog");
+      setActionStatus(`That folder was already gone, so Edge refreshed the directory list.`, "info");
+      return;
+    }
     setActionStatus(body.detail || "Delete failed.", "error");
   }
 }
@@ -766,7 +963,7 @@ async function forceUpload(jobName, btn) {
         : `Forced upload for ${label}. Central may still reject it as a duplicate.`,
       "success",
     );
-    await loadData({ silent: true });
+    await loadData({ silent: true, force: true });
   } catch (error) {
     setActionStatus(error.message || `Force upload failed for ${label}.`, "error");
   } finally {
@@ -803,7 +1000,7 @@ async function recoverLatest(relativePath, jobName, btn) {
       `Recovered ${label} from ${snapshotName} and replaced ${restoredFiles} backed-up file${restoredFiles === 1 ? "" : "s"}.`,
       "success",
     );
-    await loadData({ silent: true });
+    await loadData({ silent: true, force: true });
   } catch (error) {
     setActionStatus(error.message || `Recovery failed for ${label}.`, "error");
   } finally {
@@ -817,17 +1014,24 @@ async function deleteJob() {
 }
 
 async function runNow() {
-  const response = await fetch("/api/run-now", { method: "POST" });
-  const body = await response.json();
-  if (body.status === "queued" || body.status === "started") {
-    const cleared = body.manual_retries_cleared || 0;
-    document.getElementById("run-status").textContent = cleared > 0
-      ? `Backup cycle requested. ${cleared} manual block(s) cleared for retry.`
-      : "Backup cycle requested.";
-    await loadData({ silent: true });
-    return;
+  try {
+    const response = await fetch("/api/run-now", { method: "POST" });
+    const body = await response.json();
+    if (body.status === "queued" || body.status === "started") {
+      const cleared = body.manual_retries_cleared || 0;
+      setActionStatus(
+        cleared > 0
+          ? `Backup cycle requested. ${cleared} manual block(s) cleared for retry.`
+          : "Backup cycle requested.",
+        "success",
+      );
+      await loadData({ silent: true, force: true });
+      return;
+    }
+    setActionStatus("A backup cycle is already running.", "info");
+  } catch (error) {
+    setActionStatus(error.message || "Failed to start a backup cycle.", "error");
   }
-  document.getElementById("run-status").textContent = "A cycle is already running.";
 }
 
 document.getElementById("hook_pre_command")?.addEventListener("input", () => {
@@ -838,5 +1042,6 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 });
 
 resetForm();
-loadData();
-startAutoRefresh();
+initializeFieldHelp(EDGE_SETTINGS_HELP);
+document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
+loadData({ force: true });

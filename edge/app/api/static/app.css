@@ -190,6 +190,11 @@ h3 {
   user-select: none;
 }
 
+.field-help {
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
 button,
 input,
 textarea,
@@ -363,6 +368,16 @@ textarea {
   white-space: nowrap;
 }
 
+.dir-action-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: right;
+}
+
 .dir-children {
   display: grid;
   gap: 10px;
@@ -488,6 +503,50 @@ textarea {
 .badge.error {
   background: #fde7e4;
   color: var(--danger);
+}
+
+.toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.97);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.success {
+  border-color: rgba(15, 118, 110, 0.25);
+  background: #f1fbf9;
+}
+
+.toast.error {
+  border-color: rgba(180, 35, 24, 0.18);
+  background: #fff4f2;
+}
+
+.toast-title {
+  display: block;
+  margin-bottom: 3px;
+  font-weight: 700;
 }
 
 .status-line {

@@ -19,30 +19,30 @@
       </p>
       <div class="meta-grid" id="meta"></div>
       <div class="toolbar">
-        <button type="button" onclick="loadData()">Refresh</button>
+        <button type="button" onclick="loadData({ force: true })">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <button type="button" class="secondary" onclick="openSettingsDialog()">Edit Edge Settings</button>
-        <span class="hint" id="run-status"></span>
       </div>
-      <p class="hint status-line" id="action-status"></p>
     </section>
 
     <section class="panel workspace-panel">
       <div class="section-head">
         <h2>Selected Jobs</h2>
-        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically.</p>
+        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to add, review, or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the edit screen.</p>
       </div>
       <div id="selected-jobs" class="job-list"></div>
 
       <div class="section-head compact">
         <h2>Directories Under Scan Root</h2>
-        <p class="hint">Nested directories can be collapsed, but creating a new job under an already-selected parent still stays blocked.</p>
+        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and cannot be edited separately here.</p>
       </div>
       <div id="directory-tree" class="directory-tree"></div>
     </section>
   </main>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
 
   <dialog id="settings-dialog" class="modal" aria-labelledby="settings-dialog-title">
     <div class="modal-card">
@@ -73,6 +73,7 @@
 
       <label for="settings_cron_schedule">Cron Schedule</label>
       <input id="settings_cron_schedule" placeholder="0 2 * * 0">
+      <p class="hint" id="settings-cron-help">Fields are minute, hour, day of month, month, and day of week.</p>
 
       <div class="split-row">
         <div>
@@ -166,7 +167,7 @@
       <div class="toolbar">
         <button type="button" onclick="saveSettings()">Save Edge Settings</button>
         <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
-        <span class="hint" id="settings-status"></span>
+        <span class="hint status-line" id="settings-status"></span>
       </div>
     </div>
   </dialog>
@@ -201,7 +202,7 @@
         <button type="button" class="secondary" onclick="testNtfyConfig()">Test</button>
         <button type="button" class="secondary" onclick="resetNtfyDefaults()">Defaults</button>
         <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
-        <span class="hint" id="ntfy-status"></span>
+        <span class="hint status-line" id="ntfy-status"></span>
       </div>
     </div>
   </dialog>
@@ -251,7 +252,7 @@
       </div>
 
       <div class="toolbar">
-        <span class="hint" id="hooks-status"></span>
+        <span class="hint status-line" id="hooks-status"></span>
       </div>
     </div>
   </dialog>
@@ -274,7 +275,7 @@
       <div class="modal-head">
         <div>
           <h2 id="job-dialog-title">Job Editor</h2>
-          <p class="hint">Saving writes or updates the <code>.upload_dir</code> file for the selected directory.</p>
+          <p class="hint">Click Save Job to add or update the <code>.upload_dir</code> settings for this folder. Those settings tell Edge how this folder should be backed up.</p>
         </div>
         <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Close</button>
       </div>
@@ -301,7 +302,7 @@
 
       <div class="section-head compact">
         <h3>Docker Compose Flags</h3>
-        <p class="hint">Only enable these if the selected directory itself contains `docker-compose.yml` or `compose.yml`.</p>
+        <p class="hint">Only enable these if the selected directory itself contains <code>docker-compose.yml</code> or <code>compose.yml</code>.</p>
       </div>
 
       <label class="checkbox">
@@ -316,7 +317,7 @@
 
       <div class="toolbar">
         <button type="button" onclick="saveJob()">Save Job</button>
-        <button type="button" class="danger" onclick="deleteJob()">Delete .upload_dir</button>
+        <button type="button" class="danger" onclick="deleteJob()">Stop Backing Up</button>
         <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Cancel</button>
       </div>
       <p class="hint status-line" id="form-status"></p>

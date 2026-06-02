@@ -316,6 +316,50 @@ button, .btn {
   overflow-wrap: anywhere;
 }
 
+.toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 253, 249, 0.97);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.success {
+  border-color: rgba(42, 122, 75, 0.22);
+  background: #f2fbf5;
+}
+
+.toast.error {
+  border-color: rgba(185, 28, 28, 0.2);
+  background: #fff4f4;
+}
+
+.toast-title {
+  display: block;
+  margin-bottom: 3px;
+  font-weight: 700;
+}
+
 .edge-count {
   font-size: 0.85rem;
   color: var(--muted);
@@ -512,6 +556,18 @@ button, .btn {
 
 .btn-del:hover  { background: #fbd5d5; }
 .btn-del:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-line {
+  min-height: 1.3em;
+}
+
+.status-line[data-kind="error"] {
+  color: var(--red);
+}
+
+.status-line[data-kind="success"] {
+  color: var(--green);
+}
 
 @media (max-width: 640px) {
   .page-shell { padding: 14px; }

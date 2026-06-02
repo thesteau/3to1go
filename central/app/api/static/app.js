@@ -92,27 +92,51 @@ function renderLinkValue(label, value, { className = "", clipLength = 28 } = {})
 
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
-let _overviewRefreshTimer = null;
 let _overviewLoading = false;
-let _visibilityRefreshBound = false;
-let _hooksRefreshTimer = null;
 let _centralNtfyConfig = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
-const OVERVIEW_REFRESH_INTERVAL_MS = 5000;
+const TOAST_DURATION_MS = 3600;
+
+function showToast(message, kind = "info", { duration = TOAST_DURATION_MS } = {}) {
+  if (!message) return;
+  const region = document.getElementById("toast-region");
+  if (!region) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${kind}`;
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(kind === "error" ? "Something needs attention" : kind === "success" ? "Saved" : "Notice")}</strong><span>${escapeHtml(message)}</span>`;
+  region.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("visible"));
+
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 180);
+  }, duration);
+}
 
 function setActionStatus(message, kind = "info") {
-  const element = document.getElementById("action-status");
+  showToast(message, kind);
+}
+
+function setStatus(id, message, kind = "info") {
+  const element = document.getElementById(id);
   if (!element) return;
   element.textContent = message || "";
-  element.className = kind === "error" ? "hint key-status error" : "hint";
+  if (message) {
+    element.dataset.kind = kind;
+  } else {
+    delete element.dataset.kind;
+  }
 }
 
 function clearStatus(id) {
-  const element = document.getElementById(id);
-  if (element) {
-    element.textContent = "";
-  }
+  setStatus(id, "", "info");
+}
+
+function pause(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function openDialog(id) {
@@ -125,10 +149,6 @@ function closeDialog(id) {
   const dialog = document.getElementById(id);
   if (dialog?.open) {
     dialog.close();
-  }
-  if (id === "hooks-dialog" && _hooksRefreshTimer) {
-    clearInterval(_hooksRefreshTimer);
-    _hooksRefreshTimer = null;
   }
 }
 
@@ -175,7 +195,7 @@ async function openNtfyDialog() {
     await loadNtfyConfig();
     openDialog("ntfy-dialog");
   } catch (error) {
-    alert(error.message || "Failed to load ntfy settings.");
+    setActionStatus(error.message || "Failed to load ntfy settings.", "error");
   }
 }
 
@@ -201,17 +221,18 @@ function resetNtfyDefaults() {
 }
 
 async function saveNtfyConfig() {
+  setStatus("ntfy-status", "Saving...", "info");
   const response = await fetch("/api/ntfy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(collectNtfyPayload()),
   });
   const body = await response.json();
-  document.getElementById("ntfy-status").textContent = response.ok ? "Saved." : (body.detail || "Save failed.");
+  setStatus("ntfy-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     await loadOverview({ silent: true, force: true });
     await loadNtfyConfig();
-    setActionStatus("Central ntfy settings saved.");
+    setActionStatus("Central ntfy settings saved.", "success");
   } else {
     setActionStatus(body.detail || "ntfy save failed.", "error");
   }
@@ -224,10 +245,14 @@ async function testNtfyConfig() {
     body: JSON.stringify(collectNtfyPayload()),
   });
   const body = await response.json();
-  document.getElementById("ntfy-status").textContent = response.ok
-    ? "Connection test succeeded."
-    : (body.detail || "Test failed.");
-  if (!response.ok) {
+  setStatus(
+    "ntfy-status",
+    response.ok ? "Connection test succeeded." : (body.detail || "Test failed."),
+    response.ok ? "success" : "error",
+  );
+  if (response.ok) {
+    setActionStatus("ntfy connection test succeeded.", "success");
+  } else {
     setActionStatus(body.detail || "ntfy test failed.", "error");
   }
 }
@@ -282,17 +307,9 @@ async function openHooksDialog() {
     await loadHookConfig({ preserveDrafts: false });
     openDialog("hooks-dialog");
   } catch (error) {
-    alert(error.message || "Failed to load hook settings.");
+    setActionStatus(error.message || "Failed to load hook settings.", "error");
     return;
   }
-  if (_hooksRefreshTimer) {
-    clearInterval(_hooksRefreshTimer);
-  }
-  _hooksRefreshTimer = setInterval(() => {
-    if (document.getElementById("hooks-dialog")?.open) {
-      loadHookConfig({ preserveDrafts: true }).catch(() => {});
-    }
-  }, OVERVIEW_REFRESH_INTERVAL_MS);
 }
 
 function clearHookCommand(kind) {
@@ -303,6 +320,7 @@ function clearHookCommand(kind) {
 }
 
 async function saveHookCommands() {
+  setStatus("hooks-status", "Saving...", "info");
   const payload = {
     pre_command: document.getElementById("hook_pre_command").value.trim(),
     post_command: document.getElementById("hook_post_command").value.trim(),
@@ -313,12 +331,12 @@ async function saveHookCommands() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "Commands saved." : (body.detail || "Save failed.");
+  setStatus("hooks-status", response.ok ? "Commands saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     _hookDraftDirty = { pre: false, post: false };
     await loadOverview({ silent: true, force: true });
     await loadHookConfig({ preserveDrafts: false });
-    setActionStatus("Central hook commands saved.");
+    setActionStatus("Central hook commands saved.", "success");
   } else {
     setActionStatus(body.detail || "Hook save failed.", "error");
   }
@@ -328,17 +346,18 @@ async function uploadHookFile() {
   const input = document.getElementById("hook_file_input");
   const file = input?.files?.[0];
   if (!file) {
-    document.getElementById("hooks-status").textContent = "Choose a file first.";
+    setStatus("hooks-status", "Choose a file first.", "error");
     return;
   }
   const formData = new FormData();
   formData.append("hook_file", file);
   const response = await fetch("/api/hooks/files", { method: "POST", body: formData });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "File uploaded." : (body.detail || "Upload failed.");
+  setStatus("hooks-status", response.ok ? "File uploaded." : (body.detail || "Upload failed."), response.ok ? "success" : "error");
   if (response.ok) {
     input.value = "";
     await loadHookConfig({ preserveDrafts: true });
+    setActionStatus(`Uploaded ${file.name}.`, "success");
   } else {
     setActionStatus(body.detail || "Hook upload failed.", "error");
   }
@@ -346,13 +365,13 @@ async function uploadHookFile() {
 
 async function viewHookFile(filename, viewable) {
   if (!viewable) {
-    alert("This file cannot be viewed.");
+    setActionStatus("This file cannot be viewed.", "error");
     return;
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`);
   const body = await response.json();
   if (!response.ok) {
-    alert(body.detail || "View failed.");
+    setActionStatus(body.detail || "View failed.", "error");
     return;
   }
   document.getElementById("hook-view-filename").textContent = body.filename || filename;
@@ -366,9 +385,10 @@ async function deleteHookFile(filename) {
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
   const body = await response.json();
-  document.getElementById("hooks-status").textContent = response.ok ? "File deleted." : (body.detail || "Delete failed.");
+  setStatus("hooks-status", response.ok ? "File deleted." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
   if (response.ok) {
     await loadHookConfig({ preserveDrafts: true });
+    setActionStatus(`Deleted ${filename}.`, "success");
   } else {
     setActionStatus(body.detail || "Hook delete failed.", "error");
   }
@@ -430,7 +450,7 @@ async function storeEncKey(edgeId, edgeInstanceId, key, { alertOnError = false }
       clearStoredEncKey(edgeId, edgeInstanceId);
       const message = `That key belongs to a different Edge. Expected ${shortFingerprint(expectedFingerprint)}, got ${shortFingerprint(actualFingerprint)}.`;
       setKeyStatus(edgeId, edgeInstanceId, message, "error");
-      if (alertOnError) alert(message);
+      if (alertOnError) setActionStatus(message, "error");
       return null;
     }
 
@@ -448,7 +468,7 @@ async function storeEncKey(edgeId, edgeInstanceId, key, { alertOnError = false }
     clearStoredEncKey(edgeId, edgeInstanceId);
     const message = "Encryption key was not valid base64url text.";
     setKeyStatus(edgeId, edgeInstanceId, message, "error");
-    if (alertOnError) alert(message);
+    if (alertOnError) setActionStatus(message, "error");
     return null;
   }
 }
@@ -558,7 +578,12 @@ async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) 
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      alert("Download failed.");
+      if (res.status === 404) {
+        await loadOverview({ silent: true, force: true });
+        setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
+        return;
+      }
+      setActionStatus("Download failed.", "error");
       return;
     }
     const buffer = await res.arrayBuffer();
@@ -578,10 +603,11 @@ async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) 
       clearStoredEncKey(edgeId, edgeInstanceId);
       await refreshKeyPanel(edgeId, edgeInstanceId);
       const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
-      alert(
+      setActionStatus(
         expectedFingerprint
           ? "Decryption failed after fingerprint verification. The archive may be corrupted, or the Edge key changed after this snapshot was uploaded."
           : "Decryption failed - wrong key or corrupted archive.",
+        "error",
       );
     }
   } finally {
@@ -642,10 +668,16 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
       { method: "DELETE" },
     );
     if (!res.ok) {
-      alert("Delete failed.");
+      if (res.status === 404) {
+        await loadOverview({ silent: true, force: true });
+        setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
+        return;
+      }
+      setActionStatus("Delete failed.", "error");
       return;
     }
     btn.closest(".snapshot-row").remove();
+    setActionStatus(`Deleted snapshot ${filename}.`, "success");
   } finally {
     btn.disabled = false;
   }
@@ -739,7 +771,9 @@ function renderKeyManager(ns) {
 function renderInstanceMeta(instance) {
   return `
     ${instance.edge_instance_id ? renderClipValue("Instance", instance.edge_instance_id, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Legacy snapshot path</span>'}
-    ${instance.advertised_url ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 }) : ''}
+    ${instance.advertised_url
+      ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
+      : '<span class="edge-detail edge-detail-warn" title="This Edge is still uploading to Central, but it left its advertised URL blank so Central cannot send Force Send requests back to it yet.">Advertised URL not set</span>'}
     ${instance.last_seen_source ? renderClipValue("Source", instance.last_seen_source, { className: "edge-detail", clipLength: 24 }) : '<span class="edge-detail edge-detail-warn">Source unknown</span>'}
     ${renderClipValue("Key FP", instance.encryption_key_fingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
   `;
@@ -795,11 +829,6 @@ function captureOverviewUiState() {
   };
 }
 
-function shouldDeferOverviewRefresh() {
-  const activeElement = document.activeElement;
-  return Boolean(activeElement?.matches?.("[data-edge-key-input]")) || Boolean(document.querySelector("dialog[open]"));
-}
-
 function restoreKeyDrafts(keyDrafts) {
   Object.entries(keyDrafts || {}).forEach(([edgeKeyId, value]) => {
     const [edgeId, rawInstanceId] = String(edgeKeyId).split("::", 2);
@@ -812,9 +841,6 @@ function restoreKeyDrafts(keyDrafts) {
 
 async function loadOverview({ silent = false, force = false } = {}) {
   if (_overviewLoading) {
-    return;
-  }
-  if (silent && !force && shouldDeferOverviewRefresh()) {
     return;
   }
 
@@ -874,7 +900,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
     );
   } catch (error) {
     if (!silent) {
-      alert(error.message || "Refresh failed.");
+      setActionStatus(error.message || "Refresh failed.", "error");
     }
   } finally {
     _overviewLoading = false;
@@ -882,6 +908,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
 }
 
 async function saveSettings() {
+  setStatus("settings-status", "Saving...", "info");
   const payload = {
     retention_keep_last: Number(document.getElementById("settings_retention_keep_last").value || 1),
     log_level: document.getElementById("settings_log_level").value,
@@ -905,37 +932,14 @@ async function saveSettings() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  document.getElementById("settings-status").textContent = response.ok
-    ? "Settings saved."
-    : (body.detail || "Settings save failed.");
+  setStatus("settings-status", response.ok ? "Settings saved. Closing..." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    closeDialog("settings-dialog");
     await loadOverview({ silent: true, force: true });
-    setActionStatus("Central settings saved.");
+    setActionStatus("Central settings saved.", "success");
+    await pause(450);
+    closeDialog("settings-dialog");
   } else {
     setActionStatus(body.detail || "Settings save failed.", "error");
-  }
-}
-
-function startOverviewAutoRefresh() {
-  if (_overviewRefreshTimer) {
-    clearInterval(_overviewRefreshTimer);
-  }
-
-  _overviewRefreshTimer = setInterval(() => {
-    if (document.hidden) {
-      return;
-    }
-    loadOverview({ silent: true });
-  }, OVERVIEW_REFRESH_INTERVAL_MS);
-
-  if (!_visibilityRefreshBound) {
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        loadOverview({ silent: true });
-      }
-    });
-    _visibilityRefreshBound = true;
   }
 }
 
@@ -946,5 +950,4 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
   _hookDraftDirty.post = true;
 });
 
-loadOverview();
-startOverviewAutoRefresh();
+loadOverview({ force: true });
