@@ -463,9 +463,13 @@ function openJobDialog(relativePath = ".") {
   openDialog("job-dialog");
 }
 
+function stopActionEvent(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+}
+
 function openJobDialogFromEvent(event, relativePath) {
-  event.preventDefault();
-  event.stopPropagation();
+  stopActionEvent(event);
   openJobDialog(relativePath);
   return false;
 }
@@ -830,11 +834,11 @@ function renderDirectories(data) {
           </div>
           <div class="job-card-actions">
             <span class="hint-with-help">
-              <button type="button" class="btn-force" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+              <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
               <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
             </span>
-            <button type="button" class="btn-restore" onclick="openRecoverDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
-            ${entry.blocked_by_parent ? "" : `<button type="button" class="btn-edit" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
+            <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
+            ${entry.blocked_by_parent ? "" : `<button type="button" class="btn-edit" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
           </div>
         </div>
       </div>
@@ -1066,12 +1070,24 @@ async function forceUpload(jobName, btn) {
   }
 }
 
+function forceUploadFromEvent(event, jobName, btn) {
+  stopActionEvent(event);
+  forceUpload(jobName, btn);
+  return false;
+}
+
 function openRecoverDialog(relativePath, jobName) {
   _recoverContext = { relativePath, jobName };
   document.getElementById("recover-dialog-job-name").textContent = jobName || relativePath;
   document.getElementById("recover-fingerprint").value = "";
   clearStatus("recover-status");
   openDialog("recover-dialog");
+}
+
+function openRecoverDialogFromEvent(event, relativePath, jobName) {
+  stopActionEvent(event);
+  openRecoverDialog(relativePath, jobName);
+  return false;
 }
 
 async function confirmRecover() {
