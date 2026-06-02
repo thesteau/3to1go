@@ -674,18 +674,35 @@ button.toggle-btn.toggle-on .toggle-thumb {
 
 .job-card-actions {
   display: flex;
-  flex-direction: column;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   flex-shrink: 0;
 }
 
 .job-card-actions button,
 .job-card-actions .hint-with-help {
-  width: 100%;
+  width: auto;
 }
 
 .job-card-actions button {
   white-space: nowrap;
+}
+
+.btn-force {
+  background: #fff1d6;
+  color: #8a5200;
+}
+
+.btn-restore {
+  background: #e8f4ee;
+  color: #1f6f46;
+}
+
+.btn-edit {
+  background: #d6e8e5;
+  color: #12433f;
 }
 
 @media (max-width: 640px) {
@@ -709,6 +726,14 @@ button.toggle-btn.toggle-on .toggle-thumb {
 
   .dir-actions {
     width: 100%;
+    justify-content: flex-start;
+  }
+
+  .job-card-body {
+    flex-direction: column;
+  }
+
+  .job-card-actions {
     justify-content: flex-start;
   }
 

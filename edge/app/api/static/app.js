@@ -710,17 +710,6 @@ function formatDirectoryProgress(entry) {
     : "";
 }
 
-function describeDirectoryState(entry) {
-  const lastState = String(entry.state?.last_status || "").trim();
-  if (lastState) {
-    return `Last state: ${lastState}`;
-  }
-  if (entry.blocked_by_parent) {
-    return `Covered by parent job ${entry.blocked_by_parent}`;
-  }
-  return "No backup activity yet";
-}
-
 function directoryDisplayName(entry) {
   if (entry.relative_path === ".") {
     return "Scan Root";
@@ -751,7 +740,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         </div>
         <div class="hint">${pathValue}</div>
         <div class="hint">${absolutePath}</div>
-        <div class="dir-state">${escapeHtml(describeDirectoryState(entry))}${progressLabel ? ` <span class="hint">${escapeHtml(progressLabel)}</span>` : ""}</div>
+        ${progressLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(progressLabel)}</span></div>` : ""}
       </div>
       <div class="dir-actions">
         ${actionMarkup}
@@ -833,7 +822,6 @@ function renderDirectories(data) {
           <div class="job-card-info">
             <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
             <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
-            <div class="hint">${escapeHtml(describeDirectoryState(entry))}</div>
             ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
             ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
             ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
@@ -842,11 +830,11 @@ function renderDirectories(data) {
           </div>
           <div class="job-card-actions">
             <span class="hint-with-help">
-              <button type="button" class="secondary" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+              <button type="button" class="btn-force" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
               <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
             </span>
-            <button type="button" class="secondary" onclick="openRecoverDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
-            ${entry.blocked_by_parent ? "" : `<button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
+            <button type="button" class="btn-restore" onclick="openRecoverDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
+            ${entry.blocked_by_parent ? "" : `<button type="button" class="btn-edit" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
           </div>
         </div>
       </div>
