@@ -97,6 +97,7 @@ let _centralNtfyConfig = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 const TOAST_DURATION_MS = 8000;
+let _appDialogResolve = null;
 
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
@@ -151,6 +152,62 @@ function closeDialog(id) {
   if (dialog?.open) {
     dialog.close();
   }
+}
+
+function appDialog({ title, message, input = false, inputLabel = "", inputType = "text", confirmLabel = "Continue", danger = false } = {}) {
+  const dialog = document.getElementById("app-dialog");
+  if (!dialog?.showModal) {
+    return Promise.resolve(input ? null : false);
+  }
+  if (_appDialogResolve) {
+    resolveAppDialog(false);
+  }
+
+  document.getElementById("app-dialog-title").textContent = title || "Confirm";
+  document.getElementById("app-dialog-message").textContent = message || "";
+  const inputWrap = document.getElementById("app-dialog-input-wrap");
+  const inputElement = document.getElementById("app-dialog-input");
+  document.getElementById("app-dialog-input-label").textContent = inputLabel || "";
+  inputWrap.hidden = !input;
+  inputElement.type = inputType;
+  inputElement.value = "";
+  const confirmButton = document.getElementById("app-dialog-confirm");
+  confirmButton.textContent = confirmLabel;
+  confirmButton.className = danger ? "danger" : "";
+  dialog.oncancel = (event) => {
+    event.preventDefault();
+    resolveAppDialog(false);
+  };
+  inputElement.onkeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      resolveAppDialog(true);
+    }
+  };
+
+  dialog.showModal();
+  if (input) {
+    window.setTimeout(() => inputElement.focus(), 0);
+  }
+
+  return new Promise((resolve) => {
+    _appDialogResolve = (confirmed) => {
+      const value = input ? inputElement.value.trim() : confirmed;
+      _appDialogResolve = null;
+      closeDialog("app-dialog");
+      resolve(confirmed ? value : null);
+    };
+  });
+}
+
+function resolveAppDialog(confirmed) {
+  if (_appDialogResolve) {
+    _appDialogResolve(confirmed);
+  }
+}
+
+function confirmApp(options) {
+  return appDialog(options).then(Boolean);
 }
 
 function fillSettings(settings) {
@@ -385,7 +442,12 @@ async function viewHookFile(filename, viewable) {
 }
 
 async function deleteHookFile(filename) {
-  if (!confirm(`Delete ${filename}?`)) {
+  if (!await confirmApp({
+    title: "Delete Hook File",
+    message: `Delete ${filename}?`,
+    confirmLabel: "Delete",
+    danger: true,
+  })) {
     return;
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
@@ -567,9 +629,16 @@ async function resolveEncKey(edgeId, edgeInstanceId) {
   const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
   const instanceLabel = edgeInstanceId || "legacy";
   const promptMessage = expectedFingerprint
-    ? `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}" instance "${instanceLabel}".\nExpected fingerprint: ${shortFingerprint(expectedFingerprint)}`
-    : `Snapshot is encrypted.\nEnter the encryption key for edge "${edgeId}" instance "${instanceLabel}".`;
-  const prompted = (prompt(promptMessage) || "").trim();
+    ? `Snapshot is encrypted. Enter the encryption key for edge "${edgeId}" instance "${instanceLabel}". Expected fingerprint: ${shortFingerprint(expectedFingerprint)}.`
+    : `Snapshot is encrypted. Enter the encryption key for edge "${edgeId}" instance "${instanceLabel}".`;
+  const prompted = await appDialog({
+    title: "Encryption Key Required",
+    message: promptMessage,
+    input: true,
+    inputLabel: "Encryption key",
+    inputType: "password",
+    confirmLabel: "Use Key",
+  });
   if (!prompted) return null;
   return storeEncKey(edgeId, edgeInstanceId, prompted, { alertOnError: true });
 }
@@ -652,16 +721,28 @@ function formatDate(d) {
 
 let _token = sessionStorage.getItem("relay_token") || "";
 
-function getToken() {
+async function getToken() {
   if (!_token) {
-    _token = prompt("Enter the relay auth token:") || "";
+    _token = await appDialog({
+      title: "Auth Token Required",
+      message: "Enter the relay auth token.",
+      input: true,
+      inputLabel: "Auth token",
+      inputType: "password",
+      confirmLabel: "Use Token",
+    }) || "";
     if (_token) sessionStorage.setItem("relay_token", _token);
   }
   return _token;
 }
 
 async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
-  if (!confirm(`Delete ${filename}?\nThis cannot be undone.`)) return;
+  if (!await confirmApp({
+    title: "Delete Snapshot",
+    message: `Delete ${filename}? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+  })) return;
 
   btn.disabled = true;
   try {
@@ -811,7 +892,12 @@ function restoreKeyDrafts(keyDrafts) {
 
 async function deleteInstance(edgeId, edgeInstanceId, btn) {
   const label = edgeInstanceId || "this instance";
-  if (!confirm(`Delete all snapshots for instance "${label}" under edge "${edgeId}"?\n\nThis permanently removes all backup files for this instance and cannot be undone.`)) {
+  if (!await confirmApp({
+    title: "Delete Instance",
+    message: `Delete all snapshots for instance "${label}" under edge "${edgeId}"? This permanently removes all backup files for this instance and cannot be undone.`,
+    confirmLabel: "Delete Instance",
+    danger: true,
+  })) {
     return;
   }
   btn.disabled = true;
@@ -822,7 +908,12 @@ async function deleteInstance(edgeId, edgeInstanceId, btn) {
       const body = await res.json().catch(() => ({}));
       const detail = body.detail || {};
       if (res.status === 409 && detail.cleanup_available) {
-        if (!confirm(`Central could not find backup files for instance "${label}".\n\nRemove this stale instance entry from the UI?`)) {
+        if (!await confirmApp({
+          title: "Remove Stale Instance",
+          message: `Central could not find backup files for instance "${label}". Remove this stale instance entry from the UI?`,
+          confirmLabel: "Remove Entry",
+          danger: true,
+        })) {
           setActionStatus("Cleanup cancelled.", "info");
           return;
         }

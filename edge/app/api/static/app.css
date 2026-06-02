@@ -422,6 +422,16 @@ textarea {
   margin-bottom: 12px;
 }
 
+.app-dialog-input-wrap[hidden] {
+  display: none;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .hook-section {
   margin-top: 16px;
   padding-top: 16px;

@@ -7,6 +7,7 @@ let hookDraftDirty = { pre: false, post: false };
 let showHiddenDirs = false;
 let _recoverContext = null;
 const TOAST_DURATION_MS = 8000;
+let _appDialogResolve = null;
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
   settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
@@ -152,6 +153,62 @@ function closeDialog(id) {
   if (dialog?.open) {
     dialog.close();
   }
+}
+
+function appDialog({ title, message, input = false, inputLabel = "", inputType = "text", confirmLabel = "Continue", danger = false } = {}) {
+  const dialog = document.getElementById("app-dialog");
+  if (!dialog?.showModal) {
+    return Promise.resolve(input ? null : false);
+  }
+  if (_appDialogResolve) {
+    resolveAppDialog(false);
+  }
+
+  document.getElementById("app-dialog-title").textContent = title || "Confirm";
+  document.getElementById("app-dialog-message").textContent = message || "";
+  const inputWrap = document.getElementById("app-dialog-input-wrap");
+  const inputElement = document.getElementById("app-dialog-input");
+  document.getElementById("app-dialog-input-label").textContent = inputLabel || "";
+  inputWrap.hidden = !input;
+  inputElement.type = inputType;
+  inputElement.value = "";
+  const confirmButton = document.getElementById("app-dialog-confirm");
+  confirmButton.textContent = confirmLabel;
+  confirmButton.className = danger ? "danger" : "";
+  dialog.oncancel = (event) => {
+    event.preventDefault();
+    resolveAppDialog(false);
+  };
+  inputElement.onkeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      resolveAppDialog(true);
+    }
+  };
+
+  dialog.showModal();
+  if (input) {
+    window.setTimeout(() => inputElement.focus(), 0);
+  }
+
+  return new Promise((resolve) => {
+    _appDialogResolve = (confirmed) => {
+      const value = input ? inputElement.value.trim() : confirmed;
+      _appDialogResolve = null;
+      closeDialog("app-dialog");
+      resolve(confirmed ? value : null);
+    };
+  });
+}
+
+function resolveAppDialog(confirmed) {
+  if (_appDialogResolve) {
+    _appDialogResolve(confirmed);
+  }
+}
+
+function confirmApp(options) {
+  return appDialog(options).then(Boolean);
 }
 
 async function manualRefresh() {
@@ -374,7 +431,12 @@ async function viewHookFile(filename, viewable) {
 }
 
 async function deleteHookFile(filename) {
-  if (!confirm(`Delete ${filename}?`)) {
+  if (!await confirmApp({
+    title: "Delete Hook File",
+    message: `Delete ${filename}?`,
+    confirmLabel: "Delete",
+    danger: true,
+  })) {
     return;
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
@@ -947,9 +1009,12 @@ async function saveJob() {
 }
 
 async function deleteByPath(relativePath) {
-  if (!confirm(
-    `Stop backing up ${relativePath}?\n\nThis only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Central.`,
-  )) {
+  if (!await confirmApp({
+    title: "Stop Backing Up Folder",
+    message: `Stop backing up ${relativePath}? This only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Central.`,
+    confirmLabel: "Stop Backup",
+    danger: true,
+  })) {
     return;
   }
   setStatus("form-status", "Removing this folder's upload settings...", "info");
@@ -976,9 +1041,11 @@ async function deleteByPath(relativePath) {
 
 async function forceUpload(jobName, btn) {
   const label = jobName || "this job";
-  if (!confirm(
-    `Force an upload for ${label}?\n\nThis bypasses the unchanged check. Central may still reject it as a duplicate if that snapshot already exists.`,
-  )) {
+  if (!await confirmApp({
+    title: "Force Upload",
+    message: `Force an upload for ${label}? This bypasses the unchanged check. Central may still reject it as a duplicate if that snapshot already exists.`,
+    confirmLabel: "Force Upload",
+  })) {
     return;
   }
 
@@ -1096,4 +1163,3 @@ resetForm();
 initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
 loadData();
-

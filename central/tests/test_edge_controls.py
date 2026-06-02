@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -97,6 +98,39 @@ class EdgeControlsTests(unittest.TestCase):
         self.assertEqual(after.status_code, 200, after.text)
         self.assertEqual(after.json()["edges"], [])
         self.assertIsNone(self.client.app.state.snapshot_index.get_edge_registration("edge-01", "edgeinstance0001"))
+
+    def test_delete_instance_fails_when_files_or_index_entries_remain(self) -> None:
+        namespace = "edge-01/edgeinstance0001/photos"
+        namespace_dir = self.settings.backup_root / namespace
+        namespace_dir.mkdir(parents=True, exist_ok=True)
+        snapshot = namespace_dir / "photos__2026-05-31T00-00-00Z__aaaa1111.tar.zst"
+        snapshot.write_bytes(b"still here")
+        self.client.app.state.snapshot_index.upsert_snapshot(
+            namespace,
+            {
+                "stored_as": snapshot.name,
+                "archive_sha256": "a" * 64,
+                "fingerprint": "aaaa1111",
+                "timestamp": "2026-05-31T00:00:00Z",
+                "size_bytes": snapshot.stat().st_size,
+                "mtime": snapshot.stat().st_mtime,
+            },
+        )
+
+        with patch("app.api.routes_overview.shutil.rmtree"):
+            response = self.client.delete("/api/instances/edge-01/edgeinstance0001")
+
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(
+            response.json()["detail"],
+            {
+                "message": "instance still has backup files or index entries",
+                "cleanup_available": False,
+            },
+        )
+        self.assertTrue(snapshot.exists())
+        self.assertIsNotNone(self.client.app.state.snapshot_index.get_edge_registration("edge-01", "edgeinstance0001"))
+        self.assertTrue(self.client.app.state.snapshot_index.list_namespace_entries(namespace))
 
     def test_delete_missing_instance_requires_cleanup_confirmation(self) -> None:
         response = self.client.delete("/api/instances/edge-01/edgeinstance0001")

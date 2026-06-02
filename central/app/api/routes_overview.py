@@ -100,6 +100,14 @@ async def delete_instance(
 
     for namespace in job_namespaces:
         ingest_service.reconcile_namespace(namespace)
+    if instance_dir.exists() or _instance_has_index_entries(snapshot_index, edge_id, edge_instance_id):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "instance still has backup files or index entries",
+                "cleanup_available": False,
+            },
+        )
     snapshot_index.delete_edge_registration(edge_id, edge_instance_id)
 
     return {"status": "deleted", "edge_id": edge_id, "edge_instance_id": edge_instance_id}
@@ -127,6 +135,17 @@ def _directory_usage(path: Path) -> int:
             except OSError:
                 continue
     return total
+
+
+def _instance_has_index_entries(
+    snapshot_index: SnapshotIndexBackend,
+    edge_id: str,
+    edge_instance_id: str,
+) -> bool:
+    for namespace in snapshot_index.list_namespaces():
+        if namespace.get("edge_id") == edge_id and namespace.get("edge_instance_id") == edge_instance_id:
+            return True
+    return False
 
 
 def _disk_usage(path: Path) -> tuple[int, int, int]:
