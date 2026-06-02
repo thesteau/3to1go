@@ -783,9 +783,9 @@ function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
           ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
+          ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
-        ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
         <div class="snapshot-actions">
           <button class="btn btn-dl"
             onclick="downloadSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
