@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import sys
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -61,6 +62,23 @@ class JobRoutesTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.client.close()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_directories_route_reports_scan_dir_env_value(self) -> None:
+        with patch.dict("os.environ", {"SCAN_DIR": "./scan"}):
+            response = self.client.get("/api/directories")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["scan_dir"], "./scan")
+        self.assertEqual(response.json()["scan_root"], str(self.settings.scan_root))
+
+    def test_directories_route_defaults_scan_dir_display_to_container_mount(self) -> None:
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("SCAN_DIR", None)
+            response = self.client.get("/api/directories")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["scan_dir"], "/scan")
+        self.assertEqual(response.json()["scan_root"], str(self.settings.scan_root))
 
     def test_force_send_route_returns_runner_payload(self) -> None:
         with patch.object(

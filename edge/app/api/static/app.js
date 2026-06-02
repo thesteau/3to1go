@@ -620,7 +620,7 @@ function fillMeta(data, encKey, encFingerprint) {
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br>${renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 })}</div>
     <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
-    <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
+    <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_dir, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Advertised URL</strong><br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>'}</div>
     <div><strong>Cron Schedule</strong> ${renderHelpHint(cronDetails.help)}<br><code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div></div>

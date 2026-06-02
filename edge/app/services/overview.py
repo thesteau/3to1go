@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -27,6 +28,7 @@ def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
         "edge_id": runner.settings.edge_id,
         "edge_instance_id": installation_id,
         "encryption_key_fingerprint": encryption_fingerprint,
+        "scan_dir": os.getenv("SCAN_DIR", "/scan"),
         "scan_root": str(runner.settings.scan_root),
         "central_url": runner.settings.central_url,
         "advertised_url": runner.settings.advertised_url,
