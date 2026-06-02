@@ -714,6 +714,12 @@ function formatDirectoryProgress(entry) {
     : "";
 }
 
+function formatLastState(entry) {
+  const status = String(entry.state?.last_status || "").trim();
+  if (!status) return "";
+  return `Last state: ${status.replaceAll("_", " ")}`;
+}
+
 function directoryDisplayName(entry) {
   if (entry.relative_path === ".") {
     return "Scan Root";
@@ -724,6 +730,7 @@ function directoryDisplayName(entry) {
 function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   const relativePath = entry.relative_path;
   const progressLabel = formatDirectoryProgress(entry);
+  const lastStateLabel = formatLastState(entry);
   const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
   const pathValue = relativePath === "."
     ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
@@ -744,6 +751,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         </div>
         <div class="hint">${pathValue}</div>
         <div class="hint">${absolutePath}</div>
+        ${lastStateLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(lastStateLabel)}</span></div>` : ""}
         ${progressLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(progressLabel)}</span></div>` : ""}
       </div>
       <div class="dir-actions">
@@ -820,12 +828,14 @@ function renderDirectories(data) {
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => {
       const jobName = entry.config?.job_name || entry.relative_path;
+      const lastStateLabel = formatLastState(entry);
       return `
       <div class="job-card">
         <div class="job-card-body">
           <div class="job-card-info">
             <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
             <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+            ${lastStateLabel ? `<div class="hint">${escapeHtml(lastStateLabel)}</div>` : ""}
             ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
             ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
             ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
