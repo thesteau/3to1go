@@ -17,8 +17,8 @@
       <div class="meta-grid" id="meta"></div>
       <div class="toolbar">
         <button type="button" onclick="manualRefresh()">Refresh</button>
-        <button type="button" class="btn btn-secondary" onclick="openNtfyDialog()">Configure ntfy</button>
-        <button type="button" class="btn btn-secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <button type="button" onclick="openSettingsDialog()">Edit Central Settings</button>
       </div>
     </section>
@@ -32,6 +32,10 @@
     </section>
   </main>
 
+  <div id="loading-overlay" class="loading-overlay" hidden>
+    <div class="loading-spinner" aria-label="Loading…"></div>
+  </div>
+
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
 
   <dialog id="settings-dialog" class="modal" aria-labelledby="settings-dialog-title">
@@ -41,7 +45,7 @@
           <h2 id="settings-dialog-title">Edit Central Settings</h2>
           <p class="hint">These values are saved locally by Central and persist across container restarts.</p>
         </div>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('settings-dialog')">Close</button>
+        <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
       </div>
 
       <div class="split-row">
@@ -84,7 +88,7 @@
 
       <div class="toolbar">
         <button type="button" onclick="saveSettings()">Save Central Settings</button>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('settings-dialog')">Cancel</button>
+        <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
         <span class="hint status-line" id="settings-status"></span>
       </div>
     </div>
@@ -97,7 +101,7 @@
           <h2 id="ntfy-dialog-title">Configure ntfy</h2>
           <p class="hint">Publishing is optional and best-effort. Failed ntfy posts never block Central.</p>
         </div>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('ntfy-dialog')">Close</button>
+        <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Close</button>
       </div>
 
       <div class="split-row">
@@ -133,9 +137,9 @@
 
       <div class="toolbar">
         <button type="button" onclick="saveNtfyConfig()">Save</button>
-        <button type="button" class="btn btn-secondary" onclick="testNtfyConfig()">Test</button>
-        <button type="button" class="btn btn-clear" onclick="resetNtfyDefaults()">Defaults</button>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('ntfy-dialog')">Cancel</button>
+        <button type="button" class="secondary" onclick="testNtfyConfig()">Test</button>
+        <button type="button" class="secondary" onclick="resetNtfyDefaults()">Defaults</button>
+        <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
         <span class="hint status-line" id="ntfy-status"></span>
       </div>
     </div>
@@ -148,15 +152,15 @@
           <h2 id="hooks-dialog-title">Custom Scripts</h2>
           <p class="hint">Central runs the pre command before finalize-time processing and the post command after it. Only the first 3 files in the volume are shown here.</p>
         </div>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('hooks-dialog')">Close</button>
+        <button type="button" class="secondary" onclick="closeDialog('hooks-dialog')">Close</button>
       </div>
 
       <div class="hook-section">
         <div class="hook-section-head">
           <h3>Pre Command</h3>
           <div class="hook-inline-actions">
-            <button type="button" class="btn btn-clear" onclick="clearHookCommand('pre')">Clear</button>
-            <button type="button" class="btn btn-secondary" onclick="saveHookCommands()">Save</button>
+            <button type="button" class="secondary" onclick="clearHookCommand('pre')">Clear</button>
+            <button type="button" class="secondary" onclick="saveHookCommands()">Save</button>
           </div>
         </div>
         <textarea id="hook_pre_command" placeholder="Optional command or script filename"></textarea>
@@ -166,8 +170,8 @@
         <div class="hook-section-head">
           <h3>Post Command</h3>
           <div class="hook-inline-actions">
-            <button type="button" class="btn btn-clear" onclick="clearHookCommand('post')">Clear</button>
-            <button type="button" class="btn btn-secondary" onclick="saveHookCommands()">Save</button>
+            <button type="button" class="secondary" onclick="clearHookCommand('post')">Clear</button>
+            <button type="button" class="secondary" onclick="saveHookCommands()">Save</button>
           </div>
         </div>
         <textarea id="hook_post_command" placeholder="Optional command or script filename"></textarea>
@@ -180,7 +184,7 @@
         </div>
         <div class="hook-upload-row">
           <input id="hook_file_input" type="file" accept=".sh,.txt,text/plain">
-          <button type="button" class="btn btn-secondary" onclick="uploadHookFile()">Upload</button>
+          <button type="button" class="secondary" onclick="uploadHookFile()">Upload</button>
         </div>
         <div id="hook-files" class="hook-files"></div>
       </div>
@@ -198,7 +202,7 @@
           <h2 id="hook-view-dialog-title">View Script</h2>
           <p class="hint" id="hook-view-filename"></p>
         </div>
-        <button type="button" class="btn btn-clear" onclick="closeDialog('hook-view-dialog')">Close</button>
+        <button type="button" class="secondary" onclick="closeDialog('hook-view-dialog')">Close</button>
       </div>
       <textarea id="hook-view-content" class="hook-viewer" readonly></textarea>
     </div>

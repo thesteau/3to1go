@@ -35,12 +35,30 @@
       <div id="selected-jobs" class="job-list"></div>
 
       <div class="section-head compact">
-        <h2>Directories Under Scan Root</h2>
+        <div class="section-head-row">
+          <h2>Directories Under Scan Root</h2>
+          <button
+            type="button"
+            id="hidden-dirs-toggle"
+            class="toggle-btn"
+            role="switch"
+            aria-checked="false"
+            onclick="toggleHiddenDirs()"
+            title="Show hidden folders (those starting with a dot, using the Linux/macOS convention)"
+          >
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Show hidden</span>
+          </button>
+        </div>
         <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
       </div>
       <div id="directory-tree" class="directory-tree"></div>
     </section>
   </main>
+
+  <div id="loading-overlay" class="loading-overlay" hidden>
+    <div class="loading-spinner" aria-label="Loading…"></div>
+  </div>
 
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
 
@@ -306,6 +324,30 @@
         <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Cancel</button>
       </div>
       <p class="hint status-line" id="form-status"></p>
+    </div>
+  </dialog>
+
+  <dialog id="recover-dialog" class="modal" aria-labelledby="recover-dialog-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="recover-dialog-title">Restore from Central</h2>
+          <p class="hint">Files in the backup will overwrite local copies. Files not in the backup stay untouched.</p>
+        </div>
+        <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Close</button>
+      </div>
+
+      <p>Job: <strong id="recover-dialog-job-name"></strong></p>
+
+      <label for="recover-fingerprint">Snapshot fingerprint</label>
+      <input id="recover-fingerprint" placeholder="Leave empty to restore the latest snapshot">
+      <p class="hint">Enter a content fingerprint ID to restore a specific snapshot. Each job only allows restoring its own snapshots — you cannot mix jobs.</p>
+
+      <div class="toolbar">
+        <button id="recover-confirm-btn" type="button" onclick="confirmRecover()">Restore</button>
+        <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Cancel</button>
+        <span class="hint status-line" id="recover-status"></span>
+      </div>
     </div>
   </dialog>
 

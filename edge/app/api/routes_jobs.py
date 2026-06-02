@@ -67,9 +67,12 @@ async def force_send_job(
 @router.post("/api/jobs/recover-latest")
 async def recover_latest_job(
     relative_path: str = Query(..., min_length=1),
+    snapshot_fingerprint: str | None = Query(default=None),
     runner: EdgeRunner = Depends(get_runner),
 ) -> dict:
     try:
+        if snapshot_fingerprint and snapshot_fingerprint.strip():
+            return runner.recover_job_by_fingerprint(relative_path, snapshot_fingerprint.strip())
         return runner.recover_latest_job(relative_path)
     except ValueError as exc:
         detail = str(exc)

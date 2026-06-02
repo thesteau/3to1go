@@ -92,6 +92,18 @@ class EdgeRunner:
         finally:
             self._cycle_lock.release()
 
+    def recover_job_by_fingerprint(self, relative_path: str, fingerprint: str) -> dict[str, object]:
+        job = self.directory_service.load_job(relative_path)
+        if not self._cycle_lock.acquire(blocking=False):
+            self.logger.info("job_recovery_skipped path=%s reason=cycle_already_running", relative_path)
+            return {"status": "already_running", "relative_path": relative_path}
+        try:
+            result = self.recovery_service.recover_by_fingerprint(job, fingerprint)
+            result["relative_path"] = relative_path
+            return result
+        finally:
+            self._cycle_lock.release()
+
     def save_settings(self, payload: dict) -> Settings:
         settings = self.settings_store.save(payload)
         self.update_settings(settings)

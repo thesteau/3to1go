@@ -534,13 +534,25 @@ textarea {
 }
 
 .toast.success {
-  border-color: rgba(15, 118, 110, 0.25);
-  background: #f1fbf9;
+  border-left: 4px solid #0f766e;
+  background: #f0faf8;
+}
+
+.toast.success .toast-title {
+  color: #0f766e;
 }
 
 .toast.error {
-  border-color: rgba(180, 35, 24, 0.18);
-  background: #fff4f2;
+  border-left: 4px solid #b42318;
+  background: #fff0ee;
+}
+
+.toast.error .toast-title {
+  color: #b42318;
+}
+
+.toast.info .toast-title {
+  color: #4b5563;
 }
 
 .toast-title {
@@ -559,6 +571,114 @@ textarea {
 
 .status-line[data-kind="success"] {
   color: var(--accent);
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 240, 232, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(15, 118, 110, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.section-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+button.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.toggle-track {
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ccc;
+  position: relative;
+  transition: background 160ms ease;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 160ms ease;
+}
+
+button.toggle-btn.toggle-on .toggle-track {
+  background: var(--accent);
+}
+
+button.toggle-btn.toggle-on .toggle-thumb {
+  transform: translateX(16px);
+}
+
+.job-error {
+  color: var(--danger);
+}
+
+.job-card-body {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.job-card-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.job-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.job-card-actions button,
+.job-card-actions .hint-with-help {
+  width: 100%;
+}
+
+.job-card-actions button {
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

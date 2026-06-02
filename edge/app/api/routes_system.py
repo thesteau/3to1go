@@ -61,7 +61,7 @@ async def save_settings(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"status": "ok", "settings": build_directory_response(runner)["settings"]}
+    return {"status": "ok", "settings": runner.settings_store.snapshot(settings)}
 
 
 @router.get("/api/ntfy")

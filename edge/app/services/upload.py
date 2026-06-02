@@ -230,12 +230,28 @@ class UploadClient:
         return finalize_response
 
     def download_latest_snapshot(self, edge_id: str, job_name: str, destination: Path) -> dict[str, str]:
+        return self._download_snapshot(
+            f"/backup/recovery/{edge_id}/{self.edge_instance_id}/{job_name}/latest",
+            destination,
+        )
+
+    def download_snapshot_by_fingerprint(
+        self, edge_id: str, job_name: str, fingerprint: str, destination: Path
+    ) -> dict[str, str]:
+        return self._download_snapshot(
+            f"/backup/recovery/{edge_id}/{self.edge_instance_id}/{job_name}/by-fingerprint",
+            destination,
+            params={"fp": fingerprint},
+        )
+
+    def _download_snapshot(self, path: str, destination: Path, params: dict | None = None) -> dict[str, str]:
         response = self._request(
             "get",
-            f"/backup/recovery/{edge_id}/{self.edge_instance_id}/{job_name}/latest",
+            path,
             phase="recovery_download",
             timeout=(self.connect_timeout_seconds, self._timeout_for_bytes(self.max_chunk_size_bytes)),
             stream=True,
+            params=params or {},
         )
         filename = response.headers.get("X-Relay-Snapshot-Filename") or destination.name
         destination.parent.mkdir(parents=True, exist_ok=True)

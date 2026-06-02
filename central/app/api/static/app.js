@@ -98,15 +98,21 @@ let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 const TOAST_DURATION_MS = 8000;
 
-function showToast(message, kind = "info", { duration = TOAST_DURATION_MS } = {}) {
+function showLoading(active) {
+  const el = document.getElementById("loading-overlay");
+  if (el) el.hidden = !active;
+}
+
+function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
 
+  const defaultTitle = kind === "error" ? "Something needs attention" : kind === "success" ? "Done" : "Notice";
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
   toast.setAttribute("role", "status");
-  toast.innerHTML = `<strong class="toast-title">${escapeHtml(kind === "error" ? "Something needs attention" : kind === "success" ? "Saved" : "Notice")}</strong><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(message)}</span>`;
   region.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("visible"));
 
@@ -274,7 +280,7 @@ function renderHookFiles(files) {
         <span class="hint">${escapeHtml(formatBytes(file.size_bytes))}</span>
       </div>
       <div class="hook-file-actions">
-        <button type="button" class="btn btn-secondary" onclick="viewHookFile(decodeURIComponent('${encodeURIComponent(file.name)}'), ${file.viewable ? "true" : "false"})">View</button>
+        <button type="button" class="secondary" onclick="viewHookFile(decodeURIComponent('${encodeURIComponent(file.name)}'), ${file.viewable ? "true" : "false"})">View</button>
         <button type="button" class="btn btn-del" onclick="deleteHookFile(decodeURIComponent('${encodeURIComponent(file.name)}'))">Delete</button>
       </div>
     </div>
@@ -690,15 +696,17 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
 
 function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
   if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
-  return snapshots.map((snap) => {
+  return snapshots.map((snap, idx) => {
     const name = snap.name;
     const size = formatBytes(snap.size_bytes);
     const date = formatDate(parseSnapshotDate(name));
     const fp = parseFingerprint(name) || "";
+    const isLatest = idx === 0;
     return `
       <div class="snapshot-row">
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
+          ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
           ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
@@ -747,14 +755,21 @@ function renderInstanceMeta(instance) {
 }
 
 function renderInstanceCard(edgeId, instance) {
+  const instanceId = instance.edge_instance_id;
+  const deleteBtn = instanceId
+    ? `<button class="btn btn-del btn-del-instance" type="button" onclick="deleteInstance('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Delete Instance</button>`
+    : "";
   return `
     <section class="instance-card">
       <div class="instance-head">
         <div>
-          <div class="instance-title">${escapeHtml(instance.edge_instance_id || "Legacy snapshots")}</div>
+          <div class="instance-title">${escapeHtml(instanceId || "Legacy snapshots")}</div>
           <div class="edge-submeta">${renderInstanceMeta(instance)}</div>
         </div>
-        <span class="edge-count">${(instance.jobs || []).length} job${instance.jobs.length !== 1 ? "s" : ""}</span>
+        <div class="instance-head-right">
+          <span class="edge-count">${(instance.jobs || []).length} job${instance.jobs.length !== 1 ? "s" : ""}</span>
+          ${deleteBtn}
+        </div>
       </div>
       ${instance.edge_instance_id ? renderKeyManager({ edge_id: edgeId, edge_instance_id: instance.edge_instance_id, encryption_key_fingerprint: instance.encryption_key_fingerprint }) : ""}
       ${(instance.jobs || []).map((job) => `
@@ -799,12 +814,38 @@ function restoreKeyDrafts(keyDrafts) {
   });
 }
 
+async function deleteInstance(edgeId, edgeInstanceId, btn) {
+  const label = edgeInstanceId || "this instance";
+  if (!confirm(`Delete all snapshots for instance "${label}" under edge "${edgeId}"?\n\nThis permanently removes all backup files for this instance and cannot be undone.`)) {
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await fetch(
+      `/api/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`,
+      { method: "DELETE" },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setActionStatus(body.detail || "Delete failed.", "error");
+      return;
+    }
+    setActionStatus(`Deleted all snapshots for instance ${label}.`, "success");
+    await loadOverview({ silent: true, force: true });
+  } catch (error) {
+    setActionStatus(error.message || "Delete failed.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function loadOverview({ silent = false, force = false } = {}) {
   if (_overviewLoading) {
     return;
   }
 
   _overviewLoading = true;
+  if (!silent) showLoading(true);
   const uiState = captureOverviewUiState();
 
   try {
@@ -864,6 +905,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
     }
   } finally {
     _overviewLoading = false;
+    showLoading(false);
   }
 }
 

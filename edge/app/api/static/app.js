@@ -4,6 +4,8 @@ let isLoadingData = false;
 let edgeNtfyConfig = null;
 let edgeHookConfig = null;
 let hookDraftDirty = { pre: false, post: false };
+let showHiddenDirs = false;
+let _recoverContext = null;
 const TOAST_DURATION_MS = 8000;
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
@@ -82,15 +84,21 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 32 }
   return `<span class="clip-static${classes}" title="${escapeHtml(full)}">${label ? `<span class="clip-label">${escapeHtml(label)}</span>` : ""}<span class="clip-value">${escapeHtml(short)}</span></span>`;
 }
 
-function showToast(message, kind = "info", { duration = TOAST_DURATION_MS } = {}) {
+function showLoading(active) {
+  const el = document.getElementById("loading-overlay");
+  if (el) el.hidden = !active;
+}
+
+function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
 
+  const defaultTitle = kind === "error" ? "Something needs attention" : kind === "success" ? "Done" : "Notice";
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
   toast.setAttribute("role", "status");
-  toast.innerHTML = `<strong class="toast-title">${escapeHtml(kind === "error" ? "Something needs attention" : kind === "success" ? "Saved" : "Notice")}</strong><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(message)}</span>`;
   region.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("visible"));
 
@@ -554,10 +562,7 @@ function fillMeta(data, encKey, encFingerprint) {
     <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Advertised URL</strong><br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>'}</div>
-    <div><strong>Edge UI</strong><br>${renderClipValue("", data.http_url, { className: "clip-code", clipLength: 30 })}</div>
-    <div><strong>Settings File</strong><br>${renderClipValue("", data.settings_path || "n/a", { className: "clip-code", clipLength: 34 })}</div>
     <div><strong>Cron Schedule</strong> ${renderHelpHint(cronDetails.help)}<br><code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div></div>
-    <div><strong>Minimum Gap</strong><br>${escapeHtml(`${data.minimum_cycle_gap_minutes} minutes`)}</div>
     <div><strong>Scheduler</strong> ${renderHelpHint(schedulerDetails.help)}<br>${escapeHtml(schedulerDetails.label)}</div>
     <div><strong>Next Run</strong><br>${escapeHtml(nextRunText)}</div>
     <div><strong>Upload Circuit</strong> ${renderHelpHint(uploadCircuitDetails.help)}<br>${escapeHtml(uploadCircuitDetails.label)}</div>
@@ -698,13 +703,29 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   `;
 }
 
+function isHiddenPath(relativePath) {
+  const name = relativePath === "." ? "" : (relativePath.split("/").pop() || "");
+  return name.startsWith(".");
+}
+
+function toggleHiddenDirs() {
+  showHiddenDirs = !showHiddenDirs;
+  const btn = document.getElementById("hidden-dirs-toggle");
+  if (btn) {
+    btn.setAttribute("aria-checked", String(showHiddenDirs));
+    btn.classList.toggle("toggle-on", showHiddenDirs);
+  }
+  if (latestData) renderDirectories(latestData);
+}
+
 function renderDirectoryNode(relativePath, index) {
   const entry = index.entriesByPath.get(relativePath);
   if (!entry) {
     return { html: "", hasSelectedDescendant: false };
   }
 
-  const childPaths = index.childrenByParent.get(relativePath) || [];
+  const allChildPaths = index.childrenByParent.get(relativePath) || [];
+  const childPaths = allChildPaths.filter((p) => showHiddenDirs || !isHiddenPath(p));
   const renderedChildren = childPaths.map((childPath) => renderDirectoryNode(childPath, index));
   const hasSelectedDescendant = entry.selected || renderedChildren.some((child) => child.hasSelectedDescendant);
   const header = renderDirectoryHeader(entry, childPaths.length, renderedChildren.some((child) => child.hasSelectedDescendant));
@@ -747,26 +768,33 @@ function bindDirectoryTreeEvents() {
 function renderDirectories(data) {
   const selected = data.directories.filter((entry) => entry.selected && !entry.blocked_by_parent);
   document.getElementById("selected-jobs").innerHTML = selected.length
-    ? selected.map((entry) => `
+    ? selected.map((entry) => {
+      const jobName = entry.config?.job_name || entry.relative_path;
+      return `
       <div class="job-card">
-        <div class="job-card-title">${renderStaticClipValue("", entry.config?.job_name || entry.relative_path, { className: "clip-title", clipLength: 34 })}</div>
-        <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
-        <div class="hint">${escapeHtml(describeDirectoryState(entry))}</div>
-        ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
-        ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
-        ${entry.state?.last_error_detail ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
-        ${entry.blocked_by_parent ? `<div class="hint">This folder sits under parent job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}, so Edge follows the parent path instead of treating this nested folder as its own active job.</div>` : ""}
-        ${entry.config_error ? `<div class="hint" style="color:#b42318;">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
-        <div class="toolbar">
-          <span class="hint-with-help">
-            <button type="button" class="secondary" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(entry.config?.job_name || entry.relative_path)}'), this)">Force Upload</button>
-            <span class="hover-hint" title="Use this when you want Edge to upload again even if the folder looks unchanged locally. Central may still reject the upload if it already has the same snapshot.">?</span>
-          </span>
-          <button type="button" class="secondary" onclick="recoverLatest(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(entry.config?.job_name || entry.relative_path)}'), this)">Recover Latest</button>
-          ${entry.blocked_by_parent ? "" : `<button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
+        <div class="job-card-body">
+          <div class="job-card-info">
+            <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
+            <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+            <div class="hint">${escapeHtml(describeDirectoryState(entry))}</div>
+            ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
+            ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
+            ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
+            ${entry.blocked_by_parent ? `<div class="hint">Covered by parent job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
+            ${entry.config_error ? `<div class="hint job-error">${renderClipValue("", entry.config_error, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
+          </div>
+          <div class="job-card-actions">
+            <span class="hint-with-help">
+              <button type="button" class="secondary" onclick="forceUpload(decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+              <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
+            </span>
+            <button type="button" class="secondary" onclick="openRecoverDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
+            ${entry.blocked_by_parent ? "" : `<button type="button" class="secondary" onclick="openJobDialog(decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
+          </div>
         </div>
       </div>
-    `).join("")
+      `;
+    }).join("")
     : '<p class="hint">No directories are selected yet.</p>';
 
   rememberDirectoryExpansion();
@@ -813,6 +841,7 @@ async function loadData({ silent = false } = {}) {
   }
 
   isLoadingData = true;
+  if (!silent) showLoading(true);
   try {
     const [dirRes, keyRes] = await Promise.all([
       fetch("/api/directories"),
@@ -835,6 +864,7 @@ async function loadData({ silent = false } = {}) {
     }
   } finally {
     isLoadingData = false;
+    showLoading(false);
   }
 }
 
@@ -876,12 +906,15 @@ async function saveSettings() {
     body: JSON.stringify(payload),
   });
   const body = await response.json();
-  setStatus("settings-status", response.ok ? "Settings saved. Closing..." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
+  setStatus("settings-status", response.ok ? "Saved." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true });
+    if (latestData && body.settings) {
+      latestData.settings = body.settings;
+    }
     setActionStatus("Edge settings saved.", "success");
-    await pause(450);
+    await pause(350);
     closeDialog("settings-dialog");
+    loadData({ silent: true });
   } else {
     setActionStatus(body.detail || "Settings save failed.", "error");
   }
@@ -980,40 +1013,51 @@ async function forceUpload(jobName, btn) {
   }
 }
 
-async function recoverLatest(relativePath, jobName, btn) {
-  const label = jobName || relativePath;
-  if (!confirm(
-    `Recover the latest Central backup for ${label}?\n\nFiles included in that backup will be overwritten in this folder. Files not present in the backup will stay untouched.`,
-  )) {
-    return;
-  }
+function openRecoverDialog(relativePath, jobName) {
+  _recoverContext = { relativePath, jobName };
+  document.getElementById("recover-dialog-job-name").textContent = jobName || relativePath;
+  document.getElementById("recover-fingerprint").value = "";
+  clearStatus("recover-status");
+  openDialog("recover-dialog");
+}
 
-  btn.disabled = true;
+async function confirmRecover() {
+  if (!_recoverContext) return;
+  const { relativePath, jobName } = _recoverContext;
+  const label = jobName || relativePath;
+  const fingerprint = document.getElementById("recover-fingerprint").value.trim();
+  const btn = document.getElementById("recover-confirm-btn");
+
+  setStatus("recover-status", "Restoring…", "info");
+  if (btn) btn.disabled = true;
   try {
-    const response = await fetch(`/api/jobs/recover-latest?relative_path=${encodeURIComponent(relativePath)}`, {
-      method: "POST",
-    });
+    const params = new URLSearchParams({ relative_path: relativePath });
+    if (fingerprint) params.set("snapshot_fingerprint", fingerprint);
+    const response = await fetch(`/api/jobs/recover-latest?${params}`, { method: "POST" });
     const body = await response.json();
     if (!response.ok) {
-      setActionStatus(body.detail || `Recovery failed for ${label}.`, "error");
+      setStatus("recover-status", body.detail || `Restore failed for ${label}.`, "error");
+      setActionStatus(body.detail || `Restore failed for ${label}.`, "error");
       return;
     }
     if (body.status === "already_running") {
+      setStatus("recover-status", "A backup or recovery operation is already running.", "error");
       setActionStatus("A backup or recovery operation is already running on this Edge.", "error");
       return;
     }
-
     const restoredFiles = Number(body.restored_files || 0);
-    const snapshotName = body.snapshot_filename || "latest snapshot";
+    const snapshotName = body.snapshot_filename || "snapshot";
+    closeDialog("recover-dialog");
     setActionStatus(
-      `Recovered ${label} from ${snapshotName} and replaced ${restoredFiles} backed-up file${restoredFiles === 1 ? "" : "s"}.`,
+      `Restored ${label} from ${snapshotName} — ${restoredFiles} file${restoredFiles === 1 ? "" : "s"} replaced.`,
       "success",
     );
     await loadData({ silent: true });
   } catch (error) {
-    setActionStatus(error.message || `Recovery failed for ${label}.`, "error");
+    setStatus("recover-status", error.message || `Restore failed for ${label}.`, "error");
+    setActionStatus(error.message || `Restore failed for ${label}.`, "error");
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 

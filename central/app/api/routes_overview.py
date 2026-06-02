@@ -7,14 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 
-from app.api.dependencies import get_settings, get_settings_store, get_snapshot_index, get_storage_backend
+from app.api.dependencies import get_ingest_service, get_settings, get_settings_store, get_snapshot_index, get_storage_backend
 from app.api.models import CentralSettingsInput, HealthResponse
 from app.api.views import templates
 from app.core.config import Settings
 from app.index.base import SnapshotIndexBackend
+from app.services.ingest import IngestService
 from app.services.overview import build_overview
 from app.services.settings_store import SettingsStore
 from app.storage.local import LocalFilesystemBackend
+from app.utils.paths import validate_namespace_component
 
 
 router = APIRouter()
@@ -55,6 +57,38 @@ async def save_settings(
             request.app.state.snapshot_index,
         )["settings"],
     }
+
+
+@router.delete("/api/instances/{edge_id}/{edge_instance_id}")
+async def delete_instance(
+    edge_id: str,
+    edge_instance_id: str,
+    settings: Settings = Depends(get_settings),
+    ingest_service: IngestService = Depends(get_ingest_service),
+) -> dict:
+    try:
+        validate_namespace_component(edge_id, "edge_id")
+        validate_namespace_component(edge_instance_id, "edge_instance_id")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    instance_dir = settings.backup_root / edge_id / edge_instance_id
+    if not instance_dir.exists():
+        raise HTTPException(status_code=404, detail="instance not found")
+
+    # Collect job namespaces before deleting so we can reconcile the index
+    job_namespaces = [
+        f"{edge_id}/{edge_instance_id}/{child.name}"
+        for child in instance_dir.iterdir()
+        if child.is_dir()
+    ]
+
+    shutil.rmtree(instance_dir, ignore_errors=True)
+
+    for namespace in job_namespaces:
+        ingest_service.reconcile_namespace(namespace)
+
+    return {"status": "deleted", "edge_id": edge_id, "edge_instance_id": edge_instance_id}
 
 
 @router.get("/health/ready")

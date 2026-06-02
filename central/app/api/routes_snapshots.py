@@ -39,6 +39,47 @@ def _latest_snapshot(storage_backend: LocalFilesystemBackend, namespace: str) ->
     return max(snapshots, key=lambda item: (float(item.get("mtime", 0)), str(item.get("filename", ""))))
 
 
+@router.get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint")
+async def download_snapshot_by_fingerprint(
+    edge_id: str,
+    edge_instance_id: str,
+    job_name: str,
+    fp: str,
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+    logger=Depends(get_logger),
+    storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
+) -> FileResponse:
+    authorize_request(authorization, settings, logger)
+
+    try:
+        namespace = _validated_namespace(edge_id, job_name, edge_instance_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    fp_clean = fp.strip()
+    if not fp_clean:
+        raise HTTPException(status_code=400, detail="fp parameter is required")
+
+    snapshots = storage_backend.list(namespace)
+    matches = [s for s in snapshots if fp_clean in str(s.get("filename", ""))]
+    if not matches:
+        raise HTTPException(status_code=404, detail="no snapshot found with that fingerprint")
+
+    best = max(matches, key=lambda s: float(s.get("mtime", 0)))
+    filename = str(best["filename"])
+    target = _validated_target(settings, namespace, filename)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="snapshot not found")
+
+    return FileResponse(
+        str(target),
+        filename=filename,
+        media_type="application/octet-stream",
+        headers={"X-Relay-Snapshot-Filename": filename},
+    )
+
+
 @router.get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest")
 async def download_latest_snapshot_for_recovery(
     edge_id: str,
