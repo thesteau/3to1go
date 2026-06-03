@@ -339,8 +339,10 @@
       <input id="recover-fingerprint" placeholder="Leave empty to restore the latest snapshot">
       <p class="hint">Enter a content fingerprint ID to restore a specific snapshot. Each job only allows restoring its own snapshots — you cannot mix jobs.</p>
 
+      <div id="recover-preview" class="recover-preview" hidden></div>
+
       <div class="toolbar">
-        <button id="recover-confirm-btn" type="button" onclick="confirmRecover()">Restore</button>
+        <button id="recover-confirm-btn" type="button" onclick="confirmRecover()">Preview Restore</button>
         <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Cancel</button>
         <span class="hint status-line" id="recover-status"></span>
       </div>

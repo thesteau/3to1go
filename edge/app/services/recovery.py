@@ -4,7 +4,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.backup.archiver import extract_archive
+from app.backup.archiver import extract_archive, list_archive_entries
 from app.backup.discovery import JobDefinition
 from app.core.config import Settings, encryption_key_path
 from app.core.encryption import decrypt_file, load_or_create_key
@@ -35,15 +35,17 @@ class RecoveryService:
         self.upload_client = upload_client
 
     def recover_latest(self, job: JobDefinition) -> dict[str, object]:
+        return self.recover(job)
+
+    def recover_by_fingerprint(self, job: JobDefinition, fingerprint: str) -> dict[str, object]:
+        return self.recover(job, fingerprint=fingerprint)
+
+    def recover(self, job: JobDefinition, fingerprint: str | None = None) -> dict[str, object]:
         state = self._begin_recovery(job)
         download_path = self._temp_path(".download.tar.zst")
         decrypted_path = self._temp_path(".decrypted.tar.zst")
         try:
-            download = self.upload_client.download_latest_snapshot(
-                edge_id=self.settings.edge_id,
-                job_name=job.job_name,
-                destination=download_path,
-            )
+            download = self._download_snapshot(job, download_path, fingerprint=fingerprint)
             return self._finalize_recovery(job, state, download, download_path, decrypted_path)
         except (UploadFailure, RecoveryError, Exception) as error:  # noqa: BLE001
             self._handle_recovery_error(job, state, error)
@@ -51,20 +53,14 @@ class RecoveryService:
             download_path.unlink(missing_ok=True)
             decrypted_path.unlink(missing_ok=True)
 
-    def recover_by_fingerprint(self, job: JobDefinition, fingerprint: str) -> dict[str, object]:
-        state = self._begin_recovery(job)
+    def preview(self, job: JobDefinition, fingerprint: str | None = None) -> dict[str, object]:
         download_path = self._temp_path(".download.tar.zst")
         decrypted_path = self._temp_path(".decrypted.tar.zst")
         try:
-            download = self.upload_client.download_snapshot_by_fingerprint(
-                edge_id=self.settings.edge_id,
-                job_name=job.job_name,
-                fingerprint=fingerprint,
-                destination=download_path,
-            )
-            return self._finalize_recovery(job, state, download, download_path, decrypted_path)
+            download = self._download_snapshot(job, download_path, fingerprint=fingerprint)
+            return self._preview_recovery(job, download, download_path, decrypted_path)
         except (UploadFailure, RecoveryError, Exception) as error:  # noqa: BLE001
-            self._handle_recovery_error(job, state, error)
+            self._handle_preview_error(job, error)
         finally:
             download_path.unlink(missing_ok=True)
             decrypted_path.unlink(missing_ok=True)
@@ -78,16 +74,23 @@ class RecoveryService:
         self.state_store.set(job.state_key, state)
         return state
 
+    def _download_snapshot(self, job: JobDefinition, destination: Path, *, fingerprint: str | None) -> dict[str, str]:
+        if fingerprint:
+            return self.upload_client.download_snapshot_by_fingerprint(
+                edge_id=self.settings.edge_id,
+                job_name=job.job_name,
+                fingerprint=fingerprint,
+                destination=destination,
+            )
+        return self.upload_client.download_latest_snapshot(
+            edge_id=self.settings.edge_id,
+            job_name=job.job_name,
+            destination=destination,
+        )
+
     def _finalize_recovery(self, job, state, download, download_path, decrypted_path):
         snapshot_filename = str(download["filename"])
-        key = load_or_create_key(encryption_key_path())
-        try:
-            decrypt_file(key, download_path, decrypted_path)
-        except Exception as exc:
-            raise RecoveryError(
-                "unable to decrypt snapshot with this Edge key", status_code=409
-            ) from exc
-
+        self._decrypt_snapshot(download_path, decrypted_path)
         restored_files = extract_archive(decrypted_path, job.root_path)
 
         state.last_status = "recovered"
@@ -105,8 +108,67 @@ class RecoveryService:
             "status": "recovered",
             "job_name": job.job_name,
             "snapshot_filename": snapshot_filename,
+            "snapshot_fingerprint": self._fingerprint_from_filename(snapshot_filename),
             "restored_files": restored_files,
         }
+
+    def _preview_recovery(self, job, download, download_path, decrypted_path):
+        snapshot_filename = str(download["filename"])
+        self._decrypt_snapshot(download_path, decrypted_path)
+        preview = list_archive_entries(decrypted_path, job.root_path)
+        return {
+            "status": "preview",
+            "job_name": job.job_name,
+            "snapshot_filename": snapshot_filename,
+            "snapshot_fingerprint": self._fingerprint_from_filename(snapshot_filename),
+            **preview,
+        }
+
+    def _decrypt_snapshot(self, download_path: Path, decrypted_path: Path) -> None:
+        key = load_or_create_key(encryption_key_path())
+        try:
+            decrypt_file(key, download_path, decrypted_path)
+        except Exception as exc:
+            raise RecoveryError(
+                "unable to decrypt snapshot with this Edge key", status_code=409
+            ) from exc
+
+    def _fingerprint_from_filename(self, filename: str) -> str:
+        parts = filename.split("__")
+        if len(parts) < 3:
+            return ""
+        return parts[-1].removesuffix(".tar.zst")
+
+    def _handle_preview_error(self, job, error: BaseException) -> None:
+        if isinstance(error, UploadFailure):
+            if error.status_code == 404:
+                wrapped = RecoveryError("no snapshots found on Central", status_code=404)
+            elif error.category == "unauthorized":
+                wrapped = RecoveryError(
+                    "Central rejected the recovery request; check the shared auth token",
+                    status_code=401,
+                )
+            elif error.category == "http":
+                wrapped = RecoveryError(str(error), status_code=502)
+            else:
+                wrapped = RecoveryError(str(error), status_code=400)
+            self.logger.warning(
+                "recovery_preview_failed job_name=%s path=%s detail=%s",
+                job.job_name,
+                job.root_path,
+                wrapped,
+            )
+            raise wrapped from error
+        if isinstance(error, RecoveryError):
+            self.logger.warning(
+                "recovery_preview_failed job_name=%s path=%s detail=%s",
+                job.job_name,
+                job.root_path,
+                error,
+            )
+            raise error
+        self.logger.exception("recovery_preview_failed job_name=%s path=%s", job.job_name, job.root_path)
+        raise RecoveryError(str(error), status_code=500) from error
 
     def _handle_recovery_error(self, job, state, error: BaseException) -> None:
         if isinstance(error, UploadFailure):

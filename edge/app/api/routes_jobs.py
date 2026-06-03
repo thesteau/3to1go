@@ -11,6 +11,11 @@ from app.services.runner import EdgeRunner
 router = APIRouter()
 
 
+def _optional_fingerprint(value: str | None) -> str | None:
+    normalized = value.strip() if value else ""
+    return normalized or None
+
+
 @router.post("/api/jobs")
 async def save_job(
     config: JobConfigInput,
@@ -71,9 +76,23 @@ async def recover_latest_job(
     runner: EdgeRunner = Depends(get_runner),
 ) -> dict:
     try:
-        if snapshot_fingerprint and snapshot_fingerprint.strip():
-            return runner.recover_job_by_fingerprint(relative_path, snapshot_fingerprint.strip())
-        return runner.recover_latest_job(relative_path)
+        return runner.recover_job(relative_path, fingerprint=_optional_fingerprint(snapshot_fingerprint))
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "job not found" else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    except RecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+@router.get("/api/jobs/recover-preview")
+async def preview_recovery_job(
+    relative_path: str = Query(..., min_length=1),
+    snapshot_fingerprint: str | None = Query(default=None),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        return runner.preview_recovery(relative_path, fingerprint=_optional_fingerprint(snapshot_fingerprint))
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if detail == "job not found" else 400

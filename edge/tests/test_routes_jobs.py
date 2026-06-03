@@ -106,14 +106,33 @@ class JobRoutesTests(unittest.TestCase):
     def test_recover_latest_route_returns_runner_payload(self) -> None:
         with patch.object(
             self.client.app.state.runner,
-            "recover_latest_job",
+            "recover_job",
             return_value={"status": "recovered", "snapshot_filename": "photos__latest.tar.zst", "restored_files": 2},
-        ) as recover_latest_job:
+        ) as recover_job:
             response = self.client.post("/api/jobs/recover-latest?relative_path=photos")
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["status"], "recovered")
-        recover_latest_job.assert_called_once_with("photos")
+        recover_job.assert_called_once_with("photos", fingerprint=None)
+
+    def test_recover_preview_route_returns_runner_payload(self) -> None:
+        with patch.object(
+            self.client.app.state.runner,
+            "preview_recovery",
+            return_value={
+                "status": "preview",
+                "snapshot_filename": "photos__latest.tar.zst",
+                "total_files": 2,
+                "replace_count": 1,
+                "add_count": 1,
+                "entries": [{"path": "notes.txt", "action": "replace", "size": 12}],
+            },
+        ) as preview_recovery:
+            response = self.client.get("/api/jobs/recover-preview?relative_path=photos")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "preview")
+        preview_recovery.assert_called_once_with("photos", fingerprint=None)
 
 
 if __name__ == "__main__":

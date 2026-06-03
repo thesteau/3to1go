@@ -49,6 +49,54 @@ def create_archive(archive_path: Path, files: list[DiscoveredFile]) -> None:
         os.fsync(raw_handle.fileno())
 
 
+def _archive_destination(target_root: Path, member_name: str) -> Path:
+    destination = (target_root / member_name).resolve()
+    try:
+        destination.relative_to(target_root)
+    except ValueError as exc:
+        raise ValueError(f"invalid archive entry: {member_name}") from exc
+    return destination
+
+
+def list_archive_entries(archive_path: Path, target_root: Path) -> dict[str, object]:
+    target_root = target_root.resolve()
+    entries: list[dict[str, object]] = []
+    replace_count = 0
+    add_count = 0
+    decompressor = zstandard.ZstdDecompressor()
+
+    with archive_path.open("rb") as raw_handle:
+        with decompressor.stream_reader(raw_handle) as decompressed_handle:
+            with tarfile.open(mode="r|", fileobj=decompressed_handle) as tar_handle:
+                for member in tar_handle:
+                    if member.isdir():
+                        continue
+                    if not member.isfile():
+                        raise ValueError(f"unsupported archive entry: {member.name}")
+
+                    destination = _archive_destination(target_root, member.name)
+                    action = "replace" if destination.exists() else "add"
+                    if action == "replace":
+                        replace_count += 1
+                    else:
+                        add_count += 1
+                    entries.append(
+                        {
+                            "path": member.name,
+                            "size": member.size,
+                            "mtime": member.mtime,
+                            "action": action,
+                        }
+                    )
+
+    return {
+        "entries": entries,
+        "total_files": len(entries),
+        "replace_count": replace_count,
+        "add_count": add_count,
+    }
+
+
 def extract_archive(archive_path: Path, target_root: Path) -> int:
     target_root = target_root.resolve()
     extracted_count = 0
@@ -63,12 +111,7 @@ def extract_archive(archive_path: Path, target_root: Path) -> int:
                     if not member.isfile():
                         raise ValueError(f"unsupported archive entry: {member.name}")
 
-                    destination = (target_root / member.name).resolve()
-                    try:
-                        destination.relative_to(target_root)
-                    except ValueError as exc:
-                        raise ValueError(f"invalid archive entry: {member.name}") from exc
-
+                    destination = _archive_destination(target_root, member.name)
                     source_handle = tar_handle.extractfile(member)
                     if source_handle is None:
                         raise ValueError(f"unable to extract archive entry: {member.name}")

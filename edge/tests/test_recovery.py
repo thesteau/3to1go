@@ -125,8 +125,17 @@ class RecoveryServiceTests(unittest.TestCase):
         )
 
         with patch.object(recovery_module, "encryption_key_path", return_value=key_path):
+            preview = service.preview(job)
             result = service.recover_latest(job)
 
+        self.assertEqual(preview["status"], "preview")
+        self.assertEqual(preview["total_files"], 2)
+        self.assertEqual(preview["replace_count"], 1)
+        self.assertEqual(preview["add_count"], 1)
+        self.assertEqual(
+            {entry["path"]: entry["action"] for entry in preview["entries"]},
+            {"notes.txt": "replace", "nested/child.txt": "add"},
+        )
         self.assertEqual(result["status"], "recovered")
         self.assertEqual(result["restored_files"], 2)
         self.assertEqual((job_root / "notes.txt").read_text(encoding="utf-8"), "restored contents")

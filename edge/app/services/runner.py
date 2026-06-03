@@ -80,25 +80,25 @@ class EdgeRunner:
         finally:
             self._cycle_lock.release()
 
-    def recover_latest_job(self, relative_path: str) -> dict[str, object]:
+    def recover_job(self, relative_path: str, fingerprint: str | None = None) -> dict[str, object]:
         job = self.directory_service.load_job(relative_path)
         if not self._cycle_lock.acquire(blocking=False):
             self.logger.info("job_recovery_skipped path=%s reason=cycle_already_running", relative_path)
             return {"status": "already_running", "relative_path": relative_path}
         try:
-            result = self.recovery_service.recover_latest(job)
+            result = self.recovery_service.recover(job, fingerprint=fingerprint)
             result["relative_path"] = relative_path
             return result
         finally:
             self._cycle_lock.release()
 
-    def recover_job_by_fingerprint(self, relative_path: str, fingerprint: str) -> dict[str, object]:
+    def preview_recovery(self, relative_path: str, fingerprint: str | None = None) -> dict[str, object]:
         job = self.directory_service.load_job(relative_path)
         if not self._cycle_lock.acquire(blocking=False):
-            self.logger.info("job_recovery_skipped path=%s reason=cycle_already_running", relative_path)
+            self.logger.info("job_recovery_preview_skipped path=%s reason=cycle_already_running", relative_path)
             return {"status": "already_running", "relative_path": relative_path}
         try:
-            result = self.recovery_service.recover_by_fingerprint(job, fingerprint)
+            result = self.recovery_service.preview(job, fingerprint=fingerprint)
             result["relative_path"] = relative_path
             return result
         finally:
