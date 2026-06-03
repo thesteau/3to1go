@@ -100,9 +100,7 @@ class JobProcessor:
             self._upload_pending_archive(job, state)
             return
 
-        state.last_status = "scanning"
-        state.last_upload_started_at = _utc_now_text()
-        state.last_upload_updated_at = state.last_upload_started_at
+        self._set_active_phase(job, state, "scanning", 5)
         state.last_error_detail = None
         state.last_error_category = None
         self.state_store.set(job.state_key, state)
@@ -145,7 +143,12 @@ class JobProcessor:
             )
             return
 
-        archive_path, timestamp = self._create_pending_archive(job, files, fingerprint)
+        archive_path, timestamp = self._create_pending_archive(
+            job,
+            files,
+            fingerprint,
+            progress_callback=lambda status, percent: self._set_active_phase(job, state, status, percent),
+        )
         previous_pending_archive = state.pending_archive
         state.pending_archive = str(archive_path)
         state.pending_archive_size = archive_path.stat().st_size
@@ -164,6 +167,8 @@ class JobProcessor:
         state.last_duplicate = False
         state.last_upload_started_at = None
         state.last_upload_updated_at = None
+        state.active_phase = "archive_created"
+        state.active_phase_percent = 50
         state.manual_intervention_required = False
         state.last_status = "archive_created"
         self.state_store.set(job.state_key, state)
@@ -173,18 +178,30 @@ class JobProcessor:
 
         self._upload_pending_archive(job, state)
 
-    def _create_pending_archive(self, job: JobDefinition, files: list, fingerprint: str) -> tuple[Path, str]:
+    def _create_pending_archive(
+        self,
+        job: JobDefinition,
+        files: list,
+        fingerprint: str,
+        progress_callback=None,
+    ) -> tuple[Path, str]:
         now = datetime.now(timezone.utc)
         timestamp = timestamp_for_api(now)
         archive_name = build_archive_name(job.job_name, now, fingerprint)
         archive_path = self.settings.spool_dir / archive_name
 
+        if progress_callback is not None:
+            progress_callback("compressing", 18)
         create_archive(archive_path=archive_path, files=files)
         key = load_or_create_key(encryption_key_path())
         tmp_path = archive_path.with_suffix(".enc.tmp")
+        if progress_callback is not None:
+            progress_callback("encrypting", 40)
         encrypt_file(key, archive_path, tmp_path)
         archive_path.unlink()
         tmp_path.rename(archive_path)
+        if progress_callback is not None:
+            progress_callback("archive_created", 50)
 
         self.logger.info("archive_created job_name=%s archive=%s", job.job_name, archive_name)
         return archive_path, timestamp
@@ -248,6 +265,8 @@ class JobProcessor:
         if state.pending_archive_sha256 is None:
             state.pending_archive_sha256 = sha256_path(archive_path)
 
+        state.active_phase = "uploading"
+        state.active_phase_percent = 50
         state.last_status = "uploading"
         state.last_upload_started_at = _utc_now_text()
         state.last_upload_updated_at = state.last_upload_started_at
@@ -260,6 +279,8 @@ class JobProcessor:
             state.upload_offset = offset
             state.current_chunk_size_bytes = chunk_size
             state.last_upload_updated_at = _utc_now_text()
+            state.active_phase = "uploading"
+            state.active_phase_percent = _upload_phase_percent(offset, state.pending_archive_size)
             state.last_status = "uploading"
             self.state_store.set(job.state_key, state)
 
@@ -349,6 +370,16 @@ class JobProcessor:
         delay = self.settings.upload_retry_base_delay_seconds * (2 ** max(0, attempt_count - 1))
         return min(self.settings.upload_retry_max_delay_seconds, delay)
 
+    def _set_active_phase(self, job: JobDefinition, state: JobState, status: str, percent: int) -> None:
+        now = _utc_now_text()
+        if state.last_upload_started_at is None:
+            state.last_upload_started_at = now
+        state.last_upload_updated_at = now
+        state.active_phase = status
+        state.active_phase_percent = max(0, min(100, percent))
+        state.last_status = status
+        self.state_store.set(job.state_key, state)
+
     def _clear_pending_archive(self, state: JobState) -> None:
         if state.pending_archive:
             Path(state.pending_archive).unlink(missing_ok=True)
@@ -361,6 +392,8 @@ class JobProcessor:
         state.upload_offset = 0
         state.current_chunk_size_bytes = None
         state.next_retry_at = None
+        state.active_phase = None
+        state.active_phase_percent = 0
 
     def _discard_pending_archive_file(self, state: JobState) -> None:
         if state.pending_archive:
@@ -371,6 +404,8 @@ class JobProcessor:
         state.upload_id = None
         state.upload_offset = 0
         state.current_chunk_size_bytes = None
+        state.active_phase = None
+        state.active_phase_percent = 0
 
     def cleanup_stale_archives(self) -> None:
         referenced = self.state_store.referenced_pending_archives()
@@ -415,3 +450,12 @@ def _utc_now_text() -> str:
 
 def _utc_after_seconds_text(seconds: int) -> str:
     return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _upload_phase_percent(uploaded_bytes: int, total_bytes: int | None) -> int:
+    total = max(0, int(total_bytes or 0))
+    uploaded = max(0, int(uploaded_bytes or 0))
+    if total <= 0:
+        return 50
+    upload_percent = min(100, max(0, round((uploaded / total) * 100)))
+    return min(100, 50 + round(upload_percent / 2))

@@ -29,6 +29,8 @@ class JobState:
     last_error_category: str | None = None
     last_upload_started_at: str | None = None
     last_upload_updated_at: str | None = None
+    active_phase: str | None = None
+    active_phase_percent: int = 0
     manual_intervention_required: bool = False
     last_status: str | None = None
     last_stored_as: str | None = None

@@ -777,7 +777,7 @@ function recentJobEvent(state, maxAgeMs = JOB_EVENT_LINGER_MS) {
 function jobActivityDetails(entry) {
   const state = entry.state || {};
   const status = String(state.last_status || "").trim();
-  const activeStatuses = new Set(["scanning", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
+  const activeStatuses = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
   const terminalStatuses = new Set(["success", "retry_scheduled", "manual_intervention_required", "circuit_open", "unexpected_exception", "skipped_missing"]);
   const isActive = activeStatuses.has(status);
   const isTerminal = terminalStatuses.has(status) && recentJobEvent(state);
@@ -785,21 +785,28 @@ function jobActivityDetails(entry) {
 
   const total = Number(state.pending_archive_size || 0);
   const uploaded = Math.max(0, Number(state.upload_offset || 0));
-  const rawPercent = total > 0 ? Math.round((uploaded / total) * 100) : 0;
+  const uploadPercent = total > 0 ? Math.round((uploaded / total) * 100) : 0;
+  const phasePercent = Number(state.active_phase_percent || 0);
   const percent = status === "success"
     ? 100
     : status === "uploading"
-      ? Math.min(99, Math.max(2, rawPercent))
-      : status === "archive_created"
-        ? 12
-        : status === "scanning"
-          ? 6
-          : Math.max(8, Math.min(100, rawPercent || 8));
+      ? Math.min(99, Math.max(50, phasePercent || (50 + Math.round(uploadPercent / 2))))
+      : phasePercent
+        ? Math.min(100, Math.max(2, phasePercent))
+        : status === "archive_created"
+          ? 50
+          : status === "scanning"
+            ? 5
+            : Math.max(8, Math.min(100, uploadPercent || 8));
   const kind = status === "success" ? "success" : isTerminal ? "warn" : "active";
   const label = status === "scanning"
     ? "Scanning files"
+    : status === "compressing"
+      ? "Compressing snapshot"
+      : status === "encrypting"
+        ? "Encrypting snapshot"
     : status === "archive_created"
-      ? "Archive ready, starting upload"
+      ? "Compression complete"
       : status === "uploading"
         ? "Uploading snapshot"
         : status === "success"
@@ -807,6 +814,8 @@ function jobActivityDetails(entry) {
           : formatStatusLabel(status);
   const detail = status === "success"
     ? (state.last_duplicate ? "Already stored" : "Completed")
+    : status === "compressing" || status === "encrypting" || status === "archive_created"
+      ? `${Math.min(50, percent)}% compression`
     : status === "retry_scheduled"
       ? (state.next_retry_at ? `Retry at ${formatLocalDateTime(state.next_retry_at)}` : "Retry scheduled")
       : status === "manual_intervention_required"
@@ -1189,9 +1198,11 @@ async function forceUpload(jobName, btn) {
 
   btn.disabled = true;
   try {
-    const response = await fetch(`/api/jobs/force-send?job_name=${encodeURIComponent(jobName)}`, {
+    const responsePromise = fetch(`/api/jobs/force-send?job_name=${encodeURIComponent(jobName)}`, {
       method: "POST",
     });
+    window.setTimeout(() => loadData({ silent: true, includeKey: false }), 250);
+    const response = await responsePromise;
     const body = await response.json();
     if (!response.ok) {
       setActionStatus(body.detail || `Force upload failed for ${label}.`, "error");
@@ -1363,7 +1374,9 @@ async function deleteJob() {
 
 async function runNow() {
   try {
-    const response = await fetch("/api/run-now", { method: "POST" });
+    const responsePromise = fetch("/api/run-now", { method: "POST" });
+    window.setTimeout(() => loadData({ silent: true, includeKey: false }), 250);
+    const response = await responsePromise;
     const body = await response.json();
     if (body.status === "queued" || body.status === "started") {
       const cleared = body.manual_retries_cleared || 0;
