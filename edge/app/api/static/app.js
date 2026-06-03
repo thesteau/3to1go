@@ -7,6 +7,8 @@ let hookDraftDirty = { pre: false, post: false };
 let showHiddenDirs = false;
 let _recoverContext = null;
 const TOAST_DURATION_MS = 8000;
+const JOB_EVENT_LINGER_MS = 10000;
+const EDGE_REFRESH_MS = 2500;
 let _appDialogResolve = null;
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
@@ -746,10 +748,14 @@ function formatDirectoryProgress(entry) {
     : "";
 }
 
+function formatStatusLabel(status) {
+  return String(status || "").replaceAll("_", " ");
+}
+
 function formatLastState(entry) {
   const status = String(entry.state?.last_status || "").trim();
   if (!status) return "";
-  return `Last state: ${status.replaceAll("_", " ")}`;
+  return `Last state: ${formatStatusLabel(status)}`;
 }
 
 function lastStateClass(entry) {
@@ -758,6 +764,70 @@ function lastStateClass(entry) {
   if (["manual_intervention_required", "unexpected_exception", "recovery_failed"].includes(status)) return "state-error";
   if (["retry_scheduled", "waiting_retry", "circuit_open", "skipped_missing"].includes(status)) return "state-warn";
   return "";
+}
+
+function recentJobEvent(state, maxAgeMs = JOB_EVENT_LINGER_MS) {
+  const stamp = state?.last_upload_updated_at || state?.last_upload_started_at || "";
+  if (!stamp) return false;
+  const parsed = Date.parse(stamp);
+  if (Number.isNaN(parsed)) return false;
+  return Date.now() - parsed <= maxAgeMs;
+}
+
+function jobActivityDetails(entry) {
+  const state = entry.state || {};
+  const status = String(state.last_status || "").trim();
+  const activeStatuses = new Set(["scanning", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
+  const terminalStatuses = new Set(["success", "retry_scheduled", "manual_intervention_required", "circuit_open", "unexpected_exception", "skipped_missing"]);
+  const isActive = activeStatuses.has(status);
+  const isTerminal = terminalStatuses.has(status) && recentJobEvent(state);
+  if (!isActive && !isTerminal) return "";
+
+  const total = Number(state.pending_archive_size || 0);
+  const uploaded = Math.max(0, Number(state.upload_offset || 0));
+  const rawPercent = total > 0 ? Math.round((uploaded / total) * 100) : 0;
+  const percent = status === "success"
+    ? 100
+    : status === "uploading"
+      ? Math.min(99, Math.max(2, rawPercent))
+      : status === "archive_created"
+        ? 12
+        : status === "scanning"
+          ? 6
+          : Math.max(8, Math.min(100, rawPercent || 8));
+  const kind = status === "success" ? "success" : isTerminal ? "warn" : "active";
+  const label = status === "scanning"
+    ? "Scanning files"
+    : status === "archive_created"
+      ? "Archive ready, starting upload"
+      : status === "uploading"
+        ? "Uploading snapshot"
+        : status === "success"
+          ? "Snapshot sent"
+          : formatStatusLabel(status);
+  const detail = status === "success"
+    ? (state.last_duplicate ? "Already stored" : "Completed")
+    : status === "retry_scheduled"
+      ? (state.next_retry_at ? `Retry at ${formatLocalDateTime(state.next_retry_at)}` : "Retry scheduled")
+      : status === "manual_intervention_required"
+        ? "Needs manual retry"
+        : status === "circuit_open"
+          ? "Upload paused"
+          : total > 0
+            ? `${formatBytes(Math.min(uploaded, total))} / ${formatBytes(total)}`
+            : "Preparing snapshot";
+
+  return `
+    <div class="job-activity ${kind}" aria-label="${escapeHtml(`${label}: ${detail}`)}">
+      <div class="job-activity-head">
+        <span>${escapeHtml(label)}</span>
+        <span>${escapeHtml(detail)}</span>
+      </div>
+      <div class="job-energy-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeHtml(String(percent))}">
+        <span style="width: ${escapeHtml(String(percent))}%"></span>
+      </div>
+    </div>
+  `;
 }
 
 function directoryDisplayName(entry) {
@@ -869,6 +939,7 @@ function renderSelectedJobs(directories) {
     ? selected.map((entry) => {
       const jobName = entry.config?.job_name || entry.relative_path;
       const lastStateLabel = formatLastState(entry);
+      const activity = jobActivityDetails(entry);
       return `
       <div class="job-card">
         <div class="job-card-body">
@@ -878,7 +949,7 @@ function renderSelectedJobs(directories) {
               <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
             </div>
             <div class="hint job-card-last-state ${lastStateClass(entry)}">${escapeHtml(lastStateLabel || "Last state: —")}</div>
-            ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
+            ${activity}
             ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
             ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
             ${entry.blocked_by_parent ? `<div class="hint">Covered by parent job ${renderClipValue("", entry.blocked_by_parent, { className: "clip-code", clipLength: 36 })}</div>` : ""}
@@ -943,7 +1014,7 @@ function resetForm() {
   setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-function loadData({ silent = false } = {}) {
+function loadData({ silent = false, includeKey = true } = {}) {
   if (isLoadingData) return;
   isLoadingData = true;
 
@@ -955,7 +1026,7 @@ function loadData({ silent = false } = {}) {
 
   const statusFetch = fetch("/api/status");
   const dirFetch = fetch("/api/directories");
-  const keyFetch = fetch("/api/encryption-key");
+  const keyFetch = includeKey ? fetch("/api/encryption-key") : null;
 
   statusFetch
     .then(async (res) => {
@@ -984,13 +1055,15 @@ function loadData({ silent = false } = {}) {
     })
     .finally(() => { isLoadingData = false; });
 
-  keyFetch
-    .then(async (keyRes) => {
-      if (!keyRes.ok) return;
-      const keyData = await keyRes.json();
-      fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
-    })
-    .catch(() => {});
+  if (keyFetch) {
+    keyFetch
+      .then(async (keyRes) => {
+        if (!keyRes.ok) return;
+        const keyData = await keyRes.json();
+        fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
+      })
+      .catch(() => {});
+  }
 }
 
 async function saveSettings() {
@@ -1322,3 +1395,4 @@ initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
 initMeta();
 loadData();
+window.setInterval(() => loadData({ silent: true, includeKey: false }), EDGE_REFRESH_MS);

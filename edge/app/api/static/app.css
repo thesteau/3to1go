@@ -289,6 +289,71 @@ textarea {
 .state-warn  { color: var(--warn-ink); }
 .state-error { color: var(--danger); }
 
+.job-activity {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 520px;
+}
+
+.job-activity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.job-activity-head span {
+  min-width: 0;
+}
+
+.job-activity-head span:first-child {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.job-energy-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #bddbd4;
+  border-radius: 999px;
+  background: #edf6f3;
+}
+
+.job-energy-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 10px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3fbf7f, #11936d);
+  transition: width 220ms ease;
+}
+
+.job-activity.active .job-energy-bar span {
+  background-image: linear-gradient(90deg, #3fbf7f 0%, #78d7a4 45%, #11936d 100%);
+  background-size: 180% 100%;
+  animation: energy-flow 1.1s linear infinite;
+}
+
+.job-activity.success .job-activity-head span:first-child {
+  color: var(--accent);
+}
+
+.job-activity.warn .job-activity-head span:first-child {
+  color: var(--warn-ink);
+}
+
+.job-activity.warn .job-energy-bar {
+  border-color: #e7c76f;
+  background: #fff7df;
+}
+
+.job-activity.warn .job-energy-bar span {
+  background: linear-gradient(90deg, #f7c948, #d48b00);
+}
+
 .directory-tree {
   display: grid;
   gap: 12px;
@@ -629,6 +694,10 @@ textarea {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes energy-flow {
+  to { background-position: -180% 0; }
 }
 
 .section-head-row {

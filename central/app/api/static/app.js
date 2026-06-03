@@ -97,7 +97,9 @@ let _centralNtfyConfig = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 const TOAST_DURATION_MS = 8000;
+const CENTRAL_REFRESH_MS = 5000;
 let _appDialogResolve = null;
+let _knownSnapshotKeys = null;
 
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
@@ -221,7 +223,7 @@ function fillSettings(settings) {
 }
 
 async function manualRefresh() {
-  await loadOverview({ force: true });
+  await loadOverview({ force: true, notifyNewSnapshots: true });
   setActionStatus("Refreshed.", "success");
 }
 
@@ -863,6 +865,51 @@ function renderInstanceCard(edgeId, instance) {
   `;
 }
 
+function collectSnapshotEvents(data) {
+  return (data.edges || []).flatMap((edge) => (
+    (edge.instances || []).flatMap((instance) => (
+      (instance.jobs || []).flatMap((job) => (
+        (job.snapshots || []).map((snapshot) => {
+          const edgeInstanceId = instance.edge_instance_id || "";
+          const name = snapshot.name || snapshot.filename || "";
+          return {
+            key: `${edge.edge_id}::${edgeInstanceId}::${job.job_name}::${name}`,
+            edgeId: edge.edge_id,
+            edgeInstanceId,
+            jobName: job.job_name,
+            name,
+          };
+        })
+      ))
+    ))
+  )).filter((event) => event.name);
+}
+
+function updateSnapshotArrivalToasts(data, { notify = false } = {}) {
+  const events = collectSnapshotEvents(data);
+  const nextKeys = new Set(events.map((event) => event.key));
+  if (_knownSnapshotKeys === null) {
+    _knownSnapshotKeys = nextKeys;
+    return;
+  }
+
+  const arrivals = events.filter((event) => !_knownSnapshotKeys.has(event.key));
+  _knownSnapshotKeys = nextKeys;
+  if (!notify || !arrivals.length) return;
+
+  arrivals.slice(0, 4).forEach((event) => {
+    const instanceLabel = event.edgeInstanceId ? ` / ${event.edgeInstanceId}` : "";
+    showToast(
+      `Received ${event.jobName} from ${event.edgeId}${instanceLabel}.`,
+      "success",
+      { title: "Snapshot received" },
+    );
+  });
+  if (arrivals.length > 4) {
+    showToast(`${arrivals.length - 4} more snapshots received.`, "success", { title: "Snapshot received" });
+  }
+}
+
 function captureOverviewUiState() {
   const expandedEdges = Array.from(document.querySelectorAll("#namespaces details[data-edge-id][open]"))
     .map((element) => element.dataset.edgeId)
@@ -938,7 +985,7 @@ async function deleteInstance(edgeId, edgeInstanceId, btn) {
   }
 }
 
-async function loadOverview({ silent = false, force = false } = {}) {
+async function loadOverview({ silent = false, force = false, notifyNewSnapshots = false } = {}) {
   if (_overviewLoading) {
     return;
   }
@@ -956,6 +1003,7 @@ async function loadOverview({ silent = false, force = false } = {}) {
     }
     const data = await res.json();
     window.__centralSettings = data.settings || {};
+    updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
@@ -1051,4 +1099,4 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 });
 
 loadOverview({ force: true });
-
+window.setInterval(() => loadOverview({ silent: true, notifyNewSnapshots: true }), CENTRAL_REFRESH_MS);

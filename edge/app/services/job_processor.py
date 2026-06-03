@@ -67,6 +67,7 @@ class JobProcessor:
             current_state.last_status = "unexpected_exception"
             current_state.last_error_category = "unexpected"
             current_state.last_error_detail = str(exc)
+            current_state.last_upload_updated_at = _utc_now_text()
             self.state_store.set(job.state_key, current_state)
         finally:
             final_state = self.state_store.get(job.state_key)
@@ -98,6 +99,13 @@ class JobProcessor:
             self.logger.info("force_send_pending job_name=%s archive=%s", job.job_name, Path(state.pending_archive).name)
             self._upload_pending_archive(job, state)
             return
+
+        state.last_status = "scanning"
+        state.last_upload_started_at = _utc_now_text()
+        state.last_upload_updated_at = state.last_upload_started_at
+        state.last_error_detail = None
+        state.last_error_category = None
+        self.state_store.set(job.state_key, state)
 
         files = build_file_list(job, self.logger)
         if not files:
