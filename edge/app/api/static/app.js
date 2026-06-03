@@ -845,8 +845,8 @@ function bindDirectoryTreeEvents() {
   });
 }
 
-function renderDirectories(data) {
-  const selected = data.directories.filter((entry) => entry.selected && !entry.blocked_by_parent);
+function renderSelectedJobs(directories) {
+  const selected = (directories || []).filter((entry) => entry.selected && !entry.blocked_by_parent);
   document.getElementById("selected-jobs").innerHTML = selected.length
     ? selected.map((entry) => {
       const jobName = entry.config?.job_name || entry.relative_path;
@@ -877,11 +877,18 @@ function renderDirectories(data) {
       `;
     }).join("")
     : '<p class="hint">No directories are selected yet.</p>';
+}
 
+function renderDirectoryTree(directories) {
   rememberDirectoryExpansion();
-  const tree = renderDirectoryNode(".", buildDirectoryIndex(data.directories || []));
+  const tree = renderDirectoryNode(".", buildDirectoryIndex(directories || []));
   document.getElementById("directory-tree").innerHTML = tree.html || '<p class="hint">No directories were found under the scan root.</p>';
   bindDirectoryTreeEvents();
+}
+
+function renderDirectories(data) {
+  renderSelectedJobs(data.directories);
+  renderDirectoryTree(data.directories);
 }
 
 function findEntry(relativePath) {
@@ -916,45 +923,54 @@ function resetForm() {
   setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-async function loadData({ silent = false } = {}) {
-  if (isLoadingData) {
-    return;
-  }
-
+function loadData({ silent = false } = {}) {
+  if (isLoadingData) return;
   isLoadingData = true;
+
   if (!silent) {
     const spinner = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
     document.getElementById("selected-jobs").innerHTML = spinner;
     document.getElementById("directory-tree").innerHTML = spinner;
   }
 
+  const statusFetch = fetch("/api/status");
   const dirFetch = fetch("/api/directories");
   const keyFetch = fetch("/api/encryption-key");
 
-  try {
-    const dirRes = await dirFetch;
-    if (!dirRes.ok) {
-      throw new Error("Refresh failed.");
-    }
-    latestData = await dirRes.json();
-    fillMetaFromDir(latestData);
-    if (!document.getElementById("settings-dialog")?.open) {
-      fillSettings(latestData.settings || {});
-    }
-    renderDirectories(latestData);
-  } catch (error) {
-    if (!silent) {
-      setActionStatus(error.message || "Refresh failed.", "error");
-    }
-  } finally {
-    isLoadingData = false;
-  }
+  statusFetch
+    .then(async (res) => {
+      if (!res.ok) return;
+      latestData = await res.json();
+      fillMetaFromDir(latestData);
+      if (!document.getElementById("settings-dialog")?.open) {
+        fillSettings(latestData.settings || {});
+      }
+    })
+    .catch(() => {});
 
-  keyFetch.then(async (keyRes) => {
-    if (!keyRes.ok || !latestData) return;
-    const keyData = await keyRes.json();
-    fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
-  }).catch(() => {});
+  dirFetch
+    .then(async (res) => {
+      if (!res.ok) {
+        if (!silent) setActionStatus("Refresh failed.", "error");
+        return;
+      }
+      const dirData = await res.json();
+      latestData = { ...(latestData || {}), directories: dirData.directories };
+      renderSelectedJobs(dirData.directories);
+      requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
+    })
+    .catch((error) => {
+      if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
+    })
+    .finally(() => { isLoadingData = false; });
+
+  keyFetch
+    .then(async (keyRes) => {
+      if (!keyRes.ok) return;
+      const keyData = await keyRes.json();
+      fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
+    })
+    .catch(() => {});
 }
 
 async function saveSettings() {

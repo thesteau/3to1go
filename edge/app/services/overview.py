@@ -21,7 +21,7 @@ def _encryption_fingerprint() -> str:
     return key_fingerprint(load_or_create_key(encryption_key_path()))
 
 
-def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
+def build_status_response(runner: EdgeRunner) -> dict[str, Any]:
     installation_id = _installation_id()
     encryption_fingerprint = _encryption_fingerprint()
     return {
@@ -41,5 +41,8 @@ def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
             "auth_token_configured": bool(runner.settings.auth_token.strip()),
         },
         "upload_circuit": runner.upload_client.snapshot(),
-        "directories": runner.list_directories(),
     }
+
+
+def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
+    return {"directories": runner.list_directories()}

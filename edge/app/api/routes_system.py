@@ -9,7 +9,7 @@ from app.api.models import EdgeHookCommandsInput, EdgeNtfySettingsInput, EdgeSet
 from app.api.views import templates
 from app.core.config import encryption_key_path
 from app.core.encryption import key_as_base64, key_fingerprint, load_or_create_key
-from app.services.overview import build_directory_response
+from app.services.overview import build_directory_response, build_status_response
 from app.services.runner import EdgeRunner
 from app.services.scheduler import SchedulerController
 
@@ -22,14 +22,14 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
+@router.get("/api/status")
+async def get_status(runner: EdgeRunner = Depends(get_runner)) -> dict:
+    return build_status_response(runner)
+
+
 @router.get("/api/directories")
-async def list_directories(
-    runner: EdgeRunner = Depends(get_runner),
-    scheduler: SchedulerController = Depends(get_scheduler),
-) -> dict:
-    response = build_directory_response(runner)
-    response["scheduler"] = scheduler.snapshot()
-    return response
+async def list_directories(runner: EdgeRunner = Depends(get_runner)) -> dict:
+    return build_directory_response(runner)
 
 
 @router.post("/api/run-now")
