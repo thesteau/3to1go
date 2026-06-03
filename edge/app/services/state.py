@@ -103,6 +103,7 @@ class StateStore:
             return True
 
     def _save_locked(self) -> None:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             "w",
             encoding="utf-8",

@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core import config  # noqa: E402
+from app.services.state import JobState, StateStore  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -32,6 +33,26 @@ class ConfigTests(unittest.TestCase):
 
         self.assertTrue(settings.scan_root.as_posix().endswith("/scan"))
         self.assertEqual(settings.http_host, "0.0.0.0")
+
+    def test_build_settings_normalizes_legacy_container_state_paths(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "XDG_CONFIG_HOME": "/config",
+                "XDG_STATE_HOME": "/data/state",
+                "XDG_CACHE_HOME": "/data/cache",
+            },
+            clear=True,
+        ):
+            settings = config.build_settings(
+                {
+                    "state_dir": "/data/state/RelayCentralizerEdge",
+                    "spool_dir": "/data/cache/RelayCentralizerEdge/spool",
+                }
+            )
+
+        self.assertEqual(settings.state_dir, Path("/data/state"))
+        self.assertEqual(settings.spool_dir, Path("/data/spool"))
 
     def test_resolve_auth_token_file_path_uses_secret_dir_for_bare_filename(self) -> None:
         resolved = config._resolve_auth_token_file_path("relay_auth_token")
@@ -98,6 +119,15 @@ class ConfigTests(unittest.TestCase):
             app = create_app(start_scheduler=False)
 
         self.assertEqual(app.title, "RelayCentralizer Edge")
+
+    def test_state_store_recreates_missing_state_dir_before_save(self) -> None:
+        state_dir = PROJECT_ROOT / ".tmp-test-config" / "missing-state-dir"
+        store = StateStore(state_dir)
+        state_dir.rmdir()
+
+        store.set("job", JobState(job_name="job", active_phase="scanning"))
+
+        self.assertTrue((state_dir / "edge-state.json").exists())
 
 
 if __name__ == "__main__":

@@ -73,6 +73,22 @@ def _default_spool_dir() -> Path:
     return home / ".cache" / APP_DIR_NAME / "spool"
 
 
+def _normalize_state_dir(value: Any) -> Path:
+    raw = _coerce_text(value, str(_default_state_dir()))
+    path = Path(raw).expanduser()
+    if _uses_container_layout() and path == legacy_state_dir():
+        return _default_state_dir()
+    return path
+
+
+def _normalize_spool_dir(value: Any) -> Path:
+    raw = _coerce_text(value, str(_default_spool_dir()))
+    path = Path(raw).expanduser()
+    if _uses_container_layout() and path == legacy_spool_dir():
+        return _default_spool_dir()
+    return path
+
+
 def _settings_path() -> Path:
     return _default_config_dir() / "settings.json"
 
@@ -275,8 +291,8 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         advertised_url=_coerce_url(raw.get("advertised_url"), ""),
         auth_token=str(raw.get("auth_token") or "").strip(),
         cron_schedule=cron_schedule,
-        state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),
-        spool_dir=Path(_coerce_text(raw.get("spool_dir"), str(_default_spool_dir()))).expanduser(),
+        state_dir=_normalize_state_dir(raw.get("state_dir")),
+        spool_dir=_normalize_spool_dir(raw.get("spool_dir")),
         log_level=_coerce_text(raw.get("log_level"), "INFO").upper(),
         theme=_coerce_theme(raw.get("theme")),
         max_depth=_coerce_int(raw.get("max_depth"), 10, 0),
