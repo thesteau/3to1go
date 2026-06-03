@@ -37,8 +37,8 @@ class JobProcessor:
         self.ntfy_publisher = ntfy_publisher
 
     def run_cycle(self) -> bool:
-        if not self.settings.auth_token.strip():
-            self.logger.warning("cycle_skipped reason=auth_token_missing")
+        if not self.settings.edge_credential.strip():
+            self.logger.warning("cycle_skipped reason=edge_credential_missing")
             return False
         for job in discover_jobs(self.settings.scan_root, self.settings.max_depth, self.logger):
             self.process_job(job)

@@ -90,7 +90,7 @@ class UploadClient:
     def __init__(self, settings: Settings) -> None:
         self.central_url = settings.central_url.rstrip("/")
         self.advertised_url = settings.advertised_url.rstrip("/") if settings.advertised_url else None
-        self.auth_token = settings.auth_token
+        self.edge_credential = settings.edge_credential
         self.edge_instance_id = load_or_create_installation_id(installation_id_path())
         self.encryption_key_fingerprint = key_fingerprint(load_or_create_key(encryption_key_path()))
         self.chunk_size_bytes = settings.upload_chunk_size_bytes
@@ -334,7 +334,7 @@ class UploadClient:
 
     def _request(self, method: str, path: str, *, phase: str, **kwargs) -> Response:
         self.circuit_breaker.before_request()
-        headers = {"Authorization": f"Bearer {self.auth_token}"}
+        headers = {"Authorization": f"Bearer {self.edge_credential}"}
         extra_headers = kwargs.pop("headers", None) or {}
         headers.update(extra_headers)
         try:
@@ -454,7 +454,9 @@ class UploadClient:
             phase=phase,
         )
 
-    def _initial_chunk_size(self, *, preferred_chunk_size: int | None, recommended_chunk_size: int, archive_size: int) -> int:
+    def _initial_chunk_size(
+        self, *, preferred_chunk_size: int | None, recommended_chunk_size: int, archive_size: int
+    ) -> int:
         target = preferred_chunk_size or recommended_chunk_size or self.chunk_size_bytes
         target = max(self.min_chunk_size_bytes, min(self.max_chunk_size_bytes, target))
         return max(1, min(target, archive_size))

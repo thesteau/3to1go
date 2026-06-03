@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
 
-from app.core.auth import load_auth_token
+from app.core.auth import issuer_key_path_from_env, revoked_credentials_path_from_env
+from app.core.signing import load_or_create_issuer_keypair, load_revoked_credentials, public_key_to_bytes
 
 
 APP_DIR_NAME = "RelayCentralizerCentral"
@@ -73,7 +74,9 @@ def _coerce_theme(value: Any) -> str:
 
 @dataclass(slots=True)
 class Settings:
-    auth_token: str
+    issuer_key_path: Path
+    issuer_public_key_bytes: bytes
+    revoked_credentials: frozenset
     storage_backend: str
     backup_root: Path
     retention_keep_last: int
@@ -127,8 +130,13 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
 
 def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     raw = payload or {}
+    key_path = issuer_key_path_from_env()
+    _, public_key = load_or_create_issuer_keypair(key_path)
+    revoked = load_revoked_credentials(revoked_credentials_path_from_env())
     return Settings(
-        auth_token=load_auth_token(),
+        issuer_key_path=key_path,
+        issuer_public_key_bytes=public_key_to_bytes(public_key),
+        revoked_credentials=revoked,
         storage_backend=os.getenv("STORAGE_BACKEND", "local").strip().lower(),
         index_database_url=_build_index_database_url(),
         backup_root=Path(os.getenv("BACKUP_ROOT", "/backups")),
@@ -158,8 +166,14 @@ def _build_index_database_url() -> str:
     if explicit_url:
         return explicit_url
 
-    username = os.getenv("INDEX_DATABASE_USER", "").strip() or os.getenv("POSTGRES_USER", "").strip()
-    password = os.getenv("INDEX_DATABASE_PASSWORD", "").strip() or os.getenv("POSTGRES_PASSWORD", "").strip()
+    username = (
+        os.getenv("INDEX_DATABASE_USER", "").strip()
+        or os.getenv("POSTGRES_USER", "").strip()
+    )
+    password = (
+        os.getenv("INDEX_DATABASE_PASSWORD", "").strip()
+        or os.getenv("POSTGRES_PASSWORD", "").strip()
+    )
     if not username or not password:
         raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
 
