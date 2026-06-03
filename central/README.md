@@ -30,13 +30,13 @@ Central also keeps its own advanced runtime settings in a local config file. In 
 
 The easiest way to start is with Docker Compose.
 
-### 1. Prepare the token file
+### 1. Prepare the issuer key file
 
-Central expects `AUTH_TOKEN_FILE` to point to a file that contains the shared bearer token.
+Central expects `ISSUER_KEY_FILE` to point to a file that contains the Ed25519 issuer private key.
 
-If the file does not exist yet, Central creates it on startup. That token must then be copied into each Edge that should talk to this Central.
+If the file does not exist yet, Central generates it on startup. After starting, use Central's UI (`Settings > Credentials > Mint Credential`) to generate a signed JWT for each Edge.
 
-The bundled Central Compose file mounts `./secrets` as a directory at `/run/secrets` so first-boot token generation works automatically.
+The bundled Central Compose file mounts `./secrets` as a directory at `/run/secrets` so first-boot key generation works automatically.
 
 ### 2. Start the service
 
@@ -151,7 +151,8 @@ These are the environment variables most people care about first:
 
 | Variable | Default | What it means |
 | --- | --- | --- |
-| `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` in the contributor Compose, `relay_auth_token` in the deploy example | File containing the shared bearer token |
+| `ISSUER_KEY_FILE` | `/run/secrets/relay_issuer.key` in the contributor Compose, `relay_issuer.key` in the deploy example | File containing the Ed25519 issuer private key (auto-generated on first run) |
+| `REVOKED_CREDENTIALS_FILE` | unset | Optional path to a text file listing revoked credential JTIs, one per line |
 | `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata |
 | `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata |
 
@@ -210,6 +211,6 @@ The bundled Compose example mounts:
 - `./data/postgres` for PostgreSQL metadata storage
 - `./secrets` to `/run/secrets`
 
-After the first start, Central writes the generated token to `./secrets/relay_auth_token`.
+After the first start, Central writes the generated issuer key to `./secrets/relay_issuer.key`.
 
-If you prefer mounting a single token file instead of the whole directory, create that host file before starting the stack. Otherwise Docker may create a directory at that path and Central will refuse to start with a configuration error.
+If you prefer mounting a single key file instead of the whole directory, create that host file before starting the stack. Otherwise Docker may create a directory at that path and Central will refuse to start with a configuration error.

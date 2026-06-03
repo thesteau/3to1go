@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core.config import Settings  # noqa: E402
+from app.core.signing import load_or_create_issuer_keypair, public_key_to_bytes  # noqa: E402
 from app.storage.local import LocalFilesystemBackend  # noqa: E402
 
 
@@ -25,8 +26,12 @@ class HealthcheckTests(unittest.TestCase):
         temp_root = WORKSPACE_ROOT / ".tmp-test-healthcheck"
         temp_root.mkdir(parents=True, exist_ok=True)
         self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
+        key_path = self.temp_dir / "issuer.key"
+        _, public_key = load_or_create_issuer_keypair(key_path)
         self.settings = Settings(
-            auth_token="secret",
+            issuer_key_path=key_path,
+            issuer_public_key_bytes=public_key_to_bytes(public_key),
+            revoked_credentials=frozenset(),
             storage_backend="local",
             backup_root=self.temp_dir / "backups",
             retention_keep_last=3,

@@ -15,7 +15,7 @@ const EDGE_SETTINGS_HELP = {
   settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
   settings_central_url: "The Central server URL Edge uploads backups to.",
   settings_advertised_url: "Optional URL Central displays as a link to this Edge instance.",
-  settings_auth_token: "Shared secret Edge includes when it talks to Central.",
+  settings_edge_credential: "JWT credential minted from Central. Edge includes this when uploading.",
   settings_cron_schedule: "Five cron fields: minute, hour, day of month, month, day of week.",
   settings_state_dir: "Where Edge keeps retry state, progress, and other local bookkeeping.",
   settings_spool_dir: "Where Edge stages local archive files before and during upload.",
@@ -618,7 +618,7 @@ function initMeta() {
     <div><strong>Advertised URL</strong><br><span id="meta-val-advertised-url">${pending}</span></div>
     <div><strong>Cron Schedule</strong> <span id="meta-hint-cron"></span><br><span id="meta-val-cron">${pending}</span></div>
     <div><strong>Upload Circuit</strong> <span id="meta-hint-upload-circuit"></span><br><span id="meta-val-upload-circuit">${pending}</span></div>
-    <div><strong>Auth Token</strong><br><span id="meta-val-auth-token">${pending}</span></div>
+    <div><strong>Edge Credential</strong><br><span id="meta-val-edge-credential">${pending}</span></div>
     <div class="enc-key-cell">
       <strong>Encryption Key</strong>
       <div class="enc-key-row">
@@ -648,7 +648,7 @@ function fillMetaFromDir(data) {
   set("meta-val-cron", `<code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div>`);
   set("meta-hint-upload-circuit", renderHelpHint(uploadCircuitDetails.help));
   set("meta-val-upload-circuit", escapeHtml(uploadCircuitDetails.label));
-  set("meta-val-auth-token", escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing"));
+  set("meta-val-edge-credential", escapeHtml(settingsStatus.edge_credential_configured ? "configured" : "missing"));
   if (data.encryption_key_fingerprint) {
     set("meta-val-enc-fingerprint", `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`);
   }
@@ -690,7 +690,7 @@ function fillSettings(settings) {
   document.getElementById("settings_scan_root").value = data.scan_root || "";
   document.getElementById("settings_central_url").value = data.central_url || "";
   document.getElementById("settings_advertised_url").value = data.advertised_url || "";
-  document.getElementById("settings_auth_token").value = data.auth_token || "";
+  document.getElementById("settings_edge_credential").value = data.edge_credential || "";
   document.getElementById("settings_cron_schedule").value = data.cron_schedule || "";
   document.getElementById("settings_state_dir").value = data.state_dir || "";
   document.getElementById("settings_spool_dir").value = data.spool_dir || "";
@@ -1082,7 +1082,7 @@ async function saveSettings() {
     scan_root: document.getElementById("settings_scan_root").value.trim(),
     central_url: document.getElementById("settings_central_url").value.trim(),
     advertised_url: document.getElementById("settings_advertised_url").value.trim(),
-    auth_token: document.getElementById("settings_auth_token").value,
+    edge_credential: document.getElementById("settings_edge_credential").value,
     cron_schedule: document.getElementById("settings_cron_schedule").value.trim(),
     state_dir: document.getElementById("settings_state_dir").value.trim(),
     spool_dir: document.getElementById("settings_spool_dir").value.trim(),

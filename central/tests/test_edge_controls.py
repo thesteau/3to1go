@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core.config import Settings  # noqa: E402
+from app.core.signing import load_or_create_issuer_keypair, mint_credential, public_key_to_bytes  # noqa: E402
 
 
 class EdgeControlsTests(unittest.TestCase):
@@ -27,8 +28,13 @@ class EdgeControlsTests(unittest.TestCase):
         temp_root = WORKSPACE_ROOT / ".tmp-test-edge-controls"
         temp_root.mkdir(parents=True, exist_ok=True)
         self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
+        key_path = self.temp_dir / "issuer.key"
+        private_key, public_key = load_or_create_issuer_keypair(key_path)
+        self.credential = mint_credential(private_key)
         self.settings = Settings(
-            auth_token="secret",
+            issuer_key_path=key_path,
+            issuer_public_key_bytes=public_key_to_bytes(public_key),
+            revoked_credentials=frozenset(),
             storage_backend="local",
             backup_root=self.temp_dir / "backups",
             retention_keep_last=3,
@@ -76,7 +82,7 @@ class EdgeControlsTests(unittest.TestCase):
 
         response = self.client.get(
             "/backup/recovery/edge-01/edgeinstance0001/photos/latest",
-            headers={"Authorization": "Bearer secret"},
+            headers={"Authorization": f"Bearer {self.credential}"},
         )
 
         self.assertEqual(response.status_code, 200, response.text)

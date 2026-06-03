@@ -38,7 +38,7 @@ def build_status_response(runner: EdgeRunner) -> dict[str, Any]:
         "settings_path": str(settings_storage_path()),
         "settings": runner.settings_store.snapshot(runner.settings),
         "settings_status": {
-            "auth_token_configured": bool(runner.settings.auth_token.strip()),
+            "edge_credential_configured": bool(runner.settings.edge_credential.strip()),
         },
         "upload_circuit": runner.upload_client.snapshot(),
     }

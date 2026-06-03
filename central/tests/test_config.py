@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -17,10 +19,23 @@ from app.core import config  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temp_root = WORKSPACE_ROOT / ".tmp-test-config"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _key_path(self) -> Path:
+        return self.temp_dir / "relay_issuer.key"
+
+    def _key_env(self) -> dict[str, str]:
+        return {"ISSUER_KEY_FILE": str(self._key_path())}
+
     def test_build_settings_defaults_http_port_to_6555(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(config, "load_auth_token", return_value="secret"):
-                settings = config.build_settings({})
+        with patch.dict(os.environ, self._key_env(), clear=True):
+            settings = config.build_settings({})
 
         self.assertEqual(settings.http_port, 6555)
 
@@ -74,40 +89,36 @@ class ConfigTests(unittest.TestCase):
         self.assertIsNone(url)
 
     def test_load_settings_reads_saved_config_and_ignores_env_for_ui_managed_values(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            settings_path = temp_path / "settings.json"
-            auth_token_path = temp_path / "relay_auth_token"
-            auth_token_path.write_text("secret\n", encoding="utf-8")
-            settings_path.write_text(
-                json.dumps(
-                    {
-                        "retention_keep_last": 9,
-                        "log_level": "ERROR",
-                        "max_upload_size_mb": 777,
-                        "upload_chunk_size_mb": 12,
-                        "upload_session_ttl_hours": 36,
-                        "upload_cleanup_interval_seconds": 900,
-                    }
-                ),
-                encoding="utf-8",
-            )
+        settings_path = self.temp_dir / "settings.json"
+        settings_path.write_text(
+            json.dumps(
+                {
+                    "retention_keep_last": 9,
+                    "log_level": "ERROR",
+                    "max_upload_size_mb": 777,
+                    "upload_chunk_size_mb": 12,
+                    "upload_session_ttl_hours": 36,
+                    "upload_cleanup_interval_seconds": 900,
+                }
+            ),
+            encoding="utf-8",
+        )
 
-            with patch.object(config, "settings_storage_path", return_value=settings_path):
-                with patch.dict(
-                    os.environ,
-                    {
-                        "AUTH_TOKEN_FILE": str(auth_token_path),
-                        "RETENTION_KEEP_LAST": "2",
-                        "LOG_LEVEL": "DEBUG",
-                        "MAX_UPLOAD_SIZE_MB": "100",
-                        "UPLOAD_CHUNK_SIZE_MB": "2",
-                        "UPLOAD_SESSION_TTL_HOURS": "12",
-                        "UPLOAD_CLEANUP_INTERVAL_SECONDS": "60",
-                    },
-                    clear=True,
-                ):
-                    settings = config.load_settings()
+        with patch.object(config, "settings_storage_path", return_value=settings_path):
+            with patch.dict(
+                os.environ,
+                {
+                    **self._key_env(),
+                    "RETENTION_KEEP_LAST": "2",
+                    "LOG_LEVEL": "DEBUG",
+                    "MAX_UPLOAD_SIZE_MB": "100",
+                    "UPLOAD_CHUNK_SIZE_MB": "2",
+                    "UPLOAD_SESSION_TTL_HOURS": "12",
+                    "UPLOAD_CLEANUP_INTERVAL_SECONDS": "60",
+                },
+                clear=True,
+            ):
+                settings = config.load_settings()
 
         self.assertEqual(settings.retention_keep_last, 9)
         self.assertEqual(settings.log_level, "ERROR")
@@ -120,6 +131,7 @@ class ConfigTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
+                **self._key_env(),
                 "NTFY_URL": "https://ntfy.example.com",
                 "NTFY_TOPIC": "uploads",
                 "NTFY_MESSAGE_TEMPLATE": "Hello {{ edge_id }}",
@@ -131,8 +143,7 @@ class ConfigTests(unittest.TestCase):
             },
             clear=True,
         ):
-            with patch.object(config, "load_auth_token", return_value="secret"):
-                settings = config.build_settings({})
+            settings = config.build_settings({})
 
         self.assertEqual(settings.ntfy_url, "https://ntfy.example.com")
         self.assertEqual(settings.ntfy_topic, "uploads")
@@ -147,6 +158,7 @@ class ConfigTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
+                **self._key_env(),
                 "NTFY_URL": "https://ntfy.example.com",
                 "NTFY_TOPIC": "uploads",
                 "HOOK_PRE_COMMAND": "pre.sh",
@@ -154,15 +166,14 @@ class ConfigTests(unittest.TestCase):
             },
             clear=True,
         ):
-            with patch.object(config, "load_auth_token", return_value="secret"):
-                settings = config.build_settings(
-                    {
-                        "ntfy_url": "https://saved.example.com",
-                        "ntfy_topic": "saved-topic",
-                        "hook_pre_command": "saved-pre.sh",
-                        "hook_post_command": "saved-post.sh",
-                    }
-                )
+            settings = config.build_settings(
+                {
+                    "ntfy_url": "https://saved.example.com",
+                    "ntfy_topic": "saved-topic",
+                    "hook_pre_command": "saved-pre.sh",
+                    "hook_post_command": "saved-post.sh",
+                }
+            )
 
         self.assertEqual(settings.ntfy_url, "https://saved.example.com")
         self.assertEqual(settings.ntfy_topic, "saved-topic")

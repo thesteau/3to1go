@@ -123,7 +123,7 @@ class Settings:
     scan_root: Path
     central_url: str
     advertised_url: str
-    auth_token: str
+    edge_credential: str
     cron_schedule: str
     state_dir: Path
     spool_dir: Path
@@ -178,7 +178,7 @@ def installation_id_path() -> Path:
     return _default_config_dir() / "installation.id"
 
 
-def _resolve_auth_token_file_path(value: str) -> Path:
+def _resolve_edge_credential_file_path(value: str) -> Path:
     candidate = Path(value.strip())
     if candidate.is_absolute():
         return candidate
@@ -196,7 +196,7 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
         "scan_root": str(settings.scan_root),
         "central_url": settings.central_url,
         "advertised_url": settings.advertised_url,
-        "auth_token": settings.auth_token,
+        "edge_credential": settings.edge_credential,
         "cron_schedule": settings.cron_schedule,
         "state_dir": str(settings.state_dir),
         "spool_dir": str(settings.spool_dir),
@@ -234,7 +234,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         scan_root=Path(_coerce_text(raw.get("scan_root"), str(_default_scan_root()))).expanduser().resolve(),
         central_url=_coerce_url(raw.get("central_url"), "http://127.0.0.1:6555"),
         advertised_url=_coerce_url(raw.get("advertised_url"), ""),
-        auth_token=str(raw.get("auth_token") or "").strip(),
+        edge_credential=str(raw.get("edge_credential") or "").strip(),
         cron_schedule=cron_schedule,
         state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),
         spool_dir=Path(_coerce_text(raw.get("spool_dir"), str(_default_spool_dir()))).expanduser(),
@@ -249,7 +249,9 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         upload_retry_max_delay_seconds=_coerce_int(raw.get("upload_retry_max_delay_seconds"), 300, 1),
         upload_connect_timeout_seconds=_coerce_int(raw.get("upload_connect_timeout_seconds"), 10, 1),
         upload_read_timeout_padding_seconds=_coerce_int(raw.get("upload_read_timeout_padding_seconds"), 30, 5),
-        upload_min_throughput_bytes_per_second=_coerce_int(raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024),
+        upload_min_throughput_bytes_per_second=_coerce_int(
+            raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024
+        ),
         circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
         circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
         ntfy_url=_coerce_url(_config_or_env(raw, "ntfy_url", "NTFY_URL")),
@@ -292,15 +294,15 @@ def _env_overrides() -> dict[str, Any]:
         if value is not None:
             overrides[setting_key] = value
 
-    auth_token_file = os.getenv("AUTH_TOKEN_FILE")
-    if auth_token_file:
+    edge_credential_file = os.getenv("EDGE_CREDENTIAL_FILE")
+    if edge_credential_file:
         try:
-            token_path = _resolve_auth_token_file_path(auth_token_file)
-            overrides["auth_token"] = token_path.read_text(encoding="utf-8").strip()
+            token_path = _resolve_edge_credential_file_path(edge_credential_file)
+            overrides["edge_credential"] = token_path.read_text(encoding="utf-8").strip()
         except OSError:
             pass
-    elif os.getenv("AUTH_TOKEN"):
-        overrides["auth_token"] = os.getenv("AUTH_TOKEN")
+    elif os.getenv("EDGE_CREDENTIAL"):
+        overrides["edge_credential"] = os.getenv("EDGE_CREDENTIAL")
 
     return overrides
 

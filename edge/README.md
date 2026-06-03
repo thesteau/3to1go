@@ -101,16 +101,18 @@ Key locations by install type:
 
 ## Auth And Identity
 
-### Shared token
+### Edge credential
 
-Edge can get the shared auth token in two ways:
+Edge authenticates to Central using a signed JWT credential minted by Central.
+
+Edge can receive the credential in two ways:
 
 - entered in the Edge UI and stored in local `settings.json`
-- preloaded from `AUTH_TOKEN_FILE`, which is how the bundled Docker examples work
+- preloaded from `EDGE_CREDENTIAL_FILE`, which is how the bundled Docker examples work
 
-- The token must match Central's token.
-- Edge does not read secrets from Central's filesystem.
-- Token rotation is global across all Edges using that Central.
+To generate a credential: start Central, then open its UI and go to `Settings > Credentials > Mint Credential`. Copy the credential and paste it into Edge's UI, or save it to the file referenced by `EDGE_CREDENTIAL_FILE`.
+
+Each Edge has its own credential. Revoking one Edge does not affect others.
 
 ### Unique `EDGE_ID`
 
@@ -193,9 +195,9 @@ docker compose up --build
 
 Open the UI at `http://localhost:6556/`.
 
-Place the shared token file at `./secrets/relay_auth_token` before starting the stack.
-In the bundled Docker examples, `AUTH_TOKEN_FILE` can be just the filename, such as `relay_auth_token`.
-If you prefer a different filename, update `AUTH_TOKEN_FILE` in `.env` to match it.
+Mint a credential from Central's UI and save it to `./secrets/relay_edge_credential` before starting the stack.
+In the bundled Docker examples, `EDGE_CREDENTIAL_FILE` can be just the filename, such as `relay_edge_credential`.
+If you prefer a different filename, update `EDGE_CREDENTIAL_FILE` in `.env` to match it.
 
 ## Release Builds
 
@@ -235,8 +237,8 @@ Most people care about these first:
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
 | `SCAN_ROOT` | `/scan` in Docker, platform-dependent otherwise | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://127.0.0.1:6555` | Address of Central |
-| `AUTH_TOKEN_FILE` | unset | Optional token file path, or just a filename under `/run/secrets` in the Docker examples |
-| `AUTH_TOKEN` | empty | Shared bearer token when not using `AUTH_TOKEN_FILE` |
+| `EDGE_CREDENTIAL_FILE` | unset | Optional credential file path, or just a filename under `/run/secrets` in the Docker examples |
+| `EDGE_CREDENTIAL` | empty | JWT credential when not using `EDGE_CREDENTIAL_FILE` |
 | Cron Schedule in the Edge UI | `0 2 * * 0` | Backup schedule, defaulting to Sunday at 2:00 AM |
 | `HTTP_PORT` | `6556` | Local Edge UI port |
 
