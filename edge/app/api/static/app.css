@@ -270,8 +270,19 @@ textarea {
   background: #fffaf2;
 }
 
+.job-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .job-card-title {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+}
+
+.job-card-last-state {
+  margin-top: 6px;
 }
 
 .directory-tree {

@@ -663,8 +663,18 @@ function fillMetaEncKey(key, fingerprint) {
 
 async function copyEncKey() {
   const key = document.getElementById("enc-key-value")?.textContent;
-  if (!key || key === "—") return;
-  await navigator.clipboard.writeText(key);
+  if (!key || key === "—" || key === "…") return;
+  try {
+    await navigator.clipboard.writeText(key);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = key;
+    ta.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
   const btn = document.querySelector(".enc-key-copy");
   if (btn) {
     btn.textContent = "Copied!";
@@ -855,9 +865,11 @@ function renderSelectedJobs(directories) {
       <div class="job-card">
         <div class="job-card-body">
           <div class="job-card-info">
-            <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
-            <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
-            ${lastStateLabel ? `<div class="hint">${escapeHtml(lastStateLabel)}</div>` : ""}
+            <div class="job-card-header">
+              <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
+              <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+            </div>
+            <div class="hint job-card-last-state">${escapeHtml(lastStateLabel || "Last state: —")}</div>
             ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
             ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
             ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
