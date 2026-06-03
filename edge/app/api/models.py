@@ -21,6 +21,7 @@ class EdgeSettingsInput(BaseModel):
     state_dir: str
     spool_dir: str
     log_level: str
+    theme: str = "dark"
     max_depth: int
     keep_local_pending: bool = True
     upload_chunk_size_mb: int
@@ -50,6 +51,7 @@ class EdgeSettingsInput(BaseModel):
         "state_dir",
         "spool_dir",
         "log_level",
+        "theme",
         "ntfy_url",
         "ntfy_topic",
         "ntfy_message_template",
@@ -59,6 +61,14 @@ class EdgeSettingsInput(BaseModel):
     @classmethod
     def normalize_text(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("theme")
+    @classmethod
+    def normalize_theme(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"dark", "light"}:
+            raise ValueError("theme must be dark or light")
+        return normalized
 
 
 class EdgeNtfySettingsInput(BaseModel):

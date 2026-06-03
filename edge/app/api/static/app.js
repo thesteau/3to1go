@@ -35,6 +35,55 @@ const EDGE_SETTINGS_HELP = {
   settings_circuit_breaker_cooldown_seconds: "How long Edge waits before trying again after the upload circuit opens.",
 };
 
+function currentTheme() {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+function normalizeTheme(theme) {
+  return theme === "light" ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+  const resolved = normalizeTheme(theme);
+  document.documentElement.dataset.theme = resolved;
+  const setting = document.getElementById("settings_theme_dark");
+  if (setting) {
+    setting.checked = resolved === "dark";
+  }
+  const toggle = document.getElementById("theme-toggle");
+  if (!toggle) return;
+  const isDark = resolved === "dark";
+  toggle.textContent = isDark ? "Light Mode" : "Dark Mode";
+  toggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  toggle.setAttribute("aria-pressed", String(isDark));
+}
+
+async function toggleTheme() {
+  if (!latestData?.settings) {
+    setActionStatus("Settings are still loading.", "info");
+    return;
+  }
+  const previousTheme = currentTheme();
+  const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+  const toggle = document.getElementById("theme-toggle");
+  if (toggle) toggle.disabled = true;
+  try {
+    const { response, body } = await postSettings(collectSettingsPayload({ theme: nextTheme }));
+    if (!response.ok) {
+      throw new Error(body.detail || "Theme save failed.");
+    }
+    latestData.settings = body.settings || { ...latestData.settings, theme: nextTheme };
+    fillSettings(latestData.settings);
+    setActionStatus(`${nextTheme === "dark" ? "Dark" : "Light"} mode saved.`, "success");
+  } catch (error) {
+    applyTheme(previousTheme);
+    setActionStatus(error.message || "Theme save failed.", "error");
+  } finally {
+    if (toggle) toggle.disabled = false;
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -695,6 +744,7 @@ function fillSettings(settings) {
   document.getElementById("settings_state_dir").value = data.state_dir || "";
   document.getElementById("settings_spool_dir").value = data.spool_dir || "";
   document.getElementById("settings_log_level").value = data.log_level || "INFO";
+  applyTheme(data.theme || "dark");
   document.getElementById("settings_max_depth").value = data.max_depth ?? 10;
   document.getElementById("settings_keep_local_pending").checked = data.keep_local_pending ?? true;
   document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
@@ -709,6 +759,50 @@ function fillSettings(settings) {
   document.getElementById("settings_circuit_breaker_failure_threshold").value = data.circuit_breaker_failure_threshold ?? 5;
   document.getElementById("settings_circuit_breaker_cooldown_seconds").value = data.circuit_breaker_cooldown_seconds ?? 300;
   updateCronScheduleHint();
+}
+
+function collectSettingsPayload(overrides = {}) {
+  return {
+    edge_id: document.getElementById("settings_edge_id").value.trim(),
+    scan_root: document.getElementById("settings_scan_root").value.trim(),
+    central_url: document.getElementById("settings_central_url").value.trim(),
+    advertised_url: document.getElementById("settings_advertised_url").value.trim(),
+    auth_token: document.getElementById("settings_auth_token").value,
+    cron_schedule: document.getElementById("settings_cron_schedule").value.trim(),
+    state_dir: document.getElementById("settings_state_dir").value.trim(),
+    spool_dir: document.getElementById("settings_spool_dir").value.trim(),
+    log_level: document.getElementById("settings_log_level").value,
+    theme: document.getElementById("settings_theme_dark")?.checked ? "dark" : "light",
+    max_depth: Number(document.getElementById("settings_max_depth").value || 0),
+    keep_local_pending: document.getElementById("settings_keep_local_pending").checked,
+    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
+    min_upload_chunk_size_mb: Number(document.getElementById("settings_min_upload_chunk_size_mb").value || 1),
+    max_upload_chunk_size_mb: Number(document.getElementById("settings_max_upload_chunk_size_mb").value || 1),
+    upload_retry_max_attempts: Number(document.getElementById("settings_upload_retry_max_attempts").value || 1),
+    upload_retry_base_delay_seconds: Number(document.getElementById("settings_upload_retry_base_delay_seconds").value || 1),
+    upload_retry_max_delay_seconds: Number(document.getElementById("settings_upload_retry_max_delay_seconds").value || 1),
+    upload_connect_timeout_seconds: Number(document.getElementById("settings_upload_connect_timeout_seconds").value || 1),
+    upload_read_timeout_padding_seconds: Number(document.getElementById("settings_upload_read_timeout_padding_seconds").value || 5),
+    upload_min_throughput_bytes_per_second: Number(document.getElementById("settings_upload_min_throughput_bytes_per_second").value || 1024),
+    circuit_breaker_failure_threshold: Number(document.getElementById("settings_circuit_breaker_failure_threshold").value || 1),
+    circuit_breaker_cooldown_seconds: Number(document.getElementById("settings_circuit_breaker_cooldown_seconds").value || 1),
+    ntfy_url: latestData?.settings?.ntfy_url || "",
+    ntfy_topic: latestData?.settings?.ntfy_topic || "",
+    ntfy_message_template: latestData?.settings?.ntfy_message_template || "",
+    hook_pre_command: latestData?.settings?.hook_pre_command || "",
+    hook_post_command: latestData?.settings?.hook_post_command || "",
+    ...overrides,
+  };
+}
+
+async function postSettings(payload) {
+  const response = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  return { response, body };
 }
 
 function rememberDirectoryExpansion() {
@@ -1041,6 +1135,9 @@ function loadData({ silent = false, includeKey = true } = {}) {
     .then(async (res) => {
       if (!res.ok) return;
       latestData = await res.json();
+      if (!document.getElementById("settings-dialog")?.open) {
+        applyTheme(latestData.settings?.theme || "dark");
+      }
       fillMetaFromDir(latestData);
       if (!document.getElementById("settings-dialog")?.open) {
         fillSettings(latestData.settings || {});
@@ -1077,47 +1174,14 @@ function loadData({ silent = false, includeKey = true } = {}) {
 
 async function saveSettings() {
   setStatus("settings-status", "Saving...", "info");
-  const payload = {
-    edge_id: document.getElementById("settings_edge_id").value.trim(),
-    scan_root: document.getElementById("settings_scan_root").value.trim(),
-    central_url: document.getElementById("settings_central_url").value.trim(),
-    advertised_url: document.getElementById("settings_advertised_url").value.trim(),
-    auth_token: document.getElementById("settings_auth_token").value,
-    cron_schedule: document.getElementById("settings_cron_schedule").value.trim(),
-    state_dir: document.getElementById("settings_state_dir").value.trim(),
-    spool_dir: document.getElementById("settings_spool_dir").value.trim(),
-    log_level: document.getElementById("settings_log_level").value,
-    max_depth: Number(document.getElementById("settings_max_depth").value || 0),
-    keep_local_pending: document.getElementById("settings_keep_local_pending").checked,
-    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
-    min_upload_chunk_size_mb: Number(document.getElementById("settings_min_upload_chunk_size_mb").value || 1),
-    max_upload_chunk_size_mb: Number(document.getElementById("settings_max_upload_chunk_size_mb").value || 1),
-    upload_retry_max_attempts: Number(document.getElementById("settings_upload_retry_max_attempts").value || 1),
-    upload_retry_base_delay_seconds: Number(document.getElementById("settings_upload_retry_base_delay_seconds").value || 1),
-    upload_retry_max_delay_seconds: Number(document.getElementById("settings_upload_retry_max_delay_seconds").value || 1),
-    upload_connect_timeout_seconds: Number(document.getElementById("settings_upload_connect_timeout_seconds").value || 1),
-    upload_read_timeout_padding_seconds: Number(document.getElementById("settings_upload_read_timeout_padding_seconds").value || 5),
-    upload_min_throughput_bytes_per_second: Number(document.getElementById("settings_upload_min_throughput_bytes_per_second").value || 1024),
-    circuit_breaker_failure_threshold: Number(document.getElementById("settings_circuit_breaker_failure_threshold").value || 1),
-    circuit_breaker_cooldown_seconds: Number(document.getElementById("settings_circuit_breaker_cooldown_seconds").value || 1),
-    ntfy_url: latestData?.settings?.ntfy_url || "",
-    ntfy_topic: latestData?.settings?.ntfy_topic || "",
-    ntfy_message_template: latestData?.settings?.ntfy_message_template || "",
-    hook_pre_command: latestData?.settings?.hook_pre_command || "",
-    hook_post_command: latestData?.settings?.hook_post_command || "",
-  };
-
-  const response = await fetch("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const body = await response.json();
+  const payload = collectSettingsPayload();
+  const { response, body } = await postSettings(payload);
   setStatus("settings-status", response.ok ? "Saved." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     if (latestData && body.settings) {
       latestData.settings = body.settings;
     }
+    applyTheme(latestData?.settings?.theme || payload.theme);
     setActionStatus("Edge settings saved.", "success");
     await pause(350);
     closeDialog("settings-dialog");
@@ -1403,6 +1467,7 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 });
 document.getElementById("recover-fingerprint")?.addEventListener("input", resetRecoverPreview);
 
+applyTheme("dark");
 resetForm();
 initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);

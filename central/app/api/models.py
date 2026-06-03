@@ -135,6 +135,7 @@ class UploadChunkResponse(BaseModel):
 class CentralSettingsInput(BaseModel):
     retention_keep_last: int = Field(ge=1)
     log_level: str = Field(min_length=4, max_length=16)
+    theme: str = "dark"
     max_upload_size_mb: int = Field(ge=1)
     upload_chunk_size_mb: int = Field(ge=1)
     upload_session_ttl_hours: int = Field(ge=1)
@@ -154,6 +155,14 @@ class CentralSettingsInput(BaseModel):
         normalized = value.strip().upper()
         if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("log_level must be one of DEBUG, INFO, WARNING, ERROR")
+        return normalized
+
+    @field_validator("theme")
+    @classmethod
+    def normalize_theme(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"dark", "light"}:
+            raise ValueError("theme must be dark or light")
         return normalized
 
     @field_validator(

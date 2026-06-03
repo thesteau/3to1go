@@ -101,6 +101,55 @@ const CENTRAL_REFRESH_MS = 5000;
 let _appDialogResolve = null;
 let _knownSnapshotKeys = null;
 
+function currentTheme() {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+function normalizeTheme(theme) {
+  return theme === "light" ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+  const resolved = normalizeTheme(theme);
+  document.documentElement.dataset.theme = resolved;
+  const setting = document.getElementById("settings_theme_dark");
+  if (setting) {
+    setting.checked = resolved === "dark";
+  }
+  const toggle = document.getElementById("theme-toggle");
+  if (!toggle) return;
+  const isDark = resolved === "dark";
+  toggle.textContent = isDark ? "Light Mode" : "Dark Mode";
+  toggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+  toggle.setAttribute("aria-pressed", String(isDark));
+}
+
+async function toggleTheme() {
+  if (!window.__centralSettings) {
+    setActionStatus("Settings are still loading.", "info");
+    return;
+  }
+  const previousTheme = currentTheme();
+  const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+  const toggle = document.getElementById("theme-toggle");
+  if (toggle) toggle.disabled = true;
+  try {
+    const { response, body } = await postSettings(collectSettingsPayload({ theme: nextTheme }));
+    if (!response.ok) {
+      throw new Error(body.detail || "Theme save failed.");
+    }
+    window.__centralSettings = body.settings || { ...window.__centralSettings, theme: nextTheme };
+    fillSettings(window.__centralSettings);
+    setActionStatus(`${nextTheme === "dark" ? "Dark" : "Light"} mode saved.`, "success");
+  } catch (error) {
+    applyTheme(previousTheme);
+    setActionStatus(error.message || "Theme save failed.", "error");
+  } finally {
+    if (toggle) toggle.disabled = false;
+  }
+}
+
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
   if (!message) return;
   const region = document.getElementById("toast-region");
@@ -216,10 +265,42 @@ function fillSettings(settings) {
   const data = settings || {};
   document.getElementById("settings_retention_keep_last").value = data.retention_keep_last ?? 3;
   document.getElementById("settings_log_level").value = data.log_level || "INFO";
+  applyTheme(data.theme || "dark");
   document.getElementById("settings_max_upload_size_mb").value = data.max_upload_size_mb ?? 2048;
   document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
   document.getElementById("settings_upload_session_ttl_hours").value = data.upload_session_ttl_hours ?? 24;
   document.getElementById("settings_upload_cleanup_interval_seconds").value = data.upload_cleanup_interval_seconds ?? 300;
+}
+
+function collectSettingsPayload(overrides = {}) {
+  return {
+    retention_keep_last: Number(document.getElementById("settings_retention_keep_last").value || 1),
+    log_level: document.getElementById("settings_log_level").value,
+    theme: document.getElementById("settings_theme_dark")?.checked ? "dark" : "light",
+    max_upload_size_mb: Number(document.getElementById("settings_max_upload_size_mb").value || 1),
+    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
+    upload_session_ttl_hours: Number(document.getElementById("settings_upload_session_ttl_hours").value || 1),
+    upload_cleanup_interval_seconds: Number(document.getElementById("settings_upload_cleanup_interval_seconds").value || 10),
+    ntfy_url: window.__centralSettings?.ntfy_url || "",
+    ntfy_topic: window.__centralSettings?.ntfy_topic || "",
+    ntfy_message_template: window.__centralSettings?.ntfy_message_template || "",
+    ntfy_match_edge_id: window.__centralSettings?.ntfy_match_edge_id || "",
+    ntfy_match_edge_instance_id: window.__centralSettings?.ntfy_match_edge_instance_id || "",
+    ntfy_match_source: window.__centralSettings?.ntfy_match_source || "",
+    hook_pre_command: window.__centralSettings?.hook_pre_command || "",
+    hook_post_command: window.__centralSettings?.hook_post_command || "",
+    ...overrides,
+  };
+}
+
+async function postSettings(payload) {
+  const response = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  return { response, body };
 }
 
 async function manualRefresh() {
@@ -1003,6 +1084,9 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     }
     const data = await res.json();
     window.__centralSettings = data.settings || {};
+    if (!document.getElementById("settings-dialog")?.open) {
+      applyTheme(window.__centralSettings.theme || "dark");
+    }
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
     document.getElementById("meta").innerHTML = `
@@ -1057,31 +1141,12 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
 
 async function saveSettings() {
   setStatus("settings-status", "Saving...", "info");
-  const payload = {
-    retention_keep_last: Number(document.getElementById("settings_retention_keep_last").value || 1),
-    log_level: document.getElementById("settings_log_level").value,
-    max_upload_size_mb: Number(document.getElementById("settings_max_upload_size_mb").value || 1),
-    upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
-    upload_session_ttl_hours: Number(document.getElementById("settings_upload_session_ttl_hours").value || 1),
-    upload_cleanup_interval_seconds: Number(document.getElementById("settings_upload_cleanup_interval_seconds").value || 10),
-    ntfy_url: window.__centralSettings?.ntfy_url || "",
-    ntfy_topic: window.__centralSettings?.ntfy_topic || "",
-    ntfy_message_template: window.__centralSettings?.ntfy_message_template || "",
-    ntfy_match_edge_id: window.__centralSettings?.ntfy_match_edge_id || "",
-    ntfy_match_edge_instance_id: window.__centralSettings?.ntfy_match_edge_instance_id || "",
-    ntfy_match_source: window.__centralSettings?.ntfy_match_source || "",
-    hook_pre_command: window.__centralSettings?.hook_pre_command || "",
-    hook_post_command: window.__centralSettings?.hook_post_command || "",
-  };
-
-  const response = await fetch("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const body = await response.json();
+  const payload = collectSettingsPayload();
+  const { response, body } = await postSettings(payload);
   setStatus("settings-status", response.ok ? "Settings saved. Closing..." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
   if (response.ok) {
+    window.__centralSettings = body.settings || { ...window.__centralSettings, ...payload };
+    applyTheme(window.__centralSettings.theme);
     await loadOverview({ silent: true, force: true });
     setActionStatus("Central settings saved.", "success");
     await pause(450);
@@ -1098,5 +1163,6 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
   _hookDraftDirty.post = true;
 });
 
+applyTheme("dark");
 loadOverview({ force: true });
 window.setInterval(() => loadOverview({ silent: true, notifyNewSnapshots: true }), CENTRAL_REFRESH_MS);

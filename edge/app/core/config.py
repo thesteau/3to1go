@@ -98,6 +98,13 @@ def _coerce_url(value: Any, default: str = "") -> str:
     return normalized
 
 
+def _coerce_theme(value: Any) -> str:
+    normalized = _coerce_text(value, "dark").lower()
+    if normalized not in {"dark", "light"}:
+        return "dark"
+    return normalized
+
+
 def _coerce_int(value: Any, default: int, minimum: int) -> int:
     if value is None or value == "":
         return default
@@ -140,6 +147,7 @@ class Settings:
     hook_post_command: str
     http_host: str
     http_port: int
+    theme: str = "dark"
 
     @property
     def upload_chunk_size_bytes(self) -> int:
@@ -193,6 +201,7 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
         "state_dir": str(settings.state_dir),
         "spool_dir": str(settings.spool_dir),
         "log_level": settings.log_level,
+        "theme": settings.theme,
         "max_depth": settings.max_depth,
         "keep_local_pending": settings.keep_local_pending,
         "upload_chunk_size_mb": settings.upload_chunk_size_mb,
@@ -231,6 +240,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         state_dir=Path(_coerce_text(raw.get("state_dir"), str(_default_state_dir()))).expanduser(),
         spool_dir=Path(_coerce_text(raw.get("spool_dir"), str(_default_spool_dir()))).expanduser(),
         log_level=_coerce_text(raw.get("log_level"), "INFO").upper(),
+        theme=_coerce_theme(raw.get("theme")),
         max_depth=_coerce_int(raw.get("max_depth"), 10, 0),
         keep_local_pending=_coerce_bool(raw.get("keep_local_pending"), True),
         upload_chunk_size_mb=_coerce_int(raw.get("upload_chunk_size_mb"), 8, 1),

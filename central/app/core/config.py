@@ -56,6 +56,12 @@ def _coerce_url(value: Any, default: str = "") -> str:
     return normalized
 
 
+def _coerce_theme(value: Any) -> str:
+    normalized = _coerce_text(value, "dark").lower()
+    if normalized not in {"dark", "light"}:
+        return "dark"
+    return normalized
+
 
 @dataclass(slots=True)
 class Settings:
@@ -79,6 +85,7 @@ class Settings:
     staging_dir: Path
     http_host: str
     http_port: int
+    theme: str = "dark"
     index_database_url: str | None = None
 
     @property
@@ -94,6 +101,7 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
     return {
         "retention_keep_last": settings.retention_keep_last,
         "log_level": settings.log_level,
+        "theme": settings.theme,
         "max_upload_size_mb": settings.max_upload_size_mb,
         "upload_chunk_size_mb": settings.upload_chunk_size_mb,
         "upload_session_ttl_hours": settings.upload_session_ttl_hours,
@@ -118,6 +126,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         backup_root=Path(os.getenv("BACKUP_ROOT", "/backups")),
         retention_keep_last=_coerce_int(raw.get("retention_keep_last"), 3, 1),
         log_level=str(raw.get("log_level") or "INFO").strip().upper() or "INFO",
+        theme=_coerce_theme(raw.get("theme")),
         max_upload_size_mb=_coerce_int(raw.get("max_upload_size_mb"), 2048, 1),
         upload_chunk_size_mb=_coerce_int(raw.get("upload_chunk_size_mb"), 8, 1),
         upload_session_ttl_hours=_coerce_int(raw.get("upload_session_ttl_hours"), 24, 1),

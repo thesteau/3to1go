@@ -17,6 +17,7 @@
       <div class="meta-grid" id="meta"></div>
       <div class="toolbar">
         <button type="button" onclick="manualRefresh()">Refresh</button>
+        <button type="button" id="theme-toggle" class="secondary theme-toggle" onclick="toggleTheme()" aria-pressed="true">Light Mode</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <button type="button" onclick="openSettingsDialog()">Edit Central Settings</button>
@@ -43,6 +44,11 @@
         </div>
         <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
       </div>
+
+      <label class="checkbox" for="settings_theme_dark">
+        <input id="settings_theme_dark" type="checkbox">
+        <span>Dark Mode</span>
+      </label>
 
       <div class="split-row">
         <div>
