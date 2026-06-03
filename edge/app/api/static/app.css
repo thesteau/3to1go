@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
-  --page: #0f1514;
-  --panel: #171e1c;
+  --page: #070b0a;
+  --panel: #101513;
   --ink: #edf5f2;
   --muted: #a6b6b0;
   --accent: #5bd0c4;
@@ -10,20 +10,20 @@
   --warn-bg: #3a2b13;
   --warn-ink: #f0bd66;
   --border: #31423d;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
   --body-bg:
-    radial-gradient(circle at top left, rgba(91, 208, 196, 0.13), transparent 30%),
-    linear-gradient(135deg, #0f1514 0%, #171e1c 55%, #10231f 100%);
-  --field-bg: #0f1514;
-  --surface-soft: #1f2824;
-  --surface-subtle: #232b26;
-  --code-bg: #26302b;
+    radial-gradient(circle at top left, rgba(91, 208, 196, 0.08), transparent 30%),
+    linear-gradient(135deg, #050807 0%, #0b100f 55%, #071411 100%);
+  --field-bg: #090d0c;
+  --surface-soft: #151d1a;
+  --surface-subtle: #18211d;
+  --code-bg: #1b2420;
   --button-secondary-bg: #203d39;
   --button-secondary-ink: #b7f2eb;
   --help-bg: #2b342e;
   --line-soft: #31423d;
   --badge-error-bg: #3d211e;
-  --toast-bg: rgba(23, 30, 28, 0.97);
+  --toast-bg: rgba(16, 21, 19, 0.97);
   --success-soft: #173324;
   --danger-soft: #3d211e;
   --force-bg: #3a2b13;

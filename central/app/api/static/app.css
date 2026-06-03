@@ -1,23 +1,23 @@
 :root {
   color-scheme: dark;
-  --page: #101513;
-  --panel: #171d1b;
+  --page: #070b0a;
+  --panel: #101513;
   --ink: #eef4ef;
   --muted: #a8b5ad;
   --accent: #d88955;
   --accent-soft: #3a281d;
   --accent-soft-hover: #4a3325;
   --border: #34433b;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
   --green: #78d99c;
   --red: #ff8b8b;
   --body-bg:
-    radial-gradient(circle at top left, rgba(216, 137, 85, 0.14), transparent 28%),
-    linear-gradient(160deg, #101513 0%, #171d1b 58%, #10211e 100%);
-  --field-bg: #101513;
-  --surface-soft: #211d19;
-  --surface-subtle: #25231f;
-  --surface-overlay: rgba(16, 21, 19, 0.78);
+    radial-gradient(circle at top left, rgba(216, 137, 85, 0.08), transparent 28%),
+    linear-gradient(160deg, #050807 0%, #0b100f 58%, #071411 100%);
+  --field-bg: #090d0c;
+  --surface-soft: #181512;
+  --surface-subtle: #1b1a16;
+  --surface-overlay: rgba(9, 13, 12, 0.86);
   --chip-bg: #2b312c;
   --warn-bg: #3a2b13;
   --warn-ink: #f0bd66;
@@ -25,7 +25,7 @@
   --success-soft-hover: #20462f;
   --danger-soft: #3a1e1e;
   --danger-soft-hover: #4c2727;
-  --toast-bg: rgba(23, 29, 27, 0.97);
+  --toast-bg: rgba(16, 21, 19, 0.97);
 }
 
 :root[data-theme="light"] {
@@ -176,10 +176,6 @@ button, .btn {
 .toolbar button {
   padding: 10px 16px;
   font-size: 1rem;
-}
-
-.theme-toggle {
-  min-width: 104px;
 }
 
 button.secondary, .btn.secondary, .btn-secondary {

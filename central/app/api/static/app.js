@@ -101,10 +101,6 @@ const CENTRAL_REFRESH_MS = 5000;
 let _appDialogResolve = null;
 let _knownSnapshotKeys = null;
 
-function currentTheme() {
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
-}
-
 function normalizeTheme(theme) {
   return theme === "light" ? "light" : "dark";
 }
@@ -115,38 +111,6 @@ function applyTheme(theme) {
   const setting = document.getElementById("settings_theme_dark");
   if (setting) {
     setting.checked = resolved === "dark";
-  }
-  const toggle = document.getElementById("theme-toggle");
-  if (!toggle) return;
-  const isDark = resolved === "dark";
-  toggle.textContent = isDark ? "Light Mode" : "Dark Mode";
-  toggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
-  toggle.setAttribute("aria-pressed", String(isDark));
-}
-
-async function toggleTheme() {
-  if (!window.__centralSettings) {
-    setActionStatus("Settings are still loading.", "info");
-    return;
-  }
-  const previousTheme = currentTheme();
-  const nextTheme = currentTheme() === "dark" ? "light" : "dark";
-  applyTheme(nextTheme);
-  const toggle = document.getElementById("theme-toggle");
-  if (toggle) toggle.disabled = true;
-  try {
-    const { response, body } = await postSettings(collectSettingsPayload({ theme: nextTheme }));
-    if (!response.ok) {
-      throw new Error(body.detail || "Theme save failed.");
-    }
-    window.__centralSettings = body.settings || { ...window.__centralSettings, theme: nextTheme };
-    fillSettings(window.__centralSettings);
-    setActionStatus(`${nextTheme === "dark" ? "Dark" : "Light"} mode saved.`, "success");
-  } catch (error) {
-    applyTheme(previousTheme);
-    setActionStatus(error.message || "Theme save failed.", "error");
-  } finally {
-    if (toggle) toggle.disabled = false;
   }
 }
 

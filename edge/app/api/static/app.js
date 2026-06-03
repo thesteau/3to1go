@@ -35,10 +35,6 @@ const EDGE_SETTINGS_HELP = {
   settings_circuit_breaker_cooldown_seconds: "How long Edge waits before trying again after the upload circuit opens.",
 };
 
-function currentTheme() {
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
-}
-
 function normalizeTheme(theme) {
   return theme === "light" ? "light" : "dark";
 }
@@ -49,38 +45,6 @@ function applyTheme(theme) {
   const setting = document.getElementById("settings_theme_dark");
   if (setting) {
     setting.checked = resolved === "dark";
-  }
-  const toggle = document.getElementById("theme-toggle");
-  if (!toggle) return;
-  const isDark = resolved === "dark";
-  toggle.textContent = isDark ? "Light Mode" : "Dark Mode";
-  toggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
-  toggle.setAttribute("aria-pressed", String(isDark));
-}
-
-async function toggleTheme() {
-  if (!latestData?.settings) {
-    setActionStatus("Settings are still loading.", "info");
-    return;
-  }
-  const previousTheme = currentTheme();
-  const nextTheme = currentTheme() === "dark" ? "light" : "dark";
-  applyTheme(nextTheme);
-  const toggle = document.getElementById("theme-toggle");
-  if (toggle) toggle.disabled = true;
-  try {
-    const { response, body } = await postSettings(collectSettingsPayload({ theme: nextTheme }));
-    if (!response.ok) {
-      throw new Error(body.detail || "Theme save failed.");
-    }
-    latestData.settings = body.settings || { ...latestData.settings, theme: nextTheme };
-    fillSettings(latestData.settings);
-    setActionStatus(`${nextTheme === "dark" ? "Dark" : "Light"} mode saved.`, "success");
-  } catch (error) {
-    applyTheme(previousTheme);
-    setActionStatus(error.message || "Theme save failed.", "error");
-  } finally {
-    if (toggle) toggle.disabled = false;
   }
 }
 
@@ -1080,9 +1044,11 @@ function renderDirectoryTree(directories) {
   bindDirectoryTreeEvents();
 }
 
-function renderDirectories(data) {
+function renderDirectories(data, { refreshDirectoryTree = true } = {}) {
   renderSelectedJobs(data.directories);
-  renderDirectoryTree(data.directories);
+  if (refreshDirectoryTree) {
+    renderDirectoryTree(data.directories);
+  }
 }
 
 function findEntry(relativePath) {
@@ -1117,7 +1083,7 @@ function resetForm() {
   setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-function loadData({ silent = false, includeKey = true } = {}) {
+function loadData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
   if (isLoadingData) return;
   isLoadingData = true;
 
@@ -1154,7 +1120,9 @@ function loadData({ silent = false, includeKey = true } = {}) {
       const dirData = await res.json();
       latestData = { ...(latestData || {}), directories: dirData.directories };
       renderSelectedJobs(dirData.directories);
-      requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
+      if (refreshDirectoryTree) {
+        requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
+      }
     })
     .catch((error) => {
       if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
@@ -1185,7 +1153,7 @@ async function saveSettings() {
     setActionStatus("Edge settings saved.", "success");
     await pause(350);
     closeDialog("settings-dialog");
-    loadData({ silent: true });
+    loadData({ silent: true, refreshDirectoryTree: true });
   } else {
     setActionStatus(body.detail || "Settings save failed.", "error");
   }
@@ -1210,7 +1178,7 @@ async function saveJob() {
   const body = await response.json();
   setStatus("form-status", response.ok ? "Saved. Closing..." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true });
+    await loadData({ silent: true, refreshDirectoryTree: true });
     setActionStatus(`Saved .upload_dir for ${relativePath}.`, "success");
     await pause(450);
     closeDialog("job-dialog");
@@ -1235,13 +1203,13 @@ async function deleteByPath(relativePath) {
   const body = await response.json();
   setStatus("form-status", response.ok ? "This folder is no longer treated as its own backup job." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadData({ silent: true });
+    await loadData({ silent: true, refreshDirectoryTree: true });
     setActionStatus(`Edge will no longer back up ${relativePath} as its own job.`, "success");
     await pause(450);
     closeDialog("job-dialog");
   } else {
     if (response.status === 404 || body.detail === "directory not found") {
-      await loadData({ silent: true });
+      await loadData({ silent: true, refreshDirectoryTree: true });
       closeDialog("job-dialog");
       setActionStatus(`That folder was already gone, so Edge refreshed the directory list.`, "info");
       return;
