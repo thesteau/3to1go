@@ -285,6 +285,10 @@ textarea {
   margin-top: 6px;
 }
 
+.state-ok    { color: var(--accent); }
+.state-warn  { color: var(--warn-ink); }
+.state-error { color: var(--danger); }
+
 .directory-tree {
   display: grid;
   gap: 12px;

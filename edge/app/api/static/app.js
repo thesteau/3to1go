@@ -752,6 +752,14 @@ function formatLastState(entry) {
   return `Last state: ${status.replaceAll("_", " ")}`;
 }
 
+function lastStateClass(entry) {
+  const status = String(entry.state?.last_status || "").trim();
+  if (["success", "recovered", "skipped_unchanged", "skipped_empty"].includes(status)) return "state-ok";
+  if (["manual_intervention_required", "unexpected_exception", "recovery_failed"].includes(status)) return "state-error";
+  if (["retry_scheduled", "waiting_retry", "circuit_open", "skipped_missing"].includes(status)) return "state-warn";
+  return "";
+}
+
 function directoryDisplayName(entry) {
   if (entry.relative_path === ".") {
     return "Scan Root";
@@ -869,7 +877,7 @@ function renderSelectedJobs(directories) {
               <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
               <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
             </div>
-            <div class="hint job-card-last-state">${escapeHtml(lastStateLabel || "Last state: —")}</div>
+            <div class="hint job-card-last-state ${lastStateClass(entry)}">${escapeHtml(lastStateLabel || "Last state: —")}</div>
             ${entry.state?.pending_archive_size ? `<div class="hint">Progress: ${escapeHtml(`${entry.state?.upload_offset || 0}/${entry.state.pending_archive_size} bytes`)}</div>` : ""}
             ${entry.state?.next_retry_at ? `<div class="hint">Next retry: ${escapeHtml(entry.state.next_retry_at)}</div>` : ""}
             ${entry.state?.last_error_detail ? `<div class="hint job-error">${renderClipValue("", entry.state.last_error_detail, { className: "clip-hint", clipLength: 68 })}</div>` : ""}
