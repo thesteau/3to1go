@@ -104,14 +104,6 @@ def _coerce_int(value: Any, default: int, minimum: int) -> int:
     return max(minimum, int(value))
 
 
-def _config_or_env(raw: dict[str, Any], key: str, env_key: str) -> Any:
-    value = raw.get(key)
-    if value is None:
-        return os.getenv(env_key)
-    if isinstance(value, str) and not value.strip():
-        return os.getenv(env_key)
-    return value
-
 
 def _default_http_host() -> str:
     return "0.0.0.0" if _uses_container_layout() else "127.0.0.1"
@@ -252,11 +244,11 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         upload_min_throughput_bytes_per_second=_coerce_int(raw.get("upload_min_throughput_bytes_per_second"), 262144, 1024),
         circuit_breaker_failure_threshold=_coerce_int(raw.get("circuit_breaker_failure_threshold"), 5, 1),
         circuit_breaker_cooldown_seconds=_coerce_int(raw.get("circuit_breaker_cooldown_seconds"), 300, 1),
-        ntfy_url=_coerce_url(_config_or_env(raw, "ntfy_url", "NTFY_URL")),
-        ntfy_topic=_coerce_text(_config_or_env(raw, "ntfy_topic", "NTFY_TOPIC"), ""),
-        ntfy_message_template=_coerce_text(_config_or_env(raw, "ntfy_message_template", "NTFY_MESSAGE_TEMPLATE"), ""),
-        hook_pre_command=_coerce_text(_config_or_env(raw, "hook_pre_command", "HOOK_PRE_COMMAND"), ""),
-        hook_post_command=_coerce_text(_config_or_env(raw, "hook_post_command", "HOOK_POST_COMMAND"), ""),
+        ntfy_url=_coerce_url(raw.get("ntfy_url")),
+        ntfy_topic=_coerce_text(raw.get("ntfy_topic"), ""),
+        ntfy_message_template=_coerce_text(raw.get("ntfy_message_template"), ""),
+        hook_pre_command=_coerce_text(raw.get("hook_pre_command"), ""),
+        hook_post_command=_coerce_text(raw.get("hook_post_command"), ""),
         http_host=_coerce_text(raw.get("http_host"), _default_http_host()),
         http_port=_coerce_int(raw.get("http_port"), 6556, 1),
     )
