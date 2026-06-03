@@ -606,37 +606,59 @@ function describeUploadCircuit(uploadCircuit) {
   };
 }
 
-function fillMeta(data, encKey, encFingerprint) {
-  const scheduler = data.scheduler || {};
-  const uploadCircuit = data.upload_circuit || {};
-  const settingsStatus = data.settings_status || {};
-  const cronDetails = describeCronSchedule(data.cron_schedule);
-  const schedulerDetails = describeSchedulerState(scheduler);
-  const uploadCircuitDetails = describeUploadCircuit(uploadCircuit);
-  const advertisedUrl = String(data.advertised_url || "").trim();
-  const nextRunText = scheduler.next_run_at
-    ? formatLocalDateTime(scheduler.next_run_at)
-    : (scheduler.state === "running" ? "A backup cycle is running now." : "Waiting for the next scheduled time.");
+function initMeta() {
+  const pending = '<span class="hint">…</span>';
   document.getElementById("meta").innerHTML = `
-    <div><strong>Edge ID</strong><br>${renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 })}</div>
-    <div><strong>Instance ID</strong><br>${renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 })}</div>
-    <div><strong>Scan Root</strong><br>${renderClipValue("", data.scan_dir, { className: "clip-code", clipLength: 34 })}</div>
-    <div><strong>Central URL</strong><br>${renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 })}</div>
-    <div><strong>Advertised URL</strong><br>${advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>'}</div>
-    <div><strong>Cron Schedule</strong> ${renderHelpHint(cronDetails.help)}<br><code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div></div>
-    <div><strong>Scheduler</strong> ${renderHelpHint(schedulerDetails.help)}<br>${escapeHtml(schedulerDetails.label)}</div>
-    <div><strong>Next Run</strong><br>${escapeHtml(nextRunText)}</div>
-    <div><strong>Upload Circuit</strong> ${renderHelpHint(uploadCircuitDetails.help)}<br>${escapeHtml(uploadCircuitDetails.label)}</div>
-    <div><strong>Auth Token</strong><br>${escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing")}</div>
+    <div><strong>Edge ID</strong><br><span id="meta-val-edge-id">${pending}</span></div>
+    <div><strong>Instance ID</strong><br><span id="meta-val-instance-id">${pending}</span></div>
+    <div><strong>Scan Root</strong><br><span id="meta-val-scan-dir">${pending}</span></div>
+    <div><strong>Central URL</strong><br><span id="meta-val-central-url">${pending}</span></div>
+    <div><strong>Advertised URL</strong><br><span id="meta-val-advertised-url">${pending}</span></div>
+    <div><strong>Cron Schedule</strong> <span id="meta-hint-cron"></span><br><span id="meta-val-cron">${pending}</span></div>
+    <div><strong>Upload Circuit</strong> <span id="meta-hint-upload-circuit"></span><br><span id="meta-val-upload-circuit">${pending}</span></div>
+    <div><strong>Auth Token</strong><br><span id="meta-val-auth-token">${pending}</span></div>
     <div class="enc-key-cell">
       <strong>Encryption Key</strong>
       <div class="enc-key-row">
-        <code id="enc-key-value">${escapeHtml(encKey || "—")}</code>
+        <code id="enc-key-value">…</code>
         <button type="button" class="secondary enc-key-copy" onclick="copyEncKey()">Copy</button>
       </div>
-      <span class="hint">Fingerprint ${escapeHtml(shortFingerprint(encFingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.</span>
+      <span class="hint" id="meta-val-enc-fingerprint">…</span>
     </div>
   `;
+}
+
+function fillMetaFromDir(data) {
+  const uploadCircuit = data.upload_circuit || {};
+  const settingsStatus = data.settings_status || {};
+  const cronDetails = describeCronSchedule(data.cron_schedule);
+  const uploadCircuitDetails = describeUploadCircuit(uploadCircuit);
+  const advertisedUrl = String(data.advertised_url || "").trim();
+
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+
+  set("meta-val-edge-id", renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 }));
+  set("meta-val-instance-id", renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 }));
+  set("meta-val-scan-dir", renderClipValue("", data.scan_dir, { className: "clip-code", clipLength: 34 }));
+  set("meta-val-central-url", renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 }));
+  set("meta-val-advertised-url", advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>');
+  set("meta-hint-cron", renderHelpHint(cronDetails.help));
+  set("meta-val-cron", `<code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div>`);
+  set("meta-hint-upload-circuit", renderHelpHint(uploadCircuitDetails.help));
+  set("meta-val-upload-circuit", escapeHtml(uploadCircuitDetails.label));
+  set("meta-val-auth-token", escapeHtml(settingsStatus.auth_token_configured ? "configured" : "missing"));
+  if (data.encryption_key_fingerprint) {
+    set("meta-val-enc-fingerprint", `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`);
+  }
+}
+
+function fillMetaEncKey(key, fingerprint) {
+  const keyEl = document.getElementById("enc-key-value");
+  if (keyEl) keyEl.textContent = key || "—";
+  if (fingerprint) {
+    const fpEl = document.getElementById("meta-val-enc-fingerprint");
+    if (fpEl) fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`;
+  }
 }
 
 async function copyEncKey() {
@@ -915,7 +937,7 @@ async function loadData({ silent = false } = {}) {
       throw new Error("Refresh failed.");
     }
     latestData = await dirRes.json();
-    fillMeta(latestData, "", latestData.encryption_key_fingerprint || "");
+    fillMetaFromDir(latestData);
     if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(latestData.settings || {});
     }
@@ -931,7 +953,7 @@ async function loadData({ silent = false } = {}) {
   keyFetch.then(async (keyRes) => {
     if (!keyRes.ok || !latestData) return;
     const keyData = await keyRes.json();
-    fillMeta(latestData, keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
+    fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData.encryption_key_fingerprint || "");
   }).catch(() => {});
 }
 
@@ -1181,4 +1203,5 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 resetForm();
 initializeFieldHelp(EDGE_SETTINGS_HELP);
 document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
+initMeta();
 loadData();
