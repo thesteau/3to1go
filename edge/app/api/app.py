@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,8 +16,11 @@ from app.services.scheduler import SchedulerController
 from app.services.user_store import SESSION_COOKIE, UserStore
 
 
-def create_app(settings: Settings | None = None, start_scheduler: bool = True) -> FastAPI:
-    provided_settings = settings is not None
+def create_app(
+    settings: Settings | None = None,
+    start_scheduler: bool = True,
+    user_store_path: Path | None = None,
+) -> FastAPI:
     runner = EdgeRunner(settings or load_settings())
     scheduler = SchedulerController(runner)
 
@@ -24,7 +29,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     app.state.runner = runner
     app.state.scheduler = scheduler
     app.state.start_scheduler = start_scheduler
-    app.state.user_store = UserStore(sqlite_path=runner.settings.state_dir.parent / "edge-users.db" if provided_settings else None)
+    app.state.user_store = UserStore(sqlite_path=user_store_path)
     app.include_router(admin_router)
     app.include_router(system_router)
     app.include_router(jobs_router)

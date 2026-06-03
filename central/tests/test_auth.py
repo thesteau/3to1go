@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.core.auth import _load_or_create_auth_token  # noqa: E402
+from app.services.user_store import UserStore  # noqa: E402
 
 
 class AuthTokenTests(unittest.TestCase):
@@ -42,6 +43,19 @@ class AuthTokenTests(unittest.TestCase):
 
         self.assertIn("AUTH_TOKEN_FILE must point to a file", str(context.exception))
         self.assertIn(str(token_dir), str(context.exception))
+
+    def test_user_store_keeps_bootstrap_user_admin_after_rename(self) -> None:
+        store = UserStore(sqlite_path=self.temp_dir / "central-users.db")
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+
+        renamed = store.update_user(admin["id"], username="owner", is_admin=False)
+
+        self.assertEqual(renamed["username"], "owner")
+        self.assertTrue(renamed["is_admin"])
+        self.assertTrue(renamed["is_bootstrap_admin"])
+        with self.assertRaises(ValueError):
+            store.delete_user(admin["id"])
 
 
 if __name__ == "__main__":

@@ -57,7 +57,13 @@ class JobRoutesTests(unittest.TestCase):
             http_port=6556,
         )
         self.settings.scan_root.mkdir(parents=True, exist_ok=True)
-        self.client = TestClient(create_app(settings=self.settings, start_scheduler=False))
+        self.client = TestClient(
+            create_app(
+                settings=self.settings,
+                start_scheduler=False,
+                user_store_path=self.temp_dir / "edge-users.db",
+            )
+        )
         login = self.client.post(
             "/api/session/login",
             json={"username": "admin", "password": "admin"},

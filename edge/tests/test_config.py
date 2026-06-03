@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.api.app import create_app  # noqa: E402
 from app.core import config  # noqa: E402
 from app.services.state import JobState, StateStore  # noqa: E402
+from app.services.user_store import UserStore  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -116,7 +117,10 @@ class ConfigTests(unittest.TestCase):
 
     def test_create_app_initializes_new_routes_without_starting_scheduler(self) -> None:
         with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
-            app = create_app(start_scheduler=False)
+            app = create_app(
+                start_scheduler=False,
+                user_store_path=PROJECT_ROOT / ".tmp-test-config" / "edge-users-app.db",
+            )
 
         self.assertEqual(app.title, "RelayCentralizer Edge")
 
@@ -128,6 +132,40 @@ class ConfigTests(unittest.TestCase):
         store.set("job", JobState(job_name="job", active_phase="scanning"))
 
         self.assertTrue((state_dir / "edge-state.json").exists())
+
+    def test_user_store_persists_password_change_across_instances(self) -> None:
+        db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users.db"
+        db_path.unlink(missing_ok=True)
+        first_store = UserStore(sqlite_path=db_path)
+        admin = first_store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+        first_store.change_password(
+            admin["id"],
+            current_password="",
+            new_password="changed-admin",
+            require_current=False,
+        )
+
+        second_store = UserStore(sqlite_path=db_path)
+        self.assertIsNone(second_store.authenticate("admin", "admin"))
+        changed = second_store.authenticate("admin", "changed-admin")
+        self.assertIsNotNone(changed)
+        self.assertFalse(changed["must_change_password"])
+
+    def test_user_store_keeps_bootstrap_user_admin_after_rename(self) -> None:
+        db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users-bootstrap.db"
+        db_path.unlink(missing_ok=True)
+        store = UserStore(sqlite_path=db_path)
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+
+        renamed = store.update_user(admin["id"], username="owner", is_admin=False)
+
+        self.assertEqual(renamed["username"], "owner")
+        self.assertTrue(renamed["is_admin"])
+        self.assertTrue(renamed["is_bootstrap_admin"])
+        with self.assertRaises(ValueError):
+            store.delete_user(admin["id"])
 
 
 if __name__ == "__main__":

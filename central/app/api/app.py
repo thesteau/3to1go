@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -14,7 +15,7 @@ from app.api.routes_overview import router as overview_router
 from app.api.routes_snapshots import router as snapshots_router
 from app.api.routes_uploads import router as uploads_router
 from app.api.views import STATIC_DIR
-from app.core.config import Settings, hook_scripts_dir, load_settings
+from app.core.config import Settings, app_database_path, hook_scripts_dir, load_settings
 from app.core.logging import configure_logging
 from app.index.factory import build_snapshot_index_backend
 from app.services.hooks import HookManager
@@ -26,17 +27,13 @@ from app.services.user_store import SESSION_COOKIE, UserStore
 from app.storage.factory import build_storage_backend
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, user_store_path: Path | None = None) -> FastAPI:
     settings = settings or load_settings()
     logger = configure_logging(settings.log_level)
     storage_backend = build_storage_backend(settings)
     snapshot_index = build_snapshot_index_backend(settings)
-    settings_store = (
-        SettingsStore(database_url=settings.index_database_url)
-        if settings.index_database_url
-        else SettingsStore(path=settings.staging_dir.parent / "settings.json")
-    )
-    user_store = UserStore(database_url=settings.index_database_url, sqlite_path=settings.staging_dir.parent / "central-users.db")
+    settings_store = SettingsStore(database_url=settings.index_database_url)
+    user_store = UserStore(database_url=settings.index_database_url, sqlite_path=user_store_path or app_database_path())
     hook_manager = HookManager(hook_scripts_dir(), logger)
     ntfy_publisher = NtfyPublisher(logger)
     ingest_service = IngestService(

@@ -13,6 +13,7 @@ from app.core.config import app_database_path
 
 DEFAULT_ADMIN_USERNAME = "admin"
 DEFAULT_ADMIN_PASSWORD = "admin"
+BOOTSTRAP_ADMIN_ID = 1
 SESSION_COOKIE = "relay_session"
 SESSION_DAYS = 7
 
@@ -149,7 +150,7 @@ class UserStore:
         next_hash = _hash_password(password) if password else existing["password_hash"]
         next_admin = existing["is_admin"] if is_admin is None else bool(is_admin)
         next_must_change = existing["must_change_password"] if must_change_password is None else bool(must_change_password)
-        if existing["username"] == DEFAULT_ADMIN_USERNAME:
+        if _is_bootstrap_admin(existing):
             next_admin = True
         if self._would_remove_last_admin(user_id, next_admin):
             raise ValueError("at least one admin is required")
@@ -191,7 +192,7 @@ class UserStore:
         existing = self.get_user_by_id(user_id)
         if existing is None:
             raise ValueError("user not found")
-        if existing["username"] == DEFAULT_ADMIN_USERNAME:
+        if _is_bootstrap_admin(existing):
             raise ValueError("the bootstrap admin user cannot be removed")
         if self._would_remove_last_admin(user_id, False):
             raise ValueError("at least one admin is required")
@@ -376,9 +377,14 @@ def _public_user(user: dict[str, Any]) -> dict[str, Any]:
         "id": user["id"],
         "username": user["username"],
         "is_admin": user["is_admin"],
+        "is_bootstrap_admin": _is_bootstrap_admin(user),
         "must_change_password": user["must_change_password"],
         "created_at": user["created_at"],
     }
+
+
+def _is_bootstrap_admin(user: dict[str, Any]) -> bool:
+    return user["id"] == BOOTSTRAP_ADMIN_ID
 
 
 def _utc_now() -> datetime:

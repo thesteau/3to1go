@@ -124,11 +124,15 @@ async def update_user(
         raise HTTPException(status_code=403, detail="admin required")
     if not user.get("is_admin") and payload.is_admin is not None:
         raise HTTPException(status_code=403, detail="admin required")
+    if user["id"] == user_id and payload.is_admin is not None:
+        raise HTTPException(status_code=400, detail="you cannot change your own admin access")
+    if payload.password and (not user.get("is_admin") or user["id"] == user_id):
+        raise HTTPException(status_code=403, detail="use change password")
     try:
         updated = user_store.update_user(
             user_id,
-            username=payload.username if user.get("is_admin") else None,
-            password=payload.password,
+            username=payload.username,
+            password=payload.password if user.get("is_admin") else None,
             is_admin=payload.is_admin if user.get("is_admin") else None,
             must_change_password=False if payload.password else None,
         )

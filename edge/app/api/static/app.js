@@ -259,33 +259,51 @@ async function loadUsers() {
 function renderUsers(users) {
   const canAdmin = Boolean(currentUser?.is_admin);
   document.getElementById("add-user-section").hidden = !canAdmin;
-  document.getElementById("users-list").innerHTML = users.map((user) => `
-    <div class="user-row">
-      <div>
-        <strong>${escapeHtml(user.username)}</strong>
-        ${user.is_admin ? '<span class="admin-pill">Admin</span>' : ""}
-        ${user.must_change_password ? '<span class="hint">Password change pending</span>' : ""}
+  document.getElementById("users-list").innerHTML = users.map((user) => {
+    const isSelf = currentUser?.id === user.id;
+    const isBootstrapAdmin = Boolean(user.is_bootstrap_admin);
+    const canEditUsername = canAdmin || isSelf;
+    const canResetPassword = canAdmin && !isSelf;
+    const canToggleAdmin = canAdmin && !isSelf && !isBootstrapAdmin;
+    const canRemove = canAdmin && !isSelf && !isBootstrapAdmin;
+    return `
+      <div class="user-row">
+        <div>
+          <strong>${escapeHtml(user.username)}</strong>
+          ${user.is_admin ? '<span class="admin-pill">Admin</span>' : ""}
+          ${isSelf ? '<span class="hint">You</span>' : ""}
+          ${user.must_change_password ? '<span class="hint">Password change pending</span>' : ""}
+        </div>
+        <div>
+          ${canEditUsername ? `<input id="user_username_${user.id}" value="${escapeHtml(user.username)}">` : ""}
+          ${canResetPassword ? `<input id="user_password_${user.id}" type="password" placeholder="reset password">` : ""}
+          ${canToggleAdmin ? `<label class="checkbox"><input id="user_admin_${user.id}" type="checkbox" ${user.is_admin ? "checked" : ""}><span>Admin</span></label>` : ""}
+        </div>
+        <div class="user-actions">
+          ${canEditUsername || canResetPassword || canToggleAdmin ? `<button type="button" class="secondary" onclick="saveUser(${user.id})">Save</button>` : ""}
+          ${canRemove ? `<button type="button" class="danger" onclick="deleteUser(${user.id})">Remove</button>` : ""}
+        </div>
       </div>
-      <div>
-        ${canAdmin ? `<input id="user_username_${user.id}" value="${escapeHtml(user.username)}">` : ""}
-        <input id="user_password_${user.id}" type="password" placeholder="new password">
-        ${canAdmin ? `<label class="checkbox"><input id="user_admin_${user.id}" type="checkbox" ${user.is_admin ? "checked" : ""}><span>Admin</span></label>` : ""}
-      </div>
-      <div class="user-actions">
-        <button type="button" class="secondary" onclick="saveUser(${user.id})">Save</button>
-        ${canAdmin && user.username !== "admin" ? `<button type="button" class="danger" onclick="deleteUser(${user.id})">Remove</button>` : ""}
-      </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 async function saveUser(userId) {
-  const payload = {
-    password: document.getElementById(`user_password_${userId}`).value || null,
-  };
+  const payload = {};
+  const passwordInput = document.getElementById(`user_password_${userId}`);
+  if (passwordInput?.value) {
+    payload.password = passwordInput.value;
+  }
+  const usernameInput = document.getElementById(`user_username_${userId}`);
+  if (usernameInput) {
+    payload.username = usernameInput.value.trim() || null;
+  }
+  const adminInput = document.getElementById(`user_admin_${userId}`);
+  if (adminInput) {
+    payload.is_admin = Boolean(adminInput.checked);
+  }
   if (currentUser?.is_admin) {
-    payload.username = document.getElementById(`user_username_${userId}`)?.value.trim() || null;
-    payload.is_admin = Boolean(document.getElementById(`user_admin_${userId}`)?.checked);
+    payload.username = usernameInput?.value.trim() || payload.username || null;
   }
   const response = await fetch(`/api/users/${userId}`, {
     method: "PUT",
