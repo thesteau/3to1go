@@ -14,7 +14,14 @@ from app.core.auth import load_auth_token
 APP_DIR_NAME = "RelayCentralizerCentral"
 
 
+def _uses_container_layout() -> bool:
+    return os.getenv("XDG_CONFIG_HOME", "").strip() == "/config"
+
+
 def _default_config_dir() -> Path:
+    if _uses_container_layout():
+        return Path("/config")
+
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Library" / "Application Support" / APP_DIR_NAME
@@ -29,8 +36,20 @@ def settings_storage_path() -> Path:
     return _default_config_dir() / "settings.json"
 
 
+def legacy_settings_storage_path() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "settings.json"
+
+
+def app_database_path() -> Path:
+    return _default_config_dir() / "relaycentralizer.db"
+
+
 def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
+
+
+def legacy_hook_scripts_dir() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "hook-scripts"
 
 
 def _coerce_int(value: Any, default: int, minimum: int) -> int:
@@ -165,14 +184,44 @@ def _build_index_database_url() -> str | None:
     return f"postgresql://{quote(username)}:{quote(password)}@{host}:{port}/{database}"
 
 
-def load_settings() -> Settings:
-    path = settings_storage_path()
-    payload: dict[str, Any] = {}
-    if path.exists():
+def _load_settings_payload_from_database(database_url: str | None) -> dict[str, Any]:
+    if not database_url:
+        return {}
+    try:
+        import psycopg
+    except ImportError:
+        return {}
+    try:
+        with psycopg.connect(database_url, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute("SELECT payload FROM app_settings WHERE key = %s", ("settings",))
+            row = cur.fetchone()
+    except Exception:
+        return {}
+    if row is None:
+        return {}
+    payload = row[0]
+    return payload if isinstance(payload, dict) else {}
+
+
+def _load_settings_payload_from_json() -> dict[str, Any]:
+    paths = [settings_storage_path()]
+    try:
+        paths.append(legacy_settings_storage_path())
+    except RuntimeError:
+        pass
+    for path in paths:
+        if not path.exists():
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                payload = data
+                return data
         except (json.JSONDecodeError, OSError):
             pass
+    return {}
+
+
+def load_settings() -> Settings:
+    database_url = _build_index_database_url()
+    payload = _load_settings_payload_from_database(database_url) or _load_settings_payload_from_json()
     return build_settings(payload)

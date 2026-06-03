@@ -50,6 +50,16 @@ class EdgeControlsTests(unittest.TestCase):
             http_port=6555,
         )
         self.client = TestClient(create_app(settings=self.settings))
+        login = self.client.post(
+            "/api/session/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        password = self.client.post(
+            "/api/session/change-password",
+            json={"current_password": "", "new_password": "changed-admin"},
+        )
+        self.assertEqual(password.status_code, 200, password.text)
         self.client.app.state.snapshot_index.upsert_edge_registration(
             {
                 "edge_id": "edge-01",

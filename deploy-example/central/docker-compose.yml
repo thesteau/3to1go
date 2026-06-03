@@ -11,6 +11,8 @@ services:
       - "6555:6555"
     volumes:
       - ./config:/config
+      - ./hook-scripts:/config/hook-scripts
+      # TODO(remove after migration window): legacy nested hook path.
       - ./hook-scripts:/config/RelayCentralizerCentral/hook-scripts
       - ${BACKUP_DIR:-./data/backups}:/backups
       - ./data/staging:/staging

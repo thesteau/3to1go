@@ -1,61 +1,61 @@
 :root {
   color-scheme: dark;
-  --page: #070b0a;
-  --panel: #101513;
-  --ink: #eef4ef;
-  --muted: #a8b5ad;
-  --accent: #d88955;
-  --accent-soft: #3a281d;
-  --accent-soft-hover: #4a3325;
-  --border: #34433b;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
-  --green: #78d99c;
-  --red: #ff8b8b;
+  --page: #030406;
+  --panel: #0a0c10;
+  --ink: #f2f4f8;
+  --muted: #99a1ad;
+  --accent: #e05263;
+  --accent-soft: #2a1118;
+  --accent-soft-hover: #3a1721;
+  --border: #20242d;
+  --shadow: 0 18px 46px rgba(0, 0, 0, 0.68);
+  --green: #7aa2ff;
+  --red: #ff6b7c;
   --body-bg:
-    radial-gradient(circle at top left, rgba(216, 137, 85, 0.08), transparent 28%),
-    linear-gradient(160deg, #050807 0%, #0b100f 58%, #071411 100%);
-  --field-bg: #090d0c;
-  --surface-soft: #181512;
-  --surface-subtle: #1b1a16;
-  --surface-overlay: rgba(9, 13, 12, 0.86);
-  --chip-bg: #2b312c;
-  --warn-bg: #3a2b13;
-  --warn-ink: #f0bd66;
-  --success-soft: #173324;
-  --success-soft-hover: #20462f;
-  --danger-soft: #3a1e1e;
-  --danger-soft-hover: #4c2727;
-  --toast-bg: rgba(16, 21, 19, 0.97);
+    radial-gradient(circle at top left, rgba(224, 82, 99, 0.08), transparent 28%),
+    linear-gradient(160deg, #020304 0%, #07090d 58%, #030509 100%);
+  --field-bg: #050609;
+  --surface-soft: #10131a;
+  --surface-subtle: #121720;
+  --surface-overlay: rgba(5, 6, 9, 0.88);
+  --chip-bg: #181d27;
+  --warn-bg: #2f2413;
+  --warn-ink: #f1b65b;
+  --success-soft: #101b30;
+  --success-soft-hover: #142441;
+  --danger-soft: #31131a;
+  --danger-soft-hover: #431b24;
+  --toast-bg: rgba(10, 12, 16, 0.98);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --page: #f3efe7;
-  --panel: #fffdf9;
-  --ink: #24303b;
+  --page: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #202733;
   --muted: #667085;
-  --accent: #8a3b12;
-  --accent-soft: #f2e4d8;
-  --accent-soft-hover: #ead4c2;
-  --border: #e3d8ca;
-  --shadow: 0 14px 32px rgba(36, 48, 59, 0.09);
-  --green: #2a7a4b;
-  --red: #b91c1c;
+  --accent: #c73346;
+  --accent-soft: #f8dfe4;
+  --accent-soft-hover: #f1cbd2;
+  --border: #d8dee8;
+  --shadow: 0 14px 32px rgba(32, 39, 51, 0.1);
+  --green: #2f66c9;
+  --red: #b42335;
   --body-bg:
-    radial-gradient(circle at top left, rgba(138, 59, 18, 0.08), transparent 28%),
-    linear-gradient(160deg, #ede4d7 0%, #f9f7f2 58%, #edf3f0 100%);
+    radial-gradient(circle at top left, rgba(199, 51, 70, 0.08), transparent 28%),
+    linear-gradient(160deg, #eef1f5 0%, #fafbfc 58%, #f3f5f8 100%);
   --field-bg: #fff;
-  --surface-soft: #faf4ec;
-  --surface-subtle: #fffdf9;
-  --surface-overlay: rgba(255, 253, 249, 0.82);
-  --chip-bg: #f0e9df;
+  --surface-soft: #f3f5f8;
+  --surface-subtle: #f8fafc;
+  --surface-overlay: rgba(255, 255, 255, 0.86);
+  --chip-bg: #e9edf3;
   --warn-bg: #fff1d6;
   --warn-ink: #8a5200;
-  --success-soft: #e8f4ee;
-  --success-soft-hover: #d4eddf;
-  --danger-soft: #fde8e8;
-  --danger-soft-hover: #fbd5d5;
-  --toast-bg: rgba(255, 253, 249, 0.97);
+  --success-soft: #e7eefc;
+  --success-soft-hover: #d7e4fb;
+  --danger-soft: #fde8ec;
+  --danger-soft-hover: #fbd0d8;
+  --toast-bg: rgba(255, 255, 255, 0.98);
 }
 
 * { box-sizing: border-box; }
@@ -453,6 +453,54 @@ button.danger {
 
 .toast.error .toast-title {
   color: var(--red);
+}
+
+.auth-card {
+  max-width: 440px;
+}
+
+.user-row,
+.user-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.user-row:first-child {
+  border-top: 0;
+}
+
+.user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.migration-box {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--red);
+  border-radius: 12px;
+  background: var(--danger-soft);
+}
+
+.migration-box[hidden],
+.admin-only[hidden] {
+  display: none;
 }
 
 .toast.info .toast-title {

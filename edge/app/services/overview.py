@@ -45,4 +45,8 @@ def build_status_response(runner: EdgeRunner) -> dict[str, Any]:
 
 
 def build_directory_response(runner: EdgeRunner) -> dict[str, Any]:
-    return {"directories": runner.list_directories()}
+    return {
+        "scan_dir": os.getenv("SCAN_DIR", "/scan"),
+        "scan_root": str(runner.settings.scan_root),
+        "directories": runner.list_directories(),
+    }

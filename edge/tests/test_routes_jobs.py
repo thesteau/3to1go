@@ -58,6 +58,16 @@ class JobRoutesTests(unittest.TestCase):
         )
         self.settings.scan_root.mkdir(parents=True, exist_ok=True)
         self.client = TestClient(create_app(settings=self.settings, start_scheduler=False))
+        login = self.client.post(
+            "/api/session/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        password = self.client.post(
+            "/api/session/change-password",
+            json={"current_password": "", "new_password": "changed-admin"},
+        )
+        self.assertEqual(password.status_code, 200, password.text)
 
     def tearDown(self) -> None:
         self.client.close()

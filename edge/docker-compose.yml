@@ -8,6 +8,8 @@ services:
       - "6556:6556"
     volumes:
       - ./config:/config
+      - ./hook-scripts:/config/hook-scripts
+      # TODO(remove after migration window): legacy nested hook path.
       - ./hook-scripts:/config/RelayCentralizerEdge/hook-scripts
       - ${SCAN_DIR:-./scan}:/scan
       - ./state:/data/state

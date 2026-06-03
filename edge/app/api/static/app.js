@@ -10,6 +10,26 @@ const TOAST_DURATION_MS = 8000;
 const JOB_EVENT_LINGER_MS = 10000;
 const EDGE_REFRESH_MS = 2500;
 let _appDialogResolve = null;
+let currentUser = null;
+let _appStarted = false;
+let _migrationNoticeShown = false;
+const rawFetch = window.fetch.bind(window);
+
+window.fetch = async (...args) => {
+  const response = await rawFetch(...args);
+  const url = typeof args[0] === "string" ? args[0] : args[0]?.url || "";
+  if (!url.includes("/api/session/") && response.status === 401) {
+    openLoginDialog();
+  }
+  if (!url.includes("/api/session/") && response.status === 403) {
+    response.clone().json().then((body) => {
+      if (body.detail === "password change required") {
+        openPasswordDialog(true);
+      }
+    }).catch(() => {});
+  }
+  return response;
+};
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
   settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
@@ -136,6 +156,204 @@ function setStatus(id, message, kind = "info") {
 
 function clearStatus(id) {
   setStatus(id, "", "info");
+}
+
+async function readJson(response) {
+  return response.json().catch(() => ({}));
+}
+
+async function refreshSession() {
+  const response = await rawFetch("/api/session/me");
+  const body = await readJson(response);
+  currentUser = body.user || null;
+  return body.authenticated ? currentUser : null;
+}
+
+function openLoginDialog() {
+  clearStatus("login-status");
+  openDialog("login-dialog");
+  window.setTimeout(() => document.getElementById("login_password")?.focus(), 0);
+}
+
+async function loginUser() {
+  setStatus("login-status", "Signing in...", "info");
+  const response = await rawFetch("/api/session/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("login_username").value.trim(),
+      password: document.getElementById("login_password").value,
+    }),
+  });
+  const body = await readJson(response);
+  if (!response.ok) {
+    setStatus("login-status", body.detail || "Sign in failed.", "error");
+    return;
+  }
+  currentUser = body.user;
+  closeDialog("login-dialog");
+  document.getElementById("login_password").value = "";
+  if (currentUser.must_change_password) {
+    openPasswordDialog(true);
+    return;
+  }
+  startEdgeApp();
+}
+
+function openPasswordDialog(force = false) {
+  clearStatus("password-status");
+  document.getElementById("current_password").value = "";
+  document.getElementById("new_password").value = "";
+  document.getElementById("password-dialog-message").textContent = force
+    ? "The default admin password must be changed before continuing."
+    : "Update your password.";
+  document.getElementById("password-cancel").hidden = force;
+  openDialog("password-dialog");
+}
+
+async function changeOwnPassword() {
+  setStatus("password-status", "Saving...", "info");
+  const response = await rawFetch("/api/session/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      current_password: document.getElementById("current_password").value,
+      new_password: document.getElementById("new_password").value,
+    }),
+  });
+  const body = await readJson(response);
+  if (!response.ok) {
+    setStatus("password-status", body.detail || "Password change failed.", "error");
+    return;
+  }
+  currentUser = body.user;
+  closeDialog("password-dialog");
+  setActionStatus("Password updated.", "success");
+  startEdgeApp();
+}
+
+async function logoutUser() {
+  await rawFetch("/api/session/logout", { method: "POST" });
+  currentUser = null;
+  closeDialog("users-dialog");
+  openLoginDialog();
+}
+
+async function openUserManagementDialog() {
+  clearStatus("users-status");
+  openDialog("users-dialog");
+  await loadUsers();
+  await checkMigration();
+}
+
+async function loadUsers() {
+  const response = await fetch("/api/users");
+  const body = await readJson(response);
+  if (!response.ok) {
+    setStatus("users-status", body.detail || "Could not load users.", "error");
+    return;
+  }
+  renderUsers(body.users || []);
+}
+
+function renderUsers(users) {
+  const canAdmin = Boolean(currentUser?.is_admin);
+  document.getElementById("add-user-section").hidden = !canAdmin;
+  document.getElementById("users-list").innerHTML = users.map((user) => `
+    <div class="user-row">
+      <div>
+        <strong>${escapeHtml(user.username)}</strong>
+        ${user.is_admin ? '<span class="admin-pill">Admin</span>' : ""}
+        ${user.must_change_password ? '<span class="hint">Password change pending</span>' : ""}
+      </div>
+      <div>
+        ${canAdmin ? `<input id="user_username_${user.id}" value="${escapeHtml(user.username)}">` : ""}
+        <input id="user_password_${user.id}" type="password" placeholder="new password">
+        ${canAdmin ? `<label class="checkbox"><input id="user_admin_${user.id}" type="checkbox" ${user.is_admin ? "checked" : ""}><span>Admin</span></label>` : ""}
+      </div>
+      <div class="user-actions">
+        <button type="button" class="secondary" onclick="saveUser(${user.id})">Save</button>
+        ${canAdmin && user.username !== "admin" ? `<button type="button" class="danger" onclick="deleteUser(${user.id})">Remove</button>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function saveUser(userId) {
+  const payload = {
+    password: document.getElementById(`user_password_${userId}`).value || null,
+  };
+  if (currentUser?.is_admin) {
+    payload.username = document.getElementById(`user_username_${userId}`)?.value.trim() || null;
+    payload.is_admin = Boolean(document.getElementById(`user_admin_${userId}`)?.checked);
+  }
+  const response = await fetch(`/api/users/${userId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await readJson(response);
+  setStatus("users-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
+  if (response.ok) {
+    if (currentUser?.id === userId) currentUser = body.user;
+    await loadUsers();
+  }
+}
+
+async function createUser() {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: document.getElementById("new_user_username").value.trim(),
+      password: document.getElementById("new_user_password").value,
+      is_admin: document.getElementById("new_user_admin").checked,
+    }),
+  });
+  const body = await readJson(response);
+  setStatus("users-status", response.ok ? "User added." : (body.detail || "Add failed."), response.ok ? "success" : "error");
+  if (response.ok) {
+    document.getElementById("new_user_username").value = "";
+    document.getElementById("new_user_password").value = "";
+    document.getElementById("new_user_admin").checked = false;
+    await loadUsers();
+  }
+}
+
+async function deleteUser(userId) {
+  if (!await confirmApp({ title: "Remove User", message: "Remove this user?", confirmLabel: "Remove", danger: true })) {
+    return;
+  }
+  const response = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+  const body = await readJson(response);
+  setStatus("users-status", response.ok ? "User removed." : (body.detail || "Remove failed."), response.ok ? "success" : "error");
+  if (response.ok) await loadUsers();
+}
+
+async function checkMigration() {
+  if (!currentUser?.is_admin) return;
+  const response = await fetch("/api/migration");
+  if (!response.ok) return;
+  const migration = await response.json();
+  const box = document.getElementById("migration-box");
+  if (box) box.hidden = !migration.needed;
+  if (migration.needed && !_migrationNoticeShown) {
+    _migrationNoticeShown = true;
+    showToast("Legacy settings or nested folders need migration. Open Users & Access and run the migration soon.", "error", {
+      title: "Migration needed",
+      duration: 30000,
+    });
+  }
+}
+
+async function runMigration() {
+  const response = await fetch("/api/migration/run", { method: "POST" });
+  const body = await readJson(response);
+  setStatus("users-status", response.ok ? "Migration completed." : (body.detail || "Migration failed."), response.ok ? "success" : "error");
+  if (response.ok) {
+    setActionStatus("Migration completed.", "success");
+    await checkMigration();
+  }
 }
 
 function pause(ms) {
@@ -1435,10 +1653,35 @@ document.getElementById("hook_post_command")?.addEventListener("input", () => {
 });
 document.getElementById("recover-fingerprint")?.addEventListener("input", resetRecoverPreview);
 
+function startEdgeApp() {
+  if (_appStarted) return;
+  if (!currentUser) {
+    openLoginDialog();
+    return;
+  }
+  if (currentUser.must_change_password) {
+    openPasswordDialog(true);
+    return;
+  }
+  _appStarted = true;
+  resetForm();
+  initializeFieldHelp(EDGE_SETTINGS_HELP);
+  document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
+  initMeta();
+  loadData();
+  checkMigration();
+  window.setInterval(() => loadData({ silent: true, includeKey: false }), EDGE_REFRESH_MS);
+}
+
 applyTheme("dark");
-resetForm();
-initializeFieldHelp(EDGE_SETTINGS_HELP);
-document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
-initMeta();
-loadData();
-window.setInterval(() => loadData({ silent: true, includeKey: false }), EDGE_REFRESH_MS);
+refreshSession().then((user) => {
+  if (!user) {
+    openLoginDialog();
+    return;
+  }
+  if (user.must_change_password) {
+    openPasswordDialog(true);
+    return;
+  }
+  startEdgeApp();
+});

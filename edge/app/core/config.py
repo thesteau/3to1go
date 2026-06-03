@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,9 @@ def _default_scan_root() -> Path:
 
 
 def _default_config_dir() -> Path:
+    if _uses_container_layout():
+        return Path("/config")
+
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Library" / "Application Support" / APP_DIR_NAME
@@ -42,6 +46,9 @@ def _default_config_dir() -> Path:
 
 
 def _default_state_dir() -> Path:
+    if os.getenv("XDG_STATE_HOME", "").strip() == "/data/state":
+        return Path("/data/state")
+
     home = Path.home()
     if sys.platform == "darwin":
         return _default_config_dir() / "state"
@@ -53,6 +60,9 @@ def _default_state_dir() -> Path:
 
 
 def _default_spool_dir() -> Path:
+    if os.getenv("XDG_CACHE_HOME", "").strip() == "/data/cache":
+        return Path("/data/spool")
+
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Library" / "Caches" / APP_DIR_NAME / "spool"
@@ -166,16 +176,44 @@ def settings_storage_path() -> Path:
     return _settings_path()
 
 
+def legacy_settings_storage_path() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "settings.json"
+
+
+def app_database_path() -> Path:
+    return _default_config_dir() / "relaycentralizer-edge.db"
+
+
 def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
+
+
+def legacy_hook_scripts_dir() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "hook-scripts"
+
+
+def legacy_state_dir() -> Path:
+    return Path("/data/state") / APP_DIR_NAME if os.getenv("XDG_STATE_HOME", "").strip() == "/data/state" else _default_state_dir() / APP_DIR_NAME
+
+
+def legacy_spool_dir() -> Path:
+    return Path("/data/cache") / APP_DIR_NAME / "spool"
 
 
 def encryption_key_path() -> Path:
     return _default_config_dir() / "encryption.key"
 
 
+def legacy_encryption_key_path() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "encryption.key"
+
+
 def installation_id_path() -> Path:
     return _default_config_dir() / "installation.id"
+
+
+def legacy_installation_id_path() -> Path:
+    return _default_config_dir() / APP_DIR_NAME / "installation.id"
 
 
 def _resolve_auth_token_file_path(value: str) -> Path:
@@ -308,16 +346,40 @@ def _env_overrides() -> dict[str, Any]:
 
 
 def load_settings() -> Settings:
-    path = _settings_path()
     payload: dict[str, Any] = {}
 
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                payload = data
-        except (json.JSONDecodeError, OSError):
-            pass
+    db_payload = _load_settings_payload_from_database()
+    if db_payload:
+        payload = db_payload
+    else:
+        for path in (settings_storage_path(), legacy_settings_storage_path()):
+            if not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    payload = data
+                    break
+            except (json.JSONDecodeError, OSError):
+                pass
 
     payload.update(_env_overrides())
     return build_settings(payload)
+
+
+def _load_settings_payload_from_database() -> dict[str, Any]:
+    path = app_database_path()
+    if not path.exists():
+        return {}
+    try:
+        with sqlite3.connect(path) as conn:
+            row = conn.execute("SELECT payload FROM app_settings WHERE key = ?", ("settings",)).fetchone()
+    except sqlite3.Error:
+        return {}
+    if row is None:
+        return {}
+    try:
+        data = json.loads(row[0])
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
