@@ -1,5 +1,6 @@
 services:
   edge:
+    container_name: relay-edge
     build: .
     env_file:
       - ./.env

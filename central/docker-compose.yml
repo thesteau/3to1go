@@ -1,5 +1,6 @@
 services:
   central:
+    container_name: relay-central
     build: .
     env_file:
       - ./.env
@@ -22,6 +23,7 @@ services:
         max-file: "3"
 
   postgres:
+    container_name: relay-central-db
     image: postgres:17-alpine
     env_file:
       - ./.env

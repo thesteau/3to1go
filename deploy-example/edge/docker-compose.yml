@@ -1,5 +1,6 @@
 services:
   edge:
+    container_name: relay-edge
     image: ghcr.io/thesteau/relay-centralizer-edge:latest
     env_file:
       - ./.env
