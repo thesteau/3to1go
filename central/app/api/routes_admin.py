@@ -3,7 +3,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app.services.settings_store import SettingsStore
 from app.services.user_store import SESSION_COOKIE, UserStore
 
 
@@ -35,10 +34,6 @@ class UserUpdateInput(BaseModel):
 
 def get_user_store(request: Request) -> UserStore:
     return request.app.state.user_store
-
-
-def get_settings_store(request: Request) -> SettingsStore:
-    return request.app.state.settings_store
 
 
 def current_user(request: Request) -> dict:
@@ -157,18 +152,3 @@ async def delete_user(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok"}
 
-
-@router.get("/api/migration")
-async def migration_status(
-    _admin: dict = Depends(admin_user),
-    settings_store: SettingsStore = Depends(get_settings_store),
-) -> dict:
-    return settings_store.migration_status()
-
-
-@router.post("/api/migration/run")
-async def run_migration(
-    _admin: dict = Depends(admin_user),
-    settings_store: SettingsStore = Depends(get_settings_store),
-) -> dict:
-    return settings_store.run_migration()

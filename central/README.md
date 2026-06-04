@@ -22,9 +22,9 @@ Central is responsible for:
 
 Central stores what Edge sends. If Edge encryption is enabled, Central stores encrypted blobs and never sees plaintext.
 
-Central can also keep its internal metadata in PostgreSQL on the Central machine. That metadata covers the snapshot index (`.relay_index`) and Edge registration registry (`.relay_registry`). Edge does not connect to that database directly.
+Central keeps its internal metadata in PostgreSQL on the Central machine. That database covers the snapshot index, Edge registration registry, users, and saved runtime settings. Edge does not connect to that database directly.
 
-Central also keeps its own advanced runtime settings in a local config file. In the bundled Docker layout that file lives under the mounted `./config` volume, so values changed in the UI persist across `docker compose down` and `docker compose up`.
+Central also keeps its own advanced runtime settings in its database. In the bundled Docker layout the database lives under persistent volumes, so values changed in the UI persist across `docker compose down` and `docker compose up`.
 
 ## First-Time Setup
 
@@ -51,8 +51,8 @@ Open the UI at `http://localhost:6555/`.
 
 That deploy example already includes:
 
-- a PostgreSQL sidecar for Central metadata
-- mounted storage for backups, staging, metadata, secrets, and Central's saved UI config
+- a PostgreSQL sidecar for Central metadata, users, and saved runtime settings
+- mounted storage for backups, staging, metadata, and secrets
 - the user-facing `.env.example` with only the essentials
 
 If you are contributing and want to build from this repo instead, use the bundled files in [`central/`](./):
@@ -125,19 +125,16 @@ If you want off-site or cloud copies, the intended pattern is to sync `BACKUP_RO
 
 Final snapshot archives still live on disk under `BACKUP_ROOT`.
 
-Central's internal metadata can use either:
+Central requires PostgreSQL on the Central host for internal metadata, users, and saved runtime settings.
 
-- file-backed metadata under `.relay_index` and `.relay_registry`
-- PostgreSQL on the Central host for those same metadata records
-
-When PostgreSQL credentials are configured, Central imports existing file-backed metadata into PostgreSQL on startup so the UI and duplicate detection keep working with existing snapshots.
+Existing snapshot files remain on disk under `BACKUP_ROOT`; Central stores the live snapshot index and Edge registry in PostgreSQL.
 
 ### Settings precedence
 
 Central uses two different configuration sources on purpose:
 
 - Infrastructure settings come from the environment and Docker layout: auth token file, PostgreSQL credentials, backup root, staging dir, and the HTTP bind.
-- Operator settings come from Central's saved config file: retention, logging level, upload limits, upload session TTL, and cleanup interval.
+- Operator settings come from Central's database: retention, logging level, upload limits, upload session TTL, and cleanup interval.
 
 That means `docker compose down` and `docker compose up` do not reset the UI-edited Central settings, because those values are not being pulled from the env file anymore.
 
@@ -170,10 +167,10 @@ These are the environment variables most people care about first:
 | Variable | Default | What it means |
 | --- | --- | --- |
 | `AUTH_TOKEN_FILE` | `/run/secrets/relay_auth_token` in the contributor Compose, `relay_auth_token` in the deploy example | File containing the shared bearer token |
-| `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata |
-| `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata |
+| `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata, users, and settings |
+| `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata, users, and settings |
 
-These Central values are edited in the Central UI and saved in Central's config file instead of `.env`:
+These Central values are edited in the Central UI and saved in Central's database instead of `.env`:
 
 | Setting in Central UI | Default |
 | --- | --- |
@@ -225,7 +222,7 @@ The bundled Compose example mounts:
 
 - `./data/backups` to `/backups`
 - `./data/staging` to `/staging`
-- `./data/postgres` for PostgreSQL metadata storage
+- `./data/postgres` for PostgreSQL metadata, users, and settings
 - `./secrets` to `/run/secrets`
 
 After the first start, Central writes the generated token to `./secrets/relay_auth_token`.

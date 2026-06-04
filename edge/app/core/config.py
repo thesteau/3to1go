@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import sys
@@ -75,22 +74,12 @@ def _default_spool_dir() -> Path:
 
 def _normalize_state_dir(value: Any) -> Path:
     raw = _coerce_text(value, str(_default_state_dir()))
-    path = Path(raw).expanduser()
-    if _uses_container_layout() and path == legacy_state_dir():
-        return _default_state_dir()
-    return path
+    return Path(raw).expanduser()
 
 
 def _normalize_spool_dir(value: Any) -> Path:
     raw = _coerce_text(value, str(_default_spool_dir()))
-    path = Path(raw).expanduser()
-    if _uses_container_layout() and path == legacy_spool_dir():
-        return _default_spool_dir()
-    return path
-
-
-def _settings_path() -> Path:
-    return _default_config_dir() / "settings.json"
+    return Path(raw).expanduser()
 
 
 def _coerce_bool(value: Any, default: bool) -> bool:
@@ -188,14 +177,6 @@ class Settings:
         return self.max_upload_chunk_size_mb * 1024 * 1024
 
 
-def settings_storage_path() -> Path:
-    return _settings_path()
-
-
-def legacy_settings_storage_path() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "settings.json"
-
-
 def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer-edge.db"
 
@@ -204,32 +185,12 @@ def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
 
 
-def legacy_hook_scripts_dir() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "hook-scripts"
-
-
-def legacy_state_dir() -> Path:
-    return Path("/data/state") / APP_DIR_NAME if os.getenv("XDG_STATE_HOME", "").strip() == "/data/state" else _default_state_dir() / APP_DIR_NAME
-
-
-def legacy_spool_dir() -> Path:
-    return Path("/data/cache") / APP_DIR_NAME / "spool"
-
-
 def encryption_key_path() -> Path:
     return _default_config_dir() / "encryption.key"
 
 
-def legacy_encryption_key_path() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "encryption.key"
-
-
 def installation_id_path() -> Path:
     return _default_config_dir() / "installation.id"
-
-
-def legacy_installation_id_path() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "installation.id"
 
 
 def _resolve_auth_token_file_path(value: str) -> Path:
@@ -362,23 +323,7 @@ def _env_overrides() -> dict[str, Any]:
 
 
 def load_settings() -> Settings:
-    payload: dict[str, Any] = {}
-
-    db_payload = _load_settings_payload_from_database()
-    if db_payload:
-        payload = db_payload
-    else:
-        for path in (settings_storage_path(), legacy_settings_storage_path()):
-            if not path.exists():
-                continue
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    payload = data
-                    break
-            except (json.JSONDecodeError, OSError):
-                pass
-
+    payload = _load_settings_payload_from_database()
     payload.update(_env_overrides())
     return build_settings(payload)
 
@@ -387,15 +332,21 @@ def _load_settings_payload_from_database() -> dict[str, Any]:
     path = app_database_path()
     if not path.exists():
         return {}
+    conn: sqlite3.Connection | None = None
     try:
-        with sqlite3.connect(path) as conn:
-            row = conn.execute("SELECT payload FROM app_settings WHERE key = ?", ("settings",)).fetchone()
+        conn = sqlite3.connect(path)
+        row = conn.execute("SELECT payload FROM app_settings WHERE key = ?", ("settings",)).fetchone()
     except sqlite3.Error:
         return {}
+    finally:
+        if conn is not None:
+            conn.close()
     if row is None:
         return {}
     try:
+        import json
+
         data = json.loads(row[0])
-    except (TypeError, json.JSONDecodeError):
+    except (TypeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}

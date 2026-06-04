@@ -15,7 +15,6 @@ const ACTIVE_JOB_STATUSES = new Set(["scanning", "compressing", "encrypting", "a
 let _appDialogResolve = null;
 let currentUser = null;
 let _appStarted = false;
-let _migrationNoticeShown = false;
 let _edgeRefreshTimer = null;
 let _edgeAutoRefreshStarted = false;
 const rawFetch = window.fetch.bind(window);
@@ -301,7 +300,6 @@ async function openUserManagementDialog() {
   clearStatus("users-status");
   openDialog("users-dialog");
   await loadUsers();
-  await checkMigration();
 }
 
 async function loadUsers() {
@@ -421,32 +419,6 @@ async function deleteUser(userId) {
   const body = await readJson(response);
   setStatus("users-status", response.ok ? "User removed." : (body.detail || "Remove failed."), response.ok ? "success" : "error");
   if (response.ok) await loadUsers();
-}
-
-async function checkMigration() {
-  if (!currentUser?.is_admin) return;
-  const response = await fetch("/api/migration");
-  if (!response.ok) return;
-  const migration = await response.json();
-  const box = document.getElementById("migration-box");
-  if (box) box.hidden = !migration.needed;
-  if (migration.needed && !_migrationNoticeShown) {
-    _migrationNoticeShown = true;
-    showToast("Legacy settings or nested folders need migration. Open Users & Access and run the migration soon.", "error", {
-      title: "Migration needed",
-      duration: 30000,
-    });
-  }
-}
-
-async function runMigration() {
-  const response = await fetch("/api/migration/run", { method: "POST" });
-  const body = await readJson(response);
-  setStatus("users-status", response.ok ? "Migration completed." : (body.detail || "Migration failed."), response.ok ? "success" : "error");
-  if (response.ok) {
-    setActionStatus("Migration completed.", "success");
-    await checkMigration();
-  }
 }
 
 function pause(ms) {
@@ -1795,7 +1767,6 @@ function startEdgeApp() {
   });
   initMeta();
   loadData();
-  checkMigration();
   _edgeAutoRefreshStarted = true;
   scheduleEdgeRefresh(EDGE_IDLE_REFRESH_MS);
 }

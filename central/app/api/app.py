@@ -29,10 +29,12 @@ from app.storage.factory import build_storage_backend
 
 def create_app(settings: Settings | None = None, user_store_path: Path | None = None) -> FastAPI:
     settings = settings or load_settings()
+    if not settings.index_database_url and user_store_path is None:
+        raise RuntimeError("Central requires PostgreSQL. Tests may pass user_store_path for an isolated SQLite app database.")
     logger = configure_logging(settings.log_level)
     storage_backend = build_storage_backend(settings)
     snapshot_index = build_snapshot_index_backend(settings)
-    settings_store = SettingsStore(database_url=settings.index_database_url)
+    settings_store = SettingsStore(database_url=settings.index_database_url, sqlite_path=user_store_path)
     user_store = UserStore(database_url=settings.index_database_url, sqlite_path=user_store_path or app_database_path())
     hook_manager = HookManager(hook_scripts_dir(), logger)
     ntfy_publisher = NtfyPublisher(logger)

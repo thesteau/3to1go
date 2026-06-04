@@ -47,7 +47,9 @@ class HealthcheckTests(unittest.TestCase):
             http_host="127.0.0.1",
             http_port=6555,
         )
-        self.client = TestClient(create_app(settings=self.settings))
+        self.client = TestClient(
+            create_app(settings=self.settings, user_store_path=self.temp_dir / "central-users.db")
+        )
 
     def tearDown(self) -> None:
         self.client.close()

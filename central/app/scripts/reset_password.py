@@ -5,7 +5,7 @@ import getpass
 import os
 import sys
 
-from app.core.config import app_database_path, load_settings
+from app.core.config import load_settings
 from app.services.user_store import UserStore
 
 
@@ -18,7 +18,7 @@ def main() -> int:
 
     password = _read_password(args.password_env)
     settings = load_settings()
-    store = UserStore(database_url=settings.index_database_url, sqlite_path=app_database_path())
+    store = UserStore(database_url=settings.index_database_url)
     user = store.get_user_by_username(args.username)
     if user is None:
         print(f"User not found: {args.username}", file=sys.stderr)

@@ -12,8 +12,6 @@ services:
     volumes:
       - ./config:/config
       - ./hook-scripts:/config/hook-scripts
-      # TODO(remove after migration window): legacy nested hook path.
-      - ./hook-scripts:/config/RelayCentralizerCentral/hook-scripts
       - ${BACKUP_DIR:-./data/backups}:/backups
       - ./data/staging:/staging
       - ./secrets:/run/secrets
@@ -35,7 +33,7 @@ services:
       test:
         - CMD-SHELL
         - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
     restart: unless-stopped

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -18,7 +16,7 @@ from app.core import config  # noqa: E402
 
 class ConfigTests(unittest.TestCase):
     def test_build_settings_defaults_http_port_to_6555(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"POSTGRES_USER": "relay", "POSTGRES_PASSWORD": "secret"}, clear=True):
             with patch.object(config, "load_auth_token", return_value="secret"):
                 settings = config.build_settings({})
 
@@ -67,69 +65,31 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(url, "postgresql://relay-index:secret-index@postgres:5432/relaycentral")
 
-    def test_build_index_database_url_returns_none_without_credentials(self) -> None:
+    def test_build_index_database_url_requires_credentials(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            url = config._build_index_database_url()
+            with self.assertRaises(RuntimeError):
+                config._build_index_database_url()
 
-        self.assertIsNone(url)
-
-    def test_load_settings_reads_saved_config_and_ignores_env_for_ui_managed_values(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            settings_path = temp_path / "settings.json"
-            auth_token_path = temp_path / "relay_auth_token"
-            auth_token_path.write_text("secret\n", encoding="utf-8")
-            settings_path.write_text(
-                json.dumps(
-                    {
-                        "retention_keep_last": 9,
-                        "log_level": "ERROR",
-                        "max_upload_size_mb": 777,
-                        "upload_chunk_size_mb": 12,
-                        "upload_session_ttl_hours": 36,
-                        "upload_cleanup_interval_seconds": 900,
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            with patch.object(config, "settings_storage_path", return_value=settings_path):
-                with patch.dict(
-                    os.environ,
-                    {
-                        "AUTH_TOKEN_FILE": str(auth_token_path),
-                        "RETENTION_KEEP_LAST": "2",
-                        "LOG_LEVEL": "DEBUG",
-                        "MAX_UPLOAD_SIZE_MB": "100",
-                        "UPLOAD_CHUNK_SIZE_MB": "2",
-                        "UPLOAD_SESSION_TTL_HOURS": "12",
-                        "UPLOAD_CLEANUP_INTERVAL_SECONDS": "60",
-                    },
-                    clear=True,
-                ):
-                    settings = config.load_settings()
-
-        self.assertEqual(settings.retention_keep_last, 9)
-        self.assertEqual(settings.log_level, "ERROR")
-        self.assertEqual(settings.max_upload_size_mb, 777)
-        self.assertEqual(settings.upload_chunk_size_mb, 12)
-        self.assertEqual(settings.upload_session_ttl_hours, 36)
-        self.assertEqual(settings.upload_cleanup_interval_seconds, 900)
+    def test_load_settings_requires_postgres_credentials(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(RuntimeError):
+                config.load_settings()
 
     def test_build_settings_uses_ntfy_and_hook_values_from_payload(self) -> None:
         with patch.object(config, "load_auth_token", return_value="secret"):
-            settings = config.build_settings(
-                {
-                    "ntfy_url": "https://saved.example.com",
-                    "ntfy_topic": "saved-topic",
-                    "ntfy_message_template": "Hello {{ edge_id }}",
-                    "ntfy_match_edge_id": "edge-01",
-                    "ntfy_match_edge_instance_id": "edgeinstance0001",
-                    "ntfy_match_source": "192.168.1.10",
-                    "hook_pre_command": "saved-pre.sh",
-                    "hook_post_command": "saved-post.sh",
-                }
-            )
+            with patch.dict(os.environ, {"POSTGRES_USER": "relay", "POSTGRES_PASSWORD": "secret"}, clear=True):
+                settings = config.build_settings(
+                    {
+                        "ntfy_url": "https://saved.example.com",
+                        "ntfy_topic": "saved-topic",
+                        "ntfy_message_template": "Hello {{ edge_id }}",
+                        "ntfy_match_edge_id": "edge-01",
+                        "ntfy_match_edge_instance_id": "edgeinstance0001",
+                        "ntfy_match_source": "192.168.1.10",
+                        "hook_pre_command": "saved-pre.sh",
+                        "hook_post_command": "saved-post.sh",
+                    }
+                )
 
         self.assertEqual(settings.ntfy_url, "https://saved.example.com")
         self.assertEqual(settings.ntfy_topic, "saved-topic")

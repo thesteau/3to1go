@@ -120,12 +120,11 @@ let _centralNtfyConfig = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 const TOAST_DURATION_MS = 8000;
-const CENTRAL_REFRESH_MS = 5000;
+const CENTRAL_REFRESH_MS = 15000;
 let _appDialogResolve = null;
 let _knownSnapshotKeys = null;
 let currentUser = null;
 let _appStarted = false;
-let _migrationNoticeShown = false;
 const rawFetch = window.fetch.bind(window);
 
 window.fetch = async (...args) => {
@@ -303,7 +302,6 @@ async function openUserManagementDialog() {
   clearStatus("users-status");
   openDialog("users-dialog");
   await loadUsers();
-  await checkMigration();
 }
 
 async function loadUsers() {
@@ -423,32 +421,6 @@ async function deleteUser(userId) {
   const body = await readJson(response);
   setStatus("users-status", response.ok ? "User removed." : (body.detail || "Remove failed."), response.ok ? "success" : "error");
   if (response.ok) await loadUsers();
-}
-
-async function checkMigration() {
-  if (!currentUser?.is_admin) return;
-  const response = await fetch("/api/migration");
-  if (!response.ok) return;
-  const migration = await response.json();
-  const box = document.getElementById("migration-box");
-  if (box) box.hidden = !migration.needed;
-  if (migration.needed && !_migrationNoticeShown) {
-    _migrationNoticeShown = true;
-    showToast("Legacy settings or nested folders need migration. Open Users & Access and run the migration soon.", "error", {
-      title: "Migration needed",
-      duration: 30000,
-    });
-  }
-}
-
-async function runMigration() {
-  const response = await fetch("/api/migration/run", { method: "POST" });
-  const body = await readJson(response);
-  setStatus("users-status", response.ok ? "Migration completed." : (body.detail || "Migration failed."), response.ok ? "success" : "error");
-  if (response.ok) {
-    setActionStatus("Migration completed.", "success");
-    await checkMigration();
-  }
 }
 
 function pause(ms) {
@@ -1438,7 +1410,6 @@ function startCentralApp() {
   }
   _appStarted = true;
   loadOverview({ force: true });
-  checkMigration();
   window.setInterval(() => loadOverview({ silent: true, notifyNewSnapshots: true }), CENTRAL_REFRESH_MS);
 }
 

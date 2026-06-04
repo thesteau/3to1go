@@ -94,7 +94,7 @@ Key locations by install type:
 
 | Method | Location |
 | --- | --- |
-| Docker | `/config/RelayCentralizerEdge/encryption.key` |
+| Docker | `/config/encryption.key` |
 | Linux native | `~/.config/RelayCentralizerEdge/encryption.key` |
 | macOS native | `~/Library/Application Support/RelayCentralizerEdge/encryption.key` |
 | Windows native | `%APPDATA%\RelayCentralizerEdge\encryption.key` |
@@ -123,7 +123,7 @@ docker compose exec -e RESET_PASSWORD='new-temporary-password' edge python -m ap
 
 Edge can get the shared auth token in two ways:
 
-- entered in the Edge UI and stored in local `settings.json`
+- entered in the Edge UI and stored in the local Edge database
 - preloaded from `AUTH_TOKEN_FILE`, which is how the bundled Docker examples work
 
 - The token must match Central's token.

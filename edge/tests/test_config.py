@@ -35,7 +35,7 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(settings.scan_root.as_posix().endswith("/scan"))
         self.assertEqual(settings.http_host, "0.0.0.0")
 
-    def test_build_settings_normalizes_legacy_container_state_paths(self) -> None:
+    def test_build_settings_preserves_explicit_state_paths(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -47,13 +47,13 @@ class ConfigTests(unittest.TestCase):
         ):
             settings = config.build_settings(
                 {
-                    "state_dir": "/data/state/RelayCentralizerEdge",
-                    "spool_dir": "/data/cache/RelayCentralizerEdge/spool",
+                    "state_dir": "/custom/state",
+                    "spool_dir": "/custom/spool",
                 }
             )
 
-        self.assertEqual(settings.state_dir, Path("/data/state"))
-        self.assertEqual(settings.spool_dir, Path("/data/spool"))
+        self.assertEqual(settings.state_dir, Path("/custom/state"))
+        self.assertEqual(settings.spool_dir, Path("/custom/spool"))
 
     def test_resolve_auth_token_file_path_uses_secret_dir_for_bare_filename(self) -> None:
         resolved = config._resolve_auth_token_file_path("relay_auth_token")

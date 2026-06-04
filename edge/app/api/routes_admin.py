@@ -3,8 +3,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app.services.settings_store import SettingsStore
-from app.services.scheduler import SchedulerController
 from app.services.user_store import SESSION_COOKIE, UserStore
 
 
@@ -36,14 +34,6 @@ class UserUpdateInput(BaseModel):
 
 def get_user_store(request: Request) -> UserStore:
     return request.app.state.user_store
-
-
-def get_settings_store(request: Request) -> SettingsStore:
-    return request.app.state.runner.settings_store
-
-
-def get_scheduler(request: Request) -> SchedulerController:
-    return request.app.state.scheduler
 
 
 def current_user(request: Request) -> dict:
@@ -162,24 +152,3 @@ async def delete_user(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok"}
 
-
-@router.get("/api/migration")
-async def migration_status(
-    _admin: dict = Depends(admin_user),
-    settings_store: SettingsStore = Depends(get_settings_store),
-) -> dict:
-    return settings_store.migration_status()
-
-
-@router.post("/api/migration/run")
-async def run_migration(
-    request: Request,
-    _admin: dict = Depends(admin_user),
-    settings_store: SettingsStore = Depends(get_settings_store),
-    scheduler: SchedulerController = Depends(get_scheduler),
-) -> dict:
-    result = settings_store.run_migration()
-    runner = request.app.state.runner
-    runner.save_settings(runner.settings_store.snapshot(runner.settings))
-    scheduler.reload_settings()
-    return result

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
 from dataclasses import dataclass
@@ -32,24 +31,12 @@ def _default_config_dir() -> Path:
     return home / ".config" / APP_DIR_NAME
 
 
-def settings_storage_path() -> Path:
-    return _default_config_dir() / "settings.json"
-
-
-def legacy_settings_storage_path() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "settings.json"
-
-
 def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
 
 
 def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
-
-
-def legacy_hook_scripts_dir() -> Path:
-    return _default_config_dir() / APP_DIR_NAME / "hook-scripts"
 
 
 def _coerce_int(value: Any, default: int, minimum: int) -> int:
@@ -164,7 +151,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     )
 
 
-def _build_index_database_url() -> str | None:
+def _build_index_database_url() -> str:
     explicit_url = os.getenv("INDEX_DATABASE_URL", "").strip()
     if explicit_url:
         return explicit_url
@@ -172,7 +159,7 @@ def _build_index_database_url() -> str | None:
     username = os.getenv("INDEX_DATABASE_USER", "").strip() or os.getenv("POSTGRES_USER", "").strip()
     password = os.getenv("INDEX_DATABASE_PASSWORD", "").strip() or os.getenv("POSTGRES_PASSWORD", "").strip()
     if not username or not password:
-        return None
+        raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
 
     host = os.getenv("INDEX_DATABASE_HOST", "postgres").strip() or "postgres"
     port = os.getenv("INDEX_DATABASE_PORT", "5432").strip() or "5432"
@@ -186,7 +173,7 @@ def _build_index_database_url() -> str | None:
 
 def _load_settings_payload_from_database(database_url: str | None) -> dict[str, Any]:
     if not database_url:
-        return {}
+        raise RuntimeError("Central requires PostgreSQL for saved app settings.")
     try:
         import psycopg
     except ImportError:
@@ -203,25 +190,7 @@ def _load_settings_payload_from_database(database_url: str | None) -> dict[str, 
     return payload if isinstance(payload, dict) else {}
 
 
-def _load_settings_payload_from_json() -> dict[str, Any]:
-    paths = [settings_storage_path()]
-    try:
-        paths.append(legacy_settings_storage_path())
-    except RuntimeError:
-        pass
-    for path in paths:
-        if not path.exists():
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return data
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {}
-
-
 def load_settings() -> Settings:
     database_url = _build_index_database_url()
-    payload = _load_settings_payload_from_database(database_url) or _load_settings_payload_from_json()
+    payload = _load_settings_payload_from_database(database_url)
     return build_settings(payload)

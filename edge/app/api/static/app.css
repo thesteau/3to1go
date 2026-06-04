@@ -746,15 +746,6 @@ textarea {
   font-weight: 700;
 }
 
-.migration-box {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid var(--danger);
-  border-radius: 12px;
-  background: var(--danger-soft);
-}
-
-.migration-box[hidden],
 .admin-only[hidden] {
   display: none;
 }
