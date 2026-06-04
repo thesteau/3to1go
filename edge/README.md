@@ -101,6 +101,24 @@ Key locations by install type:
 
 ## Auth And Identity
 
+### Web UI accounts
+
+The Edge web UI starts with the default account `admin` / `admin`. On first sign-in, change it immediately. The password change form requires the current password, a new password, and confirmation of the new password. Passwords must be at least 5 characters and cannot be only spaces. Any account using `admin` as its password is always forced to change it after sign-in.
+
+Admins can add users, remove users, reset other users' passwords, and assign admin access from **Users & Access**. When an admin resets another user's password, that user is signed out and must change the temporary password on next sign-in.
+
+If every admin password is lost, reset a password from the server/container:
+
+```bash
+docker compose exec edge python -m app.scripts.reset_password admin
+```
+
+The command prompts for the new password twice, clears active sessions for that user, and requires the user to change the password after signing in. For automation, provide the password through an environment variable:
+
+```bash
+docker compose exec -e RESET_PASSWORD='new-temporary-password' edge python -m app.scripts.reset_password admin --password-env RESET_PASSWORD
+```
+
 ### Shared token
 
 Edge can get the shared auth token in two ways:

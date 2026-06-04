@@ -57,6 +57,37 @@ class AuthTokenTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.delete_user(admin["id"])
 
+    def test_user_store_rejects_wrong_current_password(self) -> None:
+        store = UserStore(sqlite_path=self.temp_dir / "central-current-password.db")
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+
+        with self.assertRaises(ValueError):
+            store.change_password(admin["id"], current_password="wrong", new_password="changed-admin")
+
+    def test_user_store_rejects_short_or_space_only_passwords(self) -> None:
+        store = UserStore(sqlite_path=self.temp_dir / "central-password-policy.db")
+
+        with self.assertRaises(ValueError):
+            store.create_user("short", "abcd")
+        with self.assertRaises(ValueError):
+            store.create_user("blank", "     ")
+        created = store.create_user("words", "words")
+
+        self.assertEqual(created["username"], "words")
+
+    def test_user_store_always_requires_change_for_default_password(self) -> None:
+        store = UserStore(sqlite_path=self.temp_dir / "central-default-password.db")
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+        updated = store.update_user(admin["id"], password="admin", must_change_password=False)
+        self.assertTrue(updated["must_change_password"])
+
+        logged_in = store.authenticate("admin", "admin")
+
+        self.assertIsNotNone(logged_in)
+        self.assertTrue(logged_in["must_change_password"])
+
 
 if __name__ == "__main__":
     unittest.main()

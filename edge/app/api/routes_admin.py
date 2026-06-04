@@ -18,12 +18,13 @@ class LoginInput(BaseModel):
 
 class PasswordChangeInput(BaseModel):
     current_password: str = ""
-    new_password: str = Field(min_length=4)
+    new_password: str = Field(min_length=5)
+    confirm_new_password: str = Field(min_length=5)
 
 
 class UserInput(BaseModel):
     username: str
-    password: str = Field(min_length=4)
+    password: str = Field(min_length=5)
     is_admin: bool = False
 
 
@@ -87,12 +88,13 @@ async def change_password(
     user: dict = Depends(current_user),
     user_store: UserStore = Depends(get_user_store),
 ) -> dict:
+    if payload.new_password != payload.confirm_new_password:
+        raise HTTPException(status_code=400, detail="new passwords do not match")
     try:
         updated = user_store.change_password(
             user["id"],
             payload.current_password,
             payload.new_password,
-            require_current=not user.get("must_change_password"),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -139,8 +141,10 @@ async def update_user(
             username=payload.username,
             password=payload.password if user.get("is_admin") else None,
             is_admin=payload.is_admin if user.get("is_admin") else None,
-            must_change_password=False if payload.password else None,
+            must_change_password=True if payload.password else None,
         )
+        if payload.password:
+            user_store.delete_sessions_for_user(user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "user": updated}

@@ -141,9 +141,8 @@ class ConfigTests(unittest.TestCase):
         self.assertIsNotNone(admin)
         first_store.change_password(
             admin["id"],
-            current_password="",
+            current_password="admin",
             new_password="changed-admin",
-            require_current=False,
         )
 
         second_store = UserStore(sqlite_path=db_path)
@@ -151,6 +150,43 @@ class ConfigTests(unittest.TestCase):
         changed = second_store.authenticate("admin", "changed-admin")
         self.assertIsNotNone(changed)
         self.assertFalse(changed["must_change_password"])
+
+    def test_user_store_rejects_wrong_current_password(self) -> None:
+        db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users-current-password.db"
+        db_path.unlink(missing_ok=True)
+        store = UserStore(sqlite_path=db_path)
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+
+        with self.assertRaises(ValueError):
+            store.change_password(admin["id"], current_password="wrong", new_password="changed-admin")
+
+    def test_user_store_rejects_short_or_space_only_passwords(self) -> None:
+        db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users-password-policy.db"
+        db_path.unlink(missing_ok=True)
+        store = UserStore(sqlite_path=db_path)
+
+        with self.assertRaises(ValueError):
+            store.create_user("short", "abcd")
+        with self.assertRaises(ValueError):
+            store.create_user("blank", "     ")
+        created = store.create_user("words", "words")
+
+        self.assertEqual(created["username"], "words")
+
+    def test_user_store_always_requires_change_for_default_password(self) -> None:
+        db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users-default-password.db"
+        db_path.unlink(missing_ok=True)
+        store = UserStore(sqlite_path=db_path)
+        admin = store.authenticate("admin", "admin")
+        self.assertIsNotNone(admin)
+        updated = store.update_user(admin["id"], password="admin", must_change_password=False)
+        self.assertTrue(updated["must_change_password"])
+
+        logged_in = store.authenticate("admin", "admin")
+
+        self.assertIsNotNone(logged_in)
+        self.assertTrue(logged_in["must_change_password"])
 
     def test_user_store_keeps_bootstrap_user_admin_after_rename(self) -> None:
         db_path = PROJECT_ROOT / ".tmp-test-config" / "edge-users-bootstrap.db"

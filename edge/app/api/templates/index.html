@@ -89,7 +89,9 @@
       <label for="current_password">Current Password</label>
       <input id="current_password" type="password" autocomplete="current-password">
       <label for="new_password">New Password</label>
-      <input id="new_password" type="password" autocomplete="new-password">
+      <input id="new_password" type="password" autocomplete="new-password" minlength="5">
+      <label for="confirm_new_password">Confirm New Password</label>
+      <input id="confirm_new_password" type="password" autocomplete="new-password" minlength="5">
       <div class="toolbar">
         <button type="button" onclick="changeOwnPassword()">Save Password</button>
         <button type="button" class="secondary" id="password-cancel" onclick="closeDialog('password-dialog')">Cancel</button>
@@ -112,7 +114,7 @@
         <h3>Add User</h3>
         <div class="user-form">
           <input id="new_user_username" placeholder="username">
-          <input id="new_user_password" type="password" placeholder="temporary password">
+          <input id="new_user_password" type="password" placeholder="temporary password" minlength="5">
           <label class="checkbox">
             <input type="checkbox" id="new_user_admin">
             <span>Admin</span>

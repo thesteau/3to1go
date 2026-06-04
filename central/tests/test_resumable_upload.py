@@ -57,7 +57,11 @@ class ResumableUploadTests(unittest.TestCase):
         self.assertEqual(login.status_code, 200, login.text)
         password = self.client.post(
             "/api/session/change-password",
-            json={"current_password": "", "new_password": "changed-admin"},
+            json={
+                "current_password": "admin",
+                "new_password": "changed-admin",
+                "confirm_new_password": "changed-admin",
+            },
         )
         self.assertEqual(password.status_code, 200, password.text)
         self.headers = {"Authorization": "Bearer secret"}

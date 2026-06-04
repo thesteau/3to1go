@@ -204,6 +204,7 @@ function openPasswordDialog(force = false) {
   clearStatus("password-status");
   document.getElementById("current_password").value = "";
   document.getElementById("new_password").value = "";
+  document.getElementById("confirm_new_password").value = "";
   document.getElementById("password-dialog-message").textContent = force
     ? "The default admin password must be changed before continuing."
     : "Update your password.";
@@ -212,13 +213,33 @@ function openPasswordDialog(force = false) {
 }
 
 async function changeOwnPassword() {
+  const currentPassword = document.getElementById("current_password").value;
+  const newPassword = document.getElementById("new_password").value;
+  const confirmNewPassword = document.getElementById("confirm_new_password").value;
+  if (!currentPassword) {
+    setStatus("password-status", "Current password is required.", "error");
+    return;
+  }
+  if (newPassword.length < 5) {
+    setStatus("password-status", "New password must be at least 5 characters.", "error");
+    return;
+  }
+  if (!newPassword.trim()) {
+    setStatus("password-status", "New password cannot be only spaces.", "error");
+    return;
+  }
+  if (newPassword !== confirmNewPassword) {
+    setStatus("password-status", "New passwords do not match.", "error");
+    return;
+  }
   setStatus("password-status", "Saving...", "info");
   const response = await rawFetch("/api/session/change-password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      current_password: document.getElementById("current_password").value,
-      new_password: document.getElementById("new_password").value,
+      current_password: currentPassword,
+      new_password: newPassword,
+      confirm_new_password: confirmNewPassword,
     }),
   });
   const body = await readJson(response);
@@ -276,7 +297,7 @@ function renderUsers(users) {
         </div>
         <div>
           ${canEditUsername ? `<input id="user_username_${user.id}" value="${escapeHtml(user.username)}">` : ""}
-          ${canResetPassword ? `<input id="user_password_${user.id}" type="password" placeholder="reset password">` : ""}
+          ${canResetPassword ? `<input id="user_password_${user.id}" type="password" placeholder="reset password" minlength="5">` : ""}
           ${canToggleAdmin ? `<label class="checkbox"><input id="user_admin_${user.id}" type="checkbox" ${user.is_admin ? "checked" : ""}><span>Admin</span></label>` : ""}
         </div>
         <div class="user-actions">
@@ -292,6 +313,14 @@ async function saveUser(userId) {
   const payload = {};
   const passwordInput = document.getElementById(`user_password_${userId}`);
   if (passwordInput?.value) {
+    if (passwordInput.value.length < 5) {
+      setStatus("users-status", "Password must be at least 5 characters.", "error");
+      return;
+    }
+    if (!passwordInput.value.trim()) {
+      setStatus("users-status", "Password cannot be only spaces.", "error");
+      return;
+    }
     payload.password = passwordInput.value;
   }
   const usernameInput = document.getElementById(`user_username_${userId}`);
@@ -319,12 +348,21 @@ async function saveUser(userId) {
 }
 
 async function createUser() {
+  const password = document.getElementById("new_user_password").value;
+  if (password.length < 5) {
+    setStatus("users-status", "Password must be at least 5 characters.", "error");
+    return;
+  }
+  if (!password.trim()) {
+    setStatus("users-status", "Password cannot be only spaces.", "error");
+    return;
+  }
   const response = await fetch("/api/users", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       username: document.getElementById("new_user_username").value.trim(),
-      password: document.getElementById("new_user_password").value,
+      password,
       is_admin: document.getElementById("new_user_admin").checked,
     }),
   });

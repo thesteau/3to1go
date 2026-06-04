@@ -29,6 +29,7 @@ class UserStore:
         user = self.get_user_by_username(username)
         if user is None or not _verify_password(password, user["password_hash"]):
             return None
+        user = self._with_default_password_change_required(user)
         return _public_user(user)
 
     def create_session(self, user_id: int) -> str:
@@ -58,6 +59,14 @@ class UserStore:
             with self._connect_sqlite() as conn:
                 conn.execute("DELETE FROM app_sessions WHERE token = ?", (token,))
 
+    def delete_sessions_for_user(self, user_id: int) -> None:
+        if self.database_url:
+            with self._connect_postgres() as conn, conn.cursor() as cur:
+                cur.execute("DELETE FROM app_sessions WHERE user_id = %s", (user_id,))
+        else:
+            with self._connect_sqlite() as conn:
+                conn.execute("DELETE FROM app_sessions WHERE user_id = ?", (user_id,))
+
     def user_for_session(self, token: str | None) -> dict[str, Any] | None:
         if not token:
             return None
@@ -85,7 +94,7 @@ class UserStore:
                     """,
                     (token, _utc_now().isoformat()),
                 ).fetchone()
-        return _public_user(_row_to_user(row)) if row else None
+        return _public_user(self._with_default_password_change_required(_row_to_user(row))) if row else None
 
     def list_users(self) -> list[dict[str, Any]]:
         rows = self._fetch_all_users()
@@ -150,6 +159,8 @@ class UserStore:
         next_hash = _hash_password(password) if password else existing["password_hash"]
         next_admin = existing["is_admin"] if is_admin is None else bool(is_admin)
         next_must_change = existing["must_change_password"] if must_change_password is None else bool(must_change_password)
+        if _verify_password(DEFAULT_ADMIN_PASSWORD, next_hash):
+            next_must_change = True
         if _is_bootstrap_admin(existing):
             next_admin = True
         if self._would_remove_last_admin(user_id, next_admin):
@@ -205,11 +216,11 @@ class UserStore:
                 conn.execute("DELETE FROM app_sessions WHERE user_id = ?", (user_id,))
                 conn.execute("DELETE FROM app_users WHERE id = ?", (user_id,))
 
-    def change_password(self, user_id: int, current_password: str | None, new_password: str, *, require_current: bool) -> dict[str, Any]:
+    def change_password(self, user_id: int, current_password: str | None, new_password: str) -> dict[str, Any]:
         user = self.get_user_by_id(user_id)
         if user is None:
             raise ValueError("user not found")
-        if require_current and not _verify_password(current_password or "", user["password_hash"]):
+        if not _verify_password(current_password or "", user["password_hash"]):
             raise ValueError("current password is incorrect")
         return self.update_user(user_id, password=new_password, must_change_password=False)
 
@@ -310,6 +321,12 @@ class UserStore:
         admins = [user for user in self.list_users() if user["is_admin"]]
         return not next_admin and len(admins) == 1 and admins[0]["id"] == user_id
 
+    def _with_default_password_change_required(self, user: dict[str, Any]) -> dict[str, Any]:
+        if user["must_change_password"] or not _verify_password(DEFAULT_ADMIN_PASSWORD, user["password_hash"]):
+            return user
+        self.update_user(user["id"], must_change_password=True)
+        return {**user, "must_change_password": True}
+
     def _delete_expired_sessions(self) -> None:
         if self.database_url:
             with self._connect_postgres() as conn, conn.cursor() as cur:
@@ -341,8 +358,10 @@ def _normalize_username(username: str) -> str:
 
 
 def _hash_password(password: str) -> str:
-    if len(password) < 4:
-        raise ValueError("password must be at least 4 characters")
+    if len(password) < 5:
+        raise ValueError("password must be at least 5 characters")
+    if not password.strip():
+        raise ValueError("password must contain at least one non-space character")
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 260_000)
     return f"pbkdf2_sha256$260000${salt.hex()}${digest.hex()}"
