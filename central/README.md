@@ -168,8 +168,8 @@ These are the environment variables most people care about first:
 | --- | --- | --- |
 | `ISSUER_KEY_FILE` | `/run/secrets/relay_issuer.key` in the contributor Compose, `relay_issuer.key` in the deploy example | File containing the Ed25519 issuer private key (auto-generated on first run) |
 | `REVOKED_CREDENTIALS_FILE` | unset | Optional path to a text file listing revoked credential JTIs, one per line |
-| `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata |
-| `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata |
+| `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata, users, and settings |
+| `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata, users, and settings |
 
 These Central values are edited in the Central UI and saved in Central's database instead of `.env`:
 

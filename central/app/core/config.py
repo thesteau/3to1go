@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
 from dataclasses import dataclass
@@ -35,10 +34,6 @@ def _default_config_dir() -> Path:
 
 def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
-
-
-def settings_storage_path() -> Path:
-    return _default_config_dir() / "settings.json"
 
 
 def hook_scripts_dir() -> Path:
@@ -189,7 +184,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     )
 
 
-def _build_index_database_url() -> str | None:
+def _build_index_database_url() -> str:
     explicit_url = os.getenv("INDEX_DATABASE_URL", "").strip()
     if explicit_url:
         return explicit_url
@@ -203,7 +198,7 @@ def _build_index_database_url() -> str | None:
         or os.getenv("POSTGRES_PASSWORD", "").strip()
     )
     if not username or not password:
-        return None
+        raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
 
     host = os.getenv("INDEX_DATABASE_HOST", "postgres").strip() or "postgres"
     port = os.getenv("INDEX_DATABASE_PORT", "5432").strip() or "5432"
@@ -215,14 +210,26 @@ def _build_index_database_url() -> str | None:
     return f"postgresql://{quote(username)}:{quote(password)}@{host}:{port}/{database}"
 
 
+def _load_settings_payload_from_database(database_url: str | None) -> dict[str, Any]:
+    if not database_url:
+        raise RuntimeError("Central requires PostgreSQL for saved app settings.")
+    try:
+        import psycopg
+    except ImportError:
+        return {}
+    try:
+        with psycopg.connect(database_url, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute("SELECT payload FROM app_settings WHERE key = %s", ("settings",))
+            row = cur.fetchone()
+    except Exception:
+        return {}
+    if row is None:
+        return {}
+    payload = row[0]
+    return payload if isinstance(payload, dict) else {}
+
+
 def load_settings() -> Settings:
-    path = settings_storage_path()
-    payload: dict[str, Any] = {}
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                payload = data
-        except (json.JSONDecodeError, OSError):
-            pass
+    database_url = _build_index_database_url()
+    payload = _load_settings_payload_from_database(database_url)
     return build_settings(payload)
