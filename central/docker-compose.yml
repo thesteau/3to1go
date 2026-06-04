@@ -11,7 +11,7 @@ services:
       - "6555:6555"
     volumes:
       - ./config:/config
-      - ./hook-scripts:/config/hook-scripts
+      - ./hook-scripts:/hook-scripts
       - ${BACKUP_DIR:-./data/backups}:/backups
       - ./data/staging:/staging
       - ./secrets:/run/secrets

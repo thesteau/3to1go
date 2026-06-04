@@ -22,6 +22,10 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.http_port, 6555)
 
+    def test_hook_scripts_dir_uses_dedicated_container_directory(self) -> None:
+        with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/config"}, clear=True):
+            self.assertEqual(config.hook_scripts_dir(), Path("/hook-scripts"))
+
     def test_build_index_database_url_prefers_explicit_url(self) -> None:
         with patch.dict(
             os.environ,

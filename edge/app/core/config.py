@@ -182,6 +182,8 @@ def app_database_path() -> Path:
 
 
 def hook_scripts_dir() -> Path:
+    if _uses_container_layout():
+        return Path("/hook-scripts")
     return _default_config_dir() / "hook-scripts"
 
 

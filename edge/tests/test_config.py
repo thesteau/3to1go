@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import unittest
 from pathlib import Path
@@ -31,6 +32,7 @@ class ConfigTests(unittest.TestCase):
         with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/config"}, clear=True):
             with patch.object(Path, "home", return_value=Path("/tmp/relay-home")):
                 settings = config.build_settings({})
+                self.assertEqual(config.hook_scripts_dir(), Path("/hook-scripts"))
 
         self.assertTrue(settings.scan_root.as_posix().endswith("/scan"))
         self.assertEqual(settings.http_host, "0.0.0.0")
@@ -126,6 +128,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_state_store_recreates_missing_state_dir_before_save(self) -> None:
         state_dir = PROJECT_ROOT / ".tmp-test-config" / "missing-state-dir"
+        shutil.rmtree(state_dir, ignore_errors=True)
         store = StateStore(state_dir)
         state_dir.rmdir()
 
