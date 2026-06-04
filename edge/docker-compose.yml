@@ -12,7 +12,6 @@ services:
       - ${SCAN_DIR:-./scan}:/scan
       - ./state:/data/state
       - ./spool:/data/spool
-      - ./secrets:/run/secrets:ro
     restart: unless-stopped
     logging:
       driver: json-file

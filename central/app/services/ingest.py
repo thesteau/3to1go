@@ -56,6 +56,7 @@ class EdgeRegistration:
     advertised_url: str | None
     first_seen_at: str
     last_seen_at: str
+    credential_hash: str | None = None
 
 
 class IngestService:
@@ -103,11 +104,12 @@ class IngestService:
         archive_sha256: str,
         idempotency_key: str,
         source_address: str | None = None,
+        credential_hash: str | None = None,
     ) -> UploadSessionResponse:
         self.cleanup_stale_uploads()
         registration_lock = await self.lock_manager.get_lock(f"edge-registry:{metadata.edge_id}")
         async with registration_lock:
-            self._register_edge(metadata)
+            self._register_edge(metadata, credential_hash)
 
         existing = self._load_session_for_key(idempotency_key)
         if existing is not None:
@@ -562,14 +564,20 @@ class IngestService:
         normalized.setdefault("source_address", None)
         return UploadSession(**normalized)
 
-    def _register_edge(self, metadata: UploadMetadata) -> None:
+    def _register_edge(self, metadata: UploadMetadata, credential_hash: str | None) -> None:
         edge_instance_id = (metadata.edge_instance_id or "").strip()
         if not edge_instance_id:
             return
 
         now = _utc_now_text()
         existing_payload = self.snapshot_index.get_edge_registration(metadata.edge_id, edge_instance_id)
-        existing = EdgeRegistration(**existing_payload) if existing_payload else None
+        if existing_payload:
+            normalized_existing = dict(existing_payload)
+            normalized_existing.setdefault("advertised_url", None)
+            normalized_existing.setdefault("credential_hash", None)
+            existing = EdgeRegistration(**normalized_existing)
+        else:
+            existing = None
 
         registration = existing or EdgeRegistration(
             edge_id=metadata.edge_id,
@@ -584,6 +592,8 @@ class IngestService:
             registration.encryption_key_fingerprint = metadata.encryption_key_fingerprint
         if metadata.advertised_url is not None:
             registration.advertised_url = metadata.advertised_url
+        if credential_hash:
+            registration.credential_hash = credential_hash
         self.snapshot_index.upsert_edge_registration(asdict(registration))
 
     def _current_upload_size(self, upload_id: str) -> int:

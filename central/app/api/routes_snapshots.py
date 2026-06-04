@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse
 
 from app.api.auth import authorize_request
-from app.api.dependencies import get_ingest_service, get_logger, get_settings, get_storage_backend
+from app.api.dependencies import get_credential_store, get_ingest_service, get_logger, get_settings, get_storage_backend
 from app.core.config import Settings
+from app.services.credential_store import CredentialStore
 from app.services.ingest import IngestService
 from app.storage.local import LocalFilesystemBackend
 from app.utils.paths import validate_namespace_component
@@ -48,9 +49,10 @@ async def download_snapshot_by_fingerprint(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
+    credential_store: CredentialStore = Depends(get_credential_store),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
 ) -> FileResponse:
-    authorize_request(authorization, settings, logger)
+    authorize_request(authorization, settings, logger, credential_store)
 
     try:
         namespace = _validated_namespace(edge_id, job_name, edge_instance_id)
@@ -88,9 +90,10 @@ async def download_latest_snapshot_for_recovery(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
+    credential_store: CredentialStore = Depends(get_credential_store),
     storage_backend: LocalFilesystemBackend = Depends(get_storage_backend),
 ) -> FileResponse:
-    authorize_request(authorization, settings, logger)
+    authorize_request(authorization, settings, logger, credential_store)
 
     try:
         namespace = _validated_namespace(edge_id, job_name, edge_instance_id)

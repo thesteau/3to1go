@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 
 from app.api.auth import authorize_request
-from app.api.dependencies import get_ingest_service, get_logger, get_settings
+from app.api.dependencies import get_credential_store, get_ingest_service, get_logger, get_settings
 from app.api.models import (
     UploadChunkResponse,
     UploadInitRequest,
@@ -12,6 +12,7 @@ from app.api.models import (
     UploadSessionResponse,
 )
 from app.core.config import Settings
+from app.services.credential_store import CredentialStore
 from app.services.ingest import IngestService
 from app.utils.paths import build_snapshot_filename, validate_namespace_component
 
@@ -61,9 +62,10 @@ async def initiate_upload(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
+    credential_store: CredentialStore = Depends(get_credential_store),
     ingest_service: IngestService = Depends(get_ingest_service),
 ) -> UploadSessionResponse:
-    authorize_request(authorization, settings, logger)
+    credential = authorize_request(authorization, settings, logger, credential_store)
 
     try:
         metadata = UploadMetadata(
@@ -107,6 +109,7 @@ async def initiate_upload(
         archive_sha256=payload.archive_sha256,
         idempotency_key=payload.idempotency_key.strip(),
         source_address=_request_source_address(request),
+        credential_hash=credential["token_hash"],
     )
     return result
 
@@ -119,9 +122,10 @@ async def append_upload_chunk(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
+    credential_store: CredentialStore = Depends(get_credential_store),
     ingest_service: IngestService = Depends(get_ingest_service),
 ) -> UploadChunkResponse:
-    authorize_request(authorization, settings, logger)
+    authorize_request(authorization, settings, logger, credential_store)
     result = await ingest_service.append_chunk(upload_id, offset, request.stream())
     return UploadChunkResponse(**result)
 
@@ -133,8 +137,9 @@ async def finalize_upload(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
     logger=Depends(get_logger),
+    credential_store: CredentialStore = Depends(get_credential_store),
     ingest_service: IngestService = Depends(get_ingest_service),
 ) -> UploadResponse:
-    authorize_request(authorization, settings, logger)
+    authorize_request(authorization, settings, logger, credential_store)
     result = await ingest_service.finalize_upload(upload_id)
     return UploadResponse(**result)

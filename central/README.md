@@ -30,11 +30,9 @@ Central also keeps its own advanced runtime settings in its database. In the bun
 
 The easiest way to start is with Docker Compose.
 
-### 1. Prepare the issuer key file
+### 1. Prepare persistent storage
 
-Central expects `ISSUER_KEY_FILE` to point to a file that contains the Ed25519 issuer private key.
-
-If the file does not exist yet, Central generates it on startup. After starting, use Central's UI (`Settings > Credentials > Mint Credential`) to generate a signed JWT for each Edge.
+Central generates its Ed25519 issuer key on startup if it does not exist yet. After starting, use Central's UI (`Mint Edge Credential`) to generate a signed JWT for each Edge.
 
 The bundled Central Compose file mounts `./secrets` as a directory at `/run/secrets` so first-boot key generation works automatically.
 
@@ -111,9 +109,10 @@ docker compose exec -e RESET_PASSWORD='new-temporary-password' central python -m
 
 Central signs per-Edge credentials with its issuer key.
 
-- Each Edge should use a credential minted from Central's UI.
-- Rotating or revoking one Edge credential does not require updating every other Edge.
-- Revoked credential JTIs are stored in Central's config directory (`revoked_credentials`) and managed by the app.
+- Mint Edge credentials from Central's UI and paste them into the Edge settings UI.
+- The credential is displayed once when minted. Central stores only database metadata needed to validate and revoke it.
+- Revoking the credential next to one instance also revokes that token for any other instances that reused it.
+- Expired credential rows are reaped from the database about every 12 hours.
 
 ### Local storage only
 
@@ -133,7 +132,7 @@ Existing snapshot files remain on disk under `BACKUP_ROOT`; Central stores the l
 
 Central uses two different configuration sources on purpose:
 
-- Infrastructure settings come from the environment and Docker layout: auth token file, PostgreSQL credentials, backup root, staging dir, and the HTTP bind.
+- Infrastructure settings come from the environment and Docker layout: PostgreSQL credentials, backup root, staging dir, and the HTTP bind.
 - Operator settings come from Central's database: retention, logging level, upload limits, upload session TTL, and cleanup interval.
 
 That means `docker compose down` and `docker compose up` do not reset the UI-edited Central settings, because those values are not being pulled from the env file anymore.
@@ -166,7 +165,6 @@ These are the environment variables most people care about first:
 
 | Variable | Default | What it means |
 | --- | --- | --- |
-| `ISSUER_KEY_FILE` | `/run/secrets/relay_issuer.key` in the contributor Compose, `relay_issuer.key` in the deploy example | File containing the Ed25519 issuer private key (auto-generated on first run) |
 | `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata, users, and settings |
 | `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata, users, and settings |
 
@@ -226,5 +224,3 @@ The bundled Compose example mounts:
 - `./secrets` to `/run/secrets`
 
 After the first start, Central writes the generated issuer key to `./secrets/relay_issuer.key`.
-
-If you prefer mounting a single key file instead of the whole directory, create that host file before starting the stack. Otherwise Docker may create a directory at that path and Central will refuse to start with a configuration error.

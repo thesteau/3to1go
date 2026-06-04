@@ -33,6 +33,7 @@ def build_overview(
                 "encryption_key_fingerprint": registration.get("encryption_key_fingerprint"),
                 "first_seen_at": registration.get("first_seen_at"),
                 "last_seen_at": registration.get("last_seen_at"),
+                "credential_configured": bool(registration.get("credential_hash")),
                 "jobs": [],
             }
             instance_map[key] = instance
@@ -42,6 +43,8 @@ def build_overview(
                 instance["advertised_url"] = registration.get("advertised_url")
             if registration.get("encryption_key_fingerprint"):
                 instance["encryption_key_fingerprint"] = registration.get("encryption_key_fingerprint")
+            if registration.get("credential_hash"):
+                instance["credential_configured"] = True
             instance["first_seen_at"] = (
                 registration.get("first_seen_at") or instance.get("first_seen_at")
             )
@@ -66,6 +69,7 @@ def build_overview(
                 "encryption_key_fingerprint": None,
                 "first_seen_at": None,
                 "last_seen_at": None,
+                "credential_configured": False,
                 "jobs": [],
             }
             instance_map[key] = instance

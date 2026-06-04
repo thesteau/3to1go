@@ -158,7 +158,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             cur.execute(
                 """
                 SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
-                       advertised_url, first_seen_at, last_seen_at
+                       advertised_url, first_seen_at, last_seen_at, credential_hash
                 FROM edge_registration
                 WHERE edge_id = %s AND edge_instance_id = %s
                 """,
@@ -174,6 +174,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
             "advertised_url": row[3],
             "first_seen_at": row[4],
             "last_seen_at": row[5],
+            "credential_hash": row[6],
         }
 
     def upsert_edge_registration(self, registration: dict[str, Any]) -> None:
@@ -186,15 +187,17 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     encryption_key_fingerprint,
                     advertised_url,
                     first_seen_at,
-                    last_seen_at
+                    last_seen_at,
+                    credential_hash
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (edge_id, edge_instance_id)
                 DO UPDATE SET
                     encryption_key_fingerprint = EXCLUDED.encryption_key_fingerprint,
                     advertised_url = EXCLUDED.advertised_url,
                     first_seen_at = EXCLUDED.first_seen_at,
-                    last_seen_at = EXCLUDED.last_seen_at
+                    last_seen_at = EXCLUDED.last_seen_at,
+                    credential_hash = EXCLUDED.credential_hash
                 """,
                 (
                     registration["edge_id"],
@@ -203,6 +206,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     registration.get("advertised_url"),
                     registration["first_seen_at"],
                     registration["last_seen_at"],
+                    registration.get("credential_hash"),
                 ),
             )
 
@@ -219,7 +223,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 cur.execute(
                     """
                     SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
-                           advertised_url, first_seen_at, last_seen_at
+                           advertised_url, first_seen_at, last_seen_at, credential_hash
                     FROM edge_registration
                     ORDER BY lower(edge_id), lower(edge_instance_id)
                     """
@@ -228,7 +232,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 cur.execute(
                     """
                     SELECT edge_id, edge_instance_id, encryption_key_fingerprint,
-                           advertised_url, first_seen_at, last_seen_at
+                           advertised_url, first_seen_at, last_seen_at, credential_hash
                     FROM edge_registration
                     WHERE edge_id = %s
                     ORDER BY lower(edge_instance_id)
@@ -244,6 +248,7 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 "advertised_url": row[3],
                 "first_seen_at": row[4],
                 "last_seen_at": row[5],
+                "credential_hash": row[6],
             }
             for row in rows
         ]
@@ -275,8 +280,15 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                     encryption_key_fingerprint TEXT,
                     advertised_url TEXT,
                     first_seen_at TEXT NOT NULL,
-                    last_seen_at TEXT NOT NULL
+                    last_seen_at TEXT NOT NULL,
+                    credential_hash TEXT
                 )
+                """
+            )
+            cur.execute(
+                """
+                ALTER TABLE edge_registration
+                ADD COLUMN IF NOT EXISTS credential_hash TEXT
                 """
             )
             cur.execute(
@@ -301,6 +313,12 @@ class PostgresSnapshotIndexBackend(SnapshotIndexBackend):
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_edge_registration_instance
                 ON edge_registration (edge_id, edge_instance_id)
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_edge_registration_credential_hash
+                ON edge_registration (credential_hash)
                 """
             )
 

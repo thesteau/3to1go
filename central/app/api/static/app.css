@@ -556,6 +556,12 @@ button.danger {
   padding: 5px 10px;
 }
 
+.credential-output {
+  min-height: 120px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  word-break: break-all;
+}
+
 .snapshot-latest-tag {
   display: inline-block;
   padding: 1px 7px;

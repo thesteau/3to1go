@@ -27,7 +27,7 @@ def _b64url_decode(s: str) -> bytes:
 def load_or_create_issuer_keypair(path: Path) -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
     if path.is_dir():
         raise RuntimeError(
-            "ISSUER_KEY_FILE must point to a file, but "
+            "Issuer key path must point to a file, but "
             f"'{path}' is a directory. If you are using Docker bind mounts, "
             "the host path likely did not exist and Docker created a directory instead. "
             "Mount './secrets:/run/secrets' for auto-generation, or create the key file on the host first."
@@ -79,8 +79,21 @@ def mint_credential(private_key: Ed25519PrivateKey, ttl_days: int = _DEFAULT_TTL
     return f"{header}.{payload}.{sig}"
 
 
-def verify_credential(token: str, public_key: Ed25519PublicKey, revoked: frozenset[str]) -> None:
-    """Raises ValueError on any verification failure."""
+def credential_payload(token: str) -> dict:
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise ValueError("malformed token")
+    try:
+        payload = json.loads(_b64url_decode(parts[1]))
+    except Exception as exc:
+        raise ValueError("malformed payload") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("malformed payload")
+    return payload
+
+
+def verify_credential(token: str, public_key: Ed25519PublicKey) -> dict:
+    """Raises ValueError on any verification failure and returns the JWT payload."""
     parts = token.split(".")
     if len(parts) != 3:
         raise ValueError("malformed token")
@@ -93,10 +106,7 @@ def verify_credential(token: str, public_key: Ed25519PublicKey, revoked: frozens
     except Exception as exc:
         raise ValueError("invalid signature") from exc
 
-    try:
-        payload = json.loads(_b64url_decode(payload_b64))
-    except Exception as exc:
-        raise ValueError("malformed payload") from exc
+    payload = credential_payload(token)
 
     if payload.get("exp", 0) < int(time.time()):
         raise ValueError("credential expired")
@@ -104,12 +114,6 @@ def verify_credential(token: str, public_key: Ed25519PublicKey, revoked: frozens
     jti = payload.get("jti")
     if not jti:
         raise ValueError("credential missing jti")
-    if jti in revoked:
-        raise ValueError("credential revoked")
+    return payload
 
 
-def load_revoked_credentials(path: Path | None) -> frozenset[str]:
-    if path is None or not path.exists():
-        return frozenset()
-    lines = path.read_text(encoding="utf-8").splitlines()
-    return frozenset(line.strip() for line in lines if line.strip())

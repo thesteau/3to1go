@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core.config import Settings  # noqa: E402
-from app.core.signing import load_or_create_issuer_keypair, mint_credential, public_key_to_bytes  # noqa: E402
+from app.core.signing import load_or_create_issuer_keypair, public_key_to_bytes  # noqa: E402
 
 
 class EdgeControlsTests(unittest.TestCase):
@@ -30,11 +30,9 @@ class EdgeControlsTests(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
         key_path = self.temp_dir / "issuer.key"
         private_key, public_key = load_or_create_issuer_keypair(key_path)
-        self.credential = mint_credential(private_key)
         self.settings = Settings(
             issuer_key_path=key_path,
             issuer_public_key_bytes=public_key_to_bytes(public_key),
-            revoked_credentials=frozenset(),
             storage_backend="local",
             backup_root=self.temp_dir / "backups",
             retention_keep_last=3,
@@ -58,6 +56,7 @@ class EdgeControlsTests(unittest.TestCase):
         self.client = TestClient(
             create_app(settings=self.settings, user_store_path=self.temp_dir / "central-users.db")
         )
+        self.credential = self.client.app.state.credential_store.mint(private_key, ttl_days=365)
         login = self.client.post(
             "/api/session/login",
             json={"username": "admin", "password": "admin"},
@@ -174,6 +173,49 @@ class EdgeControlsTests(unittest.TestCase):
         overview = self.client.get("/api/overview")
         self.assertEqual(overview.status_code, 200, overview.text)
         self.assertEqual(overview.json()["edges"], [])
+
+    def test_revoke_instance_credential_blocks_token_without_deleting_instance(self) -> None:
+        payload = {
+            "edge_id": "edge-01",
+            "edge_instance_id": "edgeinstance0001",
+            "job_name": "photos",
+            "fingerprint": "abcdef1234567890",
+            "timestamp": "2026-04-05T12:00:00Z",
+            "archive_format": "tar.zst",
+            "archive_size_bytes": 6,
+            "archive_sha256": "e9c0f8b575cbfcb42ab3b78ecc87efa3b011d9a5d10b09fa4e96f240bf6a82f5",
+            "idempotency_key": "idem-revoke01",
+            "encryption_key_fingerprint": "a" * 64,
+        }
+        init_response = self.client.post(
+            "/backup/uploads/initiate",
+            json=payload,
+            headers={"Authorization": f"Bearer {self.credential}"},
+        )
+        self.assertEqual(init_response.status_code, 200, init_response.text)
+        self.assertTrue(
+            self.client.app.state.snapshot_index.get_edge_registration(
+                "edge-01",
+                "edgeinstance0001",
+            )["credential_hash"]
+        )
+
+        response = self.client.delete("/api/credentials/instances/edge-01/edgeinstance0001")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "revoked")
+        self.assertEqual(response.json()["affected_instances"], [{"edge_id": "edge-01", "edge_instance_id": "edgeinstance0001"}])
+        self.assertIsNone(
+            self.client.app.state.snapshot_index.get_edge_registration(
+                "edge-01",
+                "edgeinstance0001",
+            )["credential_hash"]
+        )
+
+        blocked = self.client.get(
+            "/backup/recovery/edge-01/edgeinstance0001/photos/latest",
+            headers={"Authorization": f"Bearer {self.credential}"},
+        )
+        self.assertEqual(blocked.status_code, 401, blocked.text)
 
 
 if __name__ == "__main__":

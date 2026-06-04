@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.api.app import create_app  # noqa: E402
 from app.core.config import Settings  # noqa: E402
-from app.core.signing import load_or_create_issuer_keypair, mint_credential, public_key_to_bytes  # noqa: E402
+from app.core.signing import load_or_create_issuer_keypair, public_key_to_bytes  # noqa: E402
 
 
 class ResumableUploadTests(unittest.TestCase):
@@ -28,11 +28,9 @@ class ResumableUploadTests(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp(dir=temp_root))
         key_path = self.temp_dir / "issuer.key"
         private_key, public_key = load_or_create_issuer_keypair(key_path)
-        credential = mint_credential(private_key)
         self.settings = Settings(
             issuer_key_path=key_path,
             issuer_public_key_bytes=public_key_to_bytes(public_key),
-            revoked_credentials=frozenset(),
             storage_backend="local",
             backup_root=self.temp_dir / "backups",
             retention_keep_last=3,
@@ -56,6 +54,7 @@ class ResumableUploadTests(unittest.TestCase):
         self.client = TestClient(
             create_app(settings=self.settings, user_store_path=self.temp_dir / "central-users.db")
         )
+        credential = self.client.app.state.credential_store.mint(private_key, ttl_days=365)
         login = self.client.post(
             "/api/session/login",
             json={"username": "admin", "password": "admin"},

@@ -30,6 +30,7 @@ class ConfigTests(unittest.TestCase):
         return self.temp_dir / "relay_issuer.key"
 
     def _key_env(self) -> dict[str, str]:
+        self._key_path().write_bytes(b"\x01" * 32)
         return {"ISSUER_KEY_FILE": str(self._key_path())}
 
     def _settings_env(self) -> dict[str, str]:

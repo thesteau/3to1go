@@ -31,7 +31,6 @@ class HealthcheckTests(unittest.TestCase):
         self.settings = Settings(
             issuer_key_path=key_path,
             issuer_public_key_bytes=public_key_to_bytes(public_key),
-            revoked_credentials=frozenset(),
             storage_backend="local",
             backup_root=self.temp_dir / "backups",
             retention_keep_last=3,

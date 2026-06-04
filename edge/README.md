@@ -25,7 +25,7 @@ If you are seeing this for the first time, use this order:
 2. Start Edge on the machine you want to back up.
 3. Open the Edge UI at `http://localhost:6556/`.
 4. Set `CENTRAL_URL`.
-5. Enter the same auth token Central uses.
+5. Mint an Edge credential in Central and paste it into Edge settings.
 6. Pick a unique `EDGE_ID`.
 7. Create `.upload_dir` files in folders you want backed up.
 8. Run a backup cycle and confirm the snapshots appear on Central.
@@ -123,15 +123,11 @@ docker compose exec -e RESET_PASSWORD='new-temporary-password' edge python -m ap
 
 Edge authenticates to Central using a signed JWT credential minted by Central.
 
-Edge can receive the credential in two ways:
+Edge stores the credential in its local database after you paste it into the Edge settings UI. Saving a new credential overwrites the previous saved value.
 
-- entered in the Edge UI and stored in the local Edge database
-- preloaded from `EDGE_CREDENTIAL_FILE`, which is how the bundled Docker examples work
+To generate a credential: start Central, open its UI, choose `Mint Edge Credential`, copy the credential, then paste it into Edge's `Edit Edge Settings` dialog.
 
-
-To generate a credential: start Central, then open its UI and go to `Settings > Credentials > Mint Credential`. Copy the credential and paste it into Edge's UI, or save it to the file referenced by `EDGE_CREDENTIAL_FILE`.
-
-Each Edge has its own credential. Revoking one Edge does not affect others.
+Credentials can be shared across instances, but revoking a token from Central revokes it for every instance currently using that same token.
 
 ### Unique `EDGE_ID`
 
@@ -214,9 +210,7 @@ docker compose up --build
 
 Open the UI at `http://localhost:6556/`.
 
-Mint a credential from Central's UI and save it to `./secrets/relay_edge_credential` before starting the stack.
-In the bundled Docker examples, `EDGE_CREDENTIAL_FILE` can be just the filename, such as `relay_edge_credential`.
-If you prefer a different filename, update `EDGE_CREDENTIAL_FILE` in `.env` to match it.
+After the stack starts, mint a credential from Central's UI, paste it into Edge's settings, and save.
 
 ## Release Builds
 
@@ -256,8 +250,7 @@ Most people care about these first:
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
 | `SCAN_ROOT` | `/scan` in Docker, platform-dependent otherwise | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://127.0.0.1:6555` | Address of Central |
-| `EDGE_CREDENTIAL_FILE` | unset | Optional credential file path, or just a filename under `/run/secrets` in the Docker examples |
-| `EDGE_CREDENTIAL` | empty | JWT credential when not using `EDGE_CREDENTIAL_FILE` |
+| Edge Credential in the Edge UI | empty | JWT credential minted by Central and saved in Edge's local database |
 | Cron Schedule in the Edge UI | `0 2 * * 0` | Backup schedule, defaulting to Sunday at 2:00 AM |
 | `HTTP_PORT` | `6556` | Local Edge UI port |
 

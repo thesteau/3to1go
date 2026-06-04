@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.services.user_store import UserStore  # noqa: E402
+from app.services.credential_store import CredentialStore  # noqa: E402
 from app.core.signing import (  # noqa: E402
     load_or_create_issuer_keypair,
     mint_credential,
@@ -54,7 +55,7 @@ class IssuerKeypairTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             load_or_create_issuer_keypair(key_dir)
 
-        self.assertIn("ISSUER_KEY_FILE must point to a file", str(ctx.exception))
+        self.assertIn("Issuer key path must point to a file", str(ctx.exception))
 
 
 class CredentialTests(unittest.TestCase):
@@ -70,7 +71,7 @@ class CredentialTests(unittest.TestCase):
 
     def test_minted_credential_verifies(self) -> None:
         credential = mint_credential(self.private_key)
-        verify_credential(credential, self.public_key, frozenset())
+        verify_credential(credential, self.public_key)
 
     def test_tampered_credential_fails(self) -> None:
         credential = mint_credential(self.private_key)
@@ -79,21 +80,16 @@ class CredentialTests(unittest.TestCase):
         tampered = ".".join(parts)
 
         with self.assertRaises(ValueError):
-            verify_credential(tampered, self.public_key, frozenset())
+            verify_credential(tampered, self.public_key)
 
-    def test_revoked_credential_fails(self) -> None:
-        import base64
-        import json
+    def test_credential_store_revocation_deletes_database_token(self) -> None:
+        store = CredentialStore(database_url=None, sqlite_path=self.temp_dir / "credentials.db")
+        credential = store.mint(self.private_key, ttl_days=1)
+        verified = store.verify(credential, self.public_key)
 
-        credential = mint_credential(self.private_key)
-        payload_b64 = credential.split(".")[1]
-        padding = 4 - len(payload_b64) % 4
-        if padding != 4:
-            payload_b64 += "=" * padding
-        jti = json.loads(base64.urlsafe_b64decode(payload_b64))["jti"]
-
+        self.assertEqual(store.revoke(verified["token_hash"]), 1)
         with self.assertRaises(ValueError, msg="credential revoked"):
-            verify_credential(credential, self.public_key, frozenset({jti}))
+            store.verify(credential, self.public_key)
 
     def test_wrong_key_fails(self) -> None:
         other_key_path = self.temp_dir / "other.key"
@@ -101,7 +97,7 @@ class CredentialTests(unittest.TestCase):
         credential = mint_credential(self.private_key)
 
         with self.assertRaises(ValueError):
-            verify_credential(credential, other_public, frozenset())
+            verify_credential(credential, other_public)
 
     def test_user_store_keeps_bootstrap_user_admin_after_rename(self) -> None:
         store = UserStore(sqlite_path=self.temp_dir / "central-users.db")

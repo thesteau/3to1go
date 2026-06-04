@@ -549,6 +549,47 @@ function openSettingsDialog() {
   openDialog("settings-dialog");
 }
 
+function openCredentialDialog() {
+  document.getElementById("credential_ttl_days").value = "365";
+  document.getElementById("credential_output").value = "";
+  clearStatus("credential-status");
+  openDialog("credential-dialog");
+}
+
+async function mintCredential() {
+  const ttlDays = Number(document.getElementById("credential_ttl_days").value || 365);
+  setStatus("credential-status", "Minting...", "info");
+  const response = await fetch(`/api/credentials/mint?ttl_days=${encodeURIComponent(ttlDays)}`, {
+    method: "POST",
+  });
+  const body = await readJson(response);
+  if (!response.ok) {
+    setStatus("credential-status", body.detail || "Mint failed.", "error");
+    setActionStatus(body.detail || "Mint failed.", "error");
+    return;
+  }
+  document.getElementById("credential_output").value = body.credential || "";
+  setStatus("credential-status", "Credential minted. Copy it before closing.", "success");
+  setActionStatus("Edge credential minted.", "success");
+}
+
+async function copyMintedCredential() {
+  const value = document.getElementById("credential_output").value.trim();
+  if (!value) {
+    setStatus("credential-status", "Mint a credential first.", "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const output = document.getElementById("credential_output");
+    output.focus();
+    output.select();
+    document.execCommand("copy");
+  }
+  setStatus("credential-status", "Copied.", "success");
+}
+
 function fillNtfyForm(config) {
   const data = config || {};
   document.getElementById("ntfy_url").value = data.ntfy_url || "";
@@ -1151,6 +1192,9 @@ function renderInstanceCard(edgeId, instance) {
   const deleteBtn = instanceId
     ? `<button class="btn btn-del btn-del-instance" type="button" onclick="deleteInstance('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Delete Instance</button>`
     : "";
+  const revokeBtn = instanceId && instance.credential_configured
+    ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Revoke Token</button>`
+    : "";
   return `
     <section class="instance-card">
       <div class="instance-head">
@@ -1160,6 +1204,7 @@ function renderInstanceCard(edgeId, instance) {
         </div>
         <div class="instance-head-right">
           <span class="edge-count">${(instance.jobs || []).length} job${instance.jobs.length !== 1 ? "s" : ""}</span>
+          ${revokeBtn}
           ${deleteBtn}
         </div>
       </div>
@@ -1179,6 +1224,36 @@ function renderInstanceCard(edgeId, instance) {
       `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
     </section>
   `;
+}
+
+async function revokeInstanceCredential(edgeId, edgeInstanceId, btn) {
+  const label = edgeInstanceId || "this instance";
+  if (!await confirmApp({
+    title: "Revoke Token",
+    message: `Revoke the Edge credential used by "${label}"? Any other instances using the same token will stop authenticating too.`,
+    confirmLabel: "Revoke Token",
+    danger: true,
+  })) {
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const response = await fetch(`/api/credentials/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`, {
+      method: "DELETE",
+    });
+    const body = await readJson(response);
+    if (!response.ok) {
+      setActionStatus(body.detail || "Revoke failed.", "error");
+      return;
+    }
+    const affected = body.affected_instances || [];
+    setActionStatus(`Revoked token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`, "success");
+    await loadOverview({ silent: true, force: true });
+  } catch (error) {
+    setActionStatus(error.message || "Revoke failed.", "error");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function collectSnapshotEvents(data) {

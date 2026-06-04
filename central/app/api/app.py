@@ -20,6 +20,7 @@ from app.core.config import Settings, app_database_path, hook_scripts_dir, load_
 from app.core.logging import configure_logging
 from app.index.factory import build_snapshot_index_backend
 from app.services.hooks import HookManager
+from app.services.credential_store import CredentialStore
 from app.services.ingest import IngestService
 from app.services.locks import NamespaceLockManager
 from app.services.ntfy import NtfyPublisher
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     snapshot_index = build_snapshot_index_backend(settings)
     settings_store = SettingsStore(database_url=settings.index_database_url, sqlite_path=user_store_path)
     user_store = UserStore(database_url=settings.index_database_url, sqlite_path=user_store_path or app_database_path())
+    credential_store = CredentialStore(database_url=settings.index_database_url, sqlite_path=user_store_path)
     hook_manager = HookManager(hook_scripts_dir(), logger)
     ntfy_publisher = NtfyPublisher(logger)
     ingest_service = IngestService(
@@ -62,10 +64,12 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     app.state.snapshot_index = snapshot_index
     app.state.settings_store = settings_store
     app.state.user_store = user_store
+    app.state.credential_store = credential_store
     app.state.ingest_service = ingest_service
     app.state.hook_manager = hook_manager
     app.state.ntfy_publisher = ntfy_publisher
     app.state.cleanup_task = None
+    app.state.credential_cleanup_task = None
     app.include_router(admin_router)
     app.include_router(overview_router)
     app.include_router(automation_router)
@@ -84,6 +88,18 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
         app.state.cleanup_task = asyncio.create_task(
             ingest_service.cleanup_loop(interval_seconds)
         )
+
+    async def credential_cleanup_loop() -> None:
+        while True:
+            try:
+                removed = credential_store.cleanup_expired()
+                if removed:
+                    logger.info("credential_cleanup removed=%s", removed)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("credential_cleanup_failed")
+            await asyncio.sleep(12 * 60 * 60)
 
     def apply_settings(new_settings: Settings) -> None:
         app.state.settings = new_settings
@@ -114,6 +130,7 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     @app.on_event("startup")
     async def on_startup() -> None:
         await restart_cleanup_task(settings.upload_cleanup_interval_seconds)
+        app.state.credential_cleanup_task = asyncio.create_task(credential_cleanup_loop())
 
     @app.on_event("shutdown")
     async def on_shutdown() -> None:
@@ -122,6 +139,13 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
             cleanup_task.cancel()
             try:
                 await cleanup_task
+            except asyncio.CancelledError:
+                pass
+        credential_cleanup_task = app.state.credential_cleanup_task
+        if credential_cleanup_task is not None:
+            credential_cleanup_task.cancel()
+            try:
+                await credential_cleanup_task
             except asyncio.CancelledError:
                 pass
 

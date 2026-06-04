@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import quote, urlparse
 
 from app.core.auth import issuer_key_path_from_env
-from app.core.signing import load_or_create_issuer_keypair, load_revoked_credentials, public_key_to_bytes
+from app.core.signing import load_or_create_issuer_keypair, public_key_to_bytes
 
 
 APP_DIR_NAME = "RelayCentralizerCentral"
@@ -34,13 +34,6 @@ def _default_config_dir() -> Path:
 
 def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
-
-
-def revoked_credentials_path() -> Path | None:
-    try:
-        return _default_config_dir() / "revoked_credentials"
-    except RuntimeError:
-        return None
 
 
 def hook_scripts_dir() -> Path:
@@ -83,7 +76,6 @@ def _coerce_theme(value: Any) -> str:
 class Settings:
     issuer_key_path: Path
     issuer_public_key_bytes: bytes
-    revoked_credentials: frozenset
     storage_backend: str
     backup_root: Path
     retention_keep_last: int
@@ -139,11 +131,9 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     raw = payload or {}
     key_path = issuer_key_path_from_env()
     _, public_key = load_or_create_issuer_keypair(key_path)
-    revoked = load_revoked_credentials(revoked_credentials_path())
     return Settings(
         issuer_key_path=key_path,
         issuer_public_key_bytes=public_key_to_bytes(public_key),
-        revoked_credentials=revoked,
         storage_backend=os.getenv("STORAGE_BACKEND", "local").strip().lower(),
         index_database_url=_build_index_database_url(),
         backup_root=Path(os.getenv("BACKUP_ROOT", "/backups")),
@@ -163,8 +153,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         ntfy_match_edge_instance_id=_coerce_text(raw.get("ntfy_match_edge_instance_id")),
         ntfy_match_source=_coerce_text(raw.get("ntfy_match_source")),
         hook_pre_command=_coerce_text(raw.get("hook_pre_command")),
-        hook_post_command=_coerce_text(raw.get("hook_post_command")
-        ),
+        hook_post_command=_coerce_text(raw.get("hook_post_command")),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
         http_port=max(1, int(os.getenv("HTTP_PORT", "6555"))),
@@ -185,7 +174,10 @@ def _build_index_database_url() -> str:
         or os.getenv("POSTGRES_PASSWORD", "").strip()
     )
     if not username or not password:
-        raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
+        raise RuntimeError(
+            "Central requires PostgreSQL credentials. "
+            "Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD."
+        )
 
     host = os.getenv("INDEX_DATABASE_HOST", "postgres").strip() or "postgres"
     port = os.getenv("INDEX_DATABASE_PORT", "5432").strip() or "5432"

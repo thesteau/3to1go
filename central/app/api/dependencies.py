@@ -8,6 +8,7 @@ from app.index.base import SnapshotIndexBackend
 from app.services.ingest import IngestService
 from app.services.ntfy import NtfyPublisher
 from app.services.settings_store import SettingsStore
+from app.services.credential_store import CredentialStore
 from app.storage.local import LocalFilesystemBackend
 
 
@@ -29,6 +30,10 @@ def get_snapshot_index(request: Request) -> SnapshotIndexBackend:
 
 def get_settings_store(request: Request) -> SettingsStore:
     return request.app.state.settings_store
+
+
+def get_credential_store(request: Request) -> CredentialStore:
+    return request.app.state.credential_store
 
 
 def get_ingest_service(request: Request) -> IngestService:
