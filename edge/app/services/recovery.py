@@ -145,7 +145,7 @@ class RecoveryService:
                 wrapped = RecoveryError("no snapshots found on Central", status_code=404)
             elif error.category == "unauthorized":
                 wrapped = RecoveryError(
-                    "Central rejected the recovery request; check the shared auth token",
+                    "Central rejected the recovery request; check the Edge credential",
                     status_code=401,
                 )
             elif error.category == "http":
@@ -176,7 +176,7 @@ class RecoveryService:
                 wrapped = RecoveryError("no snapshots found on Central", status_code=404)
             elif error.category == "unauthorized":
                 wrapped = RecoveryError(
-                    "Central rejected the recovery request; check the shared auth token",
+                    "Central rejected the recovery request; check the Edge credential",
                     status_code=502,
                 )
             elif error.category in {"network", "server", "rate_limited", "circuit_open"}:

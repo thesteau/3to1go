@@ -16,7 +16,7 @@ class EdgeSettingsInput(BaseModel):
     scan_root: str
     central_url: str
     advertised_url: str = ""
-    auth_token: str = ""
+    edge_credential: str = ""
     cron_schedule: str
     state_dir: str
     spool_dir: str
@@ -46,7 +46,7 @@ class EdgeSettingsInput(BaseModel):
         "scan_root",
         "central_url",
         "advertised_url",
-        "auth_token",
+        "edge_credential",
         "cron_schedule",
         "state_dir",
         "spool_dir",

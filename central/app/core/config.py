@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
 
-from app.core.auth import load_auth_token
+from app.core.auth import issuer_key_path_from_env, revoked_credentials_path_from_env
+from app.core.signing import load_or_create_issuer_keypair, load_revoked_credentials, public_key_to_bytes
 
 
 APP_DIR_NAME = "RelayCentralizerCentral"
@@ -73,7 +74,9 @@ def _coerce_theme(value: Any) -> str:
 
 @dataclass(slots=True)
 class Settings:
-    auth_token: str
+    issuer_key_path: Path
+    issuer_public_key_bytes: bytes
+    revoked_credentials: frozenset
     storage_backend: str
     backup_root: Path
     retention_keep_last: int
@@ -127,8 +130,13 @@ def settings_to_payload(settings: Settings) -> dict[str, Any]:
 
 def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     raw = payload or {}
+    key_path = issuer_key_path_from_env()
+    _, public_key = load_or_create_issuer_keypair(key_path)
+    revoked = load_revoked_credentials(revoked_credentials_path_from_env())
     return Settings(
-        auth_token=load_auth_token(),
+        issuer_key_path=key_path,
+        issuer_public_key_bytes=public_key_to_bytes(public_key),
+        revoked_credentials=revoked,
         storage_backend=os.getenv("STORAGE_BACKEND", "local").strip().lower(),
         index_database_url=_build_index_database_url(),
         backup_root=Path(os.getenv("BACKUP_ROOT", "/backups")),
@@ -138,7 +146,9 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         max_upload_size_mb=_coerce_int(raw.get("max_upload_size_mb"), 2048, 1),
         upload_chunk_size_mb=_coerce_int(raw.get("upload_chunk_size_mb"), 8, 1),
         upload_session_ttl_hours=_coerce_int(raw.get("upload_session_ttl_hours"), 24, 1),
-        upload_cleanup_interval_seconds=_coerce_int(raw.get("upload_cleanup_interval_seconds"), 300, 10),
+        upload_cleanup_interval_seconds=_coerce_int(
+            raw.get("upload_cleanup_interval_seconds"), 300, 10
+        ),
         ntfy_url=_coerce_url(raw.get("ntfy_url")),
         ntfy_topic=_coerce_text(raw.get("ntfy_topic")),
         ntfy_message_template=_coerce_text(raw.get("ntfy_message_template")),
@@ -146,7 +156,8 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         ntfy_match_edge_instance_id=_coerce_text(raw.get("ntfy_match_edge_instance_id")),
         ntfy_match_source=_coerce_text(raw.get("ntfy_match_source")),
         hook_pre_command=_coerce_text(raw.get("hook_pre_command")),
-        hook_post_command=_coerce_text(raw.get("hook_post_command")),
+        hook_post_command=_coerce_text(raw.get("hook_post_command")
+        ),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
         http_port=max(1, int(os.getenv("HTTP_PORT", "6555"))),
@@ -158,8 +169,14 @@ def _build_index_database_url() -> str:
     if explicit_url:
         return explicit_url
 
-    username = os.getenv("INDEX_DATABASE_USER", "").strip() or os.getenv("POSTGRES_USER", "").strip()
-    password = os.getenv("INDEX_DATABASE_PASSWORD", "").strip() or os.getenv("POSTGRES_PASSWORD", "").strip()
+    username = (
+        os.getenv("INDEX_DATABASE_USER", "").strip()
+        or os.getenv("POSTGRES_USER", "").strip()
+    )
+    password = (
+        os.getenv("INDEX_DATABASE_PASSWORD", "").strip()
+        or os.getenv("POSTGRES_PASSWORD", "").strip()
+    )
     if not username or not password:
         raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
 

@@ -57,21 +57,24 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.state_dir, Path("/custom/state"))
         self.assertEqual(settings.spool_dir, Path("/custom/spool"))
 
-    def test_resolve_auth_token_file_path_uses_secret_dir_for_bare_filename(self) -> None:
-        resolved = config._resolve_auth_token_file_path("relay_auth_token")
-        self.assertEqual(resolved, Path("/run/secrets") / "relay_auth_token")
+    def test_resolve_credential_file_path_uses_secret_dir_for_bare_filename(self) -> None:
+        resolved = config._resolve_edge_credential_file_path("relay_edge_credential")
+        self.assertEqual(resolved, Path("/run/secrets") / "relay_edge_credential")
 
-    def test_resolve_auth_token_file_path_preserves_explicit_path(self) -> None:
-        resolved = config._resolve_auth_token_file_path("/tmp/relay_auth_token")
-        self.assertEqual(resolved, Path("/tmp/relay_auth_token"))
+
+    def test_resolve_credential_file_path_preserves_explicit_path(self) -> None:
+        resolved = config._resolve_edge_credential_file_path("/tmp/relay_edge_credential")
+        self.assertEqual(resolved, Path("/tmp/relay_edge_credential"))
 
     def test_env_overrides_reads_bare_filename_from_secret_dir(self) -> None:
-        with patch.dict(os.environ, {"AUTH_TOKEN_FILE": "relay_auth_token"}, clear=True):
-            with patch.object(Path, "read_text", autospec=True, return_value="secret\n") as read_text:
+        with patch.dict(os.environ, {"EDGE_CREDENTIAL_FILE": "relay_edge_credential"}, clear=True):
+            with patch.object(Path, "read_text", autospec=True, return_value="my.jwt\n") as read_text:
                 overrides = config._env_overrides()
 
-        self.assertEqual(overrides["auth_token"], "secret")
-        read_text.assert_called_once_with(Path("/run/secrets/relay_auth_token"), encoding="utf-8")
+        self.assertEqual(overrides["edge_credential"], "my.jwt")
+        read_text.assert_called_once_with(
+            Path("/run/secrets/relay_edge_credential"), encoding="utf-8"
+        )
 
     def test_load_settings_applies_upload_and_circuit_breaker_env_overrides(self) -> None:
         with patch.dict(

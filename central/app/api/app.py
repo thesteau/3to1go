@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes_admin import router as admin_router
 from app.api.routes_automation import router as automation_router
+from app.api.routes_credentials import router as credentials_router
 from app.api.routes_overview import router as overview_router
 from app.api.routes_snapshots import router as snapshots_router
 from app.api.routes_uploads import router as uploads_router
@@ -68,6 +69,7 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     app.include_router(admin_router)
     app.include_router(overview_router)
     app.include_router(automation_router)
+    app.include_router(credentials_router)
     app.include_router(snapshots_router)
     app.include_router(uploads_router)
 
