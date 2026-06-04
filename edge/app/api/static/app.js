@@ -9,7 +9,7 @@ let _recoverContext = null;
 const TOAST_DURATION_MS = 8000;
 const JOB_EVENT_LINGER_MS = 10000;
 const EDGE_ACTIVE_REFRESH_MS = 2500;
-const EDGE_IDLE_REFRESH_MS = 12000;
+const EDGE_ACTIVE_REFRESH_BURST_COUNT = 6;
 const EDGE_PAUSED_REFRESH_CHECK_MS = 2000;
 const ACTIVE_JOB_STATUSES = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
 let _appDialogResolve = null;
@@ -17,6 +17,7 @@ let currentUser = null;
 let _appStarted = false;
 let _edgeRefreshTimer = null;
 let _edgeAutoRefreshStarted = false;
+let _edgeRefreshBurstRemaining = 0;
 const rawFetch = window.fetch.bind(window);
 
 window.fetch = async (...args) => {
@@ -1376,19 +1377,35 @@ function edgeAutoRefreshPaused() {
   return document.hidden || Boolean(document.querySelector("dialog[open]"));
 }
 
-function scheduleEdgeRefresh(delay = edgeHasActiveWork() ? EDGE_ACTIVE_REFRESH_MS : EDGE_IDLE_REFRESH_MS) {
+function scheduleEdgeRefresh(delay = EDGE_ACTIVE_REFRESH_MS, { force = false } = {}) {
   if (!_edgeAutoRefreshStarted) return;
+  const shouldRefresh = force || edgeHasActiveWork() || _edgeRefreshBurstRemaining > 0;
+  if (!shouldRefresh) {
+    if (_edgeRefreshTimer) {
+      window.clearTimeout(_edgeRefreshTimer);
+      _edgeRefreshTimer = null;
+    }
+    return;
+  }
   if (_edgeRefreshTimer) {
     window.clearTimeout(_edgeRefreshTimer);
   }
   _edgeRefreshTimer = window.setTimeout(() => {
     _edgeRefreshTimer = null;
     if (edgeAutoRefreshPaused()) {
-      scheduleEdgeRefresh(EDGE_PAUSED_REFRESH_CHECK_MS);
+      scheduleEdgeRefresh(EDGE_PAUSED_REFRESH_CHECK_MS, { force: true });
       return;
+    }
+    if (_edgeRefreshBurstRemaining > 0) {
+      _edgeRefreshBurstRemaining -= 1;
     }
     loadData({ silent: true, includeKey: false });
   }, delay);
+}
+
+function requestEdgeActiveRefreshBurst(count = EDGE_ACTIVE_REFRESH_BURST_COUNT) {
+  _edgeRefreshBurstRemaining = Math.max(_edgeRefreshBurstRemaining, count);
+  scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS, { force: true });
 }
 
 async function loadData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
@@ -1541,6 +1558,7 @@ async function forceUpload(jobName, btn) {
 
   btn.disabled = true;
   try {
+    requestEdgeActiveRefreshBurst();
     const responsePromise = fetch(`/api/jobs/force-send?job_name=${encodeURIComponent(jobName)}`, {
       method: "POST",
     });
@@ -1717,6 +1735,7 @@ async function deleteJob() {
 
 async function runNow() {
   try {
+    requestEdgeActiveRefreshBurst();
     const responsePromise = fetch("/api/run-now", { method: "POST" });
     window.setTimeout(() => loadData({ silent: true, includeKey: false }), 250);
     const response = await responsePromise;
@@ -1762,13 +1781,12 @@ function startEdgeApp() {
   document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
-      scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS);
+      loadData({ silent: true, includeKey: false });
     }
   });
   initMeta();
-  loadData();
   _edgeAutoRefreshStarted = true;
-  scheduleEdgeRefresh(EDGE_IDLE_REFRESH_MS);
+  loadData();
 }
 
 applyTheme("dark");
