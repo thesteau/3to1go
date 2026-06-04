@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -36,6 +37,10 @@ def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
 
 
+def settings_storage_path() -> Path:
+    return _default_config_dir() / "settings.json"
+
+
 def hook_scripts_dir() -> Path:
     if _uses_container_layout():
         return Path("/hook-scripts")
@@ -65,11 +70,13 @@ def _coerce_url(value: Any, default: str = "") -> str:
     return normalized
 
 
-def _config_or_env(raw: dict[str, Any], config_key: str, env_key: str) -> Any:
-    value = raw.get(config_key)
-    if value is not None and str(value).strip():
-        return value
-    return os.getenv(env_key, "")
+def _config_or_env(raw: dict[str, Any], key: str, env_key: str) -> Any:
+    value = raw.get(key)
+    if value is None:
+        return os.getenv(env_key)
+    if isinstance(value, str) and not value.strip():
+        return os.getenv(env_key)
+    return value
 
 
 def _coerce_theme(value: Any) -> str:
@@ -182,7 +189,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     )
 
 
-def _build_index_database_url() -> str:
+def _build_index_database_url() -> str | None:
     explicit_url = os.getenv("INDEX_DATABASE_URL", "").strip()
     if explicit_url:
         return explicit_url
@@ -196,7 +203,7 @@ def _build_index_database_url() -> str:
         or os.getenv("POSTGRES_PASSWORD", "").strip()
     )
     if not username or not password:
-        raise RuntimeError("Central requires PostgreSQL credentials. Set INDEX_DATABASE_URL or POSTGRES_USER and POSTGRES_PASSWORD.")
+        return None
 
     host = os.getenv("INDEX_DATABASE_HOST", "postgres").strip() or "postgres"
     port = os.getenv("INDEX_DATABASE_PORT", "5432").strip() or "5432"
@@ -208,26 +215,14 @@ def _build_index_database_url() -> str:
     return f"postgresql://{quote(username)}:{quote(password)}@{host}:{port}/{database}"
 
 
-def _load_settings_payload_from_database(database_url: str | None) -> dict[str, Any]:
-    if not database_url:
-        raise RuntimeError("Central requires PostgreSQL for saved app settings.")
-    try:
-        import psycopg
-    except ImportError:
-        return {}
-    try:
-        with psycopg.connect(database_url, autocommit=True) as conn, conn.cursor() as cur:
-            cur.execute("SELECT payload FROM app_settings WHERE key = %s", ("settings",))
-            row = cur.fetchone()
-    except Exception:
-        return {}
-    if row is None:
-        return {}
-    payload = row[0]
-    return payload if isinstance(payload, dict) else {}
-
-
 def load_settings() -> Settings:
-    database_url = _build_index_database_url()
-    payload = _load_settings_payload_from_database(database_url)
+    path = settings_storage_path()
+    payload: dict[str, Any] = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                payload = data
+        except (json.JSONDecodeError, OSError):
+            pass
     return build_settings(payload)
