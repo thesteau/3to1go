@@ -9,6 +9,7 @@ from app.services.runner import EdgeRunner
 
 
 _MINIMUM_CYCLE_GAP = timedelta(minutes=MINIMUM_SCHEDULE_MINUTES)
+_STARTUP_DELAY = timedelta(minutes=5)
 
 
 class SchedulerController:
@@ -23,7 +24,8 @@ class SchedulerController:
         self._next_run_at: datetime | None = None
         self._last_started_at: datetime | None = None
         self._last_completed_at: datetime | None = None
-        self._run_now_requested = True
+        self._run_now_requested = False
+        self._startup_delay_until = datetime.now().astimezone() + _STARTUP_DELAY
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -52,7 +54,7 @@ class SchedulerController:
 
     def snapshot(self) -> dict[str, Any]:
         with self._status_lock:
-            return {
+            result: dict[str, Any] = {
                 "state": self._state,
                 "cron_schedule": self.schedule.expression,
                 "minimum_cycle_gap_minutes": MINIMUM_SCHEDULE_MINUTES,
@@ -61,6 +63,9 @@ class SchedulerController:
                 "last_completed_at": _format_datetime(self._last_completed_at),
                 "run_now_requested": self._run_now_requested,
             }
+            if self._last_completed_at is None:
+                result["startup_delay_until"] = _format_datetime(self._startup_delay_until)
+            return result
 
     def reload_settings(self) -> None:
         schedule = CronSchedule.from_expression(self.runner.settings.cron_schedule)
@@ -101,7 +106,7 @@ class SchedulerController:
         baseline = self._last_completed_at or self._now()
         scheduled_at = self.schedule.next_after(baseline)
         if self._last_completed_at is None:
-            return scheduled_at
+            return max(scheduled_at, self._startup_delay_until)
         return max(scheduled_at, self._last_completed_at + _MINIMUM_CYCLE_GAP)
 
     def _run_cycle(self, trigger: str) -> None:

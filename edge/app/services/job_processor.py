@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -40,8 +43,44 @@ class JobProcessor:
         if not self.settings.edge_credential.strip():
             self.logger.warning("cycle_skipped reason=edge_credential_missing")
             return False
-        for job in discover_jobs(self.settings.scan_root, self.settings.max_depth, self.logger):
-            self.process_job(job)
+
+        jobs = list(discover_jobs(self.settings.scan_root, self.settings.max_depth, self.logger))
+        if not jobs:
+            self.cleanup_stale_archives()
+            return True
+
+        # Each job compresses independently; uploads are serialised through a queue
+        # so they don't all hit the network simultaneously.
+        upload_queue: queue.Queue = queue.Queue()
+
+        def upload_worker() -> None:
+            while True:
+                item = upload_queue.get()
+                if item is None:
+                    break
+                job, state, lock = item
+                try:
+                    self._upload_pending_archive(job, state)
+                except Exception:
+                    self.logger.exception(
+                        "unexpected_exception during upload job_name=%s", job.job_name
+                    )
+                finally:
+                    self._finish_job(job, lock)
+
+        upload_thread = threading.Thread(target=upload_worker, name="edge-upload", daemon=True)
+        upload_thread.start()
+
+        with ThreadPoolExecutor(max_workers=max(1, len(jobs))) as pool:
+            futures = [pool.submit(self._prepare_job, job, upload_queue) for job in jobs]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception:
+                    self.logger.exception("unexpected_exception in prepare phase")
+
+        upload_queue.put(None)
+        upload_thread.join()
         self.cleanup_stale_archives()
         return True
 
@@ -78,6 +117,199 @@ class JobProcessor:
                 self.ntfy_publisher.publish_best_effort(self.settings, hook_context)
             lock.release()
 
+    # ------------------------------------------------------------------
+    # Cycle pipeline: concurrent compression → serial upload queue
+    # ------------------------------------------------------------------
+
+    def _prepare_job(self, job: JobDefinition, upload_queue: queue.Queue) -> None:
+        """Compress one job and enqueue the result; called concurrently from run_cycle."""
+        lock = self.lock_manager.acquire(job.state_key)
+        if lock is None:
+            self.logger.info("job_locked job_name=%s path=%s", job.job_name, job.root_path)
+            return
+
+        state = self.state_store.get(job.state_key)
+        state.job_name = job.job_name
+        ready = False
+        try:
+            self.hook_manager.run_command(
+                self.settings.hook_pre_command,
+                phase="pre",
+                context=self._hook_context(job, state),
+            )
+            ready = self._prepare_archive_locked(job, state)
+        except Exception as exc:
+            self.logger.exception(
+                "unexpected_exception job_name=%s path=%s", job.job_name, job.root_path
+            )
+            err_state = self.state_store.get(job.state_key)
+            err_state.job_name = job.job_name
+            err_state.last_status = "unexpected_exception"
+            err_state.last_error_category = "unexpected"
+            err_state.last_error_detail = str(exc)
+            err_state.last_upload_updated_at = _utc_now_text()
+            self.state_store.set(job.state_key, err_state)
+
+        if ready:
+            fresh = self.state_store.get(job.state_key)
+            fresh.job_name = job.job_name
+            upload_queue.put((job, fresh, lock))
+        else:
+            self._finish_job(job, lock)
+
+    def _finish_job(self, job: JobDefinition, lock) -> None:
+        """Run post-hook, ntfy on success, and release the lock."""
+        try:
+            final_state = self.state_store.get(job.state_key)
+            final_state.job_name = job.job_name
+            hook_context = self._hook_context(job, final_state)
+            self.hook_manager.run_command(
+                self.settings.hook_post_command, phase="post", context=hook_context
+            )
+            if final_state.last_status == "success":
+                self.ntfy_publisher.publish_best_effort(self.settings, hook_context)
+        finally:
+            lock.release()
+
+    def _prepare_archive_locked(self, job: JobDefinition, state: JobState) -> bool:
+        """Scan, fingerprint, and compress. Returns True when an archive is ready to upload."""
+        if not state.manual_intervention_required:
+            retry = self._check_retry(job, state)
+            if retry == "waiting":
+                return False
+            if retry == "upload_now":
+                return True
+
+        self._set_active_phase(job, state, "scanning", 5)
+        state.last_error_detail = None
+        state.last_error_category = None
+        self.state_store.set(job.state_key, state)
+
+        files = build_file_list(job, self.logger)
+        if not files:
+            self._clear_pending_archive(state)
+            state.last_status = "skipped_empty"
+            state.last_error_category = None
+            state.last_error_detail = None
+            state.manual_intervention_required = False
+            self.state_store.set(job.state_key, state)
+            self.logger.info("skipped_empty job_name=%s path=%s", job.job_name, job.root_path)
+            return False
+
+        fingerprint = compute_fingerprint(files)
+        if fingerprint == state.last_successful_fingerprint:
+            self._clear_pending_archive(state)
+            state.last_status = "skipped_unchanged"
+            state.last_error_category = None
+            state.last_error_detail = None
+            state.manual_intervention_required = False
+            self.state_store.set(job.state_key, state)
+            self.logger.info(
+                "skipped_unchanged job_name=%s fingerprint=%s", job.job_name, fingerprint[:8]
+            )
+            return False
+
+        if (
+            state.manual_intervention_required
+            and state.pending_archive
+            and state.pending_fingerprint == fingerprint
+            and Path(state.pending_archive).exists()
+        ):
+            state.last_status = "manual_intervention_required"
+            self.state_store.set(job.state_key, state)
+            self.logger.warning(
+                "manual_intervention_required job_name=%s archive=%s detail=%s",
+                job.job_name,
+                Path(state.pending_archive).name,
+                state.last_error_detail,
+            )
+            return False
+
+        archive_path, timestamp = self._create_pending_archive(
+            job,
+            files,
+            fingerprint,
+            progress_callback=lambda status, pct: self._set_active_phase(job, state, status, pct),
+        )
+        previous_pending = state.pending_archive
+        state.pending_archive = str(archive_path)
+        state.pending_archive_size = archive_path.stat().st_size
+        state.pending_archive_sha256 = sha256_path(archive_path)
+        state.pending_fingerprint = fingerprint
+        state.pending_timestamp = timestamp
+        state.upload_id = None
+        state.upload_offset = 0
+        state.upload_attempt_count = 0
+        state.current_chunk_size_bytes = None
+        state.next_retry_at = None
+        state.last_error_detail = None
+        state.last_error_category = None
+        state.last_stored_as = None
+        state.last_pruned = 0
+        state.last_duplicate = False
+        state.last_upload_started_at = None
+        state.last_upload_updated_at = None
+        state.active_phase = "archive_created"
+        state.active_phase_percent = 50
+        state.manual_intervention_required = False
+        state.last_status = "archive_created"
+        self.state_store.set(job.state_key, state)
+
+        if previous_pending and previous_pending != str(archive_path):
+            Path(previous_pending).unlink(missing_ok=True)
+
+        return True
+
+    def _check_retry(self, job: JobDefinition, state: JobState) -> str:
+        """Return 'waiting', 'upload_now', or 'none' (proceed to compress)."""
+        if not state.pending_fingerprint:
+            return "none"
+
+        retry_at = _parse_utc_text(state.next_retry_at)
+
+        if not state.pending_archive:
+            if retry_at is not None and retry_at > datetime.now(timezone.utc):
+                state.last_status = "waiting_retry"
+                self.state_store.set(job.state_key, state)
+                self.logger.info(
+                    "waiting_retry job_name=%s archive=%s retry_at=%s",
+                    state.job_name or job.job_name,
+                    "rebuild_required",
+                    state.next_retry_at,
+                )
+                return "waiting"
+            return "none"
+
+        pending_path = Path(state.pending_archive)
+        if not pending_path.exists():
+            self._clear_pending_archive(state)
+            state.last_status = "skipped_missing"
+            self.state_store.set(job.state_key, state)
+            self.logger.warning(
+                "skipped_missing job_name=%s pending_archive=%s",
+                state.job_name or job.job_name,
+                pending_path,
+            )
+            return "none"
+
+        if retry_at is not None and retry_at > datetime.now(timezone.utc):
+            state.last_status = "waiting_retry"
+            self.state_store.set(job.state_key, state)
+            self.logger.info(
+                "waiting_retry job_name=%s archive=%s retry_at=%s",
+                state.job_name or job.job_name,
+                pending_path.name,
+                state.next_retry_at,
+            )
+            return "waiting"
+
+        self.logger.info(
+            "retry_pending job_name=%s archive=%s",
+            state.job_name or job.job_name,
+            pending_path.name,
+        )
+        return "upload_now"
+
     def _process_job_locked(self, job: JobDefinition, force_send: bool = False) -> None:
         state = self.state_store.get(job.state_key)
         state.job_name = job.job_name
@@ -96,7 +328,11 @@ class JobProcessor:
             state.manual_intervention_required = False
             state.last_status = "force_send_requested"
             self.state_store.set(job.state_key, state)
-            self.logger.info("force_send_pending job_name=%s archive=%s", job.job_name, Path(state.pending_archive).name)
+            self.logger.info(
+                "force_send_pending job_name=%s archive=%s",
+                job.job_name,
+                Path(state.pending_archive).name,
+            )
             self._upload_pending_archive(job, state)
             return
 
