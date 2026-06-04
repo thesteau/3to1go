@@ -36,8 +36,11 @@ def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
 
 
-def revoked_credentials_path() -> Path:
-    return _default_config_dir() / "revoked_credentials"
+def revoked_credentials_path() -> Path | None:
+    try:
+        return _default_config_dir() / "revoked_credentials"
+    except RuntimeError:
+        return None
 
 
 def hook_scripts_dir() -> Path:
