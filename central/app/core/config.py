@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
 
-from app.core.auth import issuer_key_path_from_env, revoked_credentials_path_from_env
+from app.core.auth import issuer_key_path_from_env
 from app.core.signing import load_or_create_issuer_keypair, load_revoked_credentials, public_key_to_bytes
 
 
@@ -34,6 +34,10 @@ def _default_config_dir() -> Path:
 
 def app_database_path() -> Path:
     return _default_config_dir() / "relaycentralizer.db"
+
+
+def revoked_credentials_path() -> Path:
+    return _default_config_dir() / "revoked_credentials"
 
 
 def hook_scripts_dir() -> Path:
@@ -132,7 +136,7 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
     raw = payload or {}
     key_path = issuer_key_path_from_env()
     _, public_key = load_or_create_issuer_keypair(key_path)
-    revoked = load_revoked_credentials(revoked_credentials_path_from_env())
+    revoked = load_revoked_credentials(revoked_credentials_path())
     return Settings(
         issuer_key_path=key_path,
         issuer_public_key_bytes=public_key_to_bytes(public_key),

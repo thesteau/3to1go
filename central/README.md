@@ -113,7 +113,7 @@ Central signs per-Edge credentials with its issuer key.
 
 - Each Edge should use a credential minted from Central's UI.
 - Rotating or revoking one Edge credential does not require updating every other Edge.
-- `REVOKED_CREDENTIALS_FILE` can list revoked credential JTIs, one per line.
+- Revoked credential JTIs are stored in Central's config directory (`revoked_credentials`) and managed by the app.
 
 ### Local storage only
 
@@ -167,7 +167,6 @@ These are the environment variables most people care about first:
 | Variable | Default | What it means |
 | --- | --- | --- |
 | `ISSUER_KEY_FILE` | `/run/secrets/relay_issuer.key` in the contributor Compose, `relay_issuer.key` in the deploy example | File containing the Ed25519 issuer private key (auto-generated on first run) |
-| `REVOKED_CREDENTIALS_FILE` | unset | Optional path to a text file listing revoked credential JTIs, one per line |
 | `POSTGRES_USER` | `relay` | PostgreSQL username for Central metadata, users, and settings |
 | `POSTGRES_PASSWORD` | `change-this-password` | PostgreSQL password for Central metadata, users, and settings |
 

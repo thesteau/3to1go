@@ -14,13 +14,6 @@ def issuer_key_path_from_env() -> Path:
     raise RuntimeError("ISSUER_KEY_FILE environment variable is not set or empty.")
 
 
-def revoked_credentials_path_from_env() -> Path | None:
-    raw = os.getenv("REVOKED_CREDENTIALS_FILE")
-    if raw and raw.strip():
-        return Path(raw.strip())
-    return None
-
-
 def _resolve_path(value: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute():
@@ -32,5 +25,4 @@ def _resolve_path(value: str) -> Path:
 
 __all__ = [
     "issuer_key_path_from_env",
-    "revoked_credentials_path_from_env",
 ]
