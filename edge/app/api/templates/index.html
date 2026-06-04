@@ -305,7 +305,7 @@
       <div class="modal-head">
         <div>
           <h2 id="hooks-dialog-title">Custom Scripts</h2>
-          <p class="hint">Edge runs the pre command before job processing and the post command after it. Only the first 3 files in the volume are shown here.</p>
+          <p class="hint">You may be able to upload .sh and .txt files to be executed. Only the first 3 files in the volume are shown here.</p>
         </div>
         <button type="button" class="secondary" onclick="closeDialog('hooks-dialog')">Close</button>
       </div>
@@ -335,10 +335,10 @@
       <div class="hook-section">
         <div class="hook-section-head">
           <h3>Uploaded Items</h3>
-          <span class="hint">3 files max. Directory: <code id="hook-script-dir">loading...</code></span>
+          <span class="hint">3 files max. Supports .sh scripts and .txt helper files. Directory: <code id="hook-script-dir">loading...</code></span>
         </div>
         <div class="hook-upload-row">
-          <input id="hook_file_input" type="file" accept=".sh,.txt,text/plain">
+          <input id="hook_file_input" type="file" accept=".sh,.txt">
           <button type="button" class="secondary" onclick="uploadHookFile()">Upload</button>
         </div>
         <div id="hook-files" class="hook-files"></div>

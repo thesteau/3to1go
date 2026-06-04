@@ -8,7 +8,7 @@ from typing import Any
 
 
 MAX_HOOK_FILES = 3
-_ALLOWED_SUFFIXES = {"", ".sh", ".txt"}
+_ALLOWED_SUFFIXES = {".sh", ".txt"}
 _HOOK_TIMEOUT_SECONDS = 300
 
 
@@ -36,7 +36,7 @@ class HookManager:
         safe_name = self._sanitize_filename(filename)
         suffix = Path(safe_name).suffix.lower()
         if suffix not in _ALLOWED_SUFFIXES:
-            raise ValueError("only .sh, .txt, or extensionless text files are allowed")
+            raise ValueError("only .sh scripts or .txt helper files are allowed")
 
         try:
             text = content.decode("utf-8")
@@ -46,6 +46,9 @@ class HookManager:
         existing = {path.name for path in self._all_files()}
         if safe_name not in existing and len(existing) >= MAX_HOOK_FILES:
             raise ValueError("only the first 3 files are supported here")
+
+        if suffix == ".sh":
+            text = self._normalize_shell_script_text(text)
 
         target = self.scripts_dir / safe_name
         target.write_text(text, encoding="utf-8")
@@ -89,6 +92,8 @@ class HookManager:
             self.logger.warning("hook_execution_failed phase=%s command=%s detail=%s", phase, normalized, exc)
             return
 
+        self._log_command_output(result, phase=phase, command=normalized)
+
         if result.returncode != 0:
             detail = (result.stderr or result.stdout or "").strip()
             self.logger.warning(
@@ -112,6 +117,17 @@ class HookManager:
             prefix = ".\\" if os.name == "nt" else "./"
             return f"{prefix}{candidate.name}"
         return stripped
+
+    def _normalize_shell_script_text(self, text: str) -> str:
+        return text.replace("\r\n", "\n").replace("\r", "\n")
+
+    def _log_command_output(self, result: subprocess.CompletedProcess[str], *, phase: str, command: str) -> None:
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        if stdout:
+            self.logger.info("hook_execution_stdout phase=%s command=%s output=%s", phase, command, stdout)
+        if stderr:
+            self.logger.warning("hook_execution_stderr phase=%s command=%s output=%s", phase, command, stderr)
 
     def _build_env(self, phase: str, context: dict[str, Any]) -> dict[str, str]:
         env = {
