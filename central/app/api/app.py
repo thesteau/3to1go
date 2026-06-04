@@ -16,9 +16,10 @@ from app.api.routes_overview import router as overview_router
 from app.api.routes_snapshots import router as snapshots_router
 from app.api.routes_uploads import router as uploads_router
 from app.api.views import STATIC_DIR
-from app.core.config import Settings, app_database_path, hook_scripts_dir, load_settings
+from app.core.config import Settings, app_database_path, hook_scripts_dir, load_settings, trusted_certificates_dir
 from app.core.logging import configure_logging
 from app.index.factory import build_snapshot_index_backend
+from app.services.certificates import CertificateManager
 from app.services.hooks import HookManager
 from app.services.credential_store import CredentialStore
 from app.services.ingest import IngestService
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     user_store = UserStore(database_url=settings.index_database_url, sqlite_path=user_store_path or app_database_path())
     credential_store = CredentialStore(database_url=settings.index_database_url, sqlite_path=user_store_path)
     hook_manager = HookManager(hook_scripts_dir(), logger)
+    certificate_manager = CertificateManager(trusted_certificates_dir())
     ntfy_publisher = NtfyPublisher(logger)
     ingest_service = IngestService(
         settings=settings,
@@ -67,6 +69,7 @@ def create_app(settings: Settings | None = None, user_store_path: Path | None = 
     app.state.credential_store = credential_store
     app.state.ingest_service = ingest_service
     app.state.hook_manager = hook_manager
+    app.state.certificate_manager = certificate_manager
     app.state.ntfy_publisher = ntfy_publisher
     app.state.cleanup_task = None
     app.state.credential_cleanup_task = None

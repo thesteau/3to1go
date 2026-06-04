@@ -89,6 +89,21 @@ An empty `.upload_dir` also works. In that case, Edge uses the folder name as th
 
 ## Important Things To Know
 
+### Internal HTTPS Certificates
+
+The Docker deployments support optional user-provided CA certificates for internal HTTPS services such as `https://ntfy.home`.
+
+Admins can upload `.crt` PEM CA/root certificates from each app's **Trusted Certificates** dialog. The app stores uploaded certificates under `/config/trusted-certs`, installs them into the container trust store immediately, and reinstalls them on later container starts.
+
+For automated deployments, you can also drop CA/root certificates ending in `.crt` into the app's mounted `certs` directory:
+
+```text
+deploy-example/central/certs/home-ca.crt
+deploy-example/edge/certs/home-ca.crt
+```
+
+This keeps user-specific certificates out of the image while allowing Central and Edge to verify private HTTPS endpoints.
+
 ### Encryption
 
 Each Edge creates its own `encryption.key` file on first run.

@@ -144,6 +144,55 @@ Use the address Edge can actually reach:
 - different machine: use Central's hostname or IP
 - separate Docker Desktop projects on the same host: often `http://host.docker.internal:6555`
 
+If Central, ntfy, or another internal service uses a private CA, Edge can trust it without baking certificates into the image.
+
+Admins can upload trusted CA certificates from the Edge UI:
+
+1. Open **Trusted Certificates**.
+2. Upload a `.crt` PEM CA/root certificate.
+3. Test the HTTPS integration again.
+
+Uploaded certificates are stored under:
+
+```text
+/config/trusted-certs
+```
+
+The container installs them into the Debian trust store immediately after upload. On later container starts, the entrypoint installs those saved certificates again before Edge starts.
+
+You can also place the CA/root certificate in the mounted `certs` directory for automated deployments:
+
+```text
+edge/certs/home-ca.crt
+```
+
+For the published deployment example, use:
+
+```text
+deploy-example/edge/certs/home-ca.crt
+```
+
+Only files ending in `.crt` are installed.
+
+After adding a certificate through the mounted `certs` directory, restart Edge:
+
+```bash
+docker compose up -d --force-recreate edge
+```
+
+You can test trust from inside the container:
+
+```bash
+docker compose exec edge curl -v https://ntfy.home
+```
+
+Advanced overrides:
+
+| Variable | Default |
+| --- | --- |
+| `RELAY_EXTRA_CA_DIR` | `/run/relay-certs` |
+| `RELAY_EXTRA_CA_FILE` | unset |
+
 ## Running Edge
 
 ### Local Python development

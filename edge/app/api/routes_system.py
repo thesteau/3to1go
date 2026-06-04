@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from app.api.dependencies import get_runner, get_scheduler, get_start_scheduler
 from app.api.models import EdgeHookCommandsInput, EdgeNtfySettingsInput, EdgeSettingsInput
+from app.api.routes_admin import admin_user
 from app.api.views import templates
 from app.core.config import encryption_key_path
 from app.core.encryption import key_as_base64, key_fingerprint, load_or_create_key
@@ -100,6 +101,45 @@ async def test_ntfy_config(
         runner.ntfy_publisher.publish_test(config.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "ok"}
+
+
+@router.get("/api/certificates")
+async def get_certificates(
+    _admin: dict = Depends(admin_user),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    return runner.certificate_manager.snapshot()
+
+
+@router.post("/api/certificates/files")
+async def upload_certificate_file(
+    certificate_file: UploadFile = File(...),
+    _admin: dict = Depends(admin_user),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        content = await certificate_file.read()
+        saved = runner.certificate_manager.save_uploaded_file(certificate_file.filename or "", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "ok", "file": saved}
+
+
+@router.delete("/api/certificates/files/{filename}")
+async def delete_certificate_file(
+    filename: str,
+    _admin: dict = Depends(admin_user),
+    runner: EdgeRunner = Depends(get_runner),
+) -> dict:
+    try:
+        runner.certificate_manager.delete_file(filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"status": "ok"}

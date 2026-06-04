@@ -3,8 +3,9 @@ from __future__ import annotations
 import threading
 
 from app.backup.discovery import discover_jobs
-from app.core.config import Settings, hook_scripts_dir
+from app.core.config import Settings, hook_scripts_dir, trusted_certificates_dir
 from app.core.logging import configure_logging
+from app.services.certificates import CertificateManager
 from app.services.directories import DirectoryService
 from app.services.hooks import HookManager
 from app.services.job_locks import JobLockManager
@@ -25,6 +26,7 @@ class EdgeRunner:
         self.upload_client = UploadClient(settings)
         self.lock_manager = JobLockManager()
         self.hook_manager = HookManager(hook_scripts_dir(), self.logger)
+        self.certificate_manager = CertificateManager(trusted_certificates_dir())
         self.ntfy_publisher = NtfyPublisher(self.logger)
         self._cycle_lock = threading.Lock()
         self._apply_settings(settings)

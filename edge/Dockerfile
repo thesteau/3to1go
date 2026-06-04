@@ -20,12 +20,15 @@ ENV XDG_CACHE_HOME=/data/cache
 WORKDIR /srv/edge
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libffi8 \
+    && apt-get install -y --no-install-recommends ca-certificates curl libffi8 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 COPY app ./app
+COPY docker-entrypoint.sh /usr/local/bin/relay-edge-entrypoint
+RUN chmod +x /usr/local/bin/relay-edge-entrypoint
 
 EXPOSE 6556
 
+ENTRYPOINT ["relay-edge-entrypoint"]
 CMD ["python", "-m", "app.main"]

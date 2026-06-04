@@ -42,6 +42,10 @@ def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
 
 
+def trusted_certificates_dir() -> Path:
+    return _default_config_dir() / "trusted-certs"
+
+
 def _coerce_int(value: Any, default: int, minimum: int) -> int:
     if value is None or value == "":
         return default

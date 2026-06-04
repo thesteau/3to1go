@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import Request
 
 from app.core.config import Settings
+from app.services.certificates import CertificateManager
 from app.services.hooks import HookManager
 from app.index.base import SnapshotIndexBackend
 from app.services.ingest import IngestService
@@ -46,3 +47,7 @@ def get_hook_manager(request: Request) -> HookManager:
 
 def get_ntfy_publisher(request: Request) -> NtfyPublisher:
     return request.app.state.ntfy_publisher
+
+
+def get_certificate_manager(request: Request) -> CertificateManager:
+    return request.app.state.certificate_manager

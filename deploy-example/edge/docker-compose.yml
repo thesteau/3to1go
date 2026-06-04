@@ -12,6 +12,7 @@ services:
       - ${SCAN_DIR:-./scan}:/scan
       - ./state:/data/state
       - ./spool:/data/spool
+      - ./certs:/run/relay-certs:ro
     restart: unless-stopped
     logging:
       driver: json-file

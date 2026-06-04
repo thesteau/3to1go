@@ -19,6 +19,7 @@
         <button type="button" onclick="manualRefresh()">Refresh</button>
         <button type="button" class="secondary" onclick="openCredentialDialog()">Mint Edge Credential</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openCertificatesDialog()">Trusted Certificates</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <button type="button" class="secondary" onclick="openUserManagementDialog()">Users & Access</button>
         <button type="button" onclick="openSettingsDialog()">Edit Central Settings</button>
@@ -241,6 +242,34 @@
         <button type="button" class="secondary" onclick="resetNtfyDefaults()">Defaults</button>
         <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
         <span class="hint status-line" id="ntfy-status"></span>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="certificates-dialog" class="modal" aria-labelledby="certificates-dialog-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="certificates-dialog-title">Trusted Certificates</h2>
+          <p class="hint">Upload internal CA certificates for HTTPS endpoints such as ntfy.</p>
+        </div>
+        <button type="button" class="secondary" onclick="closeDialog('certificates-dialog')">Close</button>
+      </div>
+
+      <div class="hook-section">
+        <div class="hook-section-head">
+          <h3>Uploaded Certificates</h3>
+          <span class="hint">10 files max. Supports .crt PEM files. Directory: <code id="certificate-dir">loading...</code></span>
+        </div>
+        <div class="hook-upload-row">
+          <input id="certificate_file_input" type="file" accept=".crt">
+          <button type="button" class="secondary" onclick="uploadCertificateFile()">Upload</button>
+        </div>
+        <div id="certificate-files" class="hook-files"></div>
+      </div>
+
+      <div class="toolbar">
+        <span class="hint status-line" id="certificates-status"></span>
       </div>
     </div>
   </dialog>

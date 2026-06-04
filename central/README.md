@@ -72,6 +72,64 @@ If Edge is in a separate Docker Desktop project on the same machine, it will oft
 http://host.docker.internal:6555
 ```
 
+## Trusting Internal HTTPS Certificates
+
+Central can trust private/internal HTTPS services, such as a self-hosted ntfy endpoint, without baking certificates into the image.
+
+Admins can upload trusted CA certificates from the Central UI:
+
+1. Open **Trusted Certificates**.
+2. Upload a `.crt` PEM CA/root certificate.
+3. Test the HTTPS integration again, for example from **Configure ntfy**.
+
+Uploaded certificates are stored under:
+
+```text
+/config/trusted-certs
+```
+
+The container installs them into the Debian trust store immediately after upload. On later container starts, the entrypoint installs those saved certificates again before Central starts.
+
+You can also place one or more internal CA certificates in the mounted `certs` directory for automated deployments:
+
+```text
+central/certs/home-ca.crt
+```
+
+For the published deployment example, use:
+
+```text
+deploy-example/central/certs/home-ca.crt
+```
+
+Only files ending in `.crt` are installed. Use the CA/root certificate that issued the service certificate, not usually the service certificate itself.
+
+Then configure ntfy with the trusted HTTPS URL, for example:
+
+```text
+https://ntfy.home
+```
+
+After adding a certificate through the mounted `certs` directory, restart Central:
+
+```bash
+docker compose up -d --force-recreate central
+```
+
+You can test trust from inside the container:
+
+```bash
+docker compose exec central curl -v https://ntfy.home
+docker compose exec central curl -v -d "Central ntfy test" https://ntfy.home/relay-centralizer-uploads
+```
+
+Advanced overrides:
+
+| Variable | Default |
+| --- | --- |
+| `RELAY_EXTRA_CA_DIR` | `/run/relay-certs` |
+| `RELAY_EXTRA_CA_FILE` | unset |
+
 ## What The Central UI Is For
 
 The UI is for operators, not for configuring Edge.
@@ -222,5 +280,6 @@ The bundled Compose example mounts:
 - `./data/staging` to `/staging`
 - `./data/postgres` for PostgreSQL metadata, users, and settings
 - `./secrets` to `/run/secrets`
+- `./certs` to `/run/relay-certs` for optional internal CA certificates
 
 After the first start, Central writes the generated issuer key to `./secrets/relay_issuer.key`.

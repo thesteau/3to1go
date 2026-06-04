@@ -3,15 +3,62 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.requests import Request
 
-from app.api.dependencies import get_hook_manager, get_ntfy_publisher, get_settings, get_settings_store
+from app.api.dependencies import (
+    get_certificate_manager,
+    get_hook_manager,
+    get_ntfy_publisher,
+    get_settings,
+    get_settings_store,
+)
 from app.api.models import CentralHookCommandsInput, CentralNtfySettingsInput
+from app.api.routes_admin import admin_user
 from app.core.config import Settings
+from app.services.certificates import CertificateManager
 from app.services.hooks import HookManager
 from app.services.ntfy import NtfyPublisher
 from app.services.settings_store import SettingsStore
 
 
 router = APIRouter()
+
+
+@router.get("/api/certificates")
+async def get_certificates(
+    _admin: dict = Depends(admin_user),
+    certificate_manager: CertificateManager = Depends(get_certificate_manager),
+) -> dict:
+    return certificate_manager.snapshot()
+
+
+@router.post("/api/certificates/files")
+async def upload_certificate_file(
+    certificate_file: UploadFile = File(...),
+    _admin: dict = Depends(admin_user),
+    certificate_manager: CertificateManager = Depends(get_certificate_manager),
+) -> dict:
+    try:
+        content = await certificate_file.read()
+        saved = certificate_manager.save_uploaded_file(certificate_file.filename or "", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "ok", "file": saved}
+
+
+@router.delete("/api/certificates/files/{filename}")
+async def delete_certificate_file(
+    filename: str,
+    _admin: dict = Depends(admin_user),
+    certificate_manager: CertificateManager = Depends(get_certificate_manager),
+) -> dict:
+    try:
+        certificate_manager.delete_file(filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "ok"}
 
 
 @router.get("/api/ntfy")

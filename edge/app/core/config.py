@@ -186,6 +186,10 @@ def hook_scripts_dir() -> Path:
     return _default_config_dir() / "hook-scripts"
 
 
+def trusted_certificates_dir() -> Path:
+    return _default_config_dir() / "trusted-certs"
+
+
 def encryption_key_path() -> Path:
     return _default_config_dir() / "encryption.key"
 
