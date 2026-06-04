@@ -10,7 +10,6 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 
-_DEFAULT_SECRET_DIR = Path("/run/secrets")
 _DEFAULT_TTL_DAYS = 365
 
 
@@ -102,8 +101,10 @@ def verify_credential(token: str, public_key: Ed25519PublicKey, revoked: frozens
     if payload.get("exp", 0) < int(time.time()):
         raise ValueError("credential expired")
 
-    jti = payload.get("jti", "")
-    if jti and jti in revoked:
+    jti = payload.get("jti")
+    if not jti:
+        raise ValueError("credential missing jti")
+    if jti in revoked:
         raise ValueError("credential revoked")
 
 

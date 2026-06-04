@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from app.core.signing import load_or_create_issuer_keypair, load_revoked_credentials
-
 
 _DEFAULT_SECRET_DIR = Path("/run/secrets")
 
@@ -35,6 +33,4 @@ def _resolve_path(value: str) -> Path:
 __all__ = [
     "issuer_key_path_from_env",
     "revoked_credentials_path_from_env",
-    "load_or_create_issuer_keypair",
-    "load_revoked_credentials",
 ]
