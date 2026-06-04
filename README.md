@@ -13,6 +13,14 @@ If you want the shortest mental model:
 4. Edge packs and encrypts those folders.
 5. Central stores the snapshots and lets you browse them in a web UI.
 
+## Why Use RelayCentralizer
+
+- **Simple Central/Edge model** - Central receives and organizes backups, while each Edge owns scanning, encryption, scheduling, and upload retries.
+- **Encrypted snapshots by default** - Edge encrypts archives before upload, so Central can store backups without needing plaintext file access.
+- **Instance-aware storage** - Central tracks both `edge_id` and `edge_instance_id`, letting related machines be grouped without mixing their snapshots or pruning each other.
+- **Persistent operational state** - Central keeps metadata, users, settings, Edge registrations, minted credentials, and revocations in PostgreSQL; Edge keeps its local settings in its own persisted database.
+- **Operator-friendly credentials** - Central mints Edge JWT credentials from the UI, Edge saves the pasted credential locally, and Central can revoke a token without deleting snapshots.
+
 ## What It Feels Like To Use
 
 You do not write a giant backup config file up front.
@@ -42,9 +50,9 @@ Central is usually the always-on receiver.
 
 - For normal Docker deployment, use [`deploy-example/central/`](deploy-example/central/).
 - Use [`central/`](central/) if you are contributing and want to build from this repo.
-- Create the auth token file Central expects.
 - Start the container.
 - Open the Central UI at `http://localhost:6555/`.
+- Mint an Edge credential from the Central UI.
 
 More detail: [`central/README.md`](central/README.md)
 
@@ -56,7 +64,7 @@ Edge runs on the machine that owns the files.
 - Use [`edge/`](edge/) if you are contributing and want to build from this repo.
 - Open the local Edge UI at `http://localhost:6556/`.
 - Set `CENTRAL_URL`.
-- Enter the same auth token Central uses.
+- Paste the credential minted by Central.
 - Pick a unique `EDGE_ID`.
 
 More detail: [`edge/README.md`](edge/README.md)
@@ -92,14 +100,14 @@ Each Edge creates its own `encryption.key` file on first run.
 
 Back up that key file.
 
-### Auth Token
+### Edge Credentials
 
-Central and Edge share one bearer token.
+Edge authenticates to Central with a signed JWT credential minted by Central.
 
-- The token must match on Central and every Edge that talks to it.
-- Central manages only its own token file.
-- Edge stores its token in its own local settings.
-- Rotation is global: if you change the token, you need to update every connected Edge.
+- Central stores credential metadata in its database, not raw tokens.
+- Edge stores the pasted credential in its local settings database.
+- Credentials can be unique per Edge or intentionally shared across multiple Edges.
+- Revoking a shared credential blocks every Edge instance using that same token.
 
 ### Unique Edge IDs Matter
 
