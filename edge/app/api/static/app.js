@@ -8,11 +8,16 @@ let showHiddenDirs = false;
 let _recoverContext = null;
 const TOAST_DURATION_MS = 8000;
 const JOB_EVENT_LINGER_MS = 10000;
-const EDGE_REFRESH_MS = 2500;
+const EDGE_ACTIVE_REFRESH_MS = 2500;
+const EDGE_IDLE_REFRESH_MS = 12000;
+const EDGE_PAUSED_REFRESH_CHECK_MS = 2000;
+const ACTIVE_JOB_STATUSES = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
 let _appDialogResolve = null;
 let currentUser = null;
 let _appStarted = false;
 let _migrationNoticeShown = false;
+let _edgeRefreshTimer = null;
+let _edgeAutoRefreshStarted = false;
 const rawFetch = window.fetch.bind(window);
 
 window.fetch = async (...args) => {
@@ -77,6 +82,29 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function formatMessage(value, fallback = "") {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => formatMessage(entry)).filter(Boolean).join("; ") || fallback;
+  }
+  if (typeof value === "object") {
+    if (typeof value.message === "string") return value.message;
+    if (typeof value.msg === "string") {
+      const location = Array.isArray(value.loc)
+        ? value.loc.filter((part) => !["body", "query", "path"].includes(String(part))).join(".")
+        : "";
+      return location ? `${location}: ${value.msg}` : value.msg;
+    }
+    if (value.detail) return formatMessage(value.detail, fallback);
+  }
+  return String(value || fallback);
+}
+
 function encodedPath(value) {
   return encodeURIComponent(value ?? ".");
 }
@@ -121,7 +149,8 @@ function renderStaticClipValue(label, value, { className = "", clipLength = 32 }
 }
 
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
-  if (!message) return;
+  const text = formatMessage(message);
+  if (!text) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
 
@@ -129,7 +158,7 @@ function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
   toast.setAttribute("role", "status");
-  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(text)}</span>`;
   region.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("visible"));
 
@@ -146,8 +175,9 @@ function setActionStatus(message, kind = "info") {
 function setStatus(id, message, kind = "info") {
   const element = document.getElementById(id);
   if (!element) return;
-  element.textContent = message || "";
-  if (message) {
+  const text = formatMessage(message);
+  element.textContent = text;
+  if (text) {
     element.dataset.kind = kind;
   } else {
     delete element.dataset.kind;
@@ -156,6 +186,13 @@ function setStatus(id, message, kind = "info") {
 
 function clearStatus(id) {
   setStatus(id, "", "info");
+}
+
+function setHtmlIfChanged(id, html) {
+  const element = document.getElementById(id);
+  if (!element || element.innerHTML === html) return false;
+  element.innerHTML = html;
+  return true;
 }
 
 async function readJson(response) {
@@ -924,7 +961,7 @@ function fillMetaFromDir(data) {
   const uploadCircuitDetails = describeUploadCircuit(uploadCircuit);
   const advertisedUrl = String(data.advertised_url || "").trim();
 
-  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  const set = setHtmlIfChanged;
 
   set("meta-val-edge-id", renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 }));
   set("meta-val-instance-id", renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 }));
@@ -1109,9 +1146,8 @@ function recentJobEvent(state, maxAgeMs = JOB_EVENT_LINGER_MS) {
 function jobActivityDetails(entry) {
   const state = entry.state || {};
   const status = String(state.last_status || "").trim();
-  const activeStatuses = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
   const terminalStatuses = new Set(["success", "retry_scheduled", "manual_intervention_required", "circuit_open", "unexpected_exception", "skipped_missing"]);
-  const isActive = activeStatuses.has(status);
+  const isActive = ACTIVE_JOB_STATUSES.has(status);
   const isTerminal = terminalStatuses.has(status) && recentJobEvent(state);
   if (!isActive && !isTerminal) return "";
 
@@ -1276,7 +1312,7 @@ function bindDirectoryTreeEvents() {
 
 function renderSelectedJobs(directories) {
   const selected = (directories || []).filter((entry) => entry.selected && !entry.blocked_by_parent);
-  document.getElementById("selected-jobs").innerHTML = selected.length
+  const html = selected.length
     ? selected.map((entry) => {
       const jobName = entry.config?.job_name || entry.relative_path;
       const lastStateLabel = formatLastState(entry);
@@ -1309,13 +1345,15 @@ function renderSelectedJobs(directories) {
       `;
     }).join("")
     : '<p class="hint">No directories are selected yet.</p>';
+  setHtmlIfChanged("selected-jobs", html);
 }
 
 function renderDirectoryTree(directories) {
   rememberDirectoryExpansion();
   const tree = renderDirectoryNode(".", buildDirectoryIndex(directories || []));
-  document.getElementById("directory-tree").innerHTML = tree.html || '<p class="hint">No directories were found under the scan root.</p>';
-  bindDirectoryTreeEvents();
+  if (setHtmlIfChanged("directory-tree", tree.html || '<p class="hint">No directories were found under the scan root.</p>')) {
+    bindDirectoryTreeEvents();
+  }
 }
 
 function renderDirectories(data, { refreshDirectoryTree = true } = {}) {
@@ -1357,60 +1395,87 @@ function resetForm() {
   setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
 }
 
-function loadData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
-  if (isLoadingData) return;
+function edgeHasActiveWork(data = latestData) {
+  if (data?.scheduler?.state === "running") return true;
+  return (data?.directories || []).some((entry) => ACTIVE_JOB_STATUSES.has(String(entry.state?.last_status || "").trim()));
+}
+
+function edgeAutoRefreshPaused() {
+  return document.hidden || Boolean(document.querySelector("dialog[open]"));
+}
+
+function scheduleEdgeRefresh(delay = edgeHasActiveWork() ? EDGE_ACTIVE_REFRESH_MS : EDGE_IDLE_REFRESH_MS) {
+  if (!_edgeAutoRefreshStarted) return;
+  if (_edgeRefreshTimer) {
+    window.clearTimeout(_edgeRefreshTimer);
+  }
+  _edgeRefreshTimer = window.setTimeout(() => {
+    _edgeRefreshTimer = null;
+    if (edgeAutoRefreshPaused()) {
+      scheduleEdgeRefresh(EDGE_PAUSED_REFRESH_CHECK_MS);
+      return;
+    }
+    loadData({ silent: true, includeKey: false });
+  }, delay);
+}
+
+async function loadData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
+  if (isLoadingData) {
+    scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS);
+    return;
+  }
   isLoadingData = true;
 
   if (!silent) {
     const spinner = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
-    document.getElementById("selected-jobs").innerHTML = spinner;
-    document.getElementById("directory-tree").innerHTML = spinner;
+    setHtmlIfChanged("selected-jobs", spinner);
+    setHtmlIfChanged("directory-tree", spinner);
   }
 
-  const statusFetch = fetch("/api/status");
-  const dirFetch = fetch("/api/directories");
-  const keyFetch = includeKey ? fetch("/api/encryption-key") : null;
-
-  statusFetch
-    .then(async (res) => {
-      if (!res.ok) return;
-      latestData = await res.json();
+  const statusFetch = (async () => {
+    const res = await fetch("/api/status");
+    if (!res.ok) return;
+    const statusData = await res.json();
+    latestData = { ...(latestData || {}), ...statusData };
       if (!document.getElementById("settings-dialog")?.open) {
         applyTheme(latestData.settings?.theme || "dark");
       }
-      fillMetaFromDir(latestData);
+    fillMetaFromDir(latestData);
       if (!document.getElementById("settings-dialog")?.open) {
         fillSettings(latestData.settings || {});
       }
-    })
-    .catch(() => {});
+  })().catch(() => {});
 
-  dirFetch
-    .then(async (res) => {
-      if (!res.ok) {
-        if (!silent) setActionStatus("Refresh failed.", "error");
-        return;
-      }
-      const dirData = await res.json();
-      latestData = { ...(latestData || {}), directories: dirData.directories };
-      renderSelectedJobs(dirData.directories);
-      if (refreshDirectoryTree) {
-        requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
-      }
-    })
-    .catch((error) => {
-      if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
-    })
-    .finally(() => { isLoadingData = false; });
+  const dirFetch = (async () => {
+    const res = await fetch("/api/directories");
+    if (!res.ok) {
+      if (!silent) setActionStatus("Refresh failed.", "error");
+      return;
+    }
+    const dirData = await res.json();
+    latestData = { ...(latestData || {}), directories: dirData.directories };
+    renderSelectedJobs(dirData.directories);
+    if (refreshDirectoryTree) {
+      requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
+    }
+  })().catch((error) => {
+    if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
+  });
 
-  if (keyFetch) {
-    keyFetch
-      .then(async (keyRes) => {
-        if (!keyRes.ok) return;
-        const keyData = await keyRes.json();
-        fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
-      })
-      .catch(() => {});
+  const keyFetch = includeKey
+    ? (async () => {
+      const keyRes = await fetch("/api/encryption-key");
+      if (!keyRes.ok) return;
+      const keyData = await keyRes.json();
+      fillMetaEncKey(keyData.key || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
+    })().catch(() => {})
+    : null;
+
+  try {
+    await Promise.all([statusFetch, dirFetch, keyFetch].filter(Boolean));
+  } finally {
+    isLoadingData = false;
+    scheduleEdgeRefresh();
   }
 }
 
@@ -1723,10 +1788,16 @@ function startEdgeApp() {
   resetForm();
   initializeFieldHelp(EDGE_SETTINGS_HELP);
   document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS);
+    }
+  });
   initMeta();
   loadData();
   checkMigration();
-  window.setInterval(() => loadData({ silent: true, includeKey: false }), EDGE_REFRESH_MS);
+  _edgeAutoRefreshStarted = true;
+  scheduleEdgeRefresh(EDGE_IDLE_REFRESH_MS);
 }
 
 applyTheme("dark");

@@ -17,6 +17,29 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function formatMessage(value, fallback = "") {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => formatMessage(entry)).filter(Boolean).join("; ") || fallback;
+  }
+  if (typeof value === "object") {
+    if (typeof value.message === "string") return value.message;
+    if (typeof value.msg === "string") {
+      const location = Array.isArray(value.loc)
+        ? value.loc.filter((part) => !["body", "query", "path"].includes(String(part))).join(".")
+        : "";
+      return location ? `${location}: ${value.msg}` : value.msg;
+    }
+    if (value.detail) return formatMessage(value.detail, fallback);
+  }
+  return String(value || fallback);
+}
+
 function base64UrlToBytes(b64) {
   const normalized = String(b64 || "").trim();
   if (!normalized) throw new Error("missing key");
@@ -135,7 +158,8 @@ function applyTheme(theme) {
 }
 
 function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}) {
-  if (!message) return;
+  const text = formatMessage(message);
+  if (!text) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
 
@@ -143,7 +167,7 @@ function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
   toast.setAttribute("role", "status");
-  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<strong class="toast-title">${escapeHtml(title || defaultTitle)}</strong><span>${escapeHtml(text)}</span>`;
   region.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("visible"));
 
@@ -160,8 +184,9 @@ function setActionStatus(message, kind = "info") {
 function setStatus(id, message, kind = "info") {
   const element = document.getElementById(id);
   if (!element) return;
-  element.textContent = message || "";
-  if (message) {
+  const text = formatMessage(message);
+  element.textContent = text;
+  if (text) {
     element.dataset.kind = kind;
   } else {
     delete element.dataset.kind;
