@@ -61,6 +61,7 @@ class ConfigTests(unittest.TestCase):
         resolved = config._resolve_edge_credential_file_path("relay_edge_credential")
         self.assertEqual(resolved, Path("/run/secrets") / "relay_edge_credential")
 
+
     def test_resolve_credential_file_path_preserves_explicit_path(self) -> None:
         resolved = config._resolve_edge_credential_file_path("/tmp/relay_edge_credential")
         self.assertEqual(resolved, Path("/tmp/relay_edge_credential"))

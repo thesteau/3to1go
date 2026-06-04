@@ -65,6 +65,13 @@ def _coerce_url(value: Any, default: str = "") -> str:
     return normalized
 
 
+def _config_or_env(raw: dict[str, Any], config_key: str, env_key: str) -> Any:
+    value = raw.get(config_key)
+    if value is not None and str(value).strip():
+        return value
+    return os.getenv(env_key, "")
+
+
 def _coerce_theme(value: Any) -> str:
     normalized = _coerce_text(value, "dark").lower()
     if normalized not in {"dark", "light"}:
@@ -146,15 +153,29 @@ def build_settings(payload: dict[str, Any] | None = None) -> Settings:
         max_upload_size_mb=_coerce_int(raw.get("max_upload_size_mb"), 2048, 1),
         upload_chunk_size_mb=_coerce_int(raw.get("upload_chunk_size_mb"), 8, 1),
         upload_session_ttl_hours=_coerce_int(raw.get("upload_session_ttl_hours"), 24, 1),
-        upload_cleanup_interval_seconds=_coerce_int(raw.get("upload_cleanup_interval_seconds"), 300, 10),
-        ntfy_url=_coerce_url(raw.get("ntfy_url")),
-        ntfy_topic=_coerce_text(raw.get("ntfy_topic")),
-        ntfy_message_template=_coerce_text(raw.get("ntfy_message_template")),
-        ntfy_match_edge_id=_coerce_text(raw.get("ntfy_match_edge_id")),
-        ntfy_match_edge_instance_id=_coerce_text(raw.get("ntfy_match_edge_instance_id")),
-        ntfy_match_source=_coerce_text(raw.get("ntfy_match_source")),
-        hook_pre_command=_coerce_text(raw.get("hook_pre_command")),
-        hook_post_command=_coerce_text(raw.get("hook_post_command")),
+        upload_cleanup_interval_seconds=_coerce_int(
+            raw.get("upload_cleanup_interval_seconds"), 300, 10
+        ),
+        ntfy_url=_coerce_url(_config_or_env(raw, "ntfy_url", "NTFY_URL")),
+        ntfy_topic=_coerce_text(_config_or_env(raw, "ntfy_topic", "NTFY_TOPIC")),
+        ntfy_message_template=_coerce_text(
+            _config_or_env(raw, "ntfy_message_template", "NTFY_MESSAGE_TEMPLATE")
+        ),
+        ntfy_match_edge_id=_coerce_text(
+            _config_or_env(raw, "ntfy_match_edge_id", "NTFY_MATCH_EDGE_ID")
+        ),
+        ntfy_match_edge_instance_id=_coerce_text(
+            _config_or_env(raw, "ntfy_match_edge_instance_id", "NTFY_MATCH_EDGE_INSTANCE_ID")
+        ),
+        ntfy_match_source=_coerce_text(
+            _config_or_env(raw, "ntfy_match_source", "NTFY_MATCH_SOURCE")
+        ),
+        hook_pre_command=_coerce_text(
+            _config_or_env(raw, "hook_pre_command", "HOOK_PRE_COMMAND")
+        ),
+        hook_post_command=_coerce_text(
+            _config_or_env(raw, "hook_post_command", "HOOK_POST_COMMAND")
+        ),
         staging_dir=Path(os.getenv("STAGING_DIR", "/staging")),
         http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
         http_port=max(1, int(os.getenv("HTTP_PORT", "6555"))),

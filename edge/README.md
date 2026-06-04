@@ -128,6 +128,7 @@ Edge can receive the credential in two ways:
 - entered in the Edge UI and stored in the local Edge database
 - preloaded from `EDGE_CREDENTIAL_FILE`, which is how the bundled Docker examples work
 
+
 To generate a credential: start Central, then open its UI and go to `Settings > Credentials > Mint Credential`. Copy the credential and paste it into Edge's UI, or save it to the file referenced by `EDGE_CREDENTIAL_FILE`.
 
 Each Edge has its own credential. Revoking one Edge does not affect others.
