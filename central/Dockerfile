@@ -1,22 +1,26 @@
-FROM python:3.12-slim
+FROM golang:1.25-alpine AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /central ./cmd/server
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates curl
+
 ENV XDG_CONFIG_HOME=/config
 
 WORKDIR /srv/central
 
-COPY requirements.txt .
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY app ./app
+COPY --from=builder /central /usr/local/bin/central
 COPY docker-entrypoint.sh /usr/local/bin/relay-central-entrypoint
 RUN chmod +x /usr/local/bin/relay-central-entrypoint
 
 EXPOSE 6555
 
 ENTRYPOINT ["relay-central-entrypoint"]
-CMD ["python", "-m", "app.main"]
+CMD ["/usr/local/bin/central"]

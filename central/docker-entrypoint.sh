@@ -46,7 +46,7 @@ fi
 
 if [ "$installed_count" -gt 0 ]; then
     echo "Installed $installed_count extra CA certificate(s). Updating trust store..."
-    sh -c "$update_ca_certificates"
+    "$update_ca_certificates"
 fi
 
 exec "$@"
