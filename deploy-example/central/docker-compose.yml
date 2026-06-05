@@ -15,7 +15,6 @@ services:
       - ${BACKUP_DIR:-./data/backups}:/backups
       - ./data/staging:/staging
       - ./secrets:/run/secrets
-      - ./certs:/run/relay-certs:ro
     restart: unless-stopped
     logging:
       driver: json-file

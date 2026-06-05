@@ -90,16 +90,16 @@ Uploaded certificates are stored under:
 
 The container installs them into the Debian trust store immediately after upload. On later container starts, the entrypoint installs those saved certificates again before Central starts.
 
-You can also place one or more internal CA certificates in the mounted `certs` directory for automated deployments:
+You can also place one or more internal CA certificates in the persisted config directory for automated deployments:
 
 ```text
-central/certs/home-ca.crt
+central/config/trusted-certs/home-ca.crt
 ```
 
 For the published deployment example, use:
 
 ```text
-deploy-example/central/certs/home-ca.crt
+deploy-example/central/config/trusted-certs/home-ca.crt
 ```
 
 Only files ending in `.crt` are installed. Use the CA/root certificate that issued the service certificate, not usually the service certificate itself.
@@ -110,7 +110,7 @@ Then configure ntfy with the trusted HTTPS URL, for example:
 https://ntfy.home
 ```
 
-After adding a certificate through the mounted `certs` directory, restart Central:
+After adding a certificate directly to the persisted config directory, restart Central:
 
 ```bash
 docker compose up -d --force-recreate central
@@ -280,6 +280,6 @@ The bundled Compose example mounts:
 - `./data/staging` to `/staging`
 - `./data/postgres` for PostgreSQL metadata, users, and settings
 - `./secrets` to `/run/secrets`
-- `./certs` to `/run/relay-certs` for optional internal CA certificates
+- `./config`, including `./config/trusted-certs` for optional internal CA certificates
 
 After the first start, Central writes the generated issuer key to `./secrets/relay_issuer.key`.

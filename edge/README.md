@@ -160,21 +160,21 @@ Uploaded certificates are stored under:
 
 The container installs them into the Debian trust store immediately after upload. On later container starts, the entrypoint installs those saved certificates again before Edge starts.
 
-You can also place the CA/root certificate in the mounted `certs` directory for automated deployments:
+You can also place the CA/root certificate in the persisted config directory for automated deployments:
 
 ```text
-edge/certs/home-ca.crt
+edge/config/trusted-certs/home-ca.crt
 ```
 
 For the published deployment example, use:
 
 ```text
-deploy-example/edge/certs/home-ca.crt
+deploy-example/edge/config/trusted-certs/home-ca.crt
 ```
 
 Only files ending in `.crt` are installed.
 
-After adding a certificate through the mounted `certs` directory, restart Edge:
+After adding a certificate directly to the persisted config directory, restart Edge:
 
 ```bash
 docker compose up -d --force-recreate edge

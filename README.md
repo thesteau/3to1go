@@ -95,11 +95,11 @@ The Docker deployments support optional user-provided CA certificates for intern
 
 Admins can upload `.crt` PEM CA/root certificates from each app's **Edit Settings** dialog under **Trusted Certificates**. The app stores uploaded certificates under `/config/trusted-certs`, installs them into the container trust store immediately, and reinstalls them on later container starts.
 
-For automated deployments, you can also drop CA/root certificates ending in `.crt` into the app's mounted `certs` directory:
+For automated deployments, you can also drop CA/root certificates ending in `.crt` into the app's persisted config certificate directory:
 
 ```text
-deploy-example/central/certs/home-ca.crt
-deploy-example/edge/certs/home-ca.crt
+deploy-example/central/config/trusted-certs/home-ca.crt
+deploy-example/edge/config/trusted-certs/home-ca.crt
 ```
 
 This keeps user-specific certificates out of the image while allowing Central and Edge to verify private HTTPS endpoints.
