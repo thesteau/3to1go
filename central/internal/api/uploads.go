@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/relay/central/internal/ingest"
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/store"
 )
 
 func (a *App) authorizeBearer(r *http.Request) (*store.CredentialRecord, error) {

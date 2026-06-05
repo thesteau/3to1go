@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relay/central/internal/config"
+	"github.com/3to1go/central/internal/config"
 )
 
 const DefaultNtfyMessageTemplate = "Central received {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} from {{ source_address }} as {{ stored_as }}."

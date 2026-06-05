@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/relay/central/internal/config"
+	"github.com/3to1go/central/internal/config"
 )
 
 func discardLogger() *slog.Logger {

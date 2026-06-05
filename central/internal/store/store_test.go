@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/signing"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/signing"
 )
 
 // ---------------------------------------------------------------------------

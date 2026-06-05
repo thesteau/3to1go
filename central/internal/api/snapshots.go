@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/relay/central/internal/ingest"
+	"github.com/3to1go/central/internal/ingest"
 )
 
 func validatedNamespace(edgeID, instID, jobName string) (string, error) {

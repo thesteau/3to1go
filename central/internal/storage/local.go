@@ -23,7 +23,7 @@ type LocalBackend struct {
 }
 
 func NewLocalBackend(backupRoot string) *LocalBackend {
-	probeRoot := filepath.Join(os.TempDir(), "relay-central", "healthchecks")
+	probeRoot := filepath.Join(os.TempDir(), "3to1go", "central", "healthchecks")
 	sum := sha256.Sum256([]byte(backupRoot))
 	probeName := hex.EncodeToString(sum[:])[:16]
 	return &LocalBackend{

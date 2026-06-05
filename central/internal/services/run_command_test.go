@@ -36,7 +36,7 @@ func TestRunCommand_EnvInjection(t *testing.T) {
 	hasSh(t)
 	hm, dir := newHookManager(t)
 	// Write a script that checks the env vars
-	hm.SaveUploadedFile("check.sh", []byte("#!/bin/sh\necho \"$RELAY_APP\" \"$RELAY_HOOK_PHASE\"\n"))
+	hm.SaveUploadedFile("check.sh", []byte("#!/bin/sh\necho \"$THREETOONEGO_APP\" \"$THREETOONEGO_HOOK_PHASE\"\n"))
 	hm.RunCommand("check.sh", "pre", map[string]interface{}{})
 	_ = dir // used to create temp script
 }

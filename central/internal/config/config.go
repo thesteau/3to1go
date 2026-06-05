@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/relay/central/internal/signing"
+	"github.com/3to1go/central/internal/signing"
 )
 
-const AppDirName = "RelayCentralizerCentral"
+const AppDirName = "3to1goCentral"
 
 // Settings holds all runtime configuration for the central server.
 type Settings struct {
@@ -267,7 +267,7 @@ func buildIndexDatabaseURL() (string, error) {
 	}
 	host := coerceText(os.Getenv("INDEX_DATABASE_HOST"), "postgres")
 	port := coerceText(os.Getenv("INDEX_DATABASE_PORT"), "5432")
-	db := firstNonEmpty(os.Getenv("INDEX_DATABASE_NAME"), os.Getenv("POSTGRES_DB"), "relaycentral")
+	db := firstNonEmpty(os.Getenv("INDEX_DATABASE_NAME"), os.Getenv("POSTGRES_DB"), "three_to_one_go")
 	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s",
 		url.QueryEscape(username), url.QueryEscape(password), host, port, db), nil
 }

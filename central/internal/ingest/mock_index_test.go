@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/store"
 )
 
 // mockIndex is a configurable in-memory implementation of snapshotIndexer.

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/services"
-	"github.com/relay/central/internal/storage"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/storage"
 )
 
 func discardLogger() *slog.Logger {

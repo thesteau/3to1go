@@ -22,11 +22,11 @@ type CertManager struct {
 }
 
 func NewCertManager(storageDir string) *CertManager {
-	trustTarget := strings.TrimSpace(os.Getenv("RELAY_TRUST_TARGET_DIR"))
+	trustTarget := strings.TrimSpace(os.Getenv("THREETOONEGO_TRUST_TARGET_DIR"))
 	if trustTarget == "" {
-		trustTarget = "/usr/local/share/ca-certificates/relay-centralizer"
+		trustTarget = "/usr/local/share/ca-certificates/3to1go"
 	}
-	updateCmd := strings.TrimSpace(os.Getenv("RELAY_UPDATE_CA_CERTIFICATES"))
+	updateCmd := strings.TrimSpace(os.Getenv("THREETOONEGO_UPDATE_CA_CERTIFICATES"))
 	if updateCmd == "" {
 		updateCmd = "update-ca-certificates"
 	}

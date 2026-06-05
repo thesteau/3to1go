@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/storage"
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/central/internal/store"
 )
 
 // SnapshotIndexer is the subset of store.SnapshotIndex used by BuildOverview.

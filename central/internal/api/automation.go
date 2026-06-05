@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/services"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/services"
 )
 
 // --- Certificates ---

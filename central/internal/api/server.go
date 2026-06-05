@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/services"
-	"github.com/relay/central/internal/storage"
-	"github.com/relay/central/internal/store"
-	"github.com/relay/central/static"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/central/static"
 )
 
 // App holds all server state.

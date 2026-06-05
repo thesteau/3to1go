@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/store"
 )
 
 func newServiceWithIndex(t *testing.T, idx snapshotIndexer) *Service {

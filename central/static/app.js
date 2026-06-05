@@ -912,7 +912,7 @@ function getExpectedKeyFingerprint(edgeId, edgeInstanceId) {
 function getEncKey(edgeId, edgeInstanceId) {
   const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
   if (_encKeys[keyId]) return _encKeys[keyId];
-  const stored = sessionStorage.getItem(`relay_enc_${keyId}`);
+  const stored = sessionStorage.getItem(`3to1go_enc_${keyId}`);
   if (stored) {
     _encKeys[keyId] = stored;
     return stored;
@@ -923,13 +923,13 @@ function getEncKey(edgeId, edgeInstanceId) {
 function setEncKey(edgeId, edgeInstanceId, key) {
   const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
   _encKeys[keyId] = key;
-  sessionStorage.setItem(`relay_enc_${keyId}`, key);
+  sessionStorage.setItem(`3to1go_enc_${keyId}`, key);
 }
 
 function clearStoredEncKey(edgeId, edgeInstanceId) {
   const keyId = buildEdgeKeyId(edgeId, edgeInstanceId);
   delete _encKeys[keyId];
-  sessionStorage.removeItem(`relay_enc_${keyId}`);
+  sessionStorage.removeItem(`3to1go_enc_${keyId}`);
 }
 
 function keyInputElement(edgeId, edgeInstanceId) {
@@ -1159,19 +1159,19 @@ function formatDate(d) {
   });
 }
 
-let _token = sessionStorage.getItem("relay_token") || "";
+let _token = sessionStorage.getItem("3to1go_token") || "";
 
 async function getToken() {
   if (!_token) {
     _token = await appDialog({
       title: "Auth Token Required",
-      message: "Enter the relay auth token.",
+      message: "Enter the 3to1go auth token.",
       input: true,
       inputLabel: "Auth token",
       inputType: "password",
       confirmLabel: "Use Token",
     }) || "";
-    if (_token) sessionStorage.setItem("relay_token", _token);
+    if (_token) sessionStorage.setItem("3to1go_token", _token);
   }
   return _token;
 }

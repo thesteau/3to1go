@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/ingest"
-	"github.com/relay/central/internal/services"
-	"github.com/relay/central/internal/storage"
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/central/internal/store"
 )
 
 // ---------------------------------------------------------------------------

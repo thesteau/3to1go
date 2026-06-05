@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/relay/central/internal/ingest"
-	"github.com/relay/central/internal/signing"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/signing"
 )
 
 func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {

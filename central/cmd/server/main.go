@@ -11,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/3to1go/central/internal/api"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/central/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/relay/central/internal/api"
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/ingest"
-	"github.com/relay/central/internal/services"
-	"github.com/relay/central/internal/storage"
-	"github.com/relay/central/internal/store"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/store"
 )
 
 func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {

@@ -20,7 +20,7 @@ const (
 	DefaultAdminUsername = "admin"
 	DefaultAdminPassword = "admin"
 	BootstrapAdminID     = 1
-	SessionCookie        = "relay_session"
+	SessionCookie        = "three_to_one_go_session"
 	sessionDays          = 7
 	pbkdf2Iterations     = 260_000
 )

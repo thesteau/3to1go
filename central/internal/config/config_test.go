@@ -247,8 +247,8 @@ func TestBuildIndexDatabaseURL_DefaultDBName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.HasSuffix(got, "/relaycentral") {
-		t.Errorf("expected default db name 'relaycentral', got %q", got)
+	if !strings.HasSuffix(got, "/three_to_one_go") {
+		t.Errorf("expected default db name 'three_to_one_go', got %q", got)
 	}
 }
 

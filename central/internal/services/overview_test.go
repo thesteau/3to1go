@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/storage"
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/central/internal/store"
 )
 
 func TestStatusString_OK(t *testing.T) {

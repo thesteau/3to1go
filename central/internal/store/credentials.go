@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/relay/central/internal/signing"
+	"github.com/3to1go/central/internal/signing"
 )
 
 type CredentialStore struct {

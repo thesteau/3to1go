@@ -3,7 +3,7 @@ package services
 import (
 	"sort"
 
-	"github.com/relay/central/internal/storage"
+	"github.com/3to1go/central/internal/storage"
 )
 
 // PruneOldSnapshots deletes excess snapshots, keeping the keepLast most recent.

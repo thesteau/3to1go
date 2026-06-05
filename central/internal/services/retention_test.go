@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relay/central/internal/storage"
+	"github.com/3to1go/central/internal/storage"
 )
 
 func newTestBackend(t *testing.T) (*storage.LocalBackend, string) {

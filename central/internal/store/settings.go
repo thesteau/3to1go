@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/3to1go/central/internal/config"
 	"github.com/jackc/pgx/v5"
-	"github.com/relay/central/internal/config"
 )
 
 type SettingsStore struct {

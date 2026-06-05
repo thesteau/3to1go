@@ -137,15 +137,15 @@ func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]inter
 
 	shellCmd := h.resolveCommand(normalized)
 	env := os.Environ()
-	env = append(env, "RELAY_APP=central")
-	env = append(env, "RELAY_HOOK_PHASE="+phase)
-	env = append(env, "RELAY_HOOK_SCRIPTS_DIR="+h.ScriptsDir)
+	env = append3to1goEnv(env, "APP", "central")
+	env = append3to1goEnv(env, "HOOK_PHASE", phase)
+	env = append3to1goEnv(env, "HOOK_SCRIPTS_DIR", h.ScriptsDir)
 	for k, v := range hookCtx {
 		val := ""
 		if v != nil {
 			val = fmt.Sprintf("%v", v)
 		}
-		env = append(env, "RELAY_"+strings.ToUpper(k)+"="+val)
+		env = append3to1goEnv(env, strings.ToUpper(k), val)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), hookTimeoutSeconds*time.Second)
@@ -174,6 +174,10 @@ func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]inter
 	if runErr != nil {
 		h.logger.Warn("hook_execution_nonzero", "phase", phase, "command", normalized, "error", runErr)
 	}
+}
+
+func append3to1goEnv(env []string, name, value string) []string {
+	return append(env, "THREETOONEGO_"+name+"="+value)
 }
 
 func (h *HookManager) resolveCommand(command string) string {

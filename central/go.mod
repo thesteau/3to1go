@@ -1,4 +1,4 @@
-module github.com/relay/central
+module github.com/3to1go/central
 
 go 1.25
 

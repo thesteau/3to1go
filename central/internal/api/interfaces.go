@@ -5,9 +5,9 @@ import (
 	"crypto/ed25519"
 	"io"
 
-	"github.com/relay/central/internal/config"
-	"github.com/relay/central/internal/ingest"
-	"github.com/relay/central/internal/store"
+	"github.com/3to1go/central/internal/config"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/store"
 )
 
 type userStorer interface {

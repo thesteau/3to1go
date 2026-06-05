@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/relay/central/static"
+	"github.com/3to1go/central/static"
 )
 
 func readStaticFile(name string) ([]byte, error) {

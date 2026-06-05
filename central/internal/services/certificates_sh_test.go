@@ -81,8 +81,8 @@ func TestCertDelete_Success(t *testing.T) {
 
 func TestNewCertManager_EnvVars(t *testing.T) {
 	hasSh(t)
-	t.Setenv("RELAY_TRUST_TARGET_DIR", "/tmp/test-trust")
-	t.Setenv("RELAY_UPDATE_CA_CERTIFICATES", "true")
+	t.Setenv("THREETOONEGO_TRUST_TARGET_DIR", "/tmp/test-trust")
+	t.Setenv("THREETOONEGO_UPDATE_CA_CERTIFICATES", "true")
 	cm := NewCertManager(t.TempDir())
 	if cm.TrustTargetDir != "/tmp/test-trust" {
 		t.Errorf("TrustTargetDir = %q", cm.TrustTargetDir)
@@ -94,8 +94,8 @@ func TestNewCertManager_EnvVars(t *testing.T) {
 
 func TestNewCertManager_Defaults(t *testing.T) {
 	hasSh(t)
-	t.Setenv("RELAY_TRUST_TARGET_DIR", "")
-	t.Setenv("RELAY_UPDATE_CA_CERTIFICATES", "")
+	t.Setenv("THREETOONEGO_TRUST_TARGET_DIR", "")
+	t.Setenv("THREETOONEGO_UPDATE_CA_CERTIFICATES", "")
 	cm := NewCertManager(t.TempDir())
 	if cm.TrustTargetDir == "" {
 		t.Error("TrustTargetDir should have default")
