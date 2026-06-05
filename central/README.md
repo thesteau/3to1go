@@ -78,7 +78,7 @@ Central can trust private/internal HTTPS services, such as a self-hosted ntfy en
 
 Admins can upload trusted CA certificates from the Central UI:
 
-1. Open **Trusted Certificates**.
+1. Open **Edit Central Settings** and find **Trusted Certificates**.
 2. Upload a `.crt` PEM CA/root certificate.
 3. Test the HTTPS integration again, for example from **Configure ntfy**.
 

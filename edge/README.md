@@ -148,7 +148,7 @@ If Central, ntfy, or another internal service uses a private CA, Edge can trust 
 
 Admins can upload trusted CA certificates from the Edge UI:
 
-1. Open **Trusted Certificates**.
+1. Open **Edit Edge Settings** and find **Trusted Certificates**.
 2. Upload a `.crt` PEM CA/root certificate.
 3. Test the HTTPS integration again.
 

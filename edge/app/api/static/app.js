@@ -515,10 +515,16 @@ async function manualRefresh() {
   setActionStatus("Refreshed.", "success");
 }
 
-function openSettingsDialog() {
+async function openSettingsDialog() {
   fillSettings(latestData?.settings || {});
   clearStatus("settings-status");
+  clearStatus("certificates-status");
   openDialog("settings-dialog");
+  try {
+    await loadCertificateConfig();
+  } catch (error) {
+    setActionStatus(error.message || "Failed to load certificates.", "error");
+  }
 }
 
 function fillNtfyForm(config) {
@@ -632,16 +638,6 @@ async function loadCertificateConfig() {
   }
   fillCertificateForm(body);
   return body;
-}
-
-async function openCertificatesDialog() {
-  clearStatus("certificates-status");
-  openDialog("certificates-dialog");
-  try {
-    await loadCertificateConfig();
-  } catch (error) {
-    setActionStatus(error.message || "Failed to load certificates.", "error");
-  }
 }
 
 async function uploadCertificateFile() {
