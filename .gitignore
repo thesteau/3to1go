@@ -12,9 +12,7 @@ edge/config/
 edge/scan/
 edge/state/
 edge/spool/
+certs/
 data/
 .auth_token
 relay_auth_token
-build/
-dist/
-package/

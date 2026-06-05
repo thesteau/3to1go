@@ -90,14 +90,11 @@ Each Edge creates an `encryption.key` file on first run.
 
 Back up the key file. If you lose it, old encrypted snapshots from that Edge cannot be decrypted.
 
-Key locations by install type:
+In Docker, the key is stored at:
 
-| Method | Location |
-| --- | --- |
-| Docker | `/config/encryption.key` |
-| Linux native | `~/.config/RelayCentralizerEdge/encryption.key` |
-| macOS native | `~/Library/Application Support/RelayCentralizerEdge/encryption.key` |
-| Windows native | `%APPDATA%\RelayCentralizerEdge\encryption.key` |
+```text
+/config/encryption.key
+```
 
 ## Auth And Identity
 
@@ -195,51 +192,6 @@ Advanced overrides:
 
 ## Running Edge
 
-### Local Python development
-
-```powershell
-python -m app.main
-```
-
-Edge starts with built-in defaults and exposes its UI on `http://localhost:6556/`.
-
-### Dev helper scripts
-
-If you do not want to manage a virtualenv manually, use the provided helper scripts.
-
-Windows PowerShell:
-
-```powershell
-.\dev-edge.ps1 setup
-.\dev-edge.ps1 run
-.\dev-edge.ps1 start
-.\dev-edge.ps1 stop
-.\dev-edge.ps1 status
-```
-
-Windows Command Prompt:
-
-```cmd
-dev-edge.cmd setup
-dev-edge.cmd run
-dev-edge.cmd start
-dev-edge.cmd stop
-dev-edge.cmd status
-```
-
-macOS and Linux:
-
-```bash
-chmod +x ./dev-edge.sh
-./dev-edge.sh setup
-./dev-edge.sh run
-./dev-edge.sh start
-./dev-edge.sh stop
-./dev-edge.sh status
-```
-
-### Docker
-
 For normal deployment with the published image, use [`deploy-example/edge/`](../deploy-example/edge/):
 
 ```bash
@@ -261,26 +213,15 @@ Open the UI at `http://localhost:6556/`.
 
 After the stack starts, mint a credential from Central's UI, paste it into Edge's settings, and save.
 
-## Release Builds
+## Docker Image Builds
 
-Edge release assets come in two styles:
-
-- installer packages for normal use
-- raw bundles for manual setup or testing
-
-After installing or unpacking Edge:
+Edge is distributed and run as a Docker image. After starting the container:
 
 1. Open `http://localhost:6556/`.
 2. Set `CENTRAL_URL`.
 3. Enter an Edge credential minted by Central.
 4. Set a unique `EDGE_ID`.
-5. In the Docker examples, Edge automatically starts with `SCAN_ROOT=/scan`. You can change that later in the Edge UI if needed.
-
-Windows installer startup can be registered manually with:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "C:\Program Files\RelayCentralizer Edge\Install-RelayCentralizerEdgeTask.ps1"
-```
+5. Edge automatically starts with `SCAN_ROOT=/scan`. You can change that later in the Edge UI if needed.
 
 ## Scheduler Behavior
 
@@ -297,7 +238,7 @@ Most people care about these first:
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `EDGE_ID` | `edge-01` | Name sent to Central; should be unique per installation |
-| `SCAN_ROOT` | `/scan` in Docker, platform-dependent otherwise | Root directory Edge scans for `.upload_dir` files |
+| `SCAN_ROOT` | `/scan` | Root directory Edge scans for `.upload_dir` files |
 | `CENTRAL_URL` | `http://127.0.0.1:6555` | Address of Central |
 | Edge Credential in the Edge UI | empty | JWT credential minted by Central and saved in Edge's local database |
 | Cron Schedule in the Edge UI | `0 2 * * 0` | Backup schedule, defaulting to Sunday at 2:00 AM |
@@ -307,8 +248,8 @@ Additional settings:
 
 | Setting | Default |
 | --- | --- |
-| `STATE_DIR` | platform state dir |
-| `SPOOL_DIR` | platform cache dir + `spool` |
+| `STATE_DIR` | `/data/state` |
+| `SPOOL_DIR` | `/data/spool` |
 | `LOG_LEVEL` | `INFO` |
 | `MAX_DEPTH` | `10` |
 | `KEEP_LOCAL_PENDING` | `true` |
@@ -323,7 +264,7 @@ Additional settings:
 | `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` |
 | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` |
-| `HTTP_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise |
+| `HTTP_HOST` | `0.0.0.0` |
 
 ## API Surface
 

@@ -26,7 +26,8 @@ RUN apt-get update \
 COPY --from=builder /install /usr/local
 COPY app ./app
 COPY docker-entrypoint.sh /usr/local/bin/relay-edge-entrypoint
-RUN chmod +x /usr/local/bin/relay-edge-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/relay-edge-entrypoint \
+    && chmod +x /usr/local/bin/relay-edge-entrypoint
 
 EXPOSE 6556
 

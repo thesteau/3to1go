@@ -1,8 +1,0 @@
-#!/bin/sh
-set -e
-
-mkdir -p /usr/local/var/log
-
-ln -sf /usr/local/lib/relaycentralizer-edge/relaycentralizer-edge /usr/local/bin/relaycentralizer-edge
-
-exit 0
