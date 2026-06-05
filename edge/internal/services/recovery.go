@@ -37,20 +37,20 @@ type RecoveryResult struct {
 
 // RecoveryService downloads and optionally restores archives from central.
 type RecoveryService struct {
-	settings     *config.Settings
-	logger       *slog.Logger
-	stateStore   *StateStore
-	uploadClient *UploadClient
-	encKey       []byte
+	settings   *config.Settings
+	logger     *slog.Logger
+	stateStore jobStateStore
+	downloader snapshotDownloader
+	encKey     []byte
 }
 
-func NewRecoveryService(settings *config.Settings, logger *slog.Logger, stateStore *StateStore, uploadClient *UploadClient, encKey []byte) *RecoveryService {
+func NewRecoveryService(settings *config.Settings, logger *slog.Logger, stateStore jobStateStore, downloader snapshotDownloader, encKey []byte) *RecoveryService {
 	return &RecoveryService{
-		settings:     settings,
-		logger:       logger,
-		stateStore:   stateStore,
-		uploadClient: uploadClient,
-		encKey:       encKey,
+		settings:   settings,
+		logger:     logger,
+		stateStore: stateStore,
+		downloader: downloader,
+		encKey:     encKey,
 	}
 }
 
@@ -141,9 +141,9 @@ func (r *RecoveryService) Preview(ctx context.Context, job *backup.JobDefinition
 
 func (r *RecoveryService) downloadSnapshot(ctx context.Context, job *backup.JobDefinition, fingerprint, destPath string) (string, error) {
 	if fingerprint != "" {
-		return r.uploadClient.DownloadSnapshotByFingerprint(ctx, r.settings.EdgeID, job.JobName, fingerprint, destPath)
+		return r.downloader.DownloadSnapshotByFingerprint(ctx, r.settings.EdgeID, job.JobName, fingerprint, destPath)
 	}
-	return r.uploadClient.DownloadLatestSnapshot(ctx, r.settings.EdgeID, job.JobName, destPath)
+	return r.downloader.DownloadLatestSnapshot(ctx, r.settings.EdgeID, job.JobName, destPath)
 }
 
 func (r *RecoveryService) beginRecovery(job *backup.JobDefinition) JobState {

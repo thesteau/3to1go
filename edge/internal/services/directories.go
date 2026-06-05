@@ -16,10 +16,10 @@ import (
 type DirectoryService struct {
 	settings   *config.Settings
 	logger     *slog.Logger
-	stateStore *StateStore
+	stateStore jobStateStore
 }
 
-func NewDirectoryService(settings *config.Settings, logger *slog.Logger, stateStore *StateStore) *DirectoryService {
+func NewDirectoryService(settings *config.Settings, logger *slog.Logger, stateStore jobStateStore) *DirectoryService {
 	return &DirectoryService{settings: settings, logger: logger, stateStore: stateStore}
 }
 

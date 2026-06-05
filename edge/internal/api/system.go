@@ -6,15 +6,13 @@ import (
 	"strings"
 
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services"
 )
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	runner := a.runner
-	resp := services.BuildStatusResponse(runner.Settings, runner.EncryptionKeyFingerprint(), runner.UploadClient)
+	resp := a.runner.StatusSnapshot()
 	resp["scheduler"] = a.scheduler.Snapshot()
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -31,7 +29,7 @@ func (a *App) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return
 	}
-	payload := config.SettingsToPayload(a.runner.Settings)
+	payload := config.SettingsToPayload(a.runner.CurrentSettings())
 	writeJSON(w, http.StatusOK, map[string]interface{}{"settings": payload})
 }
 
@@ -66,7 +64,7 @@ func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, a.runner.NtfyPublisher.Snapshot(a.runner.Settings))
+	writeJSON(w, http.StatusOK, a.runner.NtfySnapshot(a.runner.CurrentSettings()))
 }
 
 func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +80,7 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	existing := config.SettingsToPayload(a.runner.Settings)
+	existing := config.SettingsToPayload(a.runner.CurrentSettings())
 	existing.NtfyURL = body.NtfyURL
 	existing.NtfyTopic = body.NtfyTopic
 	existing.NtfyMessageTemplate = body.NtfyMessageTemplate
@@ -95,7 +93,7 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, a.runner.NtfyPublisher.Snapshot(newSettings))
+	writeJSON(w, http.StatusOK, a.runner.NtfySnapshot(newSettings))
 }
 
 func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +109,7 @@ func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := a.runner.NtfyPublisher.PublishTest(body.NtfyURL, body.NtfyTopic, body.NtfyMessageTemplate); err != nil {
+	if err := a.runner.TestNtfy(body.NtfyURL, body.NtfyTopic, body.NtfyMessageTemplate); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -122,7 +120,7 @@ func (a *App) handleGetCertificates(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, a.runner.CertManager.Snapshot())
+	writeJSON(w, http.StatusOK, a.runner.CertSnapshot())
 }
 
 func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +139,7 @@ func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "failed to read file")
 		return
 	}
-	info, err := a.runner.CertManager.SaveUploadedFile(header.Filename, content)
+	info, err := a.runner.SaveCertFile(header.Filename, content)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -154,7 +152,7 @@ func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filename := r.PathValue("filename")
-	if err := a.runner.CertManager.DeleteFile(filename); err != nil {
+	if err := a.runner.DeleteCertFile(filename); err != nil {
 		if strings.HasSuffix(err.Error(), ": not found") {
 			writeError(w, http.StatusNotFound, err.Error())
 		} else {
@@ -169,8 +167,8 @@ func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK,
-		a.runner.HookManager.Snapshot(a.runner.Settings.HookPreCommand, a.runner.Settings.HookPostCommand))
+	s := a.runner.CurrentSettings()
+	writeJSON(w, http.StatusOK, a.runner.HookSnapshot(s.HookPreCommand, s.HookPostCommand))
 }
 
 func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +183,7 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	existing := config.SettingsToPayload(a.runner.Settings)
+	existing := config.SettingsToPayload(a.runner.CurrentSettings())
 	existing.HookPreCommand = body.HookPreCommand
 	existing.HookPostCommand = body.HookPostCommand
 	newSettings, err := config.BuildSettings(&existing)
@@ -197,8 +195,7 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK,
-		a.runner.HookManager.Snapshot(newSettings.HookPreCommand, newSettings.HookPostCommand))
+	writeJSON(w, http.StatusOK, a.runner.HookSnapshot(newSettings.HookPreCommand, newSettings.HookPostCommand))
 }
 
 func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +214,7 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "failed to read file")
 		return
 	}
-	info, err := a.runner.HookManager.SaveUploadedFile(header.Filename, content)
+	info, err := a.runner.SaveHookFile(header.Filename, content)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -230,7 +227,7 @@ func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filename := r.PathValue("filename")
-	name, content, err := a.runner.HookManager.ReadTextFile(filename)
+	name, content, err := a.runner.ReadHookFile(filename)
 	if err != nil {
 		if strings.HasSuffix(err.Error(), ": not found") {
 			writeError(w, http.StatusNotFound, err.Error())
@@ -247,7 +244,7 @@ func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filename := r.PathValue("filename")
-	if err := a.runner.HookManager.DeleteFile(filename); err != nil {
+	if err := a.runner.DeleteHookFile(filename); err != nil {
 		if strings.HasSuffix(err.Error(), ": not found") {
 			writeError(w, http.StatusNotFound, err.Error())
 		} else {
@@ -267,4 +264,3 @@ func (a *App) handleGetEncryptionKey(w http.ResponseWriter, r *http.Request) {
 		"key_base64":  a.runner.EncryptionKeyBase64(),
 	})
 }
-

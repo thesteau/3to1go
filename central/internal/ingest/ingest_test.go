@@ -691,6 +691,158 @@ func TestCleanupLoop_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestMemorySessionStoreRoundTripAndExpiry(t *testing.T) {
+	store := NewMemorySessionStore()
+	ctx := context.Background()
+	active := &UploadSession{
+		UploadID:         "active",
+		IdempotencyKey:   "key-active",
+		Status:           "initiated",
+		ArchiveSizeBytes: 100,
+		ExpiresAt:        utcAfter(time.Hour),
+	}
+	expired := &UploadSession{
+		UploadID:         "expired",
+		IdempotencyKey:   "key-expired",
+		Status:           "uploaded",
+		ArchiveSizeBytes: 50,
+		ExpiresAt:        "2000-01-01T00:00:00Z",
+	}
+	completed := &UploadSession{
+		UploadID:         "completed",
+		IdempotencyKey:   "key-completed",
+		Status:           "completed",
+		ArchiveSizeBytes: 500,
+		ExpiresAt:        utcAfter(time.Hour),
+	}
+	for _, sess := range []*UploadSession{active, expired, completed} {
+		if err := store.Save(ctx, sess); err != nil {
+			t.Fatalf("Save %s: %v", sess.UploadID, err)
+		}
+	}
+	loaded, err := store.Load(ctx, "active")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.UploadID != "active" {
+		t.Fatalf("Load = %+v", loaded)
+	}
+	loaded.Status = "mutated"
+	loadedAgain, err := store.LoadByIdempotencyKey(ctx, "key-active")
+	if err != nil {
+		t.Fatalf("LoadByIdempotencyKey: %v", err)
+	}
+	if loadedAgain.Status != "initiated" {
+		t.Fatalf("store returned shared pointer: %+v", loadedAgain)
+	}
+	reserved, err := store.ReservedBytes(ctx)
+	if err != nil {
+		t.Fatalf("ReservedBytes: %v", err)
+	}
+	if reserved != 100 {
+		t.Fatalf("ReservedBytes = %d", reserved)
+	}
+	expiredSessions, err := store.DeleteExpired(ctx, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("DeleteExpired: %v", err)
+	}
+	if len(expiredSessions) != 1 || expiredSessions[0].UploadID != "expired" {
+		t.Fatalf("expired = %+v", expiredSessions)
+	}
+	if _, err := store.Load(ctx, "expired"); err != ErrSessionNotFound {
+		t.Fatalf("expired load err = %v", err)
+	}
+	if unlock, err := store.Lock(ctx, "active"); err != nil {
+		t.Fatalf("Lock: %v", err)
+	} else {
+		unlock()
+	}
+	if err := store.Delete(ctx, active); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := store.LoadByIdempotencyKey(ctx, "key-active"); err != ErrSessionNotFound {
+		t.Fatalf("deleted key err = %v", err)
+	}
+	if err := store.Delete(ctx, nil); err != nil {
+		t.Fatalf("Delete nil: %v", err)
+	}
+}
+
+func TestMigrateLegacyUploadSessions(t *testing.T) {
+	svc := newTestService(t)
+	store := NewMemorySessionStore()
+	svc.sessions = store
+
+	existing := &UploadSession{
+		UploadID:       "already-there",
+		IdempotencyKey: "key-existing",
+		Status:         "initiated",
+		ExpiresAt:      utcAfter(time.Hour),
+	}
+	if err := store.Save(context.Background(), existing); err != nil {
+		t.Fatalf("pre-save: %v", err)
+	}
+	writeLegacySession(t, svc, existing)
+	legacy := &UploadSession{
+		UploadID:         "legacy-only",
+		IdempotencyKey:   "key-legacy",
+		Status:           "initiated",
+		ArchiveSizeBytes: 25,
+		ExpiresAt:        utcAfter(time.Hour),
+	}
+	writeLegacySession(t, svc, legacy)
+	os.WriteFile(filepath.Join(svc.uploadRoot, "loose-file"), []byte("x"), 0o644)
+
+	count, err := svc.MigrateLegacyUploadSessions(context.Background())
+	if err != nil {
+		t.Fatalf("MigrateLegacyUploadSessions: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("migrated count = %d", count)
+	}
+	loaded, err := store.Load(context.Background(), "legacy-only")
+	if err != nil {
+		t.Fatalf("Load migrated: %v", err)
+	}
+	if loaded.IdempotencyKey != "key-legacy" {
+		t.Fatalf("loaded migrated = %+v", loaded)
+	}
+	count, err = svc.MigrateLegacyUploadSessions(context.Background())
+	if err != nil {
+		t.Fatalf("MigrateLegacyUploadSessions second: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("second migrated count = %d", count)
+	}
+}
+
+func TestMigrateLegacyUploadSessionsBadJSON(t *testing.T) {
+	svc := newTestService(t)
+	svc.sessions = NewMemorySessionStore()
+	dir := svc.sessionDir("bad")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "metadata.json"), []byte("not json"), 0o644)
+
+	if _, err := svc.MigrateLegacyUploadSessions(context.Background()); err == nil {
+		t.Fatal("expected bad JSON error")
+	}
+}
+
+func writeLegacySession(t *testing.T, svc *Service, sess *UploadSession) {
+	t.Helper()
+	dir := svc.sessionDir(sess.UploadID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir session: %v", err)
+	}
+	raw, err := json.Marshal(sess)
+	if err != nil {
+		t.Fatalf("marshal session: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), raw, 0o644); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+}
+
 // --- hookContext ---
 
 func TestHookContext(t *testing.T) {

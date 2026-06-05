@@ -10,7 +10,7 @@ func (a *App) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, services.BuildDirectoryResponse(a.runner.Settings, a.runner.DirService))
+	writeJSON(w, http.StatusOK, a.runner.DirectoriesSnapshot())
 }
 
 func (a *App) handleSaveJob(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +28,7 @@ func (a *App) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 	if body.Config == nil {
 		body.Config = map[string]interface{}{}
 	}
-	entry, err := a.runner.DirService.SaveJob(body.RelativePath, body.Config)
+	entry, err := a.runner.SaveJob(body.RelativePath, body.Config)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -47,7 +47,7 @@ func (a *App) handleDeleteJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := a.runner.DirService.DeleteJob(body.RelativePath); err != nil {
+	if err := a.runner.DeleteJob(body.RelativePath); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -6,23 +6,22 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/3to1go/edge/internal/services"
 	"github.com/3to1go/edge/internal/store"
 	"github.com/3to1go/edge/static"
 )
 
 // App holds all edge server state.
 type App struct {
-	runner    *services.EdgeRunner
-	scheduler *services.SchedulerController
+	runner    edgeRunner
+	scheduler schedulerFacade
 	userStore userStorer
 	logger    *slog.Logger
 }
 
 // NewApp constructs the App from its dependencies.
 func NewApp(
-	runner *services.EdgeRunner,
-	scheduler *services.SchedulerController,
+	runner edgeRunner,
+	scheduler schedulerFacade,
 	userStore userStorer,
 	logger *slog.Logger,
 ) *App {

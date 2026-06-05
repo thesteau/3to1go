@@ -7,14 +7,13 @@ import (
 )
 
 // BuildStatusResponse returns the full status payload for the /api/status endpoint.
-func BuildStatusResponse(settings *config.Settings, keyFingerprint string, uploadClient *UploadClient) map[string]interface{} {
+func BuildStatusResponse(settings *config.Settings, keyFingerprint string, circuit circuitSnapshotter) map[string]interface{} {
 	instID := identity.LoadOrCreate(config.InstallationIDPath())
-	keyFP := keyFingerprint
 	payload := config.SettingsToPayload(settings)
 	return map[string]interface{}{
 		"edge_id":                       settings.EdgeID,
 		"edge_instance_id":              instID,
-		"encryption_key_fingerprint":    keyFP,
+		"encryption_key_fingerprint":    keyFingerprint,
 		"scan_root":                     settings.ScanRoot,
 		"central_url":                   settings.CentralURL,
 		"advertised_url":                settings.AdvertisedURL,
@@ -25,7 +24,7 @@ func BuildStatusResponse(settings *config.Settings, keyFingerprint string, uploa
 		"settings_status": map[string]interface{}{
 			"edge_credential_configured": settings.EdgeCredential != "",
 		},
-		"upload_circuit": uploadClient.CircuitBreaker.Snapshot(),
+		"upload_circuit": circuit.Snapshot(),
 	}
 }
 

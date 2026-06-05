@@ -1,0 +1,38 @@
+name: Central Tests
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "central/**"
+      - ".github/workflows/central-tests.yml"
+  pull_request:
+    paths:
+      - "central/**"
+      - ".github/workflows/central-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run central unit tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: central
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: central/go.mod
+          cache-dependency-path: central/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run tests
+        run: go test -race ./...
