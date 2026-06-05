@@ -99,8 +99,8 @@ func (cb *CircuitBreaker) Snapshot() map[string]interface{} {
 	defer cb.mu.Unlock()
 	if cb.openedUntilMonotonic == 0 {
 		return map[string]interface{}{
-			"state":                    "closed",
-			"consecutive_failures":     cb.consecutiveFailures,
+			"state":                      "closed",
+			"consecutive_failures":       cb.consecutiveFailures,
 			"cooldown_remaining_seconds": 0,
 		}
 	}
@@ -110,8 +110,8 @@ func (cb *CircuitBreaker) Snapshot() map[string]interface{} {
 		state = "closed"
 	}
 	return map[string]interface{}{
-		"state":                    state,
-		"consecutive_failures":     cb.consecutiveFailures,
+		"state":                      state,
+		"consecutive_failures":       cb.consecutiveFailures,
 		"cooldown_remaining_seconds": remaining,
 	}
 }
@@ -121,22 +121,22 @@ type ProgressCallback func(uploadID string, offset, chunkSize int64)
 
 // UploadClient sends backup archives to the central server.
 type UploadClient struct {
-	centralURL                    string
-	advertisedURL                 string
-	edgeCredential                string
-	edgeInstanceID                string
-	encryptionKeyFingerprint      string
-	chunkSizeBytes                int64
-	minChunkSizeBytes             int64
-	maxChunkSizeBytes             int64
-	maxRetryAttempts              int
-	retryBaseDelay                time.Duration
-	retryMaxDelay                 time.Duration
-	connectTimeout                time.Duration
-	readTimeoutPadding            time.Duration
-	minThroughputBytesPerSecond   int64
-	http                          *http.Client
-	CircuitBreaker                *CircuitBreaker
+	centralURL                  string
+	advertisedURL               string
+	edgeCredential              string
+	edgeInstanceID              string
+	encryptionKeyFingerprint    string
+	chunkSizeBytes              int64
+	minChunkSizeBytes           int64
+	maxChunkSizeBytes           int64
+	maxRetryAttempts            int
+	retryBaseDelay              time.Duration
+	retryMaxDelay               time.Duration
+	connectTimeout              time.Duration
+	readTimeoutPadding          time.Duration
+	minThroughputBytesPerSecond int64
+	http                        *http.Client
+	CircuitBreaker              *CircuitBreaker
 }
 
 // NewUploadClient constructs an UploadClient from settings and the loaded encryption key.
@@ -425,7 +425,8 @@ func (c *UploadClient) sendChunk(ctx context.Context, uploadID string, offset in
 	req.ContentLength = int64(len(chunk))
 
 	timeout := c.connectTimeout + c.timeoutForBytes(int64(len(chunk)))
-	c.http.Timeout = timeout
+	req, cancel := requestWithTimeout(req, timeout)
+	defer cancel()
 
 	resp, err := c.doRequest(req, "chunk")
 	if err != nil {
@@ -445,7 +446,8 @@ func (c *UploadClient) finalizeSession(ctx context.Context, uploadID string) (ma
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	timeout := c.connectTimeout + c.timeoutForBytes(c.chunkSizeBytes)
-	c.http.Timeout = timeout
+	req, cancel := requestWithTimeout(req, timeout)
+	defer cancel()
 
 	resp, err := c.doRequest(req, "finalize")
 	if err != nil {
@@ -467,7 +469,8 @@ func (c *UploadClient) jsonPost(ctx context.Context, path string, body interface
 	req.Header.Set("Authorization", "Bearer "+c.edgeCredential)
 	req.Header.Set("Content-Type", "application/json")
 
-	c.http.Timeout = c.connectTimeout + readTimeout
+	req, cancel := requestWithTimeout(req, c.connectTimeout+readTimeout)
+	defer cancel()
 
 	resp, err := c.doRequest(req, phase)
 	if err != nil {
@@ -475,6 +478,14 @@ func (c *UploadClient) jsonPost(ctx context.Context, path string, body interface
 	}
 	defer resp.Body.Close()
 	return decodeJSON(resp.Body)
+}
+
+func requestWithTimeout(req *http.Request, timeout time.Duration) (*http.Request, context.CancelFunc) {
+	if timeout <= 0 {
+		return req, func() {}
+	}
+	ctx, cancel := context.WithTimeout(req.Context(), timeout)
+	return req.WithContext(ctx), cancel
 }
 
 func (c *UploadClient) doRequest(req *http.Request, phase string) (*http.Response, error) {

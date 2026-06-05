@@ -4,13 +4,14 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // CredentialPayload is the signed credential body.
@@ -85,7 +86,7 @@ func LoadOrCreateIssuerKeypair(path string) (ed25519.PrivateKey, ed25519.PublicK
 	return priv, priv.Public().(ed25519.PublicKey), nil
 }
 
-// MintCredential creates a signed JWT token compatible with the Python implementation.
+// MintCredential creates a signed EdDSA JWT credential.
 func MintCredential(priv ed25519.PrivateKey, ttlDays int) (string, error) {
 	now := time.Now().Unix()
 	jti, err := newUUID()
@@ -93,81 +94,73 @@ func MintCredential(priv ed25519.PrivateKey, ttlDays int) (string, error) {
 		return "", err
 	}
 
-	headerJSON, err := json.Marshal(struct {
-		Algorithm string `json:"alg"`
-		Type      string `json:"typ"`
-	}{
-		Algorithm: "EdDSA",
-		Type:      "RCT",
-	})
-	if err != nil {
-		return "", fmt.Errorf("marshal credential header: %w", err)
+	claims := jwt.RegisteredClaims{
+		IssuedAt:  jwt.NewNumericDate(time.Unix(now, 0)),
+		ExpiresAt: jwt.NewNumericDate(time.Unix(now+int64(ttlDays)*86400, 0)),
+		ID:        jti,
 	}
-	payloadJSON, err := json.Marshal(CredentialPayload{
-		IssuedAt:  now,
-		ExpiresAt: now + int64(ttlDays)*86400,
-		JTI:       jti,
-	})
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	token.Header["typ"] = "JWT"
+	signed, err := token.SignedString(priv)
 	if err != nil {
-		return "", fmt.Errorf("marshal credential payload: %w", err)
+		return "", fmt.Errorf("sign credential: %w", err)
 	}
-
-	header := b64url(headerJSON)
-	payload := b64url(payloadJSON)
-	signingInput := []byte(header + "." + payload)
-	sig := ed25519.Sign(priv, signingInput)
-
-	return header + "." + payload + "." + b64url(sig), nil
+	return signed, nil
 }
 
 // DecodeCredentialPayload decodes the payload without verifying the signature.
 func DecodeCredentialPayload(token string) (*CredentialPayload, error) {
-	parts, err := splitToken(token)
-	if err != nil {
-		return nil, err
-	}
-	rawPayload, err := b64urlDecode(parts[1])
-	if err != nil {
+	claims := &jwt.RegisteredClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(token, claims); err != nil {
 		return nil, fmt.Errorf("malformed payload")
 	}
-	var payload CredentialPayload
-	if err := json.Unmarshal(rawPayload, &payload); err != nil {
-		return nil, fmt.Errorf("malformed payload")
-	}
-	return &payload, nil
+	return payloadFromClaims(claims), nil
 }
 
 // VerifyCredential verifies the token signature, expiry, and jti presence.
-func VerifyCredential(token string, pub ed25519.PublicKey) (*CredentialPayload, error) {
-	parts, err := splitToken(token)
+func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPayload, error) {
+	claims := &jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		claims,
+		func(token *jwt.Token) (interface{}, error) {
+			if token.Method.Alg() != jwt.SigningMethodEdDSA.Alg() {
+				return nil, fmt.Errorf("unexpected signing method %q", token.Method.Alg())
+			}
+			return pub, nil
+		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}),
+	)
 	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, errors.New("credential expired")
+		}
+		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+			return nil, errors.New("invalid signature")
+		}
 		return nil, err
 	}
-
-	sig, err := b64urlDecode(parts[2])
-	if err != nil {
-		return nil, errors.New("invalid signature encoding")
+	if token == nil || !token.Valid {
+		return nil, errors.New("invalid token")
 	}
 
-	signingInput := []byte(parts[0] + "." + parts[1])
-	if !ed25519.Verify(pub, signingInput, sig) {
-		return nil, errors.New("invalid signature")
-	}
-
-	payload, err := DecodeCredentialPayload(token)
-	if err != nil {
-		return nil, err
-	}
-
-	if payload.ExpiresAt < time.Now().Unix() {
-		return nil, errors.New("credential expired")
-	}
-
+	payload := payloadFromClaims(claims)
 	if strings.TrimSpace(payload.JTI) == "" {
 		return nil, errors.New("credential missing jti")
 	}
 
 	return payload, nil
+}
+
+func payloadFromClaims(claims *jwt.RegisteredClaims) *CredentialPayload {
+	payload := &CredentialPayload{JTI: claims.ID}
+	if claims.IssuedAt != nil {
+		payload.IssuedAt = claims.IssuedAt.Unix()
+	}
+	if claims.ExpiresAt != nil {
+		payload.ExpiresAt = claims.ExpiresAt.Unix()
+	}
+	return payload
 }
 
 func splitToken(token string) ([3]string, error) {

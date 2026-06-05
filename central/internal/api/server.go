@@ -138,6 +138,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/users", a.handleCreateUser)
 	mux.HandleFunc("PUT /api/users/{user_id}", a.handleUpdateUser)
 	mux.HandleFunc("DELETE /api/users/{user_id}", a.handleDeleteUser)
+	mux.HandleFunc("POST /api/migrations/upload-sessions", a.handleMigrateUploadSessions)
 
 	// Overview + settings
 	mux.HandleFunc("GET /api/overview", a.handleOverview)
@@ -182,7 +183,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", a.handleDownloadLatest)
 	mux.HandleFunc("GET /backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", a.handleDownloadByFingerprint)
 
-	return a.sessionMiddleware(mux)
+	return newRateLimiter().middleware(a.sessionMiddleware(mux))
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {

@@ -13,10 +13,10 @@ import (
 
 // App holds all edge server state.
 type App struct {
-	runner     *services.EdgeRunner
-	scheduler  *services.SchedulerController
-	userStore  userStorer
-	logger     *slog.Logger
+	runner    *services.EdgeRunner
+	scheduler *services.SchedulerController
+	userStore userStorer
+	logger    *slog.Logger
 }
 
 // NewApp constructs the App from its dependencies.
@@ -95,7 +95,7 @@ func (a *App) Handler() http.Handler {
 	// Encryption key
 	mux.HandleFunc("GET /api/encryption-key", a.handleGetEncryptionKey)
 
-	return a.sessionMiddleware(mux)
+	return newRateLimiter().middleware(a.sessionMiddleware(mux))
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {

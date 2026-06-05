@@ -53,6 +53,7 @@ func run(logger *slog.Logger) error {
 	credStore := store.NewCredentialStore(pool)
 	settingsStore := store.NewSettingsStore(pool)
 	snapIndex := store.NewSnapshotIndex(pool)
+	uploadSessionStore := ingest.NewPGSessionStore(pool)
 
 	// Run migrations
 	if err := userStore.EnsureSchema(ctx); err != nil {
@@ -66,6 +67,9 @@ func run(logger *slog.Logger) error {
 	}
 	if err := snapIndex.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("snapshot index schema: %w", err)
+	}
+	if err := uploadSessionStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("upload session schema: %w", err)
 	}
 	if err := userStore.EnsureDefaultAdmin(ctx); err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
@@ -103,7 +107,7 @@ func run(logger *slog.Logger) error {
 	certs := services.NewCertManager(config.TrustedCertificatesDir())
 	ntfy := services.NewNtfyPublisher(logger)
 
-	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hooks, ntfy)
+	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hooks, ntfy, uploadSessionStore)
 	if err != nil {
 		return fmt.Errorf("initialize ingest service: %w", err)
 	}

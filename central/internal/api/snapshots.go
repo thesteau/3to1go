@@ -4,10 +4,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/3to1go/central/internal/ingest"
 )
+
+var fingerprintQueryRE = regexp.MustCompile(`^[a-f0-9]{8}([a-f0-9]{56})?$`)
 
 func validatedNamespace(edgeID, instID, jobName string) (string, error) {
 	edgeID, err := ingest.ValidateNamespaceComponent(edgeID, "edge_id")
@@ -202,6 +205,14 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "fp parameter is required")
 		return
 	}
+	if !fingerprintQueryRE.MatchString(fp) {
+		writeError(w, http.StatusBadRequest, "fp must be an 8- or 64-character lowercase hex fingerprint")
+		return
+	}
+	fpPrefix := fp
+	if len(fpPrefix) > 8 {
+		fpPrefix = fpPrefix[:8]
+	}
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -220,7 +231,7 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	}
 	var matchSlice []fileMatch
 	for _, f := range files {
-		if strings.Contains(f.Filename, fp) {
+		if snapshotFingerprintPrefix(f.Filename) == fpPrefix {
 			matchSlice = append(matchSlice, fileMatch{mtime: f.Mtime, filename: f.Filename})
 		}
 	}
@@ -237,4 +248,12 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	}
 
 	a.serveSnapshot(w, r, namespace, best.filename, true)
+}
+
+func snapshotFingerprintPrefix(filename string) string {
+	base := strings.TrimSuffix(filename, ".tar.zst")
+	if idx := strings.LastIndex(base, "__"); idx >= 0 {
+		return base[idx+2:]
+	}
+	return ""
 }

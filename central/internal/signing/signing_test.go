@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestLoadOrCreateIssuerKeypair_CreateNew(t *testing.T) {
@@ -102,6 +104,9 @@ func TestMintCredential_Structure(t *testing.T) {
 	if hdr["alg"] != "EdDSA" {
 		t.Errorf("alg = %q, want EdDSA", hdr["alg"])
 	}
+	if hdr["typ"] != "JWT" {
+		t.Errorf("typ = %q, want JWT", hdr["typ"])
+	}
 }
 
 func TestVerifyCredential_ValidRoundTrip(t *testing.T) {
@@ -151,14 +156,12 @@ func TestVerifyCredential_Expired(t *testing.T) {
 	dir := t.TempDir()
 	priv, pub, _ := LoadOrCreateIssuerKeypair(filepath.Join(dir, "key"))
 
-	// Craft an expired token manually
 	now := time.Now().Unix()
-	payloadJSON, _ := json.Marshal(CredentialPayload{IssuedAt: now - 100, ExpiresAt: now - 1, JTI: "test-jti"})
-	hdrJSON, _ := json.Marshal(map[string]string{"alg": "EdDSA", "typ": "RCT"})
-	hdr := b64url(hdrJSON)
-	pay := b64url(payloadJSON)
-	sig := ed25519.Sign(priv, []byte(hdr+"."+pay))
-	token := hdr + "." + pay + "." + b64url(sig)
+	token := signedTestToken(t, priv, jwt.RegisteredClaims{
+		IssuedAt:  jwt.NewNumericDate(time.Unix(now-100, 0)),
+		ExpiresAt: jwt.NewNumericDate(time.Unix(now-1, 0)),
+		ID:        "test-jti",
+	})
 
 	_, err := VerifyCredential(token, pub)
 	if err == nil || !strings.Contains(err.Error(), "expired") {
@@ -170,12 +173,12 @@ func TestVerifyCredential_MissingJTI(t *testing.T) {
 	dir := t.TempDir()
 	priv, pub, _ := LoadOrCreateIssuerKeypair(filepath.Join(dir, "key"))
 
-	payloadJSON, _ := json.Marshal(CredentialPayload{IssuedAt: time.Now().Unix(), ExpiresAt: time.Now().Unix() + 86400, JTI: "   "})
-	hdrJSON, _ := json.Marshal(map[string]string{"alg": "EdDSA", "typ": "RCT"})
-	hdr := b64url(hdrJSON)
-	pay := b64url(payloadJSON)
-	sig := ed25519.Sign(priv, []byte(hdr+"."+pay))
-	token := hdr + "." + pay + "." + b64url(sig)
+	now := time.Now().Unix()
+	token := signedTestToken(t, priv, jwt.RegisteredClaims{
+		IssuedAt:  jwt.NewNumericDate(time.Unix(now, 0)),
+		ExpiresAt: jwt.NewNumericDate(time.Unix(now+86400, 0)),
+		ID:        "   ",
+	})
 
 	_, err := VerifyCredential(token, pub)
 	if err == nil || !strings.Contains(err.Error(), "jti") {
@@ -250,4 +253,15 @@ func TestSplitToken_ExtraDotsInSig(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for token with extra dots in sig")
 	}
+}
+
+func signedTestToken(t *testing.T, priv ed25519.PrivateKey, claims jwt.RegisteredClaims) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	token.Header["typ"] = "JWT"
+	signed, err := token.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign test token: %v", err)
+	}
+	return signed
 }
