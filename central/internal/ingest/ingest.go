@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -124,6 +125,7 @@ type Service struct {
 	settings     *config.Settings
 	backend      *storage.LocalBackend
 	index        snapshotIndexer
+	sessions     UploadSessionStore
 	locks        *services.NamespaceLockManager
 	hooks        *services.HookManager
 	ntfy         *services.NtfyPublisher
@@ -141,6 +143,7 @@ func New(
 	locks *services.NamespaceLockManager,
 	hooks *services.HookManager,
 	ntfy *services.NtfyPublisher,
+	sessionStores ...UploadSessionStore,
 ) (*Service, error) {
 	stagingDir := settings.StagingDir
 	uploadRoot := filepath.Join(stagingDir, "uploads")
@@ -149,12 +152,17 @@ func New(
 		return nil, fmt.Errorf("create upload staging directory: %w", err)
 	}
 	if err := os.MkdirAll(keyRoot, 0o755); err != nil {
-		return nil, fmt.Errorf("create idempotency key directory: %w", err)
+		return nil, fmt.Errorf("create legacy idempotency key directory: %w", err)
+	}
+	sessionStore := UploadSessionStore(NewMemorySessionStore())
+	if len(sessionStores) > 0 && sessionStores[0] != nil {
+		sessionStore = sessionStores[0]
 	}
 	return &Service{
 		settings:   settings,
 		backend:    backend,
 		index:      index,
+		sessions:   sessionStore,
 		locks:      locks,
 		hooks:      hooks,
 		ntfy:       ntfy,
@@ -171,8 +179,6 @@ func (s *Service) UpdateSettings(settings *config.Settings) {
 }
 
 func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, sourceAddr, credHash *string) (*SessionResponse, error) {
-	s.CleanupStaleUploads()
-
 	meta := UploadMetadata{
 		EdgeID:                   req.EdgeID,
 		EdgeInstanceID:           req.EdgeInstanceID,
@@ -190,11 +196,11 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 	}
 
 	// Check idempotency
-	existing := s.loadSessionForKey(req.IdempotencyKey)
+	existing := s.loadSessionForKeyContext(ctx, req.IdempotencyKey)
 	if existing != nil {
 		if s.sessionReferencesMissingSnapshot(ctx, existing) {
 			s.reconcileNamespace(ctx, existing.Namespace)
-			s.discardSession(existing)
+			s.discardSessionContext(ctx, existing)
 			existing = nil
 		}
 	}
@@ -205,7 +211,7 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		existing.UploadedBytes = s.currentUploadSize(existing.UploadID)
 		existing.UpdatedAt = utcNow()
 		existing.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSession(existing); err != nil {
+		if err := s.saveSessionContext(ctx, existing); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 		return s.buildSessionResponse(existing), nil
@@ -221,7 +227,7 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 	}
 
 	// Validate capacity
-	if err := s.validateNewReservation(req.ArchiveSizeBytes); err != nil {
+	if err := s.validateNewReservationContext(ctx, req.ArchiveSizeBytes); err != nil {
 		return nil, err
 	}
 
@@ -252,22 +258,21 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		UpdatedAt:        now,
 		ExpiresAt:        utcAfter(s.sessionTTL()),
 	}
-	if err := s.saveSession(session); err != nil {
-		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
-	}
-	if err := s.writeKeyMapping(req.IdempotencyKey, session.UploadID); err != nil {
-		s.discardSession(session)
+	if err := s.saveSessionContext(ctx, session); err != nil {
+		s.discardSessionContext(ctx, session)
 		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 	}
 	return s.buildSessionResponse(session), nil
 }
 
 func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64, body io.Reader) (*ChunkResponse, error) {
-	l := s.sessionLock(uploadID)
-	l.Lock()
-	defer l.Unlock()
+	unlock, err := s.sessionStore().Lock(ctx, "upload:"+uploadID)
+	if err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to lock upload session")
+	}
+	defer unlock()
 
-	session, err := s.loadSession(uploadID)
+	session, err := s.loadSessionContext(ctx, uploadID)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +336,7 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 	}
 	session.UpdatedAt = utcNow()
 	session.ExpiresAt = utcAfter(s.sessionTTL())
-	if err := s.saveSession(session); err != nil {
+	if err := s.saveSessionContext(ctx, session); err != nil {
 		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 	}
 
@@ -344,7 +349,13 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 }
 
 func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*FinalizeResponse, error) {
-	session, err := s.loadSession(uploadID)
+	unlock, err := s.sessionStore().Lock(ctx, "upload:"+uploadID)
+	if err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to lock upload session")
+	}
+	defer unlock()
+
+	session, err := s.loadSessionContext(ctx, uploadID)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +363,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	if session.Status == "completed" {
 		if s.sessionReferencesMissingSnapshot(ctx, session) {
 			s.reconcileNamespace(ctx, session.Namespace)
-			s.discardSession(session)
+			s.discardSessionContext(ctx, session)
 			return nil, httpError(http.StatusConflict, "stored snapshot missing; re-initiate upload")
 		}
 		storedAs := session.Filename
@@ -368,7 +379,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	defer nsLock.Unlock()
 
 	// Re-read under lock
-	session, err = s.loadSession(uploadID)
+	session, err = s.loadSessionContext(ctx, uploadID)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +403,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		session.Status = "checksum_retry_required"
 		session.UpdatedAt = utcNow()
 		session.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSession(session); err != nil {
+		if err := s.saveSessionContext(ctx, session); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
@@ -425,7 +436,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		session.Pruned = 0
 		session.UpdatedAt = utcNow()
 		session.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSession(session); err != nil {
+		if err := s.saveSessionContext(ctx, session); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 		hookStatus = "ok"
@@ -469,7 +480,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		session.Pruned = pruned
 		session.UpdatedAt = utcNow()
 		session.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSession(session); err != nil {
+		if err := s.saveSessionContext(ctx, session); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 
@@ -485,27 +496,9 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 
 func (s *Service) CleanupStaleUploads() {
 	cutoff := time.Now().UTC()
-	entries, _ := os.ReadDir(s.uploadRoot)
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		metaPath := filepath.Join(s.uploadRoot, e.Name(), "metadata.json")
-		data, err := os.ReadFile(metaPath)
-		if err != nil {
-			continue
-		}
-		var sess UploadSession
-		if err := json.Unmarshal(data, &sess); err != nil {
-			continue
-		}
-		expiresAt, err := time.ParseInLocation(timeFormat, sess.ExpiresAt, time.UTC)
-		if err != nil || expiresAt.After(cutoff) {
-			continue
-		}
-		keyPath := s.keyMappingPath(sess.IdempotencyKey)
-		os.Remove(keyPath)
-		os.RemoveAll(filepath.Join(s.uploadRoot, e.Name()))
+	expired, _ := s.sessionStore().DeleteExpired(context.Background(), cutoff)
+	for _, sess := range expired {
+		os.RemoveAll(s.sessionDir(sess.UploadID))
 	}
 }
 
@@ -520,6 +513,49 @@ func (s *Service) CleanupLoop(ctx context.Context, intervalSeconds int) {
 			s.CleanupStaleUploads()
 		}
 	}
+}
+
+func (s *Service) MigrateLegacyUploadSessions(ctx context.Context) (int, error) {
+	entries, err := os.ReadDir(s.uploadRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read legacy upload sessions: %w", err)
+	}
+
+	var migrated int
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == "keys" {
+			continue
+		}
+		uploadID := e.Name()
+		if _, err := s.sessionStore().Load(ctx, uploadID); err == nil {
+			continue
+		} else if !errors.Is(err, ErrSessionNotFound) {
+			return migrated, fmt.Errorf("check existing upload session %q: %w", uploadID, err)
+		}
+
+		data, err := os.ReadFile(s.metadataPath(uploadID))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return migrated, fmt.Errorf("read legacy upload session %q: %w", uploadID, err)
+		}
+		var sess UploadSession
+		if err := json.Unmarshal(data, &sess); err != nil {
+			return migrated, fmt.Errorf("parse legacy upload session %q: %w", uploadID, err)
+		}
+		if strings.TrimSpace(sess.UploadID) == "" {
+			sess.UploadID = uploadID
+		}
+		if err := s.saveSessionContext(ctx, &sess); err != nil {
+			return migrated, fmt.Errorf("save migrated upload session %q: %w", sess.UploadID, err)
+		}
+		migrated++
+	}
+	return migrated, nil
 }
 
 func (s *Service) ReconcileNamespace(ctx context.Context, namespace string) {
@@ -600,10 +636,17 @@ func (s *Service) hookContext(session *UploadSession, stagedPath string) map[str
 }
 
 func (s *Service) validateNewReservation(archiveSizeBytes int64) error {
+	return s.validateNewReservationContext(context.Background(), archiveSizeBytes)
+}
+
+func (s *Service) validateNewReservationContext(ctx context.Context, archiveSizeBytes int64) error {
 	if archiveSizeBytes > s.settings.MaxUploadSizeBytes() {
 		return httpError(http.StatusRequestEntityTooLarge, "upload too large")
 	}
-	reserved := s.reservedBytes()
+	reserved, err := s.reservedBytesContext(ctx)
+	if err != nil {
+		return httpError(http.StatusInternalServerError, "failed to calculate reserved upload storage")
+	}
 	stagingFree := diskFree(s.stagingDir)
 	if archiveSizeBytes+reserved > stagingFree {
 		return httpError(507, "insufficient staging storage")
@@ -616,26 +659,12 @@ func (s *Service) validateNewReservation(archiveSizeBytes int64) error {
 }
 
 func (s *Service) reservedBytes() int64 {
-	var total int64
-	entries, _ := os.ReadDir(s.uploadRoot)
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		metaPath := filepath.Join(s.uploadRoot, e.Name(), "metadata.json")
-		data, err := os.ReadFile(metaPath)
-		if err != nil {
-			continue
-		}
-		var sess UploadSession
-		if err := json.Unmarshal(data, &sess); err != nil {
-			continue
-		}
-		if activeSessionStatuses[sess.Status] {
-			total += sess.ArchiveSizeBytes
-		}
-	}
+	total, _ := s.reservedBytesContext(context.Background())
 	return total
+}
+
+func (s *Service) reservedBytesContext(ctx context.Context) (int64, error) {
+	return s.sessionStore().ReservedBytes(ctx)
 }
 
 func diskFree(path string) int64 {
@@ -731,7 +760,11 @@ func (s *Service) reconcileNamespace(ctx context.Context, namespace string) {
 }
 
 func (s *Service) discardSession(sess *UploadSession) {
-	os.Remove(s.keyMappingPath(sess.IdempotencyKey))
+	s.discardSessionContext(context.Background(), sess)
+}
+
+func (s *Service) discardSessionContext(ctx context.Context, sess *UploadSession) {
+	_ = s.sessionStore().Delete(ctx, sess)
 	os.RemoveAll(s.sessionDir(sess.UploadID))
 }
 
@@ -757,16 +790,22 @@ func (s *Service) writeKeyMapping(key, uploadID string) error {
 	if err != nil {
 		return err
 	}
-	tmpPath := s.keyMappingPath(key) + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.keyMappingPath(key)), 0o755); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, s.keyMappingPath(key))
+	return os.WriteFile(s.keyMappingPath(key), data, 0o644)
 }
 
 func (s *Service) loadSessionForKey(key string) *UploadSession {
-	path := s.keyMappingPath(key)
-	data, err := os.ReadFile(path)
+	return s.loadSessionForKeyContext(context.Background(), key)
+}
+
+func (s *Service) loadSessionForKeyContext(ctx context.Context, key string) *UploadSession {
+	sess, err := s.sessionStore().LoadByIdempotencyKey(ctx, key)
+	if err == nil {
+		return sess
+	}
+	data, err := os.ReadFile(s.keyMappingPath(key))
 	if err != nil {
 		return nil
 	}
@@ -778,44 +817,56 @@ func (s *Service) loadSessionForKey(key string) *UploadSession {
 	if uploadID == "" {
 		return nil
 	}
-	sess, err := s.loadSession(uploadID)
+	sess, err = s.loadSessionContext(ctx, uploadID)
 	if err != nil {
-		os.Remove(path)
+		os.Remove(s.keyMappingPath(key))
 		return nil
 	}
 	return sess
 }
 
 func (s *Service) loadSession(uploadID string) (*UploadSession, error) {
-	metaPath := s.metadataPath(uploadID)
-	data, err := os.ReadFile(metaPath)
+	return s.loadSessionContext(context.Background(), uploadID)
+}
+
+func (s *Service) loadSessionContext(ctx context.Context, uploadID string) (*UploadSession, error) {
+	sess, err := s.sessionStore().Load(ctx, uploadID)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, ErrSessionNotFound) {
+			data, readErr := os.ReadFile(s.metadataPath(uploadID))
+			if readErr == nil {
+				var legacy UploadSession
+				if err := json.Unmarshal(data, &legacy); err != nil {
+					return nil, httpError(http.StatusInternalServerError, "failed to load upload session")
+				}
+				return &legacy, nil
+			}
 			return nil, httpError(http.StatusNotFound, "upload session not found")
 		}
 		return nil, httpError(http.StatusInternalServerError, "failed to load upload session")
 	}
-	var sess UploadSession
-	if err := json.Unmarshal(data, &sess); err != nil {
-		return nil, httpError(http.StatusInternalServerError, "failed to load upload session")
-	}
-	return &sess, nil
+	return sess, nil
 }
 
 func (s *Service) saveSession(sess *UploadSession) error {
+	return s.saveSessionContext(context.Background(), sess)
+}
+
+func (s *Service) saveSessionContext(ctx context.Context, sess *UploadSession) error {
 	dir := s.sessionDir(sess.UploadID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	data, err := jsonMarshal(sess)
-	if err != nil {
-		return err
+	return s.sessionStore().Save(ctx, sess)
+}
+
+func (s *Service) sessionStore() UploadSessionStore {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sessions == nil {
+		s.sessions = NewMemorySessionStore()
 	}
-	tmpPath := filepath.Join(dir, "metadata.tmp")
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, s.metadataPath(sess.UploadID))
+	return s.sessions
 }
 
 func (s *Service) currentUploadSize(uploadID string) int64 {

@@ -1,6 +1,6 @@
 services:
   central:
-    container_name: relay-central
+    container_name: 3to1go-central
     image: ghcr.io/thesteau/relay-centralizer-central:latest
     env_file:
       - ./.env
@@ -23,7 +23,7 @@ services:
         max-file: "3"
 
   postgres:
-    container_name: relay-central-db
+    container_name: 3to1go-central-db
     image: postgres:17-alpine
     env_file:
       - ./.env

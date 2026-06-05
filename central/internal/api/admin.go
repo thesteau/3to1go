@@ -227,3 +227,18 @@ func (a *App) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
+func (a *App) handleMigrateUploadSessions(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	migrated, err := a.ingest.MigrateLegacyUploadSessions(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to migrate upload sessions")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":   "ok",
+		"migrated": migrated,
+	})
+}

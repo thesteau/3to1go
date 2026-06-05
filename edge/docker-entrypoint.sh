@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-ca_dir="${RELAY_EXTRA_CA_DIR:-/run/relay-certs}"
-persisted_ca_dir="${RELAY_PERSISTED_CA_DIR:-/config/trusted-certs}"
-ca_file="${RELAY_EXTRA_CA_FILE:-}"
-trust_target_dir="${RELAY_TRUST_TARGET_DIR:-/usr/local/share/ca-certificates/relay-centralizer}"
-update_ca_certificates="${RELAY_UPDATE_CA_CERTIFICATES:-update-ca-certificates}"
+ca_dir="${THREETOONEGO_EXTRA_CA_DIR:-/run/3to1go-certs}"
+persisted_ca_dir="${THREETOONEGO_PERSISTED_CA_DIR:-/config/trusted-certs}"
+ca_file="${THREETOONEGO_EXTRA_CA_FILE:-}"
+trust_target_dir="${THREETOONEGO_TRUST_TARGET_DIR:-/usr/local/share/ca-certificates/3to1go}"
+update_ca_certificates="${THREETOONEGO_UPDATE_CA_CERTIFICATES:-update-ca-certificates}"
 installed_count=0
 
 install_ca_file() {
@@ -46,7 +46,7 @@ fi
 
 if [ "$installed_count" -gt 0 ]; then
     echo "Installed $installed_count extra CA certificate(s). Updating trust store..."
-    sh -c "$update_ca_certificates"
+    "$update_ca_certificates"
 fi
 
 exec "$@"

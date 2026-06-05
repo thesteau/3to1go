@@ -111,6 +111,12 @@
         <button type="button" class="secondary" onclick="closeDialog('users-dialog')">Close</button>
       </div>
       <div id="users-list"></div>
+      <div class="hook-section admin-only" id="migration-section" hidden>
+        <h3>Maintenance</h3>
+        <div class="toolbar">
+          <button type="button" class="secondary" id="migrate-upload-sessions-btn" onclick="migrateUploadSessions()">Migrate Upload Sessions</button>
+        </div>
+      </div>
       <div class="hook-section admin-only" id="add-user-section" hidden>
         <h3>Add User</h3>
         <div class="user-form">

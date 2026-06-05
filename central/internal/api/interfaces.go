@@ -49,5 +49,6 @@ type ingestSvc interface {
 	FinalizeUpload(ctx context.Context, uploadID string) (*ingest.FinalizeResponse, error)
 	ReconcileNamespace(ctx context.Context, namespace string)
 	CleanupLoop(ctx context.Context, intervalSeconds int)
+	MigrateLegacyUploadSessions(ctx context.Context) (int, error)
 	UpdateSettings(settings *config.Settings)
 }

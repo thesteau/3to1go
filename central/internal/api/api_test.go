@@ -138,6 +138,8 @@ type mockIngest struct {
 	chunkErr  error
 	finResp   *ingest.FinalizeResponse
 	finErr    error
+	migN      int
+	migErr    error
 }
 
 func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, _, _ *string) (*ingest.SessionResponse, error) {
@@ -151,7 +153,10 @@ func (m *mockIngest) FinalizeUpload(_ context.Context, _ string) (*ingest.Finali
 }
 func (m *mockIngest) ReconcileNamespace(_ context.Context, _ string) {}
 func (m *mockIngest) CleanupLoop(_ context.Context, _ int)           {}
-func (m *mockIngest) UpdateSettings(_ *config.Settings)              {}
+func (m *mockIngest) MigrateLegacyUploadSessions(_ context.Context) (int, error) {
+	return m.migN, m.migErr
+}
+func (m *mockIngest) UpdateSettings(_ *config.Settings) {}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -624,6 +629,38 @@ func TestHandleDeleteUser_Success(t *testing.T) {
 	app.handleDeleteUser(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Errorf("code = %d, want 200", rr.Code)
+	}
+}
+
+func TestHandleMigrateUploadSessions_AdminOnly(t *testing.T) {
+	app := newTestApp(t, nil, nil, nil, nil)
+	rr := httptest.NewRecorder()
+	req := withUser(httptest.NewRequest("POST", "/api/migrations/upload-sessions", nil), regularUser())
+
+	app.handleMigrateUploadSessions(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("code = %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleMigrateUploadSessions_Success(t *testing.T) {
+	app := newTestApp(t, nil, nil, nil, nil)
+	app.ingest = &mockIngest{migN: 2}
+	rr := httptest.NewRecorder()
+	req := withUser(httptest.NewRequest("POST", "/api/migrations/upload-sessions", nil), adminUser())
+
+	app.handleMigrateUploadSessions(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+	var body map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("response JSON: %v", err)
+	}
+	if body["migrated"].(float64) != 2 {
+		t.Errorf("migrated = %v, want 2", body["migrated"])
 	}
 }
 

@@ -317,6 +317,7 @@ async function loadUsers() {
 function renderUsers(users) {
   const canAdmin = Boolean(currentUser?.is_admin);
   document.getElementById("add-user-section").hidden = !canAdmin;
+  document.getElementById("migration-section").hidden = !canAdmin;
   document.getElementById("users-list").innerHTML = users.map((user) => {
     const isSelf = currentUser?.id === user.id;
     const isBootstrapAdmin = Boolean(user.is_bootstrap_admin);
@@ -344,6 +345,33 @@ function renderUsers(users) {
       </div>
     `;
   }).join("");
+}
+
+async function migrateUploadSessions() {
+  if (!currentUser?.is_admin) return;
+  const button = document.getElementById("migrate-upload-sessions-btn");
+  if (button) button.disabled = true;
+  setStatus("users-status", "Migrating upload sessions...", "info");
+  try {
+    const response = await fetch("/api/migrations/upload-sessions", { method: "POST" });
+    const body = await readJson(response);
+    if (!response.ok) {
+      setStatus("users-status", body.detail || "Migration failed.", "error");
+      return;
+    }
+    const migrated = Number(body.migrated || 0);
+    if (migrated > 0) {
+      const message = `Migrated ${migrated} upload session${migrated === 1 ? "" : "s"}.`;
+      setStatus("users-status", message, "success");
+      showToast(message, "success", { title: "Migration complete" });
+      return;
+    }
+    clearStatus("users-status");
+  } catch (error) {
+    setStatus("users-status", error.message || "Migration failed.", "error");
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function saveUser(userId) {

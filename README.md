@@ -1,6 +1,6 @@
-# RelayCentralizer
+# 3to1go
 
-RelayCentralizer is a simple backup system with two parts:
+3to1go is a simple backup system with two parts:
 
 - `Edge` runs on the machine that has the files you care about.
 - `Central` receives encrypted backups and keeps them on disk.
@@ -13,7 +13,7 @@ If you want the shortest mental model:
 4. Edge packs and encrypts those folders.
 5. Central stores the snapshots and lets you browse them in a web UI.
 
-## Why Use RelayCentralizer
+## Why Use 3to1go
 
 - **Simple Central/Edge model** - Central receives and organizes backups, while each Edge owns scanning, encryption, scheduling, and upload retries.
 - **Encrypted snapshots by default** - Edge encrypts archives before upload, so Central can store backups without needing plaintext file access.
@@ -54,7 +54,7 @@ Central is usually the always-on receiver.
 - Open the Central UI at `http://localhost:6555/`.
 - Mint an Edge credential from the Central UI.
 
-More detail: [`central/README.md`](central/README.md)
+More detail: [`deploy-example/central/`](deploy-example/central/)
 
 ### 2. Start Edge
 
@@ -67,7 +67,7 @@ Edge runs on the machine that owns the files.
 - Paste the credential minted by Central.
 - Pick a unique `EDGE_ID`.
 
-More detail: [`edge/README.md`](edge/README.md)
+More detail: [`deploy-example/edge/`](deploy-example/edge/)
 
 ### 3. Mark A Folder For Backup
 
@@ -136,20 +136,16 @@ Central stores backups on the local filesystem. It is not trying to be an S3, Dr
 
 If you want off-site copies, the expected pattern is:
 
-1. Let RelayCentralizer write to Central's local `BACKUP_ROOT`.
+1. Let 3to1go write to Central's local `BACKUP_ROOT`.
 2. Use a separate sync or replication tool to copy that storage elsewhere.
 
 ## Repo Layout
 
 - [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image
 - [`deploy-example/edge/`](deploy-example/edge/) - user-facing Edge Compose setup with the published image
-- [`central/`](central/) - receiver API, storage logic, and Central web UI
-- [`edge/`](edge/) - scan agent, upload logic, encryption, and Edge web UI
-
-## Which README Should I Read Next?
-
-- Read [`central/README.md`](central/README.md) if you are setting up the receiving server.
-- Read [`edge/README.md`](edge/README.md) if you are setting up a machine that will produce backups.
+- [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go)
+- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Python, current deployed version)
+- [`edge-tmp/`](edge-tmp/) - 3to1go Edge rewrite in Go (in progress)
 
 ## License
 
