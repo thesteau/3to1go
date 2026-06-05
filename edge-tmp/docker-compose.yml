@@ -1,0 +1,20 @@
+services:
+  edge:
+    container_name: relay-edge
+    build: .
+    env_file:
+      - ./.env
+    ports:
+      - "6556:6556"
+    volumes:
+      - ./config:/config
+      - ./hook-scripts:/hook-scripts
+      - ${SCAN_DIR:-./scan}:/scan
+      - ./state:/data/state
+      - ./spool:/data/spool
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
