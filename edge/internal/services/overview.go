@@ -29,7 +29,7 @@ func BuildStatusResponse(settings *config.Settings, keyFingerprint string, circu
 }
 
 // BuildDirectoryResponse returns the directory list payload for /api/directories.
-func BuildDirectoryResponse(settings *config.Settings, dirService *DirectoryService) map[string]any {
+func BuildDirectoryResponse(settings *config.Settings, dirService dirLister) map[string]any {
 	dirs, err := dirService.ListDirectories()
 	if err != nil {
 		dirs = nil

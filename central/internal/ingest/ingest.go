@@ -43,6 +43,24 @@ type snapshotIndexer interface {
 	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
 }
 
+type ingestBackend interface {
+	Store(namespace, filename, stagedPath string) (string, error)
+	List(namespace string) ([]storage.StorageFile, error)
+	Delete(namespace, filename string) error
+}
+
+type namespaceLocks interface {
+	Lock(namespace string) *sync.Mutex
+}
+
+type hookRunner interface {
+	RunCommand(command, phase string, hookCtx map[string]any)
+}
+
+type ntfyBroadcaster interface {
+	PublishBestEffort(s *config.Settings, ctx map[string]any)
+}
+
 // UploadSession holds state for a resumable upload.
 type UploadSession struct {
 	UploadID         string  `json:"upload_id"`
@@ -124,12 +142,12 @@ type FinalizeResponse struct {
 // Service manages resumable uploads.
 type Service struct {
 	settings     *config.Settings
-	backend      *storage.LocalBackend
+	backend      ingestBackend
 	index        snapshotIndexer
 	sessions     UploadSessionStore
-	locks        *services.NamespaceLockManager
-	hooks        *services.HookManager
-	ntfy         *services.NtfyPublisher
+	locks        namespaceLocks
+	hooks        hookRunner
+	ntfy         ntfyBroadcaster
 	stagingDir   string
 	uploadRoot   string
 	keyRoot      string
@@ -139,11 +157,11 @@ type Service struct {
 
 func New(
 	settings *config.Settings,
-	backend *storage.LocalBackend,
+	backend ingestBackend,
 	index snapshotIndexer,
-	locks *services.NamespaceLockManager,
-	hooks *services.HookManager,
-	ntfy *services.NtfyPublisher,
+	locks namespaceLocks,
+	hooks hookRunner,
+	ntfy ntfyBroadcaster,
 	sessionStores ...UploadSessionStore,
 ) (*Service, error) {
 	stagingDir := settings.StagingDir

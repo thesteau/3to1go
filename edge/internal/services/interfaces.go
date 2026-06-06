@@ -22,3 +22,9 @@ type snapshotDownloader interface {
 type circuitSnapshotter interface {
 	Snapshot() map[string]any
 }
+
+// dirLister lists configured backup directories.
+// Consumers define this interface; *DirectoryService satisfies it.
+type dirLister interface {
+	ListDirectories() ([]DirectoryEntry, error)
+}

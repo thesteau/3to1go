@@ -7,7 +7,9 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/services"
 	"github.com/3to1go/central/internal/signing"
+	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 )
 
@@ -52,4 +54,27 @@ type ingestSvc interface {
 	CleanupLoop(ctx context.Context, intervalSeconds int)
 	MigrateLegacyUploadSessions(ctx context.Context) (int, error)
 	UpdateSettings(settings *config.Settings)
+}
+
+type storageBackend interface {
+	Healthcheck() bool
+	List(namespace string) ([]storage.StorageFile, error)
+}
+
+type certManager interface {
+	Snapshot() map[string]any
+	SaveUploadedFile(filename string, content []byte) (services.CertFileInfo, error)
+	DeleteFile(filename string) error
+}
+
+type hookManager interface {
+	Snapshot(preCommand, postCommand string) map[string]any
+	SaveUploadedFile(filename string, content []byte) (services.HookFileInfo, error)
+	ReadTextFile(filename string) (string, string, error)
+	DeleteFile(filename string) error
+}
+
+type ntfyPublisher interface {
+	Snapshot(s *config.Settings) map[string]any
+	PublishTest(cfg map[string]any) error
 }

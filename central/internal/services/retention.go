@@ -7,9 +7,14 @@ import (
 	"github.com/3to1go/central/internal/storage"
 )
 
+type snapshotStore interface {
+	List(namespace string) ([]storage.StorageFile, error)
+	Delete(namespace, filename string) error
+}
+
 // PruneOldSnapshots deletes excess snapshots, keeping the keepLast most recent.
 // Returns the number of deleted snapshots.
-func PruneOldSnapshots(backend *storage.LocalBackend, namespace string, keepLast int) (int, error) {
+func PruneOldSnapshots(backend snapshotStore, namespace string, keepLast int) (int, error) {
 	files, err := backend.List(namespace)
 	if err != nil {
 		return 0, err

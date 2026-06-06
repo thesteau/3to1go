@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
-	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 	"github.com/3to1go/central/static"
 	"github.com/go-chi/chi/v5"
@@ -24,11 +22,11 @@ type App struct {
 	credStore     credStorer
 	settingsStore settingsStorer
 	snapIndex     snapIndexer
-	backend       *storage.LocalBackend
+	backend       storageBackend
 	ingest        ingestSvc
-	hooks         *services.HookManager
-	certs         *services.CertManager
-	ntfy          *services.NtfyPublisher
+	hooks         hookManager
+	certs         certManager
+	ntfy          ntfyPublisher
 	logger        *slog.Logger
 
 	cleanupCancel     context.CancelFunc
@@ -41,11 +39,11 @@ func NewApp(
 	credStore credStorer,
 	settingsStore settingsStorer,
 	snapIndex snapIndexer,
-	backend *storage.LocalBackend,
+	backend storageBackend,
 	ingestSvc ingestSvc,
-	hooks *services.HookManager,
-	certs *services.CertManager,
-	ntfy *services.NtfyPublisher,
+	hooks hookManager,
+	certs certManager,
+	ntfy ntfyPublisher,
 	logger *slog.Logger,
 ) *App {
 	return &App{

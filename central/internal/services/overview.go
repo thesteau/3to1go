@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 )
 
@@ -14,8 +13,13 @@ type SnapshotIndexer interface {
 	ListNamespaces(ctx context.Context) ([]store.NamespaceEntry, error)
 }
 
+// StorageProbe is the health-check contract used by BuildOverview.
+type StorageProbe interface {
+	Healthcheck() bool
+}
+
 // BuildOverview assembles the dashboard data.
-func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.LocalBackend, idx SnapshotIndexer) (map[string]any, error) {
+func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe, idx SnapshotIndexer) (map[string]any, error) {
 	registrations, err := idx.ListEdgeRegistrations(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -115,7 +119,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 	}, nil
 }
 
-func statusString(backend *storage.LocalBackend) string {
+func statusString(backend StorageProbe) string {
 	if backend.Healthcheck() {
 		return "ok"
 	}
