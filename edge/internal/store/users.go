@@ -201,6 +201,9 @@ func (s *UserStore) CreateUser(ctx context.Context, username, password string, i
 	if err != nil {
 		return nil, err
 	}
+	if normalized == DefaultAdminUsername && !isAdmin {
+		return nil, errors.New(`the "admin" username is reserved for admin users`)
+	}
 	hash, err := hashPassword(password)
 	if err != nil {
 		return nil, err
@@ -255,6 +258,13 @@ func (s *UserStore) UpdateUser(ctx context.Context, userID int, username, passwo
 	}
 	if existing.ID == BootstrapAdminID {
 		nextAdmin = true
+	}
+
+	if existing.Username == DefaultAdminUsername && nextUsername != DefaultAdminUsername {
+		return nil, errors.New(`the "admin" user cannot be renamed`)
+	}
+	if nextUsername == DefaultAdminUsername && !nextAdmin {
+		return nil, errors.New(`the "admin" username is reserved for admin users`)
 	}
 
 	if !nextAdmin {
