@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"bytes"
 	"os"
 	"testing"
 )
@@ -27,7 +28,6 @@ func TestKeyFingerprint_DifferentKeys(t *testing.T) {
 func TestKeyFingerprint_IsHex(t *testing.T) {
 	key := make([]byte, 32)
 	fp := KeyFingerprint(key)
-	// SHA-256 hex = 64 characters
 	if len(fp) != 64 {
 		t.Errorf("fingerprint length = %d, want 64", len(fp))
 	}
@@ -53,15 +53,12 @@ func TestKeyAsBase64_DifferentForDifferentKeys(t *testing.T) {
 }
 
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
-	key := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 1)
-	}
+	key := testKey()
 	dir := t.TempDir()
 	src := dir + "/plain.txt"
 	enc := dir + "/plain.txt.enc"
 	dec := dir + "/plain.txt.dec"
-	plaintext := []byte("hello, world! this is a test payload for AES-256-GCM.")
+	plaintext := []byte("hello, world! this is a test payload for streaming DARE encryption.")
 
 	if err := os.WriteFile(src, plaintext, 0o644); err != nil {
 		t.Fatal(err)
@@ -76,36 +73,42 @@ func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(result) != string(plaintext) {
+	if !bytes.Equal(result, plaintext) {
 		t.Errorf("decrypted %q, want %q", result, plaintext)
 	}
 }
 
-func TestEncryptFile_HasMagicHeader(t *testing.T) {
-	key := make([]byte, 32)
+func TestEncryptDecrypt_LargeRoundTrip(t *testing.T) {
+	key := testKey()
 	dir := t.TempDir()
-	src := dir + "/data.txt"
-	enc := dir + "/data.enc"
+	src := dir + "/large.bin"
+	enc := dir + "/large.enc"
+	dec := dir + "/large.dec"
 
-	if err := os.WriteFile(src, []byte("payload data"), 0o644); err != nil {
+	plaintext := make([]byte, 6*1024*1024)
+	for i := range plaintext {
+		plaintext[i] = byte(i % 251)
+	}
+	if err := os.WriteFile(src, plaintext, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := EncryptFile(key, src, enc); err != nil {
 		t.Fatalf("EncryptFile: %v", err)
 	}
-	data, err := os.ReadFile(enc)
+	if err := DecryptFile(key, enc, dec); err != nil {
+		t.Fatalf("DecryptFile: %v", err)
+	}
+	result, err := os.ReadFile(dec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantMagic := "RCENC1\x00\x00"
-	if len(data) < len(wantMagic) || string(data[:len(wantMagic)]) != wantMagic {
-		t.Errorf("encrypted file missing magic header")
+	if !bytes.Equal(result, plaintext) {
+		t.Fatal("decrypted large payload mismatch")
 	}
 }
 
 func TestEncryptFile_NonDeterministic(t *testing.T) {
-	// Two encryptions of the same plaintext should produce different ciphertext (random IV).
-	key := make([]byte, 32)
+	key := testKey()
 	dir := t.TempDir()
 	src := dir + "/data.txt"
 	enc1 := dir + "/data1.enc"
@@ -122,47 +125,33 @@ func TestEncryptFile_NonDeterministic(t *testing.T) {
 	}
 	d1, _ := os.ReadFile(enc1)
 	d2, _ := os.ReadFile(enc2)
-	same := len(d1) == len(d2)
-	if same {
-		for i := range d1 {
-			if d1[i] != d2[i] {
-				same = false
-				break
-			}
-		}
-	}
-	if same {
-		t.Error("two encryptions of the same plaintext should differ (random IV)")
+	if bytes.Equal(d1, d2) {
+		t.Error("two encryptions of the same plaintext should differ")
 	}
 }
 
-func TestDecryptFile_Passthrough_NoMagic(t *testing.T) {
-	key := make([]byte, 32)
+func TestDecryptFile_PlaintextRejected(t *testing.T) {
+	key := testKey()
 	dir := t.TempDir()
 	src := dir + "/raw.bin"
 	dst := dir + "/raw.out"
-	content := []byte("no magic header here — treat as plaintext passthrough")
 
-	if err := os.WriteFile(src, content, 0o644); err != nil {
+	if err := os.WriteFile(src, []byte("plain bytes are not a valid DARE stream"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := DecryptFile(key, src, dst); err != nil {
-		t.Fatalf("DecryptFile passthrough: %v", err)
+	if err := DecryptFile(key, src, dst); err == nil {
+		t.Fatal("expected plaintext input to be rejected")
 	}
-	result, err := os.ReadFile(dst)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(result) != string(content) {
-		t.Errorf("passthrough: got %q, want %q", result, content)
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		t.Fatalf("expected failed decrypt output to be removed, stat err=%v", err)
 	}
 }
 
 func TestDecryptFile_WrongKey(t *testing.T) {
-	key1 := make([]byte, 32)
+	key1 := testKey()
 	key2 := make([]byte, 32)
 	for i := range key2 {
-		key2[i] = byte(i + 1)
+		key2[i] = byte(i + 11)
 	}
 	dir := t.TempDir()
 	src := dir + "/plain.txt"
@@ -181,12 +170,23 @@ func TestDecryptFile_WrongKey(t *testing.T) {
 }
 
 func TestDecryptFile_TruncatedCiphertext(t *testing.T) {
-	key := make([]byte, 32)
+	key := testKey()
 	dir := t.TempDir()
-	// Write a file that starts with the magic header but is too short
+	src := dir + "/plain.txt"
+	enc := dir + "/plain.enc"
 	truncated := dir + "/truncated.enc"
-	payload := append([]byte("RCENC1\x00\x00"), []byte("tooshort")...)
-	if err := os.WriteFile(truncated, payload, 0o644); err != nil {
+
+	if err := os.WriteFile(src, []byte("secret data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EncryptFile(key, src, enc); err != nil {
+		t.Fatalf("EncryptFile: %v", err)
+	}
+	data, err := os.ReadFile(enc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(truncated, data[:len(data)-3], 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := DecryptFile(key, truncated, dir+"/out"); err == nil {
@@ -220,10 +220,15 @@ func TestLoadOrCreate_LoadsExistingKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := range key1 {
-		if key1[i] != key2[i] {
-			t.Error("LoadOrCreate should return the same key on subsequent calls")
-			break
-		}
+	if !bytes.Equal(key1, key2) {
+		t.Error("LoadOrCreate should return the same key on subsequent calls")
 	}
+}
+
+func testKey() []byte {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	return key
 }

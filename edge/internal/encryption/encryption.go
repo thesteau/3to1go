@@ -1,20 +1,15 @@
 package encryption
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/minio/sio"
 )
-
-// Magic header written before IV + ciphertext. Must match the Python RCENC1\x00\x00.
-var magic = []byte("RCENC1\x00\x00")
-
-const ivSize = 12
 
 // LoadOrCreate reads a 32-byte key from path, creating one if absent.
 func LoadOrCreate(path string) ([]byte, error) {
@@ -45,64 +40,87 @@ func KeyFingerprint(key []byte) string {
 	return fmt.Sprintf("%x", sum)
 }
 
-// EncryptFile reads src, encrypts with AES-256-GCM, and writes magic+IV+ciphertext to dst.
+// EncryptFile streams src through minio/sio DARE v2 and writes the encrypted file to dst.
 func EncryptFile(key []byte, src, dst string) error {
-	plaintext, err := os.ReadFile(src)
+	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("read plaintext: %w", err)
+		return fmt.Errorf("open plaintext: %w", err)
 	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return err
-	}
-	iv := make([]byte, ivSize)
-	if _, err := rand.Read(iv); err != nil {
-		return err
-	}
-	ciphertext := gcm.Seal(nil, iv, plaintext, nil)
+	defer in.Close()
 
-	out := make([]byte, 0, len(magic)+ivSize+len(ciphertext))
-	out = append(out, magic...)
-	out = append(out, iv...)
-	out = append(out, ciphertext...)
-	return os.WriteFile(dst, out, 0o644)
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("open ciphertext: %w", err)
+	}
+	closeOut := true
+	defer func() {
+		if closeOut {
+			out.Close()
+		}
+	}()
+
+	if _, err := sio.Encrypt(out, in, sioConfig(key)); err != nil {
+		out.Close()
+		os.Remove(dst)
+		return fmt.Errorf("encrypt: %w", err)
+	}
+	if err := out.Sync(); err != nil {
+		out.Close()
+		os.Remove(dst)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		closeOut = false
+		os.Remove(dst)
+		return err
+	}
+	closeOut = false
+	return nil
 }
 
-// DecryptFile reads an encrypted file written by EncryptFile and writes the plaintext to dst.
-// If the file does not begin with magic, it is copied as-is (unencrypted passthrough).
+// DecryptFile decrypts a minio/sio DARE v2 file written by EncryptFile.
 func DecryptFile(key []byte, src, dst string) error {
-	payload, err := os.ReadFile(src)
+	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("read ciphertext: %w", err)
+		return fmt.Errorf("open ciphertext: %w", err)
 	}
+	defer in.Close()
 
-	if len(payload) < len(magic) || string(payload[:len(magic)]) != string(magic) {
-		return os.WriteFile(dst, payload, 0o644)
-	}
-
-	minLen := len(magic) + ivSize + 16 // 16 = GCM auth tag minimum
-	if len(payload) < minLen {
-		return fmt.Errorf("invalid encrypted archive format")
-	}
-
-	iv := payload[len(magic) : len(magic)+ivSize]
-	ciphertext := payload[len(magic)+ivSize:]
-
-	block, err := aes.NewCipher(key)
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open plaintext: %w", err)
 	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return err
-	}
-	plaintext, err := gcm.Open(nil, iv, ciphertext, nil)
-	if err != nil {
+	closeOut := true
+	defer func() {
+		if closeOut {
+			out.Close()
+		}
+	}()
+
+	if _, err := sio.Decrypt(out, in, sioConfig(key)); err != nil {
+		out.Close()
+		os.Remove(dst)
 		return fmt.Errorf("decrypt: %w", err)
 	}
-	return os.WriteFile(dst, plaintext, 0o644)
+	if err := out.Sync(); err != nil {
+		out.Close()
+		os.Remove(dst)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		closeOut = false
+		os.Remove(dst)
+		return err
+	}
+	closeOut = false
+	return nil
+}
+
+func sioConfig(key []byte) sio.Config {
+	return sio.Config{
+		MinVersion:   sio.Version20,
+		MaxVersion:   sio.Version20,
+		CipherSuites: []byte{sio.AES_GCM},
+		Key:          key,
+	}
 }

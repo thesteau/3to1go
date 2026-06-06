@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/klauspost/compress v1.17.11
+	github.com/minio/sio v0.5.1
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.49.0
 	gopkg.in/yaml.v3 v3.0.1

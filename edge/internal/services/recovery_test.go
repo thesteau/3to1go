@@ -54,14 +54,9 @@ func testJob(root string) *backup.JobDefinition {
 	return &backup.JobDefinition{JobName: "photos", RootPath: root}
 }
 
-// fakeEncryptedContent returns bytes that start with the magic header but contain
-// invalid ciphertext, causing DecryptFile to fail with an auth-tag mismatch.
+// fakeEncryptedContent returns invalid encrypted content, causing DecryptFile to fail.
 func fakeEncryptedContent() []byte {
-	// magic(8) + iv(12) + fake ciphertext(32) — all zeros except the magic header
-	const magicAndTrailer = 8 + 12 + 32
-	b := make([]byte, magicAndTrailer)
-	copy(b, "RCENC1\x00\x00")
-	return b
+	return []byte("not a valid DARE stream")
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +173,7 @@ func TestRecover_DownloadError(t *testing.T) {
 
 func TestRecover_DecryptError_WrongKey(t *testing.T) {
 	ms := newMockStateStore()
-	// Downloader returns fake-encrypted content (magic header + garbage) so DecryptFile errors.
+	// Downloader returns malformed encrypted content so DecryptFile errors.
 	dl := &mockDownloader{
 		filename: "photos__photos__abc123.tar.zst",
 		content:  fakeEncryptedContent(),
