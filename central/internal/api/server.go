@@ -66,6 +66,7 @@ type ingestSvc interface {
 
 type storageBackend interface {
 	Healthcheck() bool
+	DiskInfo() (total, used, free int64)
 	List(namespace string) ([]storage.StorageFile, error)
 }
 
