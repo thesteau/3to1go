@@ -121,8 +121,9 @@ Edge authenticates to Central with a signed JWT credential minted by Central.
 
 - Central stores credential metadata in its database, not raw tokens.
 - Edge stores the pasted credential in its local settings database.
-- Credentials can be unique per Edge or intentionally shared across multiple Edges.
-- Revoking a shared credential blocks every Edge instance using that same token.
+- New credentials are single-instance by default and bind to the first Edge instance that reports in with them.
+- Shared credentials can be minted intentionally with an instance limit.
+- Central can revoke a credential after at least one Edge instance has reported in with it; otherwise the token expires naturally.
 
 ### Unique Edge IDs Matter
 
@@ -144,8 +145,7 @@ If you want off-site copies, the expected pattern is:
 - [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image
 - [`deploy-example/edge/`](deploy-example/edge/) - user-facing Edge Compose setup with the published image
 - [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go)
-- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Python, current deployed version)
-- [`edge-tmp/`](edge-tmp/) - 3to1go Edge rewrite in Go (in progress)
+- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Go)
 
 ## License
 

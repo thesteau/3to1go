@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/signing"
@@ -13,6 +14,8 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ttlDays := 365
+	shared := false
+	maxRegistrations := 1
 	if v := r.URL.Query().Get("ttl_days"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 || n > 3650 {
@@ -21,6 +24,37 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		}
 		ttlDays = n
 	}
+	if r.Header.Get("Content-Type") != "" {
+		var body struct {
+			TTLDays          int  `json:"ttl_days" validate:"omitempty,min=1,max=3650"`
+			Shared           bool `json:"shared"`
+			MaxRegistrations int  `json:"max_registrations" validate:"omitempty,min=1,max=10000"`
+		}
+		if err := readJSON(r, &body); err == nil {
+			if err := validateStruct(&body); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid credential options")
+				return
+			}
+			if body.TTLDays != 0 {
+				ttlDays = body.TTLDays
+			}
+			shared = body.Shared
+			if body.MaxRegistrations != 0 {
+				maxRegistrations = body.MaxRegistrations
+			}
+		} else if strings.TrimSpace(r.URL.Query().Get("ttl_days")) == "" {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+	}
+	if shared {
+		if maxRegistrations < 2 || maxRegistrations > 10000 {
+			writeError(w, http.StatusBadRequest, "max_registrations must be between 2 and 10000 for shared credentials")
+			return
+		}
+	} else {
+		maxRegistrations = 1
+	}
 
 	s := a.Settings()
 	priv, _, err := signing.LoadOrCreateIssuerKeypair(s.IssuerKeyPath)
@@ -28,14 +62,18 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to load issuer key")
 		return
 	}
-	credential, err := a.credStore.Mint(r.Context(), priv, ttlDays)
+	scope := signing.CredentialScope{Shared: shared, MaxRegistrations: maxRegistrations}
+	credential, err := a.credStore.Mint(r.Context(), priv, ttlDays, scope)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to mint credential")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"credential": credential,
-		"ttl_days":   ttlDays,
+		"credential":        credential,
+		"ttl_days":          ttlDays,
+		"shared":            shared,
+		"max_registrations": maxRegistrations,
+		"message":           "This token can be revoked from Central after an Edge instance reports in with it, or it can expire naturally.",
 	})
 }
 

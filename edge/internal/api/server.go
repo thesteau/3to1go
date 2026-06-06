@@ -8,6 +8,7 @@ import (
 
 	"github.com/3to1go/edge/internal/store"
 	"github.com/3to1go/edge/static"
+	"github.com/go-chi/chi/v5"
 )
 
 // App holds all edge server state.
@@ -33,68 +34,77 @@ func NewApp(
 	}
 }
 
-// Handler builds and returns the HTTP ServeMux for the edge server.
+// Handler builds and returns the HTTP router for the edge server.
 func (a *App) Handler() http.Handler {
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
 	// Static assets
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
 
 	// SPA root
-	mux.HandleFunc("GET /", a.handleIndex)
-	mux.HandleFunc("GET /health", a.handleHealth)
+	r.Get("/", a.handleIndex)
+	r.Get("/health", a.handleHealth)
 
 	// Session (public)
-	mux.HandleFunc("GET /api/session/me", a.handleSessionMe)
-	mux.HandleFunc("POST /api/session/login", a.handleLogin)
-	mux.HandleFunc("POST /api/session/logout", a.handleLogout)
-	mux.HandleFunc("POST /api/session/change-password", a.handleChangePassword)
+	r.Get("/api/session/me", a.handleSessionMe)
+	r.Post("/api/session/login", a.handleLogin)
+	r.Post("/api/session/logout", a.handleLogout)
+	r.Post("/api/session/change-password", a.handleChangePassword)
 
 	// Users
-	mux.HandleFunc("GET /api/users", a.handleListUsers)
-	mux.HandleFunc("POST /api/users", a.handleCreateUser)
-	mux.HandleFunc("PUT /api/users/{user_id}", a.handleUpdateUser)
-	mux.HandleFunc("DELETE /api/users/{user_id}", a.handleDeleteUser)
+	r.Get("/api/users", a.handleListUsers)
+	r.Post("/api/users", a.handleCreateUser)
+	r.Put("/api/users/{user_id}", withPathValues(a.handleUpdateUser, "user_id"))
+	r.Delete("/api/users/{user_id}", withPathValues(a.handleDeleteUser, "user_id"))
 
 	// System status + scheduler
-	mux.HandleFunc("GET /api/status", a.handleStatus)
-	mux.HandleFunc("POST /api/run-now", a.handleRunNow)
+	r.Get("/api/status", a.handleStatus)
+	r.Post("/api/run-now", a.handleRunNow)
 
 	// Directories + jobs
-	mux.HandleFunc("GET /api/directories", a.handleListDirectories)
-	mux.HandleFunc("POST /api/directories/save-job", a.handleSaveJob)
-	mux.HandleFunc("POST /api/directories/delete-job", a.handleDeleteJob)
-	mux.HandleFunc("POST /api/directories/force-send", a.handleForceSend)
+	r.Get("/api/directories", a.handleListDirectories)
+	r.Post("/api/directories/save-job", a.handleSaveJob)
+	r.Post("/api/directories/delete-job", a.handleDeleteJob)
+	r.Post("/api/directories/force-send", a.handleForceSend)
 
 	// Recovery
-	mux.HandleFunc("POST /api/recovery/preview", a.handleRecoveryPreview)
-	mux.HandleFunc("POST /api/recovery/restore", a.handleRecoveryRestore)
+	r.Post("/api/recovery/preview", a.handleRecoveryPreview)
+	r.Post("/api/recovery/restore", a.handleRecoveryRestore)
 
 	// Settings
-	mux.HandleFunc("GET /api/settings", a.handleGetSettings)
-	mux.HandleFunc("POST /api/settings", a.handleSaveSettings)
+	r.Get("/api/settings", a.handleGetSettings)
+	r.Post("/api/settings", a.handleSaveSettings)
 
 	// Ntfy
-	mux.HandleFunc("GET /api/ntfy", a.handleGetNtfy)
-	mux.HandleFunc("POST /api/ntfy", a.handleSaveNtfy)
-	mux.HandleFunc("POST /api/ntfy/test", a.handleTestNtfy)
+	r.Get("/api/ntfy", a.handleGetNtfy)
+	r.Post("/api/ntfy", a.handleSaveNtfy)
+	r.Post("/api/ntfy/test", a.handleTestNtfy)
 
 	// Certificates
-	mux.HandleFunc("GET /api/certificates", a.handleGetCertificates)
-	mux.HandleFunc("POST /api/certificates/files", a.handleUploadCertificate)
-	mux.HandleFunc("DELETE /api/certificates/files/{filename}", a.handleDeleteCertificate)
+	r.Get("/api/certificates", a.handleGetCertificates)
+	r.Post("/api/certificates/files", a.handleUploadCertificate)
+	r.Delete("/api/certificates/files/{filename}", withPathValues(a.handleDeleteCertificate, "filename"))
 
 	// Hooks
-	mux.HandleFunc("GET /api/hooks", a.handleGetHooks)
-	mux.HandleFunc("POST /api/hooks", a.handleSaveHooks)
-	mux.HandleFunc("POST /api/hooks/files", a.handleUploadHookFile)
-	mux.HandleFunc("GET /api/hooks/files/{filename}", a.handleViewHookFile)
-	mux.HandleFunc("DELETE /api/hooks/files/{filename}", a.handleDeleteHookFile)
+	r.Get("/api/hooks", a.handleGetHooks)
+	r.Post("/api/hooks", a.handleSaveHooks)
+	r.Post("/api/hooks/files", a.handleUploadHookFile)
+	r.Get("/api/hooks/files/{filename}", withPathValues(a.handleViewHookFile, "filename"))
+	r.Delete("/api/hooks/files/{filename}", withPathValues(a.handleDeleteHookFile, "filename"))
 
 	// Encryption key
-	mux.HandleFunc("GET /api/encryption-key", a.handleGetEncryptionKey)
+	r.Get("/api/encryption-key", a.handleGetEncryptionKey)
 
-	return newRateLimiter().middleware(a.sessionMiddleware(mux))
+	return newRateLimiter().middleware(a.sessionMiddleware(r))
+}
+
+func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, name := range names {
+			r.SetPathValue(name, chi.URLParam(r, name))
+		}
+		next(w, r)
+	}
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {

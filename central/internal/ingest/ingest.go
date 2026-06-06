@@ -582,6 +582,9 @@ func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHas
 	var reg *store.EdgeRegistration
 	if existing != nil {
 		reg = existing
+		if credHash != nil && *credHash != "" && reg.CredentialHash != nil && *reg.CredentialHash != "" && *reg.CredentialHash != *credHash {
+			return httpError(http.StatusForbidden, "credential is not bound to this edge instance")
+		}
 	} else {
 		reg = &store.EdgeRegistration{
 			EdgeID:         meta.EdgeID,

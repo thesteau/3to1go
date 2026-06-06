@@ -7,6 +7,7 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/store"
 )
 
@@ -25,7 +26,7 @@ type userStorer interface {
 
 type credStorer interface {
 	Verify(ctx context.Context, token string, pub ed25519.PublicKey) (*store.CredentialRecord, error)
-	Mint(ctx context.Context, priv ed25519.PrivateKey, ttlDays int) (string, error)
+	Mint(ctx context.Context, priv ed25519.PrivateKey, ttlDays int, scopes ...signing.CredentialScope) (string, error)
 	Revoke(ctx context.Context, tokenHash string) (int64, error)
 	CleanupExpired(ctx context.Context) (int64, error)
 }

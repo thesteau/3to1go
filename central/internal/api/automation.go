@@ -68,7 +68,7 @@ func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body struct {
@@ -117,7 +117,7 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body map[string]interface{}
@@ -143,7 +143,7 @@ func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body struct {
@@ -177,7 +177,7 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	r.ParseMultipartForm(10 << 20)
@@ -201,7 +201,7 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	filename := r.PathValue("filename")
@@ -218,7 +218,7 @@ func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	filename := r.PathValue("filename")

@@ -52,7 +52,7 @@ func run(logger *slog.Logger) error {
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)
 	}
-	if err := userStore.EnsureDefaultAdmin(ctx); err != nil {
+	if err := userStore.EnsureDefaultAdmin(ctx, initialAdminPassword()); err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
 	}
 
@@ -134,4 +134,11 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func initialAdminPassword() string {
+	if value := os.Getenv("INITIAL_ADMIN_PASSWORD"); value != "" {
+		return value
+	}
+	return store.DefaultAdminPassword
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -255,12 +256,11 @@ func writeAtomic(tmp, dest string, mtime time.Time, r io.Reader) error {
 
 func archiveDestination(targetRoot, memberName string) (string, error) {
 	cleaned := filepath.Clean(memberName)
-	if strings.HasPrefix(cleaned, "..") {
+	if filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, "..") {
 		return "", fmt.Errorf("invalid archive entry: %s", memberName)
 	}
-	dest := filepath.Join(targetRoot, cleaned)
-	rel, err := filepath.Rel(targetRoot, dest)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	dest, err := securejoin.SecureJoin(targetRoot, cleaned)
+	if err != nil {
 		return "", fmt.Errorf("invalid archive entry: %s", memberName)
 	}
 	return dest, nil

@@ -16,6 +16,7 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/services"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
@@ -83,7 +84,7 @@ type mockCredStore struct {
 func (m *mockCredStore) Verify(_ context.Context, _ string, _ ed25519.PublicKey) (*store.CredentialRecord, error) {
 	return m.verifyResult, m.verifyErr
 }
-func (m *mockCredStore) Mint(_ context.Context, _ ed25519.PrivateKey, _ int) (string, error) {
+func (m *mockCredStore) Mint(_ context.Context, _ ed25519.PrivateKey, _ int, _ ...signing.CredentialScope) (string, error) {
 	return m.mintResult, m.mintErr
 }
 func (m *mockCredStore) Revoke(_ context.Context, _ string) (int64, error) {

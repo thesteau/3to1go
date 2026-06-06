@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -22,6 +23,7 @@ const (
 	BootstrapAdminID     = 1
 	SessionCookie        = "three_to_one_go_edge_session"
 	sessionDays          = 7
+	bcryptCost          = 12
 	pbkdf2Iterations     = 260_000
 )
 
@@ -68,7 +70,7 @@ func (s *UserStore) EnsureSchema(ctx context.Context) error {
 	return err
 }
 
-func (s *UserStore) EnsureDefaultAdmin(ctx context.Context) error {
+func (s *UserStore) EnsureDefaultAdmin(ctx context.Context, initialPassword string) error {
 	users, err := s.ListUsers(ctx)
 	if err != nil {
 		return err
@@ -76,7 +78,10 @@ func (s *UserStore) EnsureDefaultAdmin(ctx context.Context) error {
 	if len(users) > 0 {
 		return nil
 	}
-	user, err := s.CreateUser(ctx, DefaultAdminUsername, DefaultAdminPassword, true)
+	if strings.TrimSpace(initialPassword) == "" {
+		initialPassword = DefaultAdminPassword
+	}
+	user, err := s.CreateUser(ctx, DefaultAdminUsername, initialPassword, true)
 	if err != nil {
 		return err
 	}
@@ -390,16 +395,21 @@ func hashPassword(password string) (string, error) {
 	if strings.TrimSpace(password) == "" {
 		return "", errors.New("password must contain at least one non-space character")
 	}
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
+	digest, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
 		return "", err
 	}
-	digest := pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, sha256.Size, sha256.New)
-	return fmt.Sprintf("pbkdf2_sha256$%d$%s$%s", pbkdf2Iterations,
-		hex.EncodeToString(salt), hex.EncodeToString(digest)), nil
+	return string(digest), nil
 }
 
 func verifyPassword(password, encoded string) bool {
+	if strings.HasPrefix(encoded, "$2a$") || strings.HasPrefix(encoded, "$2b$") || strings.HasPrefix(encoded, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(encoded), []byte(password)) == nil
+	}
+	return verifyPBKDF2Password(password, encoded)
+}
+
+func verifyPBKDF2Password(password, encoded string) bool {
 	parts := strings.SplitN(encoded, "$", 4)
 	if len(parts) != 4 || parts[0] != "pbkdf2_sha256" {
 		return false

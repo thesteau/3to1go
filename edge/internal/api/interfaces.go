@@ -9,7 +9,6 @@ import (
 
 type userStorer interface {
 	EnsureSchema(ctx context.Context) error
-	EnsureDefaultAdmin(ctx context.Context) error
 	Authenticate(ctx context.Context, username, password string) (*store.User, error)
 	CreateSession(ctx context.Context, userID int) (string, error)
 	DeleteSession(ctx context.Context, token string) error

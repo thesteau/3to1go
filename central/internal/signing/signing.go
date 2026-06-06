@@ -12,13 +12,27 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // CredentialPayload is the signed credential body.
 type CredentialPayload struct {
-	IssuedAt  int64  `json:"iat"`
-	ExpiresAt int64  `json:"exp"`
-	JTI       string `json:"jti"`
+	IssuedAt         int64  `json:"iat"`
+	ExpiresAt        int64  `json:"exp"`
+	JTI              string `json:"jti"`
+	Shared           bool   `json:"shared,omitempty"`
+	MaxRegistrations int    `json:"max_registrations,omitempty"`
+}
+
+type CredentialScope struct {
+	Shared           bool
+	MaxRegistrations int
+}
+
+type credentialClaims struct {
+	jwt.RegisteredClaims
+	Shared           bool `json:"shared,omitempty"`
+	MaxRegistrations int  `json:"max_registrations,omitempty"`
 }
 
 func b64url(data []byte) string {
@@ -27,16 +41,6 @@ func b64url(data []byte) string {
 
 func b64urlDecode(s string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(s)
-}
-
-func newUUID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", fmt.Errorf("read random uuid bytes: %w", err)
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
 // LoadOrCreateIssuerKeypair reads a 32-byte Ed25519 seed from path, or generates one.
@@ -87,17 +91,22 @@ func LoadOrCreateIssuerKeypair(path string) (ed25519.PrivateKey, ed25519.PublicK
 }
 
 // MintCredential creates a signed EdDSA JWT credential.
-func MintCredential(priv ed25519.PrivateKey, ttlDays int) (string, error) {
+func MintCredential(priv ed25519.PrivateKey, ttlDays int, scopes ...CredentialScope) (string, error) {
 	now := time.Now().Unix()
-	jti, err := newUUID()
+	jti, err := uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generate credential id: %w", err)
 	}
+	scope := normalizeCredentialScope(scopes...)
 
-	claims := jwt.RegisteredClaims{
-		IssuedAt:  jwt.NewNumericDate(time.Unix(now, 0)),
-		ExpiresAt: jwt.NewNumericDate(time.Unix(now+int64(ttlDays)*86400, 0)),
-		ID:        jti,
+	claims := credentialClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(time.Unix(now, 0)),
+			ExpiresAt: jwt.NewNumericDate(time.Unix(now+int64(ttlDays)*86400, 0)),
+			ID:        jti.String(),
+		},
+		Shared:           scope.Shared,
+		MaxRegistrations: scope.MaxRegistrations,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
 	token.Header["typ"] = "JWT"
@@ -110,7 +119,7 @@ func MintCredential(priv ed25519.PrivateKey, ttlDays int) (string, error) {
 
 // DecodeCredentialPayload decodes the payload without verifying the signature.
 func DecodeCredentialPayload(token string) (*CredentialPayload, error) {
-	claims := &jwt.RegisteredClaims{}
+	claims := &credentialClaims{}
 	if _, _, err := jwt.NewParser().ParseUnverified(token, claims); err != nil {
 		return nil, fmt.Errorf("malformed payload")
 	}
@@ -119,7 +128,7 @@ func DecodeCredentialPayload(token string) (*CredentialPayload, error) {
 
 // VerifyCredential verifies the token signature, expiry, and jti presence.
 func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPayload, error) {
-	claims := &jwt.RegisteredClaims{}
+	claims := &credentialClaims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		claims,
@@ -152,8 +161,15 @@ func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPay
 	return payload, nil
 }
 
-func payloadFromClaims(claims *jwt.RegisteredClaims) *CredentialPayload {
-	payload := &CredentialPayload{JTI: claims.ID}
+func payloadFromClaims(claims *credentialClaims) *CredentialPayload {
+	payload := &CredentialPayload{
+		JTI:              claims.ID,
+		Shared:           claims.Shared,
+		MaxRegistrations: claims.MaxRegistrations,
+	}
+	if payload.MaxRegistrations < 1 {
+		payload.MaxRegistrations = 1
+	}
 	if claims.IssuedAt != nil {
 		payload.IssuedAt = claims.IssuedAt.Unix()
 	}
@@ -161,6 +177,20 @@ func payloadFromClaims(claims *jwt.RegisteredClaims) *CredentialPayload {
 		payload.ExpiresAt = claims.ExpiresAt.Unix()
 	}
 	return payload
+}
+
+func normalizeCredentialScope(scopes ...CredentialScope) CredentialScope {
+	scope := CredentialScope{MaxRegistrations: 1}
+	if len(scopes) > 0 {
+		scope = scopes[0]
+	}
+	if scope.MaxRegistrations < 1 {
+		scope.MaxRegistrations = 1
+	}
+	if !scope.Shared {
+		scope.MaxRegistrations = 1
+	}
+	return scope
 }
 
 func splitToken(token string) ([3]string, error) {

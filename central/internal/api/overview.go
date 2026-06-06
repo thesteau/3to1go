@@ -25,7 +25,7 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body config.SettingsPayload
