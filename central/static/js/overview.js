@@ -374,10 +374,16 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     }
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
+    const diskFree = typeof data.disk_free_bytes === "number" ? formatBytes(data.disk_free_bytes) : null;
+    const diskUsed = typeof data.disk_used_bytes === "number" ? formatBytes(data.disk_used_bytes) : null;
+    const diskTotal = typeof data.disk_total_bytes === "number" ? formatBytes(data.disk_total_bytes) : null;
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
+      ${diskUsed !== null ? `<div><strong>Backups Used</strong><br>${escapeHtml(diskUsed)}</div>` : ""}
+      ${diskFree !== null ? `<div><strong>Disk Free</strong><br>${escapeHtml(diskFree)}</div>` : ""}
+      ${diskTotal !== null ? `<div><strong>Disk Total</strong><br>${escapeHtml(diskTotal)}</div>` : ""}
     `;
 
     const edges = data.edges || [];
