@@ -106,8 +106,10 @@ type mockRunner struct {
 	forceSendErr      error
 	previewResult     map[string]any
 	previewErr        error
-	recoverResult     map[string]any
-	recoverErr        error
+	recoverResult      map[string]any
+	recoverErr         error
+	rotateKeyResult    string
+	rotateKeyErr       error
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }
@@ -147,6 +149,9 @@ func (m *mockRunner) SaveJob(_ string, _ map[string]any) (any, error) {
 func (m *mockRunner) DeleteJob(_ string) error { return m.deleteJobErr }
 func (m *mockRunner) ForceSendJob(_ context.Context, _ string) (map[string]any, error) {
 	return m.forceSendResult, m.forceSendErr
+}
+func (m *mockRunner) RotateEncryptionKey() (string, error) {
+	return m.rotateKeyResult, m.rotateKeyErr
 }
 func (m *mockRunner) PreviewRecovery(_ context.Context, _, _ string) (map[string]any, error) {
 	return m.previewResult, m.previewErr
