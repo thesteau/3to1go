@@ -3,5 +3,5 @@ package static
 
 import "embed"
 
-//go:embed index.html css html js
+//go:embed index.html css html js img
 var Files embed.FS
