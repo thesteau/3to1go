@@ -7,7 +7,7 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/overview"
 	"github.com/3to1go/central/internal/storage"
 )
 
@@ -16,7 +16,7 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := a.Settings()
-	data, err := services.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
+	data, err := overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to build overview")
 		return
@@ -46,7 +46,7 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	a.ApplySettings(newSettings)
 	a.RestartCleanupLoop(newSettings.UploadCleanupIntervalS)
 
-	data, err := services.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
+	data, err := overview.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to build overview")
 		return

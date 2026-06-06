@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/retention"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 )
@@ -469,7 +469,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 			return nil, httpError(http.StatusInternalServerError, "failed to store archive")
 		}
 
-		pruned, _ := services.PruneOldSnapshots(s.backend, session.Namespace, s.settings.RetentionKeepLast)
+		pruned, _ := retention.PruneOldSnapshots(s.backend, session.Namespace, s.settings.RetentionKeepLast)
 
 		files, _ := s.backend.List(session.Namespace)
 		var sizeBytes int64

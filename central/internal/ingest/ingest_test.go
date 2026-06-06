@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/services/locks"
+	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/storage"
 )
 
@@ -264,10 +266,10 @@ func newTestService(t *testing.T) *Service {
 	os.MkdirAll(keyRoot, 0o755)
 
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
-	locks := services.NewNamespaceLockManager()
+	lockMgr := locks.NewNamespaceLockManager()
 	logger := discardLogger()
-	hooks := services.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
-	ntfy := services.NewNtfyPublisher(logger)
+	hookMgr := hooks.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
+	ntfyPub := ntfy.NewNtfyPublisher(logger)
 
 	return &Service{
 		settings: &config.Settings{
@@ -280,9 +282,9 @@ func newTestService(t *testing.T) *Service {
 		},
 		backend:    backend,
 		index:      nil, // not used in filesystem-only tests
-		locks:      locks,
-		hooks:      hooks,
-		ntfy:       ntfy,
+		locks:      lockMgr,
+		hooks:      hookMgr,
+		ntfy:       ntfyPub,
 		stagingDir: tmpDir,
 		uploadRoot: uploadRoot,
 		keyRoot:    keyRoot,
@@ -651,13 +653,13 @@ func TestNew_CreatesDirectories(t *testing.T) {
 		StagingDir: tmpDir,
 		BackupRoot: filepath.Join(tmpDir, "backups"),
 	}
-	locks := services.NewNamespaceLockManager()
+	lockMgr2 := locks.NewNamespaceLockManager()
 	logger := discardLogger()
-	hooks := services.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
-	ntfy := services.NewNtfyPublisher(logger)
+	hookMgr2 := hooks.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
+	ntfyPub2 := ntfy.NewNtfyPublisher(logger)
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
 
-	svc, err := New(settings, backend, nil, locks, hooks, ntfy)
+	svc, err := New(settings, backend, nil, lockMgr2, hookMgr2, ntfyPub2)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

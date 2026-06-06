@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services"
+	"github.com/3to1go/edge/internal/services/recovery"
 	"github.com/3to1go/edge/internal/store"
 )
 
@@ -1212,7 +1212,7 @@ func TestHandleRecoveryPreview_Success(t *testing.T) {
 
 func TestHandleRecoveryPreview_RecoveryError(t *testing.T) {
 	runner := defaultRunner()
-	runner.previewErr = &services.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
+	runner.previewErr = &recovery.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/preview", map[string]string{
 		"relative_path": "photos",
@@ -1255,7 +1255,7 @@ func TestHandleRecoveryRestore_Success(t *testing.T) {
 
 func TestHandleRecoveryRestore_RecoveryError(t *testing.T) {
 	runner := defaultRunner()
-	runner.recoverErr = &services.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
+	runner.recoverErr = &recovery.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/restore", map[string]string{
 		"relative_path": "photos",

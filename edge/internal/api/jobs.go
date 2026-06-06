@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/3to1go/edge/internal/services"
+	"github.com/3to1go/edge/internal/services/recovery"
 )
 
 func (a *App) handleListDirectories(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func (a *App) handleRecoveryPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := a.runner.PreviewRecovery(r.Context(), body.RelativePath, body.Fingerprint)
 	if err != nil {
-		re, ok := err.(*services.RecoveryError)
+		re, ok := err.(*recovery.RecoveryError)
 		if ok {
 			writeError(w, re.StatusCode, re.Message)
 		} else {
@@ -132,7 +132,7 @@ func (a *App) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := a.runner.RecoverJob(r.Context(), body.RelativePath, body.Fingerprint)
 	if err != nil {
-		re, ok := err.(*services.RecoveryError)
+		re, ok := err.(*recovery.RecoveryError)
 		if ok {
 			writeError(w, re.StatusCode, re.Message)
 		} else {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/certificates"
 )
 
 // --- Certificates ---
@@ -230,7 +230,7 @@ func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func isRuntimeError(err error) bool {
-	_, ok := errors.AsType[*services.ExecError](err)
+	_, ok := errors.AsType[*certificates.ExecError](err)
 	return ok
 }
 

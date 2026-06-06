@@ -16,7 +16,9 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/certificates"
+	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
@@ -178,9 +180,9 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
 	backend := storage.NewLocalBackend(settings.BackupRoot)
-	hooks := services.NewHookManager(t.TempDir(), discardLogger())
-	certs := services.NewCertManager(t.TempDir())
-	ntfy := services.NewNtfyPublisher(discardLogger())
+	hookMgr := hooks.NewHookManager(t.TempDir(), discardLogger())
+	certMgr := certificates.NewCertManager(t.TempDir())
+	ntfyPub := ntfy.NewNtfyPublisher(discardLogger())
 	if us == nil {
 		us = &mockUserStore{}
 	}
@@ -193,7 +195,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hooks, certs, ntfy, discardLogger())
+	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, ntfyPub, discardLogger())
 }
 
 func jsonReq(method, path string, body any) *http.Request {
@@ -270,7 +272,7 @@ func TestIsNotFoundError(t *testing.T) {
 }
 
 func TestIsRuntimeError(t *testing.T) {
-	execErr := &services.ExecError{Err: errors.New("exit 1")}
+	execErr := &certificates.ExecError{Err: errors.New("exit 1")}
 	if !isRuntimeError(execErr) {
 		t.Error("expected true for ExecError")
 	}
