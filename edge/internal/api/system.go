@@ -265,3 +265,19 @@ func (a *App) handleGetEncryptionKey(w http.ResponseWriter, r *http.Request) {
 		"key_base64":  a.runner.EncryptionKeyBase64(),
 	})
 }
+
+func (a *App) handleRotateEncryptionKey(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	newFingerprint, err := a.runner.RotateEncryptionKey()
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":          "ok",
+		"new_fingerprint": newFingerprint,
+		"key_base64":      a.runner.EncryptionKeyBase64(),
+	})
+}

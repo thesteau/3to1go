@@ -35,10 +35,11 @@ type Settings struct {
 	NtfyMatchSource        string
 	HookPreCommand         string
 	HookPostCommand        string
-	Theme                  string
-	IndexDatabaseURL       string
-	HTTPHost               string
-	HTTPPort               int
+	Theme                        string
+	IndexDatabaseURL             string
+	HTTPHost                     string
+	HTTPPort                     int
+	SnapshotVerifyIntervalHours  int
 }
 
 func (s *Settings) MaxUploadSizeBytes() int64 {
@@ -140,8 +141,9 @@ type SettingsPayload struct {
 	NtfyMatchEdgeID        string `json:"ntfy_match_edge_id"`
 	NtfyMatchEdgeInstID    string `json:"ntfy_match_edge_instance_id"`
 	NtfyMatchSource        string `json:"ntfy_match_source"`
-	HookPreCommand         string `json:"hook_pre_command"`
-	HookPostCommand        string `json:"hook_post_command"`
+	HookPreCommand              string `json:"hook_pre_command"`
+	HookPostCommand             string `json:"hook_post_command"`
+	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
 }
 
 func SettingsToPayload(s *Settings) SettingsPayload {
@@ -159,8 +161,9 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		NtfyMatchEdgeID:        s.NtfyMatchEdgeID,
 		NtfyMatchEdgeInstID:    s.NtfyMatchEdgeInstID,
 		NtfyMatchSource:        s.NtfyMatchSource,
-		HookPreCommand:         s.HookPreCommand,
-		HookPostCommand:        s.HookPostCommand,
+		HookPreCommand:              s.HookPreCommand,
+		HookPostCommand:             s.HookPostCommand,
+		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
 	}
 }
 
@@ -192,6 +195,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	ntfyMatchEdge := ""
 	ntfyMatchInst := ""
 	ntfyMatchSrc := ""
+	verifyIntervalHours := 0
 
 	if p != nil {
 		if p.RetentionKeepLast > 0 {
@@ -225,6 +229,9 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		ntfyMatchSrc = strings.TrimSpace(p.NtfyMatchSource)
 		hookPre = strings.TrimSpace(p.HookPreCommand)
 		hookPost = strings.TrimSpace(p.HookPostCommand)
+		if p.SnapshotVerifyIntervalHours > 0 {
+			verifyIntervalHours = maxInt(1, p.SnapshotVerifyIntervalHours)
+		}
 	}
 
 	port := coerceInt(os.Getenv("HTTP_PORT"), 6555, 1)
@@ -249,10 +256,11 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		NtfyMatchEdgeID:        ntfyMatchEdge,
 		NtfyMatchEdgeInstID:    ntfyMatchInst,
 		NtfyMatchSource:        ntfyMatchSrc,
-		HookPreCommand:         hookPre,
-		HookPostCommand:        hookPost,
-		HTTPHost:               coerceText(os.Getenv("HTTP_HOST"), "0.0.0.0"),
-		HTTPPort:               port,
+		HookPreCommand:              hookPre,
+		HookPostCommand:             hookPost,
+		HTTPHost:                    coerceText(os.Getenv("HTTP_HOST"), "0.0.0.0"),
+		HTTPPort:                    port,
+		SnapshotVerifyIntervalHours: verifyIntervalHours,
 	}, nil
 }
 

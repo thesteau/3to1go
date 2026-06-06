@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -347,6 +348,33 @@ func (r *EdgeRunner) EncryptionKeyFingerprint() string {
 // EncryptionKeyBase64 returns the key as URL-safe base64.
 func (r *EdgeRunner) EncryptionKeyBase64() string {
 	return encryption.KeyAsBase64(r.encKey)
+}
+
+// RotateEncryptionKey generates a new key, persists it, and hot-reloads all services.
+// Callers should warn users that existing snapshots are only decryptable with the old key.
+func (r *EdgeRunner) RotateEncryptionKey() (string, error) {
+	if !r.cycleLock.TryLock() {
+		return "", fmt.Errorf("cannot rotate key while a backup cycle is running")
+	}
+	defer r.cycleLock.Unlock()
+
+	newKey := make([]byte, 32)
+	if _, err := rand.Read(newKey); err != nil {
+		return "", fmt.Errorf("generate new key: %w", err)
+	}
+	keyPath := config.EncryptionKeyPath()
+	if err := os.WriteFile(keyPath, newKey, 0o600); err != nil {
+		return "", fmt.Errorf("write new key: %w", err)
+	}
+
+	r.mu.Lock()
+	settings := r.Settings
+	r.encKey = newKey
+	r.UploadClient = upload.NewUploadClient(settings, newKey, r.CertManager)
+	r.Recovery = recovery.NewRecoveryService(settings, r.logger, r.StateStore, r.UploadClient, newKey)
+	r.mu.Unlock()
+
+	return encryption.KeyFingerprint(newKey), nil
 }
 
 // InstallationID returns the persistent edge instance ID.

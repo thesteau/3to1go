@@ -18,6 +18,7 @@ import (
 	"github.com/3to1go/central/internal/services/hooks"
 	"github.com/3to1go/central/internal/services/locks"
 	"github.com/3to1go/central/internal/services/ntfy"
+	"github.com/3to1go/central/internal/services/verify"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -115,10 +116,16 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("initialize ingest service: %w", err)
 	}
 
+	verifySvc := verify.New(snapIndex, backend)
+
 	app := api.NewApp(
 		settings, userStore, credStore, settingsStore, snapIndex,
-		backend, ingestSvc, hookMgr, certMgr, ntfyPub, logger,
+		backend, ingestSvc, hookMgr, certMgr, ntfyPub, verifySvc, logger,
 	)
+
+	if settings.SnapshotVerifyIntervalHours > 0 {
+		go verifySvc.Run(ctx, settings.SnapshotVerifyIntervalHours)
+	}
 	app.RestartCleanupLoop(settings.UploadCleanupIntervalS)
 	app.StartCredentialCleanupLoop()
 

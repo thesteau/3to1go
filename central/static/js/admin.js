@@ -13,6 +13,7 @@ function fillSettings(settings) {
   document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
   document.getElementById("settings_upload_session_ttl_hours").value = data.upload_session_ttl_hours ?? 24;
   document.getElementById("settings_upload_cleanup_interval_seconds").value = data.upload_cleanup_interval_seconds ?? 300;
+  document.getElementById("settings_snapshot_verify_interval_hours").value = data.snapshot_verify_interval_hours ?? 0;
 }
 
 function collectSettingsPayload(overrides = {}) {
@@ -24,6 +25,7 @@ function collectSettingsPayload(overrides = {}) {
     upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
     upload_session_ttl_hours: Number(document.getElementById("settings_upload_session_ttl_hours").value || 1),
     upload_cleanup_interval_seconds: Number(document.getElementById("settings_upload_cleanup_interval_seconds").value || 10),
+    snapshot_verify_interval_hours: Number(document.getElementById("settings_snapshot_verify_interval_hours").value || 0),
     ntfy_url: window.__centralSettings?.ntfy_url || "",
     ntfy_topic: window.__centralSettings?.ntfy_topic || "",
     ntfy_message_template: window.__centralSettings?.ntfy_message_template || "",

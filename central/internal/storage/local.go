@@ -78,6 +78,11 @@ func (b *LocalBackend) List(namespace string) ([]StorageFile, error) {
 	return files, nil
 }
 
+func (b *LocalBackend) Open(namespace, filename string) (io.ReadCloser, error) {
+	path := filepath.Join(b.BackupRoot, namespace, filename)
+	return os.Open(path)
+}
+
 func (b *LocalBackend) Delete(namespace, filename string) error {
 	path := filepath.Join(b.BackupRoot, namespace, filename)
 	err := os.Remove(path)

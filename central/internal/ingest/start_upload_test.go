@@ -42,7 +42,7 @@ func TestStartUpload_NewSession(t *testing.T) {
 		IdempotencyKey:   "key-new-1",
 	}
 
-	resp, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("StartUpload: %v", err)
 	}
@@ -70,11 +70,11 @@ func TestStartUpload_IdempotencyKeyReturnsExisting(t *testing.T) {
 		IdempotencyKey:   "idem-key-1",
 	}
 
-	resp1, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp1, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("first StartUpload: %v", err)
 	}
-	resp2, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp2, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("second StartUpload: %v", err)
 	}
@@ -94,10 +94,10 @@ func TestStartUpload_IdempotencyKeyChecksumConflict(t *testing.T) {
 		ArchiveSHA256:    "sha-a",
 		IdempotencyKey:   "conflict-key",
 	}
-	svc.StartUpload(context.Background(), req, nil, nil)
+	svc.StartUpload(context.Background(), req, nil, nil, false)
 
 	req.ArchiveSHA256 = "sha-b"
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err == nil {
 		t.Fatal("expected conflict error for mismatched checksum")
 	}
@@ -122,7 +122,7 @@ func TestStartUpload_CommittedDuplicate(t *testing.T) {
 		IdempotencyKey:   "dup-key",
 	}
 
-	resp, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("StartUpload: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestStartUpload_FindDuplicateError(t *testing.T) {
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
 		ArchiveSizeBytes: 100, ArchiveSHA256: "sha", IdempotencyKey: "key-err",
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err == nil {
 		t.Fatal("expected error when FindDuplicate fails")
 	}
@@ -159,7 +159,7 @@ func TestStartUpload_UploadTooLarge(t *testing.T) {
 		ArchiveSizeBytes: 10 * 1024 * 1024, // 10MB > 1MB limit
 		ArchiveSHA256:    "sha", IdempotencyKey: "key-large",
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err == nil {
 		t.Fatal("expected error for too-large upload")
 	}
@@ -177,7 +177,7 @@ func TestStartUpload_WithEdgeInstanceID_NewRegistration(t *testing.T) {
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha", IdempotencyKey: "key-new-inst",
 	}
-	resp, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("StartUpload with EdgeInstanceID: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestStartUpload_WithEdgeInstanceID_ExistingRegistration(t *testing.T) {
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha", IdempotencyKey: "key-exist-edge",
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("StartUpload with existing edge: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestStartUpload_RegisterEdgeGetError(t *testing.T) {
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha", IdempotencyKey: "key-err-edge",
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err == nil {
 		t.Fatal("expected error when GetEdgeRegistration fails")
 	}
@@ -226,7 +226,7 @@ func TestStartUpload_RegisterEdgeUpsertError(t *testing.T) {
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha", IdempotencyKey: "key-upsert-err",
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, nil)
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err == nil {
 		t.Fatal("expected error when UpsertEdgeRegistration fails")
 	}
@@ -243,7 +243,7 @@ func TestStartUpload_WithCredentialHashAndURL(t *testing.T) {
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha", IdempotencyKey: "key-cred",
 		AdvertisedURL: &advURL,
 	}
-	_, err := svc.StartUpload(context.Background(), req, nil, &credHash)
+	_, err := svc.StartUpload(context.Background(), req, nil, &credHash, false)
 	if err != nil {
 		t.Fatalf("StartUpload with cred hash: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestStartUpload_DiscardsMissingIdempotentSession(t *testing.T) {
 		JobName: "job", Fingerprint: "newfp", Timestamp: "2024-06-01T00:00:00Z",
 		ArchiveSizeBytes: 50, ArchiveSHA256: "sha-new", IdempotencyKey: idemKey,
 	}
-	resp, err := svc.StartUpload(context.Background(), req, nil, nil)
+	resp, err := svc.StartUpload(context.Background(), req, nil, nil, false)
 	if err != nil {
 		t.Fatalf("StartUpload after discarding missing session: %v", err)
 	}

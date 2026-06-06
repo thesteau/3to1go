@@ -135,8 +135,9 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 
 	credHash := cred.TokenHash
 	srcAddr := ingest.SourceAddress(r)
+	srcTLS := r.TLS != nil
 
-	resp, err := a.ingest.StartUpload(r.Context(), body, srcAddr, &credHash)
+	resp, err := a.ingest.StartUpload(r.Context(), body, srcAddr, &credHash, srcTLS)
 	if err != nil {
 		writeHTTPError(w, err)
 		return

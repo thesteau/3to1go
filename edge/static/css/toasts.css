@@ -48,6 +48,15 @@
   color: var(--muted);
 }
 
+.toast.warning {
+  border-left: 4px solid var(--warn-ink);
+  background: var(--warn-bg);
+}
+
+.toast.warning .toast-title {
+  color: var(--warn-ink);
+}
+
 .toast-title {
   display: block;
   margin-bottom: 3px;

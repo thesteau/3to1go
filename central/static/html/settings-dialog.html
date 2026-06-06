@@ -51,6 +51,12 @@
       </div>
     </div>
 
+    <div>
+      <label for="settings_snapshot_verify_interval_hours">Snapshot Integrity Check Interval (hours, 0 = disabled)</label>
+      <input id="settings_snapshot_verify_interval_hours" type="number" min="0" placeholder="0">
+      <p class="hint">Periodically SHA-256 verifies the latest snapshot per job. Set 0 to disable. Changes take effect on next restart.</p>
+    </div>
+
     <div class="hook-section">
       <div class="hook-section-head">
         <div>

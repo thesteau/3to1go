@@ -17,6 +17,9 @@
 
     <label for="settings_central_url">Central URL</label>
     <input id="settings_central_url" placeholder="http://127.0.0.1:6555">
+    <p class="warning-inline" id="settings-http-warning" style="display:none">
+      Edge is served over plain HTTP. Your Edge credential travels unencrypted to Central. Use HTTPS for both the Edge UI and the Central URL to protect credentials in transit.
+    </p>
 
     <label for="settings_advertised_url">Advertised Edge URL</label>
     <input id="settings_advertised_url" placeholder="https://edge.example.com or http://192.168.1.20:6556">
