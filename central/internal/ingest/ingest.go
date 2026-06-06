@@ -98,6 +98,7 @@ type UploadMetadata struct {
 	ArchiveFormat            string
 	EncryptionKeyFingerprint *string
 	AdvertisedURL            *string
+	SourceTLS                bool
 }
 
 type UploadInitRequest struct {
@@ -197,7 +198,7 @@ func (s *Service) UpdateSettings(settings *config.Settings) {
 	s.settings = settings
 }
 
-func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, sourceAddr, credHash *string) (*SessionResponse, error) {
+func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, sourceAddr, credHash *string, sourceTLS bool) (*SessionResponse, error) {
 	meta := UploadMetadata{
 		EdgeID:                   req.EdgeID,
 		EdgeInstanceID:           req.EdgeInstanceID,
@@ -207,6 +208,7 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		ArchiveFormat:            req.ArchiveFormat,
 		EncryptionKeyFingerprint: req.EncryptionKeyFingerprint,
 		AdvertisedURL:            req.AdvertisedURL,
+		SourceTLS:                sourceTLS,
 	}
 
 	// Register edge under a per-edge lock
@@ -622,6 +624,8 @@ func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHas
 	if credHash != nil && *credHash != "" {
 		reg.CredentialHash = credHash
 	}
+	tls := meta.SourceTLS
+	reg.LastUploadTLS = &tls
 	return s.index.UpsertEdgeRegistration(ctx, reg)
 }
 

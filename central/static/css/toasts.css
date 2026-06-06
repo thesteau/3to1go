@@ -53,3 +53,12 @@
   margin-bottom: 3px;
   font-weight: 700;
 }
+
+.toast.warning {
+  border-left: 4px solid var(--warn-ink);
+  background: var(--warn-bg);
+}
+
+.toast.warning .toast-title {
+  color: var(--warn-ink);
+}

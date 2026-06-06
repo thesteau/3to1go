@@ -32,6 +32,7 @@ type edgeRunner interface {
 	UpdateSettings(s *config.Settings) error
 	EncryptionKeyFingerprint() string
 	EncryptionKeyBase64() string
+	RotateEncryptionKey() (string, error)
 
 	StatusSnapshot() map[string]any
 	DirectoriesSnapshot() map[string]any
@@ -145,6 +146,7 @@ func (a *App) Handler() http.Handler {
 
 	// Encryption key
 	r.Get("/api/encryption-key", a.handleGetEncryptionKey)
+	r.Post("/api/encryption-key/rotate", a.handleRotateEncryptionKey)
 
 	return newRateLimiter().middleware(a.sessionMiddleware(r))
 }

@@ -190,6 +190,20 @@ Each Edge needs its own `EDGE_ID`.
 
 Central groups snapshots by `EDGE_ID`, but newer builds keep each Edge installation isolated underneath that by `edge_instance_id`. That prevents two machines sharing one `EDGE_ID` from silently writing into the same namespace and pruning each other's snapshots.
 
+## Design Decisions
+
+### Full Snapshots
+
+Each backup produces a complete `tar.zst` archive of the marked folder. Incremental backups, block-level deduplication, and delta chains are not supported. Each snapshot is fully self-contained and can be restored independently without reference to any other snapshot.
+
+### Count-Based Retention
+
+Central retains the most recent N snapshots per job, where N is controlled by the `retention_keep_last` setting. Time-based retention windows and size-based limits are not supported. The number of recoverable snapshots at any point is always exactly known.
+
+### Content Fingerprinting, Not File Timestamps
+
+Edge determines whether a new snapshot is needed by comparing the folder's content fingerprint against the previous upload. File modification times (mtime) are not used as a signal, as they can be altered by restores, synchronization tools, and filesystem operations in ways that do not reflect actual content changes. The Force Backup option is available to bypass fingerprint comparison and upload unconditionally.
+
 ## Repo Layout
 
 - [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image

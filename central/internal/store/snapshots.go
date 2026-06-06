@@ -45,6 +45,7 @@ type EdgeRegistration struct {
 	FirstSeenAt              string  `json:"first_seen_at"`
 	LastSeenAt               string  `json:"last_seen_at"`
 	CredentialHash           *string `json:"credential_hash"`
+	LastUploadTLS            *bool   `json:"last_upload_tls"`
 }
 
 type SnapshotIndex struct {
@@ -80,6 +81,7 @@ func (s *SnapshotIndex) EnsureSchema(ctx context.Context) error {
 			credential_hash TEXT
 		)`,
 		`ALTER TABLE edge_registration ADD COLUMN IF NOT EXISTS credential_hash TEXT`,
+		`ALTER TABLE edge_registration ADD COLUMN IF NOT EXISTS last_upload_tls BOOLEAN`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_index_namespace_pk
 			ON snapshot_index (edge_id, edge_instance_id, job_name, stored_as)`,
 		`CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_sha
@@ -219,12 +221,12 @@ func (s *SnapshotIndex) GetEdgeRegistration(ctx context.Context, edgeID, instID 
 	var r EdgeRegistration
 	err := s.pool.QueryRow(ctx, `
 		SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
-		       first_seen_at, last_seen_at, credential_hash
+		       first_seen_at, last_seen_at, credential_hash, last_upload_tls
 		FROM edge_registration
 		WHERE edge_id = $1 AND edge_instance_id = $2`,
 		edgeID, instID).
 		Scan(&r.EdgeID, &r.EdgeInstanceID, &r.EncryptionKeyFingerprint, &r.AdvertisedURL,
-			&r.FirstSeenAt, &r.LastSeenAt, &r.CredentialHash)
+			&r.FirstSeenAt, &r.LastSeenAt, &r.CredentialHash, &r.LastUploadTLS)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -238,16 +240,17 @@ func (s *SnapshotIndex) UpsertEdgeRegistration(ctx context.Context, r *EdgeRegis
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO edge_registration
 			(edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
-			 first_seen_at, last_seen_at, credential_hash)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+			 first_seen_at, last_seen_at, credential_hash, last_upload_tls)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (edge_id, edge_instance_id) DO UPDATE SET
 			encryption_key_fingerprint = EXCLUDED.encryption_key_fingerprint,
 			advertised_url = EXCLUDED.advertised_url,
 			first_seen_at = EXCLUDED.first_seen_at,
 			last_seen_at = EXCLUDED.last_seen_at,
-			credential_hash = EXCLUDED.credential_hash`,
+			credential_hash = EXCLUDED.credential_hash,
+			last_upload_tls = EXCLUDED.last_upload_tls`,
 		r.EdgeID, r.EdgeInstanceID, r.EncryptionKeyFingerprint, r.AdvertisedURL,
-		r.FirstSeenAt, r.LastSeenAt, r.CredentialHash)
+		r.FirstSeenAt, r.LastSeenAt, r.CredentialHash, r.LastUploadTLS)
 	return err
 }
 
@@ -265,13 +268,13 @@ func (s *SnapshotIndex) ListEdgeRegistrations(ctx context.Context, edgeIDFilter 
 	)
 	if edgeIDFilter != nil {
 		query = `SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
-			first_seen_at, last_seen_at, credential_hash
+			first_seen_at, last_seen_at, credential_hash, last_upload_tls
 			FROM edge_registration WHERE edge_id = $1
 			ORDER BY lower(edge_instance_id)`
 		args = []any{*edgeIDFilter}
 	} else {
 		query = `SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
-			first_seen_at, last_seen_at, credential_hash
+			first_seen_at, last_seen_at, credential_hash, last_upload_tls
 			FROM edge_registration
 			ORDER BY lower(edge_id), lower(edge_instance_id)`
 	}
@@ -286,7 +289,7 @@ func (s *SnapshotIndex) ListEdgeRegistrations(ctx context.Context, edgeIDFilter 
 	for pgRows.Next() {
 		var r EdgeRegistration
 		if err := pgRows.Scan(&r.EdgeID, &r.EdgeInstanceID, &r.EncryptionKeyFingerprint, &r.AdvertisedURL,
-			&r.FirstSeenAt, &r.LastSeenAt, &r.CredentialHash); err != nil {
+			&r.FirstSeenAt, &r.LastSeenAt, &r.CredentialHash, &r.LastUploadTLS); err != nil {
 			return nil, err
 		}
 		result = append(result, r)

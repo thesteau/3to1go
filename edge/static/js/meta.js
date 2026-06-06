@@ -65,6 +65,7 @@ function initMeta() {
       <div class="enc-key-row">
         <code id="enc-key-value">…</code>
         <button type="button" class="secondary enc-key-copy" onclick="copyEncKey()">Copy</button>
+        <button type="button" class="danger enc-key-rotate" onclick="rotateEncKey()">Rotate</button>
       </div>
       <span class="hint" id="meta-val-enc-fingerprint">…</span>
     </div>
@@ -97,7 +98,10 @@ function fillMetaFromDir(data) {
 
 function fillMetaEncKey(key, fingerprint) {
   const keyEl = document.getElementById("enc-key-value");
-  if (keyEl) keyEl.textContent = key || "—";
+  if (keyEl) {
+    keyEl.dataset.key = key || "";
+    keyEl.textContent = key ? "••••••••••••••••••••••••••••••••" : "—";
+  }
   if (fingerprint) {
     const fpEl = document.getElementById("meta-val-enc-fingerprint");
     if (fpEl) fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`;
@@ -105,8 +109,9 @@ function fillMetaEncKey(key, fingerprint) {
 }
 
 async function copyEncKey() {
-  const key = document.getElementById("enc-key-value")?.textContent;
-  if (!key || key === "—" || key === "…") return;
+  const keyEl = document.getElementById("enc-key-value");
+  const key = keyEl?.dataset?.key;
+  if (!key) return;
   try {
     await navigator.clipboard.writeText(key);
   } catch {
@@ -122,5 +127,32 @@ async function copyEncKey() {
   if (btn) {
     btn.textContent = "Copied!";
     setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+  }
+}
+
+async function rotateEncKey() {
+  const confirmed = await confirmApp({
+    title: "Rotate Encryption Key",
+    message: "This generates a new key for future backups. Existing snapshots on Central remain encrypted with the old key — you will need the old key to decrypt them.\n\nAre you sure?",
+    confirmLabel: "Rotate Key",
+    danger: true,
+  });
+  if (!confirmed) return;
+
+  const rotateBtn = document.querySelector(".enc-key-rotate");
+  if (rotateBtn) rotateBtn.disabled = true;
+  try {
+    const res = await fetch("/api/encryption-key/rotate", { method: "POST" });
+    const body = await res.json();
+    if (!res.ok) {
+      setActionStatus(body.detail || "Key rotation failed.", "error");
+      return;
+    }
+    fillMetaEncKey(body.key_base64 || "", body.new_fingerprint || "");
+    setActionStatus("Encryption key rotated. Copy the new key and update Central before downloading future snapshots.", "success");
+  } catch {
+    setActionStatus("Key rotation failed.", "error");
+  } finally {
+    if (rotateBtn) rotateBtn.disabled = false;
   }
 }

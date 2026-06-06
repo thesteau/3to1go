@@ -145,7 +145,7 @@ type mockIngest struct {
 	migErr    error
 }
 
-func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, _, _ *string) (*ingest.SessionResponse, error) {
+func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, _, _ *string, _ bool) (*ingest.SessionResponse, error) {
 	return m.startResp, m.startErr
 }
 func (m *mockIngest) AppendChunk(_ context.Context, _ string, _ int64, _ io.Reader) (*ingest.ChunkResponse, error) {
@@ -195,7 +195,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, ntfyPub, discardLogger())
+	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, ntfyPub, nil, discardLogger())
 }
 
 func jsonReq(method, path string, body any) *http.Request {

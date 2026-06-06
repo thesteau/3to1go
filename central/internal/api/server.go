@@ -14,6 +14,7 @@ import (
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/services/certificates"
 	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/services/verify"
 	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
@@ -55,7 +56,7 @@ type snapIndexer interface {
 }
 
 type ingestSvc interface {
-	StartUpload(ctx context.Context, req ingest.UploadInitRequest, sourceAddr, credHash *string) (*ingest.SessionResponse, error)
+	StartUpload(ctx context.Context, req ingest.UploadInitRequest, sourceAddr, credHash *string, sourceTLS bool) (*ingest.SessionResponse, error)
 	AppendChunk(ctx context.Context, uploadID string, offset int64, body io.Reader) (*ingest.ChunkResponse, error)
 	FinalizeUpload(ctx context.Context, uploadID string) (*ingest.FinalizeResponse, error)
 	ReconcileNamespace(ctx context.Context, namespace string)
@@ -101,6 +102,7 @@ type App struct {
 	hooks         hookManager
 	certs         certManager
 	ntfy          ntfyPublisher
+	verify        *verify.Service
 	logger        *slog.Logger
 
 	cleanupCancel     context.CancelFunc
@@ -118,6 +120,7 @@ func NewApp(
 	hooks hookManager,
 	certs certManager,
 	ntfy ntfyPublisher,
+	verify *verify.Service,
 	logger *slog.Logger,
 ) *App {
 	return &App{
@@ -131,6 +134,7 @@ func NewApp(
 		hooks:         hooks,
 		certs:         certs,
 		ntfy:          ntfy,
+		verify:        verify,
 		logger:        logger,
 	}
 }
@@ -228,6 +232,10 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/certificates", a.handleGetCertificates)
 	r.Post("/api/certificates/files", a.handleUploadCertificate)
 	r.Delete("/api/certificates/files/{filename}", withPathValues(a.handleDeleteCertificate, "filename"))
+
+	// Verify
+	r.Get("/api/admin/verify", a.handleGetVerifyStatus)
+	r.Post("/api/admin/verify", a.handleRunVerify)
 
 	// Ntfy
 	r.Get("/api/ntfy", a.handleGetNtfy)

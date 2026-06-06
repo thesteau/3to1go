@@ -35,6 +35,9 @@ function startEdgeApp() {
     return;
   }
   _appStarted = true;
+  if (window.location.protocol === "http:") {
+    showToast("Edge is running over plain HTTP. Credentials sent to Central are not encrypted in transit. Consider setting up HTTPS.", "warning", { duration: 12000 });
+  }
   resetForm();
   initializeFieldHelp(EDGE_SETTINGS_HELP);
   document.getElementById("settings_cron_schedule")?.addEventListener("input", updateCronScheduleHint);

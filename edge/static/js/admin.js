@@ -36,6 +36,10 @@ async function openSettingsDialog() {
   fillSettings(latestData?.settings || {});
   clearStatus("settings-status");
   clearStatus("certificates-status");
+  const httpWarning = document.getElementById("settings-http-warning");
+  if (httpWarning) {
+    httpWarning.style.display = window.location.protocol === "http:" ? "" : "none";
+  }
   openDialog("settings-dialog");
   try {
     await loadCertificateConfig();

@@ -59,6 +59,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe
 				"first_seen_at":              reg.FirstSeenAt,
 				"last_seen_at":               reg.LastSeenAt,
 				"credential_configured":      reg.CredentialHash != nil && *reg.CredentialHash != "",
+				"last_upload_tls":            reg.LastUploadTLS,
 				"jobs":                       []any{},
 			}
 			instMap[key] = inst
