@@ -79,51 +79,53 @@ func (m *mockUserStore) ChangePassword(_ context.Context, _ int, _, _ string) (*
 // ---------------------------------------------------------------------------
 
 type mockRunner struct {
-	settings         *config.Settings
+	settings          *config.Settings
+	updateSettingsHit bool
 	updateSettingsErr error
-	fingerprint      string
-	keyBase64        string
-	statusSnapshot   map[string]interface{}
-	dirSnapshot      map[string]interface{}
-	ntfySnapshot     map[string]interface{}
-	testNtfyErr      error
-	certSnapshot     map[string]interface{}
-	saveCertResult   interface{}
-	saveCertErr      error
-	deleteCertErr    error
-	hookSnapshot     map[string]interface{}
-	saveHookResult   interface{}
-	saveHookErr      error
-	readHookName     string
-	readHookContent  string
-	readHookErr      error
-	deleteHookErr    error
-	saveJobResult    interface{}
-	saveJobErr       error
-	deleteJobErr     error
-	forceSendResult  map[string]interface{}
-	forceSendErr     error
-	previewResult    map[string]interface{}
-	previewErr       error
-	recoverResult    map[string]interface{}
-	recoverErr       error
+	fingerprint       string
+	keyBase64         string
+	statusSnapshot    map[string]interface{}
+	dirSnapshot       map[string]interface{}
+	ntfySnapshot      map[string]interface{}
+	testNtfyErr       error
+	certSnapshot      map[string]interface{}
+	saveCertResult    interface{}
+	saveCertErr       error
+	deleteCertErr     error
+	hookSnapshot      map[string]interface{}
+	saveHookResult    interface{}
+	saveHookErr       error
+	readHookName      string
+	readHookContent   string
+	readHookErr       error
+	deleteHookErr     error
+	saveJobResult     interface{}
+	saveJobErr        error
+	deleteJobErr      error
+	forceSendResult   map[string]interface{}
+	forceSendErr      error
+	previewResult     map[string]interface{}
+	previewErr        error
+	recoverResult     map[string]interface{}
+	recoverErr        error
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }
 func (m *mockRunner) UpdateSettings(s *config.Settings) error {
+	m.updateSettingsHit = true
 	if m.updateSettingsErr == nil {
 		m.settings = s
 	}
 	return m.updateSettingsErr
 }
-func (m *mockRunner) EncryptionKeyFingerprint() string                    { return m.fingerprint }
-func (m *mockRunner) EncryptionKeyBase64() string                         { return m.keyBase64 }
-func (m *mockRunner) StatusSnapshot() map[string]interface{}              { return m.statusSnapshot }
-func (m *mockRunner) DirectoriesSnapshot() map[string]interface{}         { return m.dirSnapshot }
+func (m *mockRunner) EncryptionKeyFingerprint() string            { return m.fingerprint }
+func (m *mockRunner) EncryptionKeyBase64() string                 { return m.keyBase64 }
+func (m *mockRunner) StatusSnapshot() map[string]interface{}      { return m.statusSnapshot }
+func (m *mockRunner) DirectoriesSnapshot() map[string]interface{} { return m.dirSnapshot }
 func (m *mockRunner) NtfySnapshot(_ *config.Settings) map[string]interface{} {
 	return m.ntfySnapshot
 }
-func (m *mockRunner) TestNtfy(_, _, _ string) error { return m.testNtfyErr }
+func (m *mockRunner) TestNtfy(_, _, _ string) error        { return m.testNtfyErr }
 func (m *mockRunner) CertSnapshot() map[string]interface{} { return m.certSnapshot }
 func (m *mockRunner) SaveCertFile(_ string, _ []byte) (interface{}, error) {
 	return m.saveCertResult, m.saveCertErr
@@ -164,8 +166,8 @@ type mockScheduler struct {
 }
 
 func (m *mockScheduler) Snapshot() map[string]interface{} { return m.snapshot }
-func (m *mockScheduler) RequestRunNow() string             { return m.runNowResult }
-func (m *mockScheduler) ReloadSettings(_ string) error     { return m.reloadErr }
+func (m *mockScheduler) RequestRunNow() string            { return m.runNowResult }
+func (m *mockScheduler) ReloadSettings(_ string) error    { return m.reloadErr }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -706,6 +708,29 @@ func TestHandleSaveSettings_InvalidBody(t *testing.T) {
 	app.Handler().ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleSaveSettings_InvalidCronDoesNotSave(t *testing.T) {
+	runner := defaultRunner()
+	originalCron := runner.settings.CronSchedule
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
+	rr := doAuthRequest(app.Handler(), "POST", "/api/settings", config.SettingsPayload{
+		CronSchedule: "0 2 * * 8",
+	})
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rr.Code)
+	}
+	if runner.updateSettingsHit {
+		t.Error("UpdateSettings was called for invalid cron")
+	}
+	if runner.settings.CronSchedule != originalCron {
+		t.Errorf("cron schedule changed to %q, want %q", runner.settings.CronSchedule, originalCron)
+	}
+	var resp map[string]interface{}
+	decodeJSON(t, rr, &resp)
+	if detail, _ := resp["detail"].(string); !strings.Contains(detail, "cron_schedule") {
+		t.Errorf("detail = %q, want cron_schedule error", detail)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/3to1go/edge/internal/config"
+	_ "github.com/3to1go/edge/internal/schedule"
 )
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {

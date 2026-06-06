@@ -9,10 +9,10 @@ import (
 
 func TestParse_ValidExpressions(t *testing.T) {
 	cases := []string{
-		"0 2 * * 0",    // Sundays at 2am
-		"0 */6 * * *",  // every 6 hours
-		"0 0 1 * *",    // first of month at midnight
-		"30 12 * * 1-5", // weekdays at noon
+		"0 2 * * 0",       // Sundays at 2am
+		"0 */6 * * *",     // every 6 hours
+		"0 0 1 * *",       // first of month at midnight
+		"30 12 * * 1-5",   // weekdays at noon
 		"0 8,12,18 * * *", // three times a day
 	}
 	for _, expr := range cases {
@@ -96,18 +96,11 @@ func TestParse_Every5MinutesAllowed(t *testing.T) {
 
 // --- Parse: field syntax ---
 
-func TestParse_DayOfWeek7NormalizedToSunday(t *testing.T) {
-	s, err := Parse("0 2 * * 7")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	next, err := s.NextAfter(time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("NextAfter: %v", err)
-	}
-	want := time.Date(2026, 1, 11, 2, 0, 0, 0, time.UTC)
-	if !next.Equal(want) {
-		t.Errorf("got %v, want %v", next, want)
+func TestParse_DayOfWeekOutOfRange(t *testing.T) {
+	for _, expr := range []string{"0 2 * * 7", "0 2 * * 8"} {
+		if _, err := Parse(expr); err == nil {
+			t.Errorf("expected error for %q", expr)
+		}
 	}
 }
 

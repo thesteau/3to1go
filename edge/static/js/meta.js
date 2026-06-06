@@ -2,6 +2,7 @@ function updateCronScheduleHint() {
   const input = document.getElementById("settings_cron_schedule");
   const hint = document.getElementById("settings-cron-help");
   if (!input || !hint) return;
+  input.setCustomValidity(validateCronSchedule(input.value));
   const description = describeCronSchedule(input.value);
   hint.textContent = description.summary;
   input.title = `${description.summary} ${description.help}`;

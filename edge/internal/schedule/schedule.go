@@ -32,7 +32,8 @@ func init() {
 // Parse validates and parses a 5-field cron expression.
 func Parse(expression string) (*CronSchedule, error) {
 	normalized := strings.Join(strings.Fields(expression), " ")
-	if len(strings.Fields(normalized)) != 5 {
+	parts := strings.Fields(normalized)
+	if len(parts) != 5 {
 		return nil, fmt.Errorf("cron schedule must use 5 fields like '0 2 * * 0'")
 	}
 
