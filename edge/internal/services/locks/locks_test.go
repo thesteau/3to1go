@@ -49,38 +49,46 @@ func TestAcquire_ReacquirableAfterUnlock(t *testing.T) {
 	second()
 }
 
-func TestAcquire_ConcurrentGoroutinesOnlyOneWins(t *testing.T) {
+func TestAcquire_NeverMoreThanOneConcurrentHolder(t *testing.T) {
 	m := NewJobLockManager()
 
+	const n = 20
 	var (
-		wg      sync.WaitGroup
-		winners int
-		mu      sync.Mutex
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		active   int
+		violated bool
 	)
 
-	// Hold the lock long enough for all goroutines to attempt acquisition.
-	hold := m.Acquire("job1")
+	start := make(chan struct{})
 
-	for range 5 {
+	for range n {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			u := m.Acquire("job1")
-			if u != nil {
-				mu.Lock()
-				winners++
-				mu.Unlock()
-				u()
+			<-start
+			unlock := m.Acquire("job1")
+			if unlock == nil {
+				return
 			}
+			mu.Lock()
+			active++
+			if active > 1 {
+				violated = true
+			}
+			mu.Unlock()
+
+			mu.Lock()
+			active--
+			mu.Unlock()
+			unlock()
 		}()
 	}
 
-	hold()
+	close(start) // release all goroutines at once
 	wg.Wait()
 
-	// After releasing hold, exactly one goroutine should have won.
-	// (The others raced against hold and lost — 0 or 1 winners is valid.)
-	if winners > 1 {
-		t.Errorf("expected at most 1 winner, got %d", winners)
+	if violated {
+		t.Error("more than one goroutine held the lock concurrently")
 	}
 }
