@@ -1,0 +1,16 @@
+@media (max-width: 640px) {
+  .page-shell { padding: 14px; }
+  .snapshot-size { display: none; }
+  .split-row,
+  .modal-head {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  .hook-file-row,
+  .hook-section-head {
+    align-items: flex-start;
+  }
+  .edge-key-controls {
+    grid-template-columns: 1fr;
+  }
+}

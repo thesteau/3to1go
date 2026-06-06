@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3to1go Edge</title>
+  <link rel="stylesheet" href="/static/css/variables.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/jobs.css">
+  <link rel="stylesheet" href="/static/css/directories.css">
+  <link rel="stylesheet" href="/static/css/dialogs.css">
+  <link rel="stylesheet" href="/static/css/toasts.css">
+  <link rel="stylesheet" href="/static/css/users.css">
+  <link rel="stylesheet" href="/static/css/recovery.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero panel">
+      <h1>3to1go Edge</h1>
+      <p class="eyebrow">Filesystem-driven backup selection</p>
+      <p class="lede">
+        Browse the scan root, inspect current pathing, and create or update
+        <code>.upload_dir</code> markers without touching the terminal. Edge scans
+        from the configured root, aggregates matching job directories, and uploads
+        changed archives to Central.
+      </p>
+      <div class="meta-grid" id="meta"></div>
+      <div class="toolbar">
+        <button type="button" onclick="manualRefresh()">Refresh</button>
+        <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
+        <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <button type="button" class="secondary" onclick="openUserManagementDialog()">Users &amp; Access</button>
+        <button type="button" class="secondary" onclick="openSettingsDialog()">Edit Edge Settings</button>
+      </div>
+    </section>
+
+    <section class="panel workspace-panel">
+      <div class="section-head">
+        <h2>Selected Jobs</h2>
+        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to review or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the job editor.</p>
+      </div>
+      <div id="selected-jobs" class="job-list"></div>
+
+      <div class="section-head compact">
+        <div class="section-head-row">
+          <h2>Directories Under Scan Root</h2>
+          <button
+            type="button"
+            id="hidden-dirs-toggle"
+            class="toggle-btn"
+            role="switch"
+            aria-checked="false"
+            onclick="toggleHiddenDirs()"
+            title="Show hidden folders (those starting with a dot, using the Linux/macOS convention)"
+          >
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Show hidden</span>
+          </button>
+        </div>
+        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
+      </div>
+      <div id="directory-tree" class="directory-tree"></div>
+    </section>
+  </main>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/users.js"></script>
+  <script src="/static/js/admin.js"></script>
+  <script src="/static/js/meta.js"></script>
+  <script src="/static/js/refresh.js"></script>
+  <script src="/static/js/directories.js"></script>
+  <script src="/static/js/jobs.js"></script>
+  <script src="/static/js/recovery.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

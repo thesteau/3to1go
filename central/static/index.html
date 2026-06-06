@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3to1go Central</title>
+  <link rel="stylesheet" href="/static/css/variables.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/dialogs.css">
+  <link rel="stylesheet" href="/static/css/toasts.css">
+  <link rel="stylesheet" href="/static/css/users.css">
+  <link rel="stylesheet" href="/static/css/edges.css">
+  <link rel="stylesheet" href="/static/css/snapshots.css">
+  <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero panel">
+      <h1>3to1go Central</h1>
+      <p class="eyebrow">Snapshot receiver</p>
+      <p class="lede">
+        Browse snapshots by edge and job, download archives, or delete individual snapshots.
+      </p>
+      <div class="meta-grid" id="meta"></div>
+      <div class="toolbar">
+        <button type="button" onclick="manualRefresh()">Refresh</button>
+        <button type="button" class="secondary" onclick="openCredentialDialog()">Mint Edge Credential</button>
+        <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <button type="button" class="secondary" onclick="openUserManagementDialog()">Users & Access</button>
+        <button type="button" onclick="openSettingsDialog()">Edit Central Settings</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Stored Snapshots</h2>
+        <p class="hint">Central remains file-based. This view reads directly from the current backup root on disk.</p>
+      </div>
+      <div id="namespaces" class="namespaces-list"></div>
+    </section>
+  </main>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/crypto.js"></script>
+  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/users.js"></script>
+  <script src="/static/js/admin.js"></script>
+  <script src="/static/js/keys.js"></script>
+  <script src="/static/js/overview.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

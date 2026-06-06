@@ -1,6 +1,6 @@
 services:
   edge:
-    container_name: relay-edge
+    container_name: 3to1go-edge
     build: .
     env_file:
       - ./.env

@@ -1,8 +1,0 @@
-cryptography==44.0.2
-fastapi==0.116.1
-Jinja2==3.1.6
-python-multipart==0.0.20
-PyYAML==6.0.2
-requests==2.32.5
-uvicorn==0.35.0
-zstandard==0.24.0

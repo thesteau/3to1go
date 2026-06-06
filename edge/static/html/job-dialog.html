@@ -1,0 +1,38 @@
+<dialog id="job-dialog" class="modal" aria-labelledby="job-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="job-dialog-title">Job Editor</h2>
+        <p class="hint">Click Save Job to add or update the <code>.upload_dir</code> settings for this folder. Those settings tell Edge how this folder should be backed up.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Close</button>
+    </div>
+
+    <label for="relative_path">Directory</label>
+    <input id="relative_path" readonly>
+
+    <label for="job_name">Job Name</label>
+    <input id="job_name" placeholder="Defaults to the folder name">
+
+    <label for="exclude">Exclude Patterns</label>
+    <textarea id="exclude" placeholder="One pattern per line"></textarea>
+
+    <div class="split-row">
+      <label class="checkbox">
+        <input type="checkbox" id="include_hidden" checked>
+        <span>Include hidden files</span>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="follow_symlinks">
+        <span>Follow symlinks</span>
+      </label>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" onclick="saveJob()">Save Job</button>
+      <button type="button" class="danger" onclick="deleteJob()">Stop Backing Up</button>
+      <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Cancel</button>
+    </div>
+    <p class="hint status-line" id="form-status"></p>
+  </div>
+</dialog>

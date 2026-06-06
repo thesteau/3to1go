@@ -1,0 +1,197 @@
+.job-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.job-card {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-soft);
+}
+
+.job-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.job-card-title {
+  margin-bottom: 0;
+}
+
+.job-card-last-state {
+  margin-top: 6px;
+}
+
+.state-ok    { color: var(--accent); }
+.state-warn  { color: var(--warn-ink); }
+.state-error { color: var(--danger); }
+
+.job-activity {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 520px;
+}
+
+.job-activity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.job-activity-head span {
+  min-width: 0;
+}
+
+.job-activity-head span:first-child {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.job-energy-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--energy-border);
+  border-radius: 999px;
+  background: var(--energy-bg);
+}
+
+.job-energy-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 10px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #547ccf, #e05263);
+  transition: width 220ms ease;
+}
+
+.job-activity.active .job-energy-bar span {
+  background-image: linear-gradient(90deg, #547ccf 0%, #91aef2 45%, #e05263 100%);
+  background-size: 180% 100%;
+  animation: energy-flow 1.1s linear infinite;
+}
+
+.job-activity.success .job-activity-head span:first-child {
+  color: var(--accent);
+}
+
+.job-activity.warn .job-activity-head span:first-child {
+  color: var(--warn-ink);
+}
+
+.job-activity.warn .job-energy-bar {
+  border-color: var(--warn-ink);
+  background: var(--warn-bg);
+}
+
+.job-activity.warn .job-energy-bar span {
+  background: linear-gradient(90deg, #f7c948, #d48b00);
+}
+
+.section-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+button.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.toggle-track {
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ccc;
+  position: relative;
+  transition: background 160ms ease;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--field-bg);
+  transition: transform 160ms ease;
+}
+
+button.toggle-btn.toggle-on .toggle-track {
+  background: var(--accent);
+}
+
+button.toggle-btn.toggle-on .toggle-thumb {
+  transform: translateX(16px);
+}
+
+.job-error {
+  color: var(--danger);
+}
+
+.job-card-body {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.job-card-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.job-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.job-card-actions button,
+.job-card-actions .hint-with-help {
+  width: auto;
+}
+
+.job-card-actions button {
+  white-space: nowrap;
+}
+
+.btn-force {
+  background: var(--force-bg);
+  color: var(--force-ink);
+}
+
+.btn-restore {
+  background: var(--restore-bg);
+  color: var(--restore-ink);
+}
+
+.btn-edit {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-ink);
+}

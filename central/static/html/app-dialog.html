@@ -1,0 +1,18 @@
+<dialog id="app-dialog" class="modal app-dialog" aria-labelledby="app-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="app-dialog-title"></h2>
+        <p class="hint" id="app-dialog-message"></p>
+      </div>
+    </div>
+    <div id="app-dialog-input-wrap" class="app-dialog-input-wrap">
+      <label id="app-dialog-input-label" for="app-dialog-input"></label>
+      <input id="app-dialog-input" type="text">
+    </div>
+    <div class="toolbar modal-actions">
+      <button id="app-dialog-confirm" type="button" onclick="resolveAppDialog(true)">Continue</button>
+      <button id="app-dialog-cancel" type="button" class="secondary" onclick="resolveAppDialog(false)">Cancel</button>
+    </div>
+  </div>
+</dialog>

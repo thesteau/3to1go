@@ -1,0 +1,38 @@
+name: Edge Tests
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-tests.yml"
+  pull_request:
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run edge unit tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: edge
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: edge/go.mod
+          cache-dependency-path: edge/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run tests
+        run: go test -race ./...

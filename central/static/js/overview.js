@@ -1,0 +1,425 @@
+let _overviewLoading = false;
+let _knownSnapshotKeys = null;
+const CENTRAL_REFRESH_MS = 15000;
+
+function parseSnapshotDate(filename) {
+  const parts = filename.split("__");
+  if (parts.length < 3) return null;
+  const iso = parts[1].replace(/T(\d{2})-(\d{2})-(\d{2})Z$/, "T$1:$2:$3Z");
+  const d = new Date(iso);
+  return isNaN(d) ? null : d;
+}
+
+function parseFingerprint(filename) {
+  const parts = filename.split("__");
+  if (parts.length < 3) return null;
+  return parts[2].replace(/\.tar\.zst$/, "");
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  return d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+async function manualRefresh() {
+  await loadOverview({ force: true, notifyNewSnapshots: true });
+  setActionStatus("Refreshed.", "success");
+}
+
+async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
+  const basePath = edgeInstanceId
+    ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
+    : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
+  btn.disabled = true;
+  try {
+    const res = await fetch(basePath);
+    if (!res.ok) {
+      if (res.status === 404) {
+        await loadOverview({ silent: true, force: true });
+        setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
+        return;
+      }
+      setActionStatus("Download failed.", "error");
+      return;
+    }
+    const buffer = await res.arrayBuffer();
+
+    if (!isEncrypted(buffer)) {
+      triggerBlobDownload(buffer, filename);
+      return;
+    }
+
+    const key = await resolveEncKey(edgeId, edgeInstanceId);
+    if (!key) return;
+
+    try {
+      const decrypted = await decryptBuffer(buffer, key);
+      triggerBlobDownload(decrypted, filename);
+    } catch {
+      clearStoredEncKey(edgeId, edgeInstanceId);
+      await refreshKeyPanel(edgeId, edgeInstanceId);
+      const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
+      setActionStatus(
+        expectedFingerprint
+          ? "Decryption failed after fingerprint verification. The archive may be corrupted, or the Edge key changed after this snapshot was uploaded."
+          : "Decryption failed - wrong key or corrupted archive.",
+        "error",
+      );
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
+  if (!await confirmApp({
+    title: "Delete Snapshot",
+    message: `Delete ${filename}? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+  })) return;
+
+  btn.disabled = true;
+  try {
+    const url = edgeInstanceId
+      ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
+      : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
+    const res = await fetch(url, { method: "DELETE" });
+    if (!res.ok) {
+      if (res.status === 404) {
+        await loadOverview({ silent: true, force: true });
+        setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
+        return;
+      }
+      setActionStatus("Delete failed.", "error");
+      return;
+    }
+    btn.closest(".snapshot-row")?.remove();
+    setActionStatus(`Deleted snapshot ${filename}.`, "success");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderSnapshots(edgeId, edgeInstanceId, jobName, snapshots) {
+  if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
+  return snapshots.map((snap, idx) => {
+    const name = snap.name;
+    const size = formatBytes(snap.size_bytes);
+    const date = formatDate(parseSnapshotDate(name));
+    const fp = parseFingerprint(name) || "";
+    const isLatest = idx === 0;
+    return `
+      <div class="snapshot-row">
+        <div class="snapshot-meta">
+          <span class="snapshot-date">${escapeHtml(date)}</span>
+          ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
+          ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
+        </div>
+        <span class="snapshot-size">${escapeHtml(size)}</span>
+        <div class="snapshot-actions">
+          <button class="btn btn-dl"
+            onclick="downloadSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Download</button>
+          <button class="btn btn-del"
+            onclick="deleteSnapshot('${escapeHtml(edgeId)}',${edgeInstanceId ? `'${escapeHtml(edgeInstanceId)}'` : "null"},'${escapeHtml(jobName)}','${escapeHtml(name)}',this)">Delete</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderKeyManager(ns) {
+  const edgeId = ns.edge_id;
+  const edgeInstanceId = ns.edge_instance_id;
+  const edgeKeyId = buildEdgeKeyId(edgeId, edgeInstanceId);
+  const expectedFingerprint = ns.encryption_key_fingerprint || "";
+  return `
+    <div class="edge-key-panel">
+      <div class="edge-key-head">
+        <strong>Decryption Key</strong>
+        ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
+      </div>
+      <div class="edge-key-controls">
+        <input
+          type="password"
+          placeholder="Paste the Edge encryption key"
+          data-edge-key-input="${escapeHtml(edgeKeyId)}">
+        <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}','${escapeHtml(edgeInstanceId)}')">Save Key</button>
+        <button class="btn btn-clear" type="button" onclick="clearEncKey('${escapeHtml(edgeId)}','${escapeHtml(edgeInstanceId)}')">Clear</button>
+      </div>
+      <div class="key-status info" data-edge-key-status="${escapeHtml(edgeKeyId)}"></div>
+    </div>
+  `;
+}
+
+function renderInstanceMeta(instance) {
+  return `
+    ${instance.advertised_url
+      ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
+      : '<span class="edge-detail edge-detail-muted">No URL set</span>'}
+  `;
+}
+
+function renderInstanceCard(edgeId, instance) {
+  const instanceId = instance.edge_instance_id;
+  const deleteBtn = instanceId
+    ? `<button class="btn btn-del btn-del-instance" type="button" onclick="deleteInstance('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Delete Instance</button>`
+    : "";
+  const revokeBtn = instanceId && instance.credential_configured
+    ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Revoke Token</button>`
+    : "";
+  return `
+    <section class="instance-card">
+      <div class="instance-head">
+        <div>
+          <div class="instance-title">${escapeHtml(instanceId || "Legacy snapshots")}</div>
+          <div class="edge-submeta">${renderInstanceMeta(instance)}</div>
+        </div>
+        <div class="instance-head-right">
+          <span class="edge-count">${(instance.jobs || []).length} job${instance.jobs.length !== 1 ? "s" : ""}</span>
+          ${revokeBtn}
+          ${deleteBtn}
+        </div>
+      </div>
+      ${instance.edge_instance_id ? renderKeyManager({ edge_id: edgeId, edge_instance_id: instance.edge_instance_id, encryption_key_fingerprint: instance.encryption_key_fingerprint }) : ""}
+      ${(instance.jobs || []).map((job) => `
+        <div class="job-block">
+          <div class="job-header">
+            <div class="job-header-main">
+              <span class="job-name">${escapeHtml(job.job_name)}</span>
+              <span class="job-count">${escapeHtml(String(job.snapshot_count))} snapshot${job.snapshot_count !== 1 ? "s" : ""}</span>
+            </div>
+          </div>
+          <div class="snapshot-list">
+            ${renderSnapshots(edgeId, instance.edge_instance_id, job.job_name, job.snapshots || [])}
+          </div>
+        </div>
+      `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
+    </section>
+  `;
+}
+
+async function revokeInstanceCredential(edgeId, edgeInstanceId, btn) {
+  const label = edgeInstanceId || "this instance";
+  if (!await confirmApp({
+    title: "Revoke Token",
+    message: `Revoke the Edge credential used by "${label}"? Any other instances using the same token will stop authenticating too.`,
+    confirmLabel: "Revoke Token",
+    danger: true,
+  })) {
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const response = await fetch(`/api/credentials/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`, {
+      method: "DELETE",
+    });
+    const body = await readJson(response);
+    if (!response.ok) {
+      setActionStatus(body.detail || "Revoke failed.", "error");
+      return;
+    }
+    const affected = body.affected_instances || [];
+    setActionStatus(`Revoked token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`, "success");
+    await loadOverview({ silent: true, force: true });
+  } catch (error) {
+    setActionStatus(error.message || "Revoke failed.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteInstance(edgeId, edgeInstanceId, btn) {
+  const label = edgeInstanceId || "this instance";
+  if (!await confirmApp({
+    title: "Delete Instance",
+    message: `Delete all snapshots for instance "${label}" under edge "${edgeId}"? This permanently removes all backup files for this instance and cannot be undone.`,
+    confirmLabel: "Delete Instance",
+    danger: true,
+  })) {
+    return;
+  }
+  btn.disabled = true;
+  const baseUrl = `/api/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`;
+  try {
+    const res = await fetch(baseUrl, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = body.detail || {};
+      if (res.status === 409 && detail.cleanup_available) {
+        if (!await confirmApp({
+          title: "Remove Stale Instance",
+          message: `Central could not find backup files for instance "${label}". Remove this stale instance entry from the UI?`,
+          confirmLabel: "Remove Entry",
+          danger: true,
+        })) {
+          setActionStatus("Cleanup cancelled.", "info");
+          return;
+        }
+        const cleanupRes = await fetch(`${baseUrl}?cleanup_missing=true`, { method: "DELETE" });
+        if (!cleanupRes.ok) {
+          const cleanupBody = await cleanupRes.json().catch(() => ({}));
+          const cleanupDetail = cleanupBody.detail;
+          setActionStatus((typeof cleanupDetail === "string" ? cleanupDetail : cleanupDetail?.message) || "Cleanup failed.", "error");
+          return;
+        }
+        setActionStatus(`Removed stale instance entry ${label}.`, "success");
+        await loadOverview({ silent: true, force: true });
+        return;
+      }
+      setActionStatus((typeof detail === "string" ? detail : detail.message) || "Delete failed.", "error");
+      return;
+    }
+    setActionStatus(`Deleted all snapshots for instance ${label}.`, "success");
+    await loadOverview({ silent: true, force: true });
+  } catch (error) {
+    setActionStatus(error.message || "Delete failed.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function collectSnapshotEvents(data) {
+  return (data.edges || []).flatMap((edge) => (
+    (edge.instances || []).flatMap((instance) => (
+      (instance.jobs || []).flatMap((job) => (
+        (job.snapshots || []).map((snapshot) => {
+          const edgeInstanceId = instance.edge_instance_id || "";
+          const name = snapshot.name || snapshot.filename || "";
+          return {
+            key: `${edge.edge_id}::${edgeInstanceId}::${job.job_name}::${name}`,
+            edgeId: edge.edge_id,
+            edgeInstanceId,
+            jobName: job.job_name,
+            name,
+          };
+        })
+      ))
+    ))
+  )).filter((event) => event.name);
+}
+
+function updateSnapshotArrivalToasts(data, { notify = false } = {}) {
+  const events = collectSnapshotEvents(data);
+  const nextKeys = new Set(events.map((event) => event.key));
+  if (_knownSnapshotKeys === null) {
+    _knownSnapshotKeys = nextKeys;
+    return;
+  }
+
+  const arrivals = events.filter((event) => !_knownSnapshotKeys.has(event.key));
+  _knownSnapshotKeys = nextKeys;
+  if (!notify || !arrivals.length) return;
+
+  arrivals.slice(0, 4).forEach((event) => {
+    const instanceLabel = event.edgeInstanceId ? ` / ${event.edgeInstanceId}` : "";
+    showToast(
+      `Received ${event.jobName} from ${event.edgeId}${instanceLabel}.`,
+      "success",
+      { title: "Snapshot received" },
+    );
+  });
+  if (arrivals.length > 4) {
+    showToast(`${arrivals.length - 4} more snapshots received.`, "success", { title: "Snapshot received" });
+  }
+}
+
+function captureOverviewUiState() {
+  const expandedEdges = Array.from(document.querySelectorAll("#namespaces details[data-edge-id][open]"))
+    .map((element) => element.dataset.edgeId)
+    .filter(Boolean);
+  const keyDrafts = Object.fromEntries(
+    Array.from(document.querySelectorAll("[data-edge-key-input]"))
+      .map((input) => [input.dataset.edgeKeyInput, input.value])
+      .filter(([, value]) => value),
+  );
+  return {
+    expandedEdges: new Set(expandedEdges),
+    keyDrafts,
+  };
+}
+
+function restoreKeyDrafts(keyDrafts) {
+  Object.entries(keyDrafts || {}).forEach(([edgeKeyId, value]) => {
+    const [edgeId, rawInstanceId] = String(edgeKeyId).split("::", 2);
+    const input = keyInputElement(edgeId, rawInstanceId === "_legacy" ? null : rawInstanceId);
+    if (input && !input.value) {
+      input.value = value;
+    }
+  });
+}
+
+async function loadOverview({ silent = false, force = false, notifyNewSnapshots = false } = {}) {
+  if (_overviewLoading) {
+    return;
+  }
+
+  _overviewLoading = true;
+  if (!silent) {
+    document.getElementById("namespaces").innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
+  }
+  const uiState = captureOverviewUiState();
+
+  try {
+    const res = await fetch("/api/overview");
+    if (!res.ok) {
+      throw new Error("Refresh failed.");
+    }
+    const data = await res.json();
+    window.__centralSettings = data.settings || {};
+    if (!document.getElementById("settings-dialog")?.open) {
+      applyTheme(window.__centralSettings.theme || "dark");
+    }
+    updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
+
+    document.getElementById("meta").innerHTML = `
+      <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
+      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
+      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
+    `;
+
+    const edges = data.edges || [];
+    const allInstances = edges.flatMap((edge) => (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })));
+    _edgeKeyFingerprints = Object.fromEntries(
+      allInstances
+        .filter(({ instance }) => instance.edge_instance_id)
+        .map(({ edgeId, instance }) => [buildEdgeKeyId(edgeId, instance.edge_instance_id), instance.encryption_key_fingerprint || ""]),
+    );
+
+    document.getElementById("namespaces").innerHTML = edges.length
+      ? edges.map((edge) => `
+          <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(edge.edge_id)}"${uiState.expandedEdges.has(edge.edge_id) ? " open" : ""}>
+            <summary class="edge-header edge-card-summary">
+              <div class="edge-header-main">
+                <span class="edge-id">${escapeHtml(edge.edge_id)}</span>
+                <div class="edge-submeta">${escapeHtml(String((edge.instances || []).length))} instance${edge.instances.length !== 1 ? "s" : ""}</div>
+                <span class="edge-expand-label">Expand</span>
+              </div>
+              <span class="edge-count">${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0)} job${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0) !== 1 ? "s" : ""}</span>
+            </summary>
+            <div class="edge-card-body">
+              ${(edge.instances || []).map((instance) => renderInstanceCard(edge.edge_id, instance)).join("") || '<p class="no-snapshots">No instances registered yet.</p>'}
+            </div>
+          </details>
+        `).join("")
+      : '<p class="hint">No snapshots have been stored yet.</p>';
+
+    restoreKeyDrafts(uiState.keyDrafts);
+    if (!document.getElementById("settings-dialog")?.open) {
+      fillSettings(data.settings || {});
+    }
+    await Promise.all(
+      allInstances
+        .filter(({ instance }) => instance.edge_instance_id)
+        .map(({ edgeId, instance }) => refreshKeyPanel(edgeId, instance.edge_instance_id)),
+    );
+  } catch (error) {
+    if (!silent) {
+      setActionStatus(error.message || "Refresh failed.", "error");
+    }
+  } finally {
+    _overviewLoading = false;
+  }
+}
