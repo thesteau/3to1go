@@ -5,7 +5,7 @@
   <sup>Go Gopher artwork <a href="#attr-1">[1]</a></sup>
 </p>
 
-The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage)<sup><a href="#attr-2">[2]</a></sup> (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown — 3, 2, 1, Go! — and the "Go" is the literal Go language [Go](https://go.dev/)<sup><a href="#attr-3">[3]</a></sup>.
+The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage)<sup><a href="#attr-2">[2]</a></sup> (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown — 3, 2, 1, Go! — and the "Go" is the literal language [Go](https://go.dev/)<sup><a href="#attr-3">[3]</a></sup>.
 
 3to1go is a simple backup system with two parts:
 
