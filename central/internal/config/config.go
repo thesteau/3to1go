@@ -40,6 +40,7 @@ type Settings struct {
 	HTTPHost                     string
 	HTTPPort                     int
 	SnapshotVerifyIntervalHours  int
+	UploadsPaused                bool
 }
 
 func (s *Settings) MaxUploadSizeBytes() int64 {
@@ -144,6 +145,7 @@ type SettingsPayload struct {
 	HookPreCommand              string `json:"hook_pre_command"`
 	HookPostCommand             string `json:"hook_post_command"`
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
+	UploadsPaused               bool   `json:"uploads_paused"`
 }
 
 func SettingsToPayload(s *Settings) SettingsPayload {
@@ -164,6 +166,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HookPreCommand:              s.HookPreCommand,
 		HookPostCommand:             s.HookPostCommand,
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
+		UploadsPaused:               s.UploadsPaused,
 	}
 }
 
@@ -234,6 +237,11 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		}
 	}
 
+	uploadsPaused := false
+	if p != nil {
+		uploadsPaused = p.UploadsPaused
+	}
+
 	port := coerceInt(os.Getenv("HTTP_PORT"), 6555, 1)
 
 	return &Settings{
@@ -261,6 +269,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPHost:                    coerceText(os.Getenv("HTTP_HOST"), "0.0.0.0"),
 		HTTPPort:                    port,
 		SnapshotVerifyIntervalHours: verifyIntervalHours,
+		UploadsPaused:               uploadsPaused,
 	}, nil
 }
 

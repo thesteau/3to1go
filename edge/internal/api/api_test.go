@@ -175,6 +175,18 @@ func (m *mockScheduler) RequestRunNow() string         { return m.runNowResult }
 func (m *mockScheduler) ReloadSettings(_ string) error { return m.reloadErr }
 
 // ---------------------------------------------------------------------------
+// Mock settingsStorer
+// ---------------------------------------------------------------------------
+
+type mockSettingsStore struct {
+	saveErr error
+}
+
+func (m *mockSettingsStore) Save(_ context.Context, _ *config.SettingsPayload) error {
+	return m.saveErr
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -184,19 +196,21 @@ func discardLogger() *slog.Logger {
 
 func newTestApp(us userStorer) *App {
 	return &App{
-		runner:    nil,
-		scheduler: nil,
-		userStore: us,
-		logger:    discardLogger(),
+		runner:        nil,
+		scheduler:     nil,
+		userStore:     us,
+		settingsStore: &mockSettingsStore{},
+		logger:        discardLogger(),
 	}
 }
 
 func newTestAppFull(us userStorer, runner edgeRunner, sched schedulerFacade) *App {
 	return &App{
-		runner:    runner,
-		scheduler: sched,
-		userStore: us,
-		logger:    discardLogger(),
+		runner:        runner,
+		scheduler:     sched,
+		userStore:     us,
+		settingsStore: &mockSettingsStore{},
+		logger:        discardLogger(),
 	}
 }
 

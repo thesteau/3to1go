@@ -91,7 +91,7 @@ func run(logger *slog.Logger) error {
 	sched.Start()
 
 	// Build the HTTP app.
-	app := api.NewApp(edgeRunner, sched, userStore, logger)
+	app := api.NewApp(edgeRunner, sched, userStore, settingsStore, logger)
 
 	addr := net.JoinHostPort(settings.HTTPHost, fmt.Sprint(settings.HTTPPort))
 	ln, err := net.Listen("tcp", addr)

@@ -670,12 +670,12 @@ func (s *Service) validateNewReservationContext(ctx context.Context, archiveSize
 	if err != nil {
 		return httpError(http.StatusInternalServerError, "failed to calculate reserved upload storage")
 	}
-	stagingFree := diskFree(s.stagingDir)
-	if archiveSizeBytes+reserved > stagingFree {
+	stagingFree, stagingOk := diskFree(s.stagingDir)
+	if !stagingOk || archiveSizeBytes+reserved > stagingFree {
 		return httpError(507, "insufficient staging storage")
 	}
-	backupFree := diskFree(s.settings.BackupRoot)
-	if archiveSizeBytes+reserved > backupFree {
+	backupFree, backupOk := diskFree(s.settings.BackupRoot)
+	if !backupOk || archiveSizeBytes+reserved > backupFree {
 		return httpError(507, "insufficient backup storage")
 	}
 	return nil
@@ -690,7 +690,7 @@ func (s *Service) reservedBytesContext(ctx context.Context) (int64, error) {
 	return s.sessionStore().ReservedBytes(ctx)
 }
 
-func diskFree(path string) int64 {
+func diskFree(path string) (int64, bool) {
 	// Walk up to find an existing directory
 	p := path
 	for {
@@ -706,9 +706,9 @@ func diskFree(path string) int64 {
 	}
 	_, _, free, err := storage.DiskUsage(p)
 	if err != nil {
-		return 1<<62 - 1 // very large if unknown
+		return 0, false
 	}
-	return free
+	return free, true
 }
 
 func (s *Service) sessionLock(uploadID string) *sync.Mutex {

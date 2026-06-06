@@ -116,6 +116,39 @@ async function deleteJob() {
   await deleteByPath(relativePath);
 }
 
+function updateUploadsPauseButton(paused) {
+  const btn = document.getElementById("uploads-pause-btn");
+  if (!btn) return;
+  if (paused) {
+    btn.textContent = "Resume Uploads";
+    btn.classList.add("warning");
+  } else {
+    btn.textContent = "Pause Uploads";
+    btn.classList.remove("warning");
+  }
+}
+
+async function toggleUploadsPause() {
+  const paused = latestData?.settings?.uploads_paused || false;
+  const endpoint = paused ? "/api/uploads/resume" : "/api/uploads/pause";
+  try {
+    const response = await fetch(endpoint, { method: "POST" });
+    const body = await response.json();
+    if (!response.ok) {
+      setActionStatus(body.detail || "Failed to update upload state.", "error");
+      return;
+    }
+    const newPaused = body.uploads_paused;
+    if (latestData?.settings) {
+      latestData.settings.uploads_paused = newPaused;
+    }
+    updateUploadsPauseButton(newPaused);
+    setActionStatus(newPaused ? "Uploads paused." : "Uploads resumed.", "success");
+  } catch (error) {
+    setActionStatus(error.message || "Failed to update upload state.", "error");
+  }
+}
+
 async function runNow() {
   try {
     requestEdgeActiveRefreshBurst();

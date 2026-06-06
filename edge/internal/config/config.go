@@ -44,6 +44,7 @@ type Settings struct {
 	HookPostCommand                   string
 	HTTPHost                          string
 	HTTPPort                          int
+	UploadsPaused                     bool
 }
 
 func (s *Settings) UploadChunkSizeBytes() int64 {
@@ -182,6 +183,7 @@ type SettingsPayload struct {
 	HookPostCommand                   string `json:"hook_post_command"`
 	HTTPHost                          string `json:"http_host"`
 	HTTPPort                          int    `json:"http_port"`
+	UploadsPaused                     bool   `json:"uploads_paused"`
 }
 
 func SettingsToPayload(s *Settings) SettingsPayload {
@@ -216,6 +218,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HookPostCommand:                   s.HookPostCommand,
 		HTTPHost:                          s.HTTPHost,
 		HTTPPort:                          s.HTTPPort,
+		UploadsPaused:                     s.UploadsPaused,
 	}
 }
 
@@ -284,6 +287,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HookPostCommand:                   strings.TrimSpace(raw.HookPostCommand),
 		HTTPHost:                          httpHost,
 		HTTPPort:                          httpPort,
+		UploadsPaused:                     raw.UploadsPaused,
 	}, nil
 }
 

@@ -119,6 +119,10 @@ func (r *EdgeRunner) RunCycle() bool {
 		r.logger.Warn("cycle_skipped", "reason", "edge_credential_missing")
 		return false
 	}
+	if settings.UploadsPaused {
+		r.logger.Info("cycle_skipped", "reason", "uploads_paused")
+		return false
+	}
 
 	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))

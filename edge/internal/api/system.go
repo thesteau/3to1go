@@ -55,10 +55,43 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if err := a.scheduler.ReloadSettings(newSettings.CronSchedule); err != nil {
 		a.logger.Warn("scheduler_reload_failed", "error", err)
 	}
+	normalized := config.SettingsToPayload(newSettings)
+	if err := a.settingsStore.Save(r.Context(), &normalized); err != nil {
+		a.logger.Warn("settings_persist_failed", "error", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
-		"settings": config.SettingsToPayload(newSettings),
+		"settings": normalized,
 	})
+}
+
+func (a *App) handlePauseUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, true)
+}
+
+func (a *App) handleResumeUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, false)
+}
+
+func (a *App) setUploadsPaused(w http.ResponseWriter, r *http.Request, paused bool) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	payload := config.SettingsToPayload(a.runner.CurrentSettings())
+	payload.UploadsPaused = paused
+	newSettings, err := config.BuildSettings(&payload)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to build settings")
+		return
+	}
+	if err := a.runner.UpdateSettings(newSettings); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
+		a.logger.Warn("settings_persist_failed", "error", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
 }
 
 func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {

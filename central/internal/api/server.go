@@ -220,6 +220,8 @@ func (a *App) Handler() http.Handler {
 	// Overview + settings
 	r.Get("/api/overview", a.handleOverview)
 	r.Post("/api/settings", a.handleSaveSettings)
+	r.Post("/api/admin/uploads/pause", a.handlePauseUploads)
+	r.Post("/api/admin/uploads/resume", a.handleResumeUploads)
 
 	// Instances
 	r.Delete("/api/instances/{edge_id}/{edge_instance_id}", withPathValues(a.handleDeleteInstance, "edge_id", "edge_instance_id"))
