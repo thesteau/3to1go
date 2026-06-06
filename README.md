@@ -46,6 +46,18 @@ Central is always your own infrastructure, so it counts as "offsite" only if you
 
 Because Edge encrypts archives before upload, Central never sees your plaintext files. That makes it practical to run Central on hardware you do not fully control, such as a shared home server or an inexpensive remote host.
 
+### Storage Scope
+
+`BACKUP_ROOT` is just a directory path. Central writes plain files there and does not care what is behind it, so you can point it at any mounted filesystem:
+
+- **Local disk** — the default; fast and simple.
+- **Mounted NAS** — works out of the box. Central already handles cross-device moves when the backup root is on a different filesystem than the system temp directory.
+- **Removable hard drive** — same as above; mount it and point `BACKUP_ROOT` at it.
+- **Dropbox / Google Drive / OneDrive** — point `BACKUP_ROOT` at the local sync folder. The desktop client replicates files to the cloud automatically. Because Central stores encrypted archives, the cloud provider never has access to plaintext data.
+- **S3 / Backblaze B2 / other object storage** — mount the bucket as a local filesystem first (e.g. with `rclone mount`) and point `BACKUP_ROOT` at the mount point. Alternatively, keep `BACKUP_ROOT` on a local disk and run `rclone sync` or `aws s3 sync` on a schedule to push completed backups to the bucket.
+
+Central is not trying to be a sync engine itself — it just writes files. Any tool that can replicate a directory can handle the rest.
+
 ## What It Feels Like To Use
 
 You do not write a giant backup config file up front.
@@ -158,7 +170,7 @@ If you are locked out of Central, SSH into the Docker host, change into the Cent
 
 ```sh
 cd deploy-example/central
-docker compose exec postgres psql -U three_to_one_go -d three_to_one_go -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; UPDATE app_users SET password_hash = crypt('change-this-admin-password', gen_salt('bf', 10)), must_change_password = true WHERE username = 'admin';"
+docker compose exec postgres psql -U three_to_one_go -d three_to_one_go -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; UPDATE app_users SET password_hash = crypt('admin', gen_salt('bf', 10)), must_change_password = true WHERE username = 'admin';"
 ```
 
 If you changed `POSTGRES_USER` or `POSTGRES_DB` in `.env`, use those values in place of `three_to_one_go`.
@@ -167,7 +179,7 @@ Then open Central and sign in with:
 
 ```text
 username: admin
-password: change-this-admin-password
+password: admin
 ```
 
 Central will require a new password after sign-in.
@@ -177,18 +189,6 @@ Central will require a new password after sign-in.
 Each Edge needs its own `EDGE_ID`.
 
 Central groups snapshots by `EDGE_ID`, but newer builds keep each Edge installation isolated underneath that by `edge_instance_id`. That prevents two machines sharing one `EDGE_ID` from silently writing into the same namespace and pruning each other's snapshots.
-
-### Storage Scope
-
-`BACKUP_ROOT` is just a directory path. Central writes plain files there and does not care what is behind it, so you can point it at any mounted filesystem:
-
-- **Local disk** — the default; fast and simple.
-- **Mounted NAS** — works out of the box. Central already handles cross-device moves when the backup root is on a different filesystem than the system temp directory.
-- **Removable hard drive** — same as above; mount it and point `BACKUP_ROOT` at it.
-- **Dropbox / Google Drive / OneDrive** — point `BACKUP_ROOT` at the local sync folder. The desktop client replicates files to the cloud automatically. Because Central stores encrypted archives, the cloud provider never has access to plaintext data.
-- **S3 / Backblaze B2 / other object storage** — mount the bucket as a local filesystem first (e.g. with `rclone mount`) and point `BACKUP_ROOT` at the mount point. Alternatively, keep `BACKUP_ROOT` on a local disk and run `rclone sync` or `aws s3 sync` on a schedule to push completed backups to the bucket.
-
-Central is not trying to be a sync engine itself — it just writes files. Any tool that can replicate a directory can handle the rest.
 
 ## Repo Layout
 

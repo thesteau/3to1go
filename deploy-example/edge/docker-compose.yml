@@ -1,7 +1,7 @@
 services:
   edge:
     container_name: 3to1go-edge
-    image: ghcr.io/thesteau/relay-centralizer-edge:latest
+    image: ghcr.io/thesteau/3to1go-edge:latest
     env_file:
       - ./.env
     ports:

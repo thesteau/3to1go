@@ -1,7 +1,7 @@
 services:
   central:
     container_name: 3to1go-central
-    image: ghcr.io/thesteau/relay-centralizer-central:latest
+    image: ghcr.io/thesteau/3to1go-central:latest
     env_file:
       - ./.env
     depends_on:
