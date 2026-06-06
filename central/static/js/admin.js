@@ -80,7 +80,7 @@ async function saveSettings() {
 function openCredentialDialog() {
   document.getElementById("credential_ttl_days").value = "365";
   document.getElementById("credential_shared").checked = false;
-  document.getElementById("credential_max_registrations").value = "2";
+  document.getElementById("credential_max_registrations").value = "1";
   document.getElementById("credential_max_registrations").disabled = true;
   document.getElementById("credential_output").value = "";
   clearStatus("credential-status");
@@ -112,7 +112,11 @@ async function handleCredentialSharedToggle() {
 async function mintCredential() {
   const ttlDays = Number(document.getElementById("credential_ttl_days").value || 365);
   const shared = document.getElementById("credential_shared").checked;
-  const maxRegistrations = shared ? Number(document.getElementById("credential_max_registrations").value || 2) : 1;
+  const maxRegistrations = shared ? Number(document.getElementById("credential_max_registrations").value || 1) : 1;
+  if (shared && (maxRegistrations < 2 || maxRegistrations > 10000)) {
+    setStatus("credential-status", "Shared instance limit must be between 2 and 10000.", "error");
+    return;
+  }
   setStatus("credential-status", "Minting...", "info");
   const response = await fetch("/api/credentials/mint", {
     method: "POST",

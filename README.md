@@ -125,6 +125,28 @@ Edge authenticates to Central with a signed JWT credential minted by Central.
 - Shared credentials can be minted intentionally with an instance limit.
 - Central can revoke a credential after at least one Edge instance has reported in with it; otherwise the token expires naturally.
 
+### Reset A Central Admin Password
+
+`INITIAL_ADMIN_PASSWORD` is only used when Central creates the first admin user in an empty database. Changing it later does not reset an existing account. `POSTGRES_PASSWORD` is the database password, not the Central web UI password.
+
+If you are locked out of Central, SSH into the Docker host, change into the Central Compose directory, and reset the admin password in Postgres:
+
+```sh
+cd deploy-example/central
+docker compose exec postgres psql -U three_to_one_go -d three_to_one_go -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; UPDATE app_users SET password_hash = crypt('change-this-admin-password', gen_salt('bf', 10)), must_change_password = true WHERE username = 'admin';"
+```
+
+If you changed `POSTGRES_USER` or `POSTGRES_DB` in `.env`, use those values in place of `three_to_one_go`.
+
+Then open Central and sign in with:
+
+```text
+username: admin
+password: change-this-admin-password
+```
+
+Central will require a new password after sign-in.
+
 ### Unique Edge IDs Matter
 
 Each Edge needs its own `EDGE_ID`.
