@@ -7,7 +7,7 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/overview"
 	"github.com/3to1go/central/internal/storage"
 )
 
@@ -16,7 +16,7 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := a.Settings()
-	data, err := services.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
+	data, err := overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to build overview")
 		return
@@ -25,7 +25,7 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body config.SettingsPayload
@@ -46,12 +46,12 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	a.ApplySettings(newSettings)
 	a.RestartCleanupLoop(newSettings.UploadCleanupIntervalS)
 
-	data, err := services.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
+	data, err := overview.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to build overview")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"settings": data["settings"],
 	})
@@ -96,7 +96,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			writeError(w, http.StatusConflict, map[string]interface{}{
+			writeError(w, http.StatusConflict, map[string]any{
 				"message":           "instance files not found",
 				"cleanup_available": true,
 			})
@@ -126,7 +126,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 
 	// Check if anything remains
 	if _, err := os.Stat(instanceDir); err == nil {
-		writeError(w, http.StatusConflict, map[string]interface{}{
+		writeError(w, http.StatusConflict, map[string]any{
 			"message":           "instance still has backup files or index entries",
 			"cleanup_available": false,
 		})
@@ -134,7 +134,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), edgeID, instID)
 	if hasEntries {
-		writeError(w, http.StatusConflict, map[string]interface{}{
+		writeError(w, http.StatusConflict, map[string]any{
 			"message":           "instance still has backup files or index entries",
 			"cleanup_available": false,
 		})
@@ -163,7 +163,7 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	backupUsed := storage.DirSize(s.BackupRoot)
 	_, _, backupFree, _ := storage.DiskUsage(s.BackupRoot)
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":                       "ok",
 		"staging_dir":                  s.StagingDir,
 		"staging_used_bytes":           stagingUsed,

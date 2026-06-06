@@ -79,16 +79,53 @@ async function saveSettings() {
 
 function openCredentialDialog() {
   document.getElementById("credential_ttl_days").value = "365";
+  document.getElementById("credential_shared").checked = false;
+  document.getElementById("credential_max_registrations").value = "1";
+  document.getElementById("credential_max_registrations").disabled = true;
   document.getElementById("credential_output").value = "";
   clearStatus("credential-status");
   openDialog("credential-dialog");
 }
 
+async function handleCredentialSharedToggle() {
+  const sharedInput = document.getElementById("credential_shared");
+  const limitInput = document.getElementById("credential_max_registrations");
+  if (!sharedInput.checked) {
+    limitInput.disabled = true;
+    return;
+  }
+  const confirmed = await confirmApp({
+    title: "Shared Credential",
+    message: "A shared credential can authenticate multiple Edge instances until its limit is reached. Only use this when you intentionally want those instances to share revocation.",
+    confirmLabel: "Use Shared",
+    danger: true,
+  });
+  if (!confirmed) {
+    sharedInput.checked = false;
+    limitInput.disabled = true;
+    return;
+  }
+  limitInput.disabled = false;
+  limitInput.focus();
+}
+
 async function mintCredential() {
   const ttlDays = Number(document.getElementById("credential_ttl_days").value || 365);
+  const shared = document.getElementById("credential_shared").checked;
+  const maxRegistrations = shared ? Number(document.getElementById("credential_max_registrations").value || 1) : 1;
+  if (shared && (maxRegistrations < 2 || maxRegistrations > 10000)) {
+    setStatus("credential-status", "Shared instance limit must be between 2 and 10000.", "error");
+    return;
+  }
   setStatus("credential-status", "Minting...", "info");
-  const response = await fetch(`/api/credentials/mint?ttl_days=${encodeURIComponent(ttlDays)}`, {
+  const response = await fetch("/api/credentials/mint", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ttl_days: ttlDays,
+      shared,
+      max_registrations: maxRegistrations,
+    }),
   });
   const body = await readJson(response);
   if (!response.ok) {
@@ -97,7 +134,7 @@ async function mintCredential() {
     return;
   }
   document.getElementById("credential_output").value = body.credential || "";
-  setStatus("credential-status", "Credential minted. Copy it before closing.", "success");
+  setStatus("credential-status", body.message || "Credential minted. Copy it before closing.", "success");
   setActionStatus("Edge credential minted.", "success");
 }
 

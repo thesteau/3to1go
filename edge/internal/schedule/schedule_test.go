@@ -9,10 +9,10 @@ import (
 
 func TestParse_ValidExpressions(t *testing.T) {
 	cases := []string{
-		"0 2 * * 0",    // Sundays at 2am
-		"0 */6 * * *",  // every 6 hours
-		"0 0 1 * *",    // first of month at midnight
-		"30 12 * * 1-5", // weekdays at noon
+		"0 2 * * 0",       // Sundays at 2am
+		"0 */6 * * *",     // every 6 hours
+		"0 0 1 * *",       // first of month at midnight
+		"30 12 * * 1-5",   // weekdays at noon
 		"0 8,12,18 * * *", // three times a day
 	}
 	for _, expr := range cases {
@@ -96,13 +96,11 @@ func TestParse_Every5MinutesAllowed(t *testing.T) {
 
 // --- Parse: field syntax ---
 
-func TestParse_DayOfWeek7NormalizedToSunday(t *testing.T) {
-	s, err := Parse("0 2 * * 7")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !s.daysOfWeek[0] {
-		t.Error("expected day_of_week 7 to be normalized to 0 (Sunday)")
+func TestParse_DayOfWeekOutOfRange(t *testing.T) {
+	for _, expr := range []string{"0 2 * * 7", "0 2 * * 8"} {
+		if _, err := Parse(expr); err == nil {
+			t.Errorf("expected error for %q", expr)
+		}
 	}
 }
 
@@ -111,15 +109,13 @@ func TestParse_StepSyntaxHours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, h := range []int{0, 6, 12, 18} {
-		if !s.hours[h] {
-			t.Errorf("expected hour %d to be set", h)
-		}
+	next, err := s.NextAfter(time.Date(2026, 1, 1, 6, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NextAfter: %v", err)
 	}
-	for _, h := range []int{1, 5, 7, 11, 13, 17, 19} {
-		if s.hours[h] {
-			t.Errorf("expected hour %d to be unset", h)
-		}
+	want := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v", next, want)
 	}
 }
 
@@ -128,21 +124,13 @@ func TestParse_RangeSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, h := range []int{9, 10, 11, 12, 13, 14, 15, 16, 17} {
-		if !s.hours[h] {
-			t.Errorf("expected hour %d to be set", h)
-		}
+	next, err := s.NextAfter(time.Date(2026, 1, 2, 17, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NextAfter: %v", err)
 	}
-	if s.hours[8] || s.hours[18] {
-		t.Error("hours outside range should not be set")
-	}
-	for _, d := range []int{1, 2, 3, 4, 5} {
-		if !s.daysOfWeek[d] {
-			t.Errorf("expected dow %d to be set", d)
-		}
-	}
-	if s.daysOfWeek[0] || s.daysOfWeek[6] {
-		t.Error("weekend days should not be set")
+	want := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v", next, want)
 	}
 }
 
@@ -151,39 +139,43 @@ func TestParse_CommaSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, h := range []int{8, 12, 18} {
-		if !s.hours[h] {
-			t.Errorf("expected hour %d to be set", h)
-		}
+	next, err := s.NextAfter(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NextAfter: %v", err)
 	}
-	if s.hours[9] || s.hours[11] || s.hours[19] {
-		t.Error("unlisted hours should not be set")
+	want := time.Date(2026, 1, 1, 18, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v", next, want)
 	}
 }
 
 func TestParse_WildcardFields(t *testing.T) {
-	// "0 2 * * *" — both day-of-month and day-of-week are wildcards.
 	s, err := Parse("0 2 * * *")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !s.dayOfMonthIsWildcard {
-		t.Error("expected dayOfMonthIsWildcard=true for *")
+	next, err := s.NextAfter(time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NextAfter: %v", err)
 	}
-	if !s.dayOfWeekIsWildcard {
-		t.Error("expected dayOfWeekIsWildcard=true for *")
+	want := time.Date(2026, 1, 2, 2, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v", next, want)
 	}
+}
 
-	// "0 2 * * 0" — day-of-month is wildcard, day-of-week is specific (Sunday=0).
-	s2, err := Parse("0 2 * * 0")
+func TestParse_SpecificDayOfWeek(t *testing.T) {
+	s, err := Parse("0 2 * * 0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !s2.dayOfMonthIsWildcard {
-		t.Error("expected dayOfMonthIsWildcard=true when dom is *")
+	next, err := s.NextAfter(time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NextAfter: %v", err)
 	}
-	if s2.dayOfWeekIsWildcard {
-		t.Error("expected dayOfWeekIsWildcard=false when dow is specific (0=Sunday)")
+	want := time.Date(2026, 1, 11, 2, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v", next, want)
 	}
 }
 
@@ -270,30 +262,5 @@ func TestNextAfter_StrictlyAfterExactMatch(t *testing.T) {
 	want := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	if !next.Equal(want) {
 		t.Errorf("got %v, want %v (must be strictly after ref)", next, want)
-	}
-}
-
-// --- matches helpers ---
-
-func TestMatches_BothWild(t *testing.T) {
-	s, err := Parse("0 12 * * *")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if !s.matches(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)) {
-		t.Error("expected match at noon")
-	}
-	if s.matches(time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC)) {
-		t.Error("expected no match at 1pm")
-	}
-}
-
-func TestMatches_WrongMinute(t *testing.T) {
-	s, err := Parse("0 2 * * 0")
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if s.matches(time.Date(2026, 1, 11, 2, 1, 0, 0, time.UTC)) {
-		t.Error("expected no match at 2:01")
 	}
 }

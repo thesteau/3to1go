@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/certificates"
 )
 
 // --- Certificates ---
@@ -43,7 +43,7 @@ func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "file": saved})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
 }
 
 func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body struct {
@@ -103,7 +103,7 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.ApplySettings(newSettings)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"ntfy": map[string]string{
 			"ntfy_url":                    body.NtfyURL,
@@ -117,10 +117,10 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
-	var body map[string]interface{}
+	var body map[string]any
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -143,7 +143,7 @@ func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body struct {
@@ -170,14 +170,14 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.ApplySettings(newSettings)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"hooks":  map[string]string{"pre_command": body.PreCommand, "post_command": body.PostCommand},
 	})
 }
 
 func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	r.ParseMultipartForm(10 << 20)
@@ -197,11 +197,11 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "file": saved})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
 }
 
 func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	filename := r.PathValue("filename")
@@ -218,7 +218,7 @@ func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	filename := r.PathValue("filename")
@@ -230,8 +230,8 @@ func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func isRuntimeError(err error) bool {
-	var execErr *services.ExecError
-	return errors.As(err, &execErr)
+	_, ok := errors.AsType[*certificates.ExecError](err)
+	return ok
 }
 
 func isNotFoundError(err error) bool {

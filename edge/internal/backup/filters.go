@@ -1,9 +1,10 @@
 package backup
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -17,7 +18,7 @@ type DiscoveredFile struct {
 
 // BuildFileList walks the job's root directory and returns regular files, applying
 // exclude patterns and hidden-file filtering as configured in the job.
-func BuildFileList(job *JobDefinition, warnf func(string, ...interface{})) ([]*DiscoveredFile, error) {
+func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*DiscoveredFile, error) {
 	var files []*DiscoveredFile
 	stack := []string{job.RootPath}
 	visited := make(map[string]bool)
@@ -112,14 +113,14 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...interface{})) ([]*D
 		}
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].ArchivePath < files[j].ArchivePath
+	slices.SortFunc(files, func(a, b *DiscoveredFile) int {
+		return cmp.Compare(a.ArchivePath, b.ArchivePath)
 	})
 	return files, nil
 }
 
 func containsHidden(archivePath string) bool {
-	for _, part := range strings.Split(archivePath, "/") {
+	for part := range strings.SplitSeq(archivePath, "/") {
 		if strings.HasPrefix(part, ".") {
 			return true
 		}
@@ -136,8 +137,8 @@ func matchesExclude(archivePath string, patterns []string) bool {
 			continue
 		}
 
-		if strings.HasSuffix(normalized, "/") {
-			prefix := strings.TrimSuffix(normalized, "/")
+		if before, ok := strings.CutSuffix(normalized, "/"); ok {
+			prefix := before
 			if archivePath == prefix ||
 				strings.HasPrefix(archivePath, prefix+"/") ||
 				strings.Contains(archivePath, "/"+prefix+"/") {

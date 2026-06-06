@@ -155,6 +155,31 @@ func TestCoerceTheme_EmptyDefaultsDark(t *testing.T) {
 	}
 }
 
+// --- coerceBoolPtr ---
+
+func TestCoerceBoolPtr_NilReturnsDefault(t *testing.T) {
+	if got := coerceBoolPtr(nil, true); !got {
+		t.Error("nil pointer should return default true")
+	}
+	if got := coerceBoolPtr(nil, false); got {
+		t.Error("nil pointer should return default false")
+	}
+}
+
+func TestCoerceBoolPtr_ExplicitFalseIgnoresDefault(t *testing.T) {
+	b := false
+	if got := coerceBoolPtr(&b, true); got {
+		t.Error("explicit false should not be overridden by default true")
+	}
+}
+
+func TestCoerceBoolPtr_ExplicitTrue(t *testing.T) {
+	b := true
+	if got := coerceBoolPtr(&b, false); !got {
+		t.Error("explicit true should be returned")
+	}
+}
+
 // --- parseBoolEnv ---
 
 func TestParseBoolEnv_TrueValues(t *testing.T) {
@@ -329,6 +354,38 @@ func TestBuildSettings_EnvTakesPrecedenceOverPayload(t *testing.T) {
 	}
 	if s.EdgeID != "from-env" {
 		t.Errorf("EdgeID = %q, want from-env (env should win)", s.EdgeID)
+	}
+}
+
+func TestBuildSettings_KeepLocalPendingDefaultsTrue(t *testing.T) {
+	t.Setenv("EDGE_ID", "")
+	t.Setenv("HTTP_PORT", "")
+	t.Setenv("CENTRAL_URL", "")
+	t.Setenv("KEEP_LOCAL_PENDING", "")
+
+	s, err := BuildSettings(nil)
+	if err != nil {
+		t.Fatalf("BuildSettings: %v", err)
+	}
+	if !s.KeepLocalPending {
+		t.Error("KeepLocalPending should default to true on a fresh install")
+	}
+}
+
+func TestBuildSettings_KeepLocalPendingExplicitFalse(t *testing.T) {
+	t.Setenv("EDGE_ID", "")
+	t.Setenv("HTTP_PORT", "")
+	t.Setenv("CENTRAL_URL", "")
+	t.Setenv("KEEP_LOCAL_PENDING", "")
+
+	b := false
+	p := &SettingsPayload{KeepLocalPending: &b}
+	s, err := BuildSettings(p)
+	if err != nil {
+		t.Fatalf("BuildSettings: %v", err)
+	}
+	if s.KeepLocalPending {
+		t.Error("KeepLocalPending should be false when explicitly set to false in payload")
 	}
 }
 

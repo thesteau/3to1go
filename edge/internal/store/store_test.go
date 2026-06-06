@@ -91,10 +91,10 @@ func TestSettingsStoreRoundTrip(t *testing.T) {
 
 func TestUserStoreDefaultAdminAndAuthentication(t *testing.T) {
 	store, ctx := testUserStore(t)
-	if err := store.EnsureDefaultAdmin(ctx); err != nil {
+	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
 		t.Fatalf("EnsureDefaultAdmin: %v", err)
 	}
-	if err := store.EnsureDefaultAdmin(ctx); err != nil {
+	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
 		t.Fatalf("EnsureDefaultAdmin idempotent: %v", err)
 	}
 	users, err := store.ListUsers(ctx)
@@ -209,7 +209,7 @@ func TestUserStoreValidationAndProtection(t *testing.T) {
 		t.Fatal("expected blank password error")
 	}
 
-	if err := store.EnsureDefaultAdmin(ctx); err != nil {
+	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
 		t.Fatalf("EnsureDefaultAdmin: %v", err)
 	}
 	if err := store.DeleteUser(ctx, BootstrapAdminID); err == nil {

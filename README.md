@@ -121,8 +121,31 @@ Edge authenticates to Central with a signed JWT credential minted by Central.
 
 - Central stores credential metadata in its database, not raw tokens.
 - Edge stores the pasted credential in its local settings database.
-- Credentials can be unique per Edge or intentionally shared across multiple Edges.
-- Revoking a shared credential blocks every Edge instance using that same token.
+- New credentials are single-instance by default and bind to the first Edge instance that reports in with them.
+- Shared credentials can be minted intentionally with an instance limit.
+- Central can revoke a credential after at least one Edge instance has reported in with it; otherwise the token expires naturally.
+
+### Reset A Central Admin Password
+
+`INITIAL_ADMIN_PASSWORD` is only used when Central creates the first admin user in an empty database. Changing it later does not reset an existing account. `POSTGRES_PASSWORD` is the database password, not the Central web UI password.
+
+If you are locked out of Central, SSH into the Docker host, change into the Central Compose directory, and reset the admin password in Postgres:
+
+```sh
+cd deploy-example/central
+docker compose exec postgres psql -U three_to_one_go -d three_to_one_go -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; UPDATE app_users SET password_hash = crypt('change-this-admin-password', gen_salt('bf', 10)), must_change_password = true WHERE username = 'admin';"
+```
+
+If you changed `POSTGRES_USER` or `POSTGRES_DB` in `.env`, use those values in place of `three_to_one_go`.
+
+Then open Central and sign in with:
+
+```text
+username: admin
+password: change-this-admin-password
+```
+
+Central will require a new password after sign-in.
 
 ### Unique Edge IDs Matter
 
@@ -144,8 +167,7 @@ If you want off-site copies, the expected pattern is:
 - [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image
 - [`deploy-example/edge/`](deploy-example/edge/) - user-facing Edge Compose setup with the published image
 - [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go)
-- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Python, current deployed version)
-- [`edge-tmp/`](edge-tmp/) - 3to1go Edge rewrite in Go (in progress)
+- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Go)
 
 ## License
 

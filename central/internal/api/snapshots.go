@@ -163,7 +163,8 @@ func (a *App) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.authorizeBearer(r); err != nil {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -173,6 +174,10 @@ func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, false); status != 0 {
+		writeError(w, status, detail)
 		return
 	}
 
@@ -193,7 +198,8 @@ func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.authorizeBearer(r); err != nil {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -216,6 +222,10 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, false); status != 0 {
+		writeError(w, status, detail)
 		return
 	}
 

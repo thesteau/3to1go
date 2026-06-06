@@ -413,6 +413,18 @@ async function postSettings(payload) {
 
 async function saveSettings() {
   setStatus("settings-status", "Saving...", "info");
+  const cronInput = document.getElementById("settings_cron_schedule");
+  if (cronInput) {
+    const cronError = validateCronSchedule(cronInput.value);
+    cronInput.setCustomValidity(cronError);
+    if (cronError) {
+      cronInput.reportValidity();
+      cronInput.focus();
+      setStatus("settings-status", cronError, "error");
+      setActionStatus(cronError, "error");
+      return;
+    }
+  }
   const payload = collectSettingsPayload();
   const { response, body } = await postSettings(payload);
   setStatus("settings-status", response.ok ? "Saved." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
@@ -426,6 +438,12 @@ async function saveSettings() {
     closeDialog("settings-dialog");
     loadData({ silent: true, refreshDirectoryTree: true });
   } else {
-    setActionStatus(body.detail || "Settings save failed.", "error");
+    const detail = body.detail || "Settings save failed.";
+    if (cronInput && String(detail).includes("cron_schedule")) {
+      cronInput.setCustomValidity(detail);
+      cronInput.reportValidity();
+      cronInput.focus();
+    }
+    setActionStatus(detail, "error");
   }
 }

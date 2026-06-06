@@ -16,7 +16,10 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/certificates"
+	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/services/ntfy"
+	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 )
@@ -83,7 +86,7 @@ type mockCredStore struct {
 func (m *mockCredStore) Verify(_ context.Context, _ string, _ ed25519.PublicKey) (*store.CredentialRecord, error) {
 	return m.verifyResult, m.verifyErr
 }
-func (m *mockCredStore) Mint(_ context.Context, _ ed25519.PrivateKey, _ int) (string, error) {
+func (m *mockCredStore) Mint(_ context.Context, _ ed25519.PrivateKey, _ int, _ ...signing.CredentialScope) (string, error) {
 	return m.mintResult, m.mintErr
 }
 func (m *mockCredStore) Revoke(_ context.Context, _ string) (int64, error) {
@@ -177,9 +180,9 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
 	backend := storage.NewLocalBackend(settings.BackupRoot)
-	hooks := services.NewHookManager(t.TempDir(), discardLogger())
-	certs := services.NewCertManager(t.TempDir())
-	ntfy := services.NewNtfyPublisher(discardLogger())
+	hookMgr := hooks.NewHookManager(t.TempDir(), discardLogger())
+	certMgr := certificates.NewCertManager(t.TempDir())
+	ntfyPub := ntfy.NewNtfyPublisher(discardLogger())
 	if us == nil {
 		us = &mockUserStore{}
 	}
@@ -192,10 +195,10 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hooks, certs, ntfy, discardLogger())
+	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, ntfyPub, discardLogger())
 }
 
-func jsonReq(method, path string, body interface{}) *http.Request {
+func jsonReq(method, path string, body any) *http.Request {
 	var buf bytes.Buffer
 	if body != nil {
 		json.NewEncoder(&buf).Encode(body)
@@ -269,7 +272,7 @@ func TestIsNotFoundError(t *testing.T) {
 }
 
 func TestIsRuntimeError(t *testing.T) {
-	execErr := &services.ExecError{Err: errors.New("exit 1")}
+	execErr := &certificates.ExecError{Err: errors.New("exit 1")}
 	if !isRuntimeError(execErr) {
 		t.Error("expected true for ExecError")
 	}
@@ -362,7 +365,7 @@ func TestHandleHealth(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("handleHealth code = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(rr.Body).Decode(&resp)
 	if resp["status"] != "ok" {
 		t.Errorf("health status = %v, want ok", resp["status"])
@@ -389,7 +392,7 @@ func TestHandleSessionMe_NotAuthenticated(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("code = %d", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(rr.Body).Decode(&resp)
 	if resp["authenticated"] != false {
 		t.Errorf("authenticated = %v, want false", resp["authenticated"])
@@ -405,7 +408,7 @@ func TestHandleSessionMe_Authenticated(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("code = %d", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(rr.Body).Decode(&resp)
 	if resp["authenticated"] != true {
 		t.Errorf("authenticated = %v, want true", resp["authenticated"])
@@ -539,9 +542,9 @@ func TestHandleListUsers_Admin(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("code = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	json.NewDecoder(rr.Body).Decode(&resp)
-	if usersArr, ok := resp["users"].([]interface{}); !ok || len(usersArr) != 2 {
+	if usersArr, ok := resp["users"].([]any); !ok || len(usersArr) != 2 {
 		t.Errorf("expected 2 users, got %v", resp["users"])
 	}
 }
@@ -564,7 +567,7 @@ func TestHandleListUsers_RegularUser_SeesSelf(t *testing.T) {
 func TestHandleCreateUser_RequiresAdmin(t *testing.T) {
 	app := newTestApp(t, nil, nil, nil, nil)
 	rr := httptest.NewRecorder()
-	req := jsonReq("POST", "/api/users", map[string]interface{}{"username": "new", "password": "pass123", "is_admin": false})
+	req := jsonReq("POST", "/api/users", map[string]any{"username": "new", "password": "pass123", "is_admin": false})
 	req = withUser(req, regularUser())
 	app.handleCreateUser(rr, req)
 	if rr.Code != http.StatusForbidden {
@@ -575,7 +578,7 @@ func TestHandleCreateUser_RequiresAdmin(t *testing.T) {
 func TestHandleCreateUser_ShortPassword(t *testing.T) {
 	app := newTestApp(t, nil, nil, nil, nil)
 	rr := httptest.NewRecorder()
-	req := jsonReq("POST", "/api/users", map[string]interface{}{"username": "new", "password": "abc"})
+	req := jsonReq("POST", "/api/users", map[string]any{"username": "new", "password": "abc"})
 	req = withUser(req, adminUser())
 	app.handleCreateUser(rr, req)
 	if rr.Code != http.StatusBadRequest {
@@ -587,7 +590,7 @@ func TestHandleCreateUser_Success(t *testing.T) {
 	created := &store.User{ID: 5, Username: "newuser"}
 	app := newTestApp(t, &mockUserStore{createUserResult: created}, nil, nil, nil)
 	rr := httptest.NewRecorder()
-	req := jsonReq("POST", "/api/users", map[string]interface{}{"username": "newuser", "password": "secret123"})
+	req := jsonReq("POST", "/api/users", map[string]any{"username": "newuser", "password": "secret123"})
 	req = withUser(req, adminUser())
 	app.handleCreateUser(rr, req)
 	if rr.Code != http.StatusOK {
@@ -655,7 +658,7 @@ func TestHandleMigrateUploadSessions_Success(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200; body=%s", rr.Code, rr.Body.String())
 	}
-	var body map[string]interface{}
+	var body map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("response JSON: %v", err)
 	}

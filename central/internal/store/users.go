@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -22,6 +23,7 @@ const (
 	BootstrapAdminID     = 1
 	SessionCookie        = "three_to_one_go_session"
 	sessionDays          = 7
+	bcryptCost           = 12
 	pbkdf2Iterations     = 260_000
 )
 
@@ -66,7 +68,7 @@ func (s *UserStore) EnsureSchema(ctx context.Context) error {
 	return err
 }
 
-func (s *UserStore) EnsureDefaultAdmin(ctx context.Context) error {
+func (s *UserStore) EnsureDefaultAdmin(ctx context.Context, initialPassword string) error {
 	users, err := s.ListUsers(ctx)
 	if err != nil {
 		return err
@@ -74,11 +76,14 @@ func (s *UserStore) EnsureDefaultAdmin(ctx context.Context) error {
 	if len(users) > 0 {
 		return nil
 	}
-	user, err := s.CreateUser(ctx, DefaultAdminUsername, DefaultAdminPassword, true)
+	if strings.TrimSpace(initialPassword) == "" {
+		initialPassword = DefaultAdminPassword
+	}
+	user, err := s.CreateUser(ctx, DefaultAdminUsername, initialPassword, true)
 	if err != nil {
 		return err
 	}
-	_, err = s.UpdateUser(ctx, user.ID, nil, nil, nil, boolPtr(true))
+	_, err = s.UpdateUser(ctx, user.ID, nil, nil, nil, new(true))
 	return err
 }
 
@@ -194,6 +199,9 @@ func (s *UserStore) CreateUser(ctx context.Context, username, password string, i
 	if err != nil {
 		return nil, err
 	}
+	if normalized == DefaultAdminUsername && !isAdmin {
+		return nil, errors.New(`the "admin" username is reserved for admin users`)
+	}
 	hash, err := hashPassword(password)
 	if err != nil {
 		return nil, err
@@ -249,6 +257,13 @@ func (s *UserStore) UpdateUser(ctx context.Context, userID int, username, passwo
 	}
 	if existing.ID == BootstrapAdminID {
 		nextAdmin = true
+	}
+
+	if existing.Username == DefaultAdminUsername && nextUsername != DefaultAdminUsername {
+		return nil, errors.New(`the "admin" user cannot be renamed`)
+	}
+	if nextUsername == DefaultAdminUsername && !nextAdmin {
+		return nil, errors.New(`the "admin" username is reserved for admin users`)
 	}
 
 	if !nextAdmin {
@@ -321,7 +336,7 @@ func (s *UserStore) ChangePassword(ctx context.Context, userID int, currentPassw
 	if !verifyPassword(currentPassword, user.PasswordHash) {
 		return nil, errors.New("current password is incorrect")
 	}
-	return s.UpdateUser(ctx, userID, nil, &newPassword, nil, boolPtr(false))
+	return s.UpdateUser(ctx, userID, nil, &newPassword, nil, new(false))
 }
 
 func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
@@ -332,7 +347,7 @@ func (s *UserStore) withDefaultPasswordChangeRequired(ctx context.Context, user 
 	if user.MustChangePassword || !verifyPassword(DefaultAdminPassword, user.PasswordHash) {
 		return user, nil
 	}
-	updated, err := s.UpdateUser(ctx, user.ID, nil, nil, nil, boolPtr(true))
+	updated, err := s.UpdateUser(ctx, user.ID, nil, nil, nil, new(true))
 	if err != nil {
 		return user, nil
 	}
@@ -386,15 +401,21 @@ func hashPassword(password string) (string, error) {
 	if strings.TrimSpace(password) == "" {
 		return "", errors.New("password must contain at least one non-space character")
 	}
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
+	digest, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
 		return "", err
 	}
-	digest := pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, sha256.Size, sha256.New)
-	return fmt.Sprintf("pbkdf2_sha256$%d$%s$%s", pbkdf2Iterations, hex.EncodeToString(salt), hex.EncodeToString(digest)), nil
+	return string(digest), nil
 }
 
 func verifyPassword(password, encoded string) bool {
+	if strings.HasPrefix(encoded, "$2a$") || strings.HasPrefix(encoded, "$2b$") || strings.HasPrefix(encoded, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(encoded), []byte(password)) == nil
+	}
+	return verifyPBKDF2Password(password, encoded)
+}
+
+func verifyPBKDF2Password(password, encoded string) bool {
 	parts := strings.SplitN(encoded, "$", 4)
 	if len(parts) != 4 || parts[0] != "pbkdf2_sha256" {
 		return false
@@ -434,4 +455,5 @@ func randomToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }

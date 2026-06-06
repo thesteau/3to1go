@@ -141,6 +141,77 @@ function describeDayOfWeek(field) {
   return `day-of-week ${field}`;
 }
 
+function validateCronValue(value, spec) {
+  const namedValue = spec.names?.[String(value || "").toUpperCase()];
+  if (namedValue !== undefined) return "";
+  if (!/^\d+$/.test(value)) {
+    return `${spec.label} must be numeric, a range, a list, or *.`;
+  }
+  const n = Number(value);
+  if (n < spec.min || n > spec.max) {
+    return `${spec.label} must be between ${spec.min} and ${spec.max}.`;
+  }
+  return "";
+}
+
+function cronValueNumber(value, spec) {
+  const namedValue = spec.names?.[String(value || "").toUpperCase()];
+  if (namedValue !== undefined) return namedValue;
+  return Number(value);
+}
+
+function validateCronField(field, spec) {
+  if (!field) return `${spec.label} is required.`;
+  for (const rawPart of field.split(",")) {
+    if (!rawPart) return `${spec.label} contains an empty list item.`;
+    const stepParts = rawPart.split("/");
+    if (stepParts.length > 2) return `${spec.label} has an invalid step.`;
+    const base = stepParts[0];
+    if (stepParts.length === 2) {
+      if (!/^\d+$/.test(stepParts[1]) || Number(stepParts[1]) < 1) {
+        return `${spec.label} step must be a positive number.`;
+      }
+    }
+    if (base === "*") continue;
+    const range = base.split("-");
+    if (range.length > 2) return `${spec.label} has an invalid range.`;
+    if (range.length === 2) {
+      const startError = validateCronValue(range[0], spec);
+      if (startError) return startError;
+      const endError = validateCronValue(range[1], spec);
+      if (endError) return endError;
+      if (cronValueNumber(range[0], spec) > cronValueNumber(range[1], spec)) {
+        return `${spec.label} range must start before it ends.`;
+      }
+      continue;
+    }
+    const valueError = validateCronValue(base, spec);
+    if (valueError) return valueError;
+  }
+  return "";
+}
+
+function validateCronSchedule(expression) {
+  const normalized = String(expression || "").trim();
+  if (!normalized) return "";
+  const fields = normalized.split(/\s+/);
+  if (fields.length !== 5) {
+    return "Use five cron fields separated by spaces.";
+  }
+  const specs = [
+    { label: "Minute", min: 0, max: 59 },
+    { label: "Hour", min: 0, max: 23 },
+    { label: "Day of month", min: 1, max: 31 },
+    { label: "Month", min: 1, max: 12, names: { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 } },
+    { label: "Day of week", min: 0, max: 6, names: { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 } },
+  ];
+  for (let i = 0; i < fields.length; i += 1) {
+    const error = validateCronField(fields[i], specs[i]);
+    if (error) return error;
+  }
+  return "";
+}
+
 function describeCronSchedule(expression) {
   const normalized = String(expression || "").trim();
   const fieldHelp = "Fields run in this order: minute hour day-of-month month day-of-week.";
@@ -160,6 +231,13 @@ function describeCronSchedule(expression) {
   }
 
   const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+  const validationError = validateCronSchedule(normalized);
+  if (validationError) {
+    return {
+      summary: validationError,
+      help: fieldHelp,
+    };
+  }
   const timeLabel = formatClock(hour, minute);
   let summary = `Runs on cron schedule ${normalized}.`;
   if (timeLabel) {

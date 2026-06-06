@@ -13,7 +13,9 @@ import (
 
 	"github.com/3to1go/edge/internal/api"
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services"
+	"github.com/3to1go/edge/internal/services/certificates"
+	"github.com/3to1go/edge/internal/services/runner"
+	"github.com/3to1go/edge/internal/services/scheduler"
 	"github.com/3to1go/edge/internal/store"
 )
 
@@ -52,7 +54,7 @@ func run(logger *slog.Logger) error {
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)
 	}
-	if err := userStore.EnsureDefaultAdmin(ctx); err != nil {
+	if err := userStore.EnsureDefaultAdmin(ctx, initialAdminPassword()); err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
 	}
 
@@ -73,23 +75,23 @@ func run(logger *slog.Logger) error {
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLogLevel(settings.LogLevel)}))
 
 	// Certificate manager (needed before runner for TLS transport).
-	certMgr := services.NewCertManager(config.TrustedCertificatesDir())
+	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
 
 	// Build the runner.
-	runner, err := services.NewEdgeRunner(settings, logger, certMgr)
+	edgeRunner, err := runner.NewEdgeRunner(settings, logger, certMgr)
 	if err != nil {
 		return fmt.Errorf("init runner: %w", err)
 	}
 
 	// Build the scheduler.
-	scheduler, err := services.NewSchedulerController(runner)
+	sched, err := scheduler.NewSchedulerController(edgeRunner)
 	if err != nil {
 		return fmt.Errorf("init scheduler: %w", err)
 	}
-	scheduler.Start()
+	sched.Start()
 
 	// Build the HTTP app.
-	app := api.NewApp(runner, scheduler, userStore, logger)
+	app := api.NewApp(edgeRunner, sched, userStore, logger)
 
 	addr := net.JoinHostPort(settings.HTTPHost, fmt.Sprint(settings.HTTPPort))
 	ln, err := net.Listen("tcp", addr)
@@ -111,7 +113,7 @@ func run(logger *slog.Logger) error {
 	go func() {
 		<-quit
 		logger.Info("shutting down server")
-		scheduler.Stop()
+		sched.Stop()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		srv.Shutdown(shutCtx)
@@ -134,4 +136,11 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func initialAdminPassword() string {
+	if value := os.Getenv("INITIAL_ADMIN_PASSWORD"); value != "" {
+		return value
+	}
+	return store.DefaultAdminPassword
 }

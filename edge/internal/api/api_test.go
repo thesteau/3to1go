@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services"
+	"github.com/3to1go/edge/internal/services/recovery"
 	"github.com/3to1go/edge/internal/store"
 )
 
@@ -79,77 +79,79 @@ func (m *mockUserStore) ChangePassword(_ context.Context, _ int, _, _ string) (*
 // ---------------------------------------------------------------------------
 
 type mockRunner struct {
-	settings         *config.Settings
+	settings          *config.Settings
+	updateSettingsHit bool
 	updateSettingsErr error
-	fingerprint      string
-	keyBase64        string
-	statusSnapshot   map[string]interface{}
-	dirSnapshot      map[string]interface{}
-	ntfySnapshot     map[string]interface{}
-	testNtfyErr      error
-	certSnapshot     map[string]interface{}
-	saveCertResult   interface{}
-	saveCertErr      error
-	deleteCertErr    error
-	hookSnapshot     map[string]interface{}
-	saveHookResult   interface{}
-	saveHookErr      error
-	readHookName     string
-	readHookContent  string
-	readHookErr      error
-	deleteHookErr    error
-	saveJobResult    interface{}
-	saveJobErr       error
-	deleteJobErr     error
-	forceSendResult  map[string]interface{}
-	forceSendErr     error
-	previewResult    map[string]interface{}
-	previewErr       error
-	recoverResult    map[string]interface{}
-	recoverErr       error
+	fingerprint       string
+	keyBase64         string
+	statusSnapshot    map[string]any
+	dirSnapshot       map[string]any
+	ntfySnapshot      map[string]any
+	testNtfyErr       error
+	certSnapshot      map[string]any
+	saveCertResult    any
+	saveCertErr       error
+	deleteCertErr     error
+	hookSnapshot      map[string]any
+	saveHookResult    any
+	saveHookErr       error
+	readHookName      string
+	readHookContent   string
+	readHookErr       error
+	deleteHookErr     error
+	saveJobResult     any
+	saveJobErr        error
+	deleteJobErr      error
+	forceSendResult   map[string]any
+	forceSendErr      error
+	previewResult     map[string]any
+	previewErr        error
+	recoverResult     map[string]any
+	recoverErr        error
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }
 func (m *mockRunner) UpdateSettings(s *config.Settings) error {
+	m.updateSettingsHit = true
 	if m.updateSettingsErr == nil {
 		m.settings = s
 	}
 	return m.updateSettingsErr
 }
-func (m *mockRunner) EncryptionKeyFingerprint() string                    { return m.fingerprint }
-func (m *mockRunner) EncryptionKeyBase64() string                         { return m.keyBase64 }
-func (m *mockRunner) StatusSnapshot() map[string]interface{}              { return m.statusSnapshot }
-func (m *mockRunner) DirectoriesSnapshot() map[string]interface{}         { return m.dirSnapshot }
-func (m *mockRunner) NtfySnapshot(_ *config.Settings) map[string]interface{} {
+func (m *mockRunner) EncryptionKeyFingerprint() string    { return m.fingerprint }
+func (m *mockRunner) EncryptionKeyBase64() string         { return m.keyBase64 }
+func (m *mockRunner) StatusSnapshot() map[string]any      { return m.statusSnapshot }
+func (m *mockRunner) DirectoriesSnapshot() map[string]any { return m.dirSnapshot }
+func (m *mockRunner) NtfySnapshot(_ *config.Settings) map[string]any {
 	return m.ntfySnapshot
 }
 func (m *mockRunner) TestNtfy(_, _, _ string) error { return m.testNtfyErr }
-func (m *mockRunner) CertSnapshot() map[string]interface{} { return m.certSnapshot }
-func (m *mockRunner) SaveCertFile(_ string, _ []byte) (interface{}, error) {
+func (m *mockRunner) CertSnapshot() map[string]any  { return m.certSnapshot }
+func (m *mockRunner) SaveCertFile(_ string, _ []byte) (any, error) {
 	return m.saveCertResult, m.saveCertErr
 }
 func (m *mockRunner) DeleteCertFile(_ string) error { return m.deleteCertErr }
-func (m *mockRunner) HookSnapshot(_, _ string) map[string]interface{} {
+func (m *mockRunner) HookSnapshot(_, _ string) map[string]any {
 	return m.hookSnapshot
 }
-func (m *mockRunner) SaveHookFile(_ string, _ []byte) (interface{}, error) {
+func (m *mockRunner) SaveHookFile(_ string, _ []byte) (any, error) {
 	return m.saveHookResult, m.saveHookErr
 }
 func (m *mockRunner) ReadHookFile(_ string) (string, string, error) {
 	return m.readHookName, m.readHookContent, m.readHookErr
 }
 func (m *mockRunner) DeleteHookFile(_ string) error { return m.deleteHookErr }
-func (m *mockRunner) SaveJob(_ string, _ map[string]interface{}) (interface{}, error) {
+func (m *mockRunner) SaveJob(_ string, _ map[string]any) (any, error) {
 	return m.saveJobResult, m.saveJobErr
 }
 func (m *mockRunner) DeleteJob(_ string) error { return m.deleteJobErr }
-func (m *mockRunner) ForceSendJob(_ context.Context, _ string) (map[string]interface{}, error) {
+func (m *mockRunner) ForceSendJob(_ context.Context, _ string) (map[string]any, error) {
 	return m.forceSendResult, m.forceSendErr
 }
-func (m *mockRunner) PreviewRecovery(_ context.Context, _, _ string) (map[string]interface{}, error) {
+func (m *mockRunner) PreviewRecovery(_ context.Context, _, _ string) (map[string]any, error) {
 	return m.previewResult, m.previewErr
 }
-func (m *mockRunner) RecoverJob(_ context.Context, _, _ string) (map[string]interface{}, error) {
+func (m *mockRunner) RecoverJob(_ context.Context, _, _ string) (map[string]any, error) {
 	return m.recoverResult, m.recoverErr
 }
 
@@ -158,14 +160,14 @@ func (m *mockRunner) RecoverJob(_ context.Context, _, _ string) (map[string]inte
 // ---------------------------------------------------------------------------
 
 type mockScheduler struct {
-	snapshot     map[string]interface{}
+	snapshot     map[string]any
 	runNowResult string
 	reloadErr    error
 }
 
-func (m *mockScheduler) Snapshot() map[string]interface{} { return m.snapshot }
-func (m *mockScheduler) RequestRunNow() string             { return m.runNowResult }
-func (m *mockScheduler) ReloadSettings(_ string) error     { return m.reloadErr }
+func (m *mockScheduler) Snapshot() map[string]any      { return m.snapshot }
+func (m *mockScheduler) RequestRunNow() string         { return m.runNowResult }
+func (m *mockScheduler) ReloadSettings(_ string) error { return m.reloadErr }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,11 +215,11 @@ func defaultSettings() *config.Settings {
 func defaultRunner() *mockRunner {
 	return &mockRunner{
 		settings:       defaultSettings(),
-		statusSnapshot: map[string]interface{}{"edge_id": "test"},
-		dirSnapshot:    map[string]interface{}{"directories": []interface{}{}},
-		ntfySnapshot:   map[string]interface{}{"ntfy_url": ""},
-		certSnapshot:   map[string]interface{}{"files": []interface{}{}},
-		hookSnapshot:   map[string]interface{}{"files": []interface{}{}},
+		statusSnapshot: map[string]any{"edge_id": "test"},
+		dirSnapshot:    map[string]any{"directories": []any{}},
+		ntfySnapshot:   map[string]any{"ntfy_url": ""},
+		certSnapshot:   map[string]any{"files": []any{}},
+		hookSnapshot:   map[string]any{"files": []any{}},
 		fingerprint:    "abc123",
 		keyBase64:      "base64key",
 	}
@@ -226,13 +228,13 @@ func defaultRunner() *mockRunner {
 // defaultScheduler returns a mockScheduler with safe defaults.
 func defaultScheduler() *mockScheduler {
 	return &mockScheduler{
-		snapshot:     map[string]interface{}{"status": "idle"},
+		snapshot:     map[string]any{"status": "idle"},
 		runNowResult: "triggered",
 	}
 }
 
 // doRequest sends a request without authentication.
-func doRequest(handler http.Handler, method, path string, body interface{}) *httptest.ResponseRecorder {
+func doRequest(handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
 	var reqBody io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -248,7 +250,7 @@ func doRequest(handler http.Handler, method, path string, body interface{}) *htt
 }
 
 // doAuthRequest sends a request with a session cookie set.
-func doAuthRequest(handler http.Handler, method, path string, body interface{}) *httptest.ResponseRecorder {
+func doAuthRequest(handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
 	var reqBody io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -264,7 +266,7 @@ func doAuthRequest(handler http.Handler, method, path string, body interface{}) 
 	return rr
 }
 
-func decodeJSON(t *testing.T, rr *httptest.ResponseRecorder, dst interface{}) {
+func decodeJSON(t *testing.T, rr *httptest.ResponseRecorder, dst any) {
 	t.Helper()
 	if err := json.NewDecoder(rr.Body).Decode(dst); err != nil {
 		t.Fatalf("decode response JSON: %v", err)
@@ -338,7 +340,7 @@ func TestAuthMiddleware_AdminCanAccessAdminRoute(t *testing.T) {
 	admin := &store.User{ID: 1, Username: "admin", IsAdmin: true}
 	ms := &mockUserStore{sessionUser: admin, createUserResult: newUser}
 	app := newTestApp(ms)
-	rr := doRequest(app.Handler(), "POST", "/api/users", map[string]interface{}{
+	rr := doRequest(app.Handler(), "POST", "/api/users", map[string]any{
 		"username": "newbie",
 		"password": "pass",
 		"is_admin": false,
@@ -382,7 +384,7 @@ func TestHandleSessionMe_NotAuthenticated(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["authenticated"] != false {
 		t.Errorf("authenticated = %v, want false", resp["authenticated"])
@@ -396,7 +398,7 @@ func TestHandleSessionMe_Authenticated(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["authenticated"] != true {
 		t.Errorf("authenticated = %v, want true", resp["authenticated"])
@@ -583,7 +585,7 @@ func TestHandleListUsers_NonAdminReturnsOwnUser(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["users"] == nil {
 		t.Error("expected 'users' key in response")
@@ -602,7 +604,7 @@ func TestHandleStatus_ReturnsSnapshot(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if _, ok := resp["scheduler"]; !ok {
 		t.Error("response missing 'scheduler' key")
@@ -625,7 +627,7 @@ func TestHandleStatus_RequiresLogin(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHandleRunNow_Triggered(t *testing.T) {
-	sched := &mockScheduler{runNowResult: "triggered", snapshot: map[string]interface{}{}}
+	sched := &mockScheduler{runNowResult: "triggered", snapshot: map[string]any{}}
 	app := newTestAppFull(regularUserStore(), defaultRunner(), sched)
 	rr := doAuthRequest(app.Handler(), "POST", "/api/run-now", nil)
 	if rr.Code != http.StatusOK {
@@ -639,7 +641,7 @@ func TestHandleRunNow_Triggered(t *testing.T) {
 }
 
 func TestHandleRunNow_AlreadyRunning(t *testing.T) {
-	sched := &mockScheduler{runNowResult: "already_running", snapshot: map[string]interface{}{}}
+	sched := &mockScheduler{runNowResult: "already_running", snapshot: map[string]any{}}
 	app := newTestAppFull(regularUserStore(), defaultRunner(), sched)
 	rr := doAuthRequest(app.Handler(), "POST", "/api/run-now", nil)
 	if rr.Code != http.StatusOK {
@@ -663,7 +665,7 @@ func TestHandleGetSettings_AdminReturnsSettings(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if _, ok := resp["settings"]; !ok {
 		t.Error("response missing 'settings' key")
@@ -690,7 +692,7 @@ func TestHandleSaveSettings_Success(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["status"] != "ok" {
 		t.Errorf("status = %q, want ok", resp["status"])
@@ -706,6 +708,29 @@ func TestHandleSaveSettings_InvalidBody(t *testing.T) {
 	app.Handler().ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleSaveSettings_InvalidCronDoesNotSave(t *testing.T) {
+	runner := defaultRunner()
+	originalCron := runner.settings.CronSchedule
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
+	rr := doAuthRequest(app.Handler(), "POST", "/api/settings", config.SettingsPayload{
+		CronSchedule: "0 2 * * 8",
+	})
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rr.Code)
+	}
+	if runner.updateSettingsHit {
+		t.Error("UpdateSettings was called for invalid cron")
+	}
+	if runner.settings.CronSchedule != originalCron {
+		t.Errorf("cron schedule changed to %q, want %q", runner.settings.CronSchedule, originalCron)
+	}
+	var resp map[string]any
+	decodeJSON(t, rr, &resp)
+	if detail, _ := resp["detail"].(string); !strings.Contains(detail, "cron_schedule") {
+		t.Errorf("detail = %q, want cron_schedule error", detail)
 	}
 }
 
@@ -727,13 +752,13 @@ func TestHandleSaveSettings_UpdateFailure(t *testing.T) {
 
 func TestHandleGetNtfy_ReturnsSnapshot(t *testing.T) {
 	runner := defaultRunner()
-	runner.ntfySnapshot = map[string]interface{}{"ntfy_url": "https://ntfy.example.com"}
+	runner.ntfySnapshot = map[string]any{"ntfy_url": "https://ntfy.example.com"}
 	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/ntfy", nil)
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["ntfy_url"] != "https://ntfy.example.com" {
 		t.Errorf("ntfy_url = %v, want https://ntfy.example.com", resp["ntfy_url"])
@@ -760,7 +785,7 @@ func TestHandleSaveNtfy_UpdateFailure(t *testing.T) {
 	runner := &mockRunner{
 		settings:          defaultSettings(),
 		updateSettingsErr: errors.New("cycle running"),
-		ntfySnapshot:      map[string]interface{}{},
+		ntfySnapshot:      map[string]any{},
 	}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy", map[string]string{})
@@ -803,7 +828,7 @@ func TestHandleTestNtfy_Failure(t *testing.T) {
 
 func TestHandleGetCertificates_ReturnsSnapshot(t *testing.T) {
 	runner := defaultRunner()
-	runner.certSnapshot = map[string]interface{}{"files": []interface{}{}}
+	runner.certSnapshot = map[string]any{"files": []any{}}
 	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/certificates", nil)
 	if rr.Code != http.StatusOK {
@@ -828,7 +853,7 @@ func TestHandleUploadCertificate_MissingFile(t *testing.T) {
 
 func TestHandleUploadCertificate_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.saveCertResult = map[string]interface{}{"name": "cert.pem"}
+	runner.saveCertResult = map[string]any{"name": "cert.pem"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 
 	body, ct := buildMultipart(t, "certificate_file", "cert.pem", []byte("---CERT---"))
@@ -896,7 +921,7 @@ func TestHandleDeleteCertificate_OtherError(t *testing.T) {
 
 func TestHandleGetHooks_ReturnsSnapshot(t *testing.T) {
 	runner := defaultRunner()
-	runner.hookSnapshot = map[string]interface{}{"pre_command": "", "post_command": ""}
+	runner.hookSnapshot = map[string]any{"pre_command": "", "post_command": ""}
 	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/hooks", nil)
 	if rr.Code != http.StatusOK {
@@ -923,7 +948,7 @@ func TestHandleSaveHooks_UpdateFailure(t *testing.T) {
 	runner := &mockRunner{
 		settings:          defaultSettings(),
 		updateSettingsErr: errors.New("cycle running"),
-		hookSnapshot:      map[string]interface{}{},
+		hookSnapshot:      map[string]any{},
 	}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/hooks", map[string]string{})
@@ -949,7 +974,7 @@ func TestHandleUploadHookFile_MissingFile(t *testing.T) {
 
 func TestHandleUploadHookFile_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.saveHookResult = map[string]interface{}{"name": "pre.sh"}
+	runner.saveHookResult = map[string]any{"name": "pre.sh"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 
 	body, ct := buildMultipart(t, "hook_file", "pre.sh", []byte("#!/bin/sh\necho hello"))
@@ -1052,16 +1077,16 @@ func TestHandleGetEncryptionKey_NonAdminForbidden(t *testing.T) {
 
 func TestHandleListDirectories_ReturnsSnapshot(t *testing.T) {
 	runner := defaultRunner()
-	runner.dirSnapshot = map[string]interface{}{
+	runner.dirSnapshot = map[string]any{
 		"scan_root":   "/data",
-		"directories": []interface{}{},
+		"directories": []any{},
 	}
 	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/directories", nil)
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["scan_root"] != "/data" {
 		t.Errorf("scan_root = %v, want /data", resp["scan_root"])
@@ -1074,16 +1099,16 @@ func TestHandleListDirectories_ReturnsSnapshot(t *testing.T) {
 
 func TestHandleSaveJob_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.saveJobResult = map[string]interface{}{"relative_path": "photos"}
+	runner.saveJobResult = map[string]any{"relative_path": "photos"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/save-job", map[string]interface{}{
+	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/save-job", map[string]any{
 		"relative_path": "photos",
-		"config":        map[string]interface{}{"job_name": "photos"},
+		"config":        map[string]any{"job_name": "photos"},
 	})
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	decodeJSON(t, rr, &resp)
 	if resp["status"] != "ok" {
 		t.Errorf("status = %v, want ok", resp["status"])
@@ -1094,7 +1119,7 @@ func TestHandleSaveJob_Failure(t *testing.T) {
 	runner := defaultRunner()
 	runner.saveJobErr = errors.New("invalid path")
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/save-job", map[string]interface{}{
+	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/save-job", map[string]any{
 		"relative_path": "../escape",
 	})
 	if rr.Code != http.StatusBadRequest {
@@ -1146,7 +1171,7 @@ func TestHandleDeleteJob_Failure(t *testing.T) {
 
 func TestHandleForceSend_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.forceSendResult = map[string]interface{}{"status": "started", "job_name": "photos"}
+	runner.forceSendResult = map[string]any{"status": "started", "job_name": "photos"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/force-send", map[string]string{
 		"job_name": "photos",
@@ -1174,7 +1199,7 @@ func TestHandleForceSend_NotFound(t *testing.T) {
 
 func TestHandleRecoveryPreview_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.previewResult = map[string]interface{}{"status": "ok", "entries": []interface{}{}}
+	runner.previewResult = map[string]any{"status": "ok", "entries": []any{}}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/preview", map[string]string{
 		"relative_path": "photos",
@@ -1187,7 +1212,7 @@ func TestHandleRecoveryPreview_Success(t *testing.T) {
 
 func TestHandleRecoveryPreview_RecoveryError(t *testing.T) {
 	runner := defaultRunner()
-	runner.previewErr = &services.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
+	runner.previewErr = &recovery.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/preview", map[string]string{
 		"relative_path": "photos",
@@ -1217,7 +1242,7 @@ func TestHandleRecoveryPreview_GenericError(t *testing.T) {
 
 func TestHandleRecoveryRestore_Success(t *testing.T) {
 	runner := defaultRunner()
-	runner.recoverResult = map[string]interface{}{"status": "restored"}
+	runner.recoverResult = map[string]any{"status": "restored"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/restore", map[string]string{
 		"relative_path": "photos",
@@ -1230,7 +1255,7 @@ func TestHandleRecoveryRestore_Success(t *testing.T) {
 
 func TestHandleRecoveryRestore_RecoveryError(t *testing.T) {
 	runner := defaultRunner()
-	runner.recoverErr = &services.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
+	runner.recoverErr = &recovery.RecoveryError{Message: "wrong key", StatusCode: http.StatusConflict}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/recovery/restore", map[string]string{
 		"relative_path": "photos",

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/retention"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 )
@@ -40,6 +41,24 @@ type snapshotIndexer interface {
 	ReconcileNamespace(ctx context.Context, namespace string, files []store.StorageFile) error
 	GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*store.EdgeRegistration, error)
 	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
+}
+
+type ingestBackend interface {
+	Store(namespace, filename, stagedPath string) (string, error)
+	List(namespace string) ([]storage.StorageFile, error)
+	Delete(namespace, filename string) error
+}
+
+type namespaceLocks interface {
+	Lock(namespace string) *sync.Mutex
+}
+
+type hookRunner interface {
+	RunCommand(command, phase string, hookCtx map[string]any)
+}
+
+type ntfyBroadcaster interface {
+	PublishBestEffort(s *config.Settings, ctx map[string]any)
 }
 
 // UploadSession holds state for a resumable upload.
@@ -123,12 +142,12 @@ type FinalizeResponse struct {
 // Service manages resumable uploads.
 type Service struct {
 	settings     *config.Settings
-	backend      *storage.LocalBackend
+	backend      ingestBackend
 	index        snapshotIndexer
 	sessions     UploadSessionStore
-	locks        *services.NamespaceLockManager
-	hooks        *services.HookManager
-	ntfy         *services.NtfyPublisher
+	locks        namespaceLocks
+	hooks        hookRunner
+	ntfy         ntfyBroadcaster
 	stagingDir   string
 	uploadRoot   string
 	keyRoot      string
@@ -138,11 +157,11 @@ type Service struct {
 
 func New(
 	settings *config.Settings,
-	backend *storage.LocalBackend,
+	backend ingestBackend,
 	index snapshotIndexer,
-	locks *services.NamespaceLockManager,
-	hooks *services.HookManager,
-	ntfy *services.NtfyPublisher,
+	locks namespaceLocks,
+	hooks hookRunner,
+	ntfy ntfyBroadcaster,
 	sessionStores ...UploadSessionStore,
 ) (*Service, error) {
 	stagingDir := settings.StagingDir
@@ -288,7 +307,7 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 	}
 
 	if offset != currentSize {
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "offset_mismatch",
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
@@ -385,7 +404,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	}
 	currentSize := s.currentUploadSize(uploadID)
 	if currentSize != session.ArchiveSizeBytes {
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "incomplete_upload",
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
@@ -406,7 +425,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		if err := s.saveSessionContext(ctx, session); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "checksum_mismatch",
 			"next_offset": 0,
 			"upload_id":   uploadID,
@@ -450,7 +469,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 			return nil, httpError(http.StatusInternalServerError, "failed to store archive")
 		}
 
-		pruned, _ := services.PruneOldSnapshots(s.backend, session.Namespace, s.settings.RetentionKeepLast)
+		pruned, _ := retention.PruneOldSnapshots(s.backend, session.Namespace, s.settings.RetentionKeepLast)
 
 		files, _ := s.backend.List(session.Namespace)
 		var sizeBytes int64
@@ -582,6 +601,9 @@ func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHas
 	var reg *store.EdgeRegistration
 	if existing != nil {
 		reg = existing
+		if credHash != nil && *credHash != "" && reg.CredentialHash != nil && *reg.CredentialHash != "" && *reg.CredentialHash != *credHash {
+			return httpError(http.StatusForbidden, "credential is not bound to this edge instance")
+		}
 	} else {
 		reg = &store.EdgeRegistration{
 			EdgeID:         meta.EdgeID,
@@ -603,23 +625,19 @@ func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHas
 	return s.index.UpsertEdgeRegistration(ctx, reg)
 }
 
-func (s *Service) runPostHook(hookCtx map[string]interface{}, status, storedAs string, pruned int, duplicate bool) {
-	final := map[string]interface{}{}
-	for k, v := range hookCtx {
-		final[k] = v
-	}
+func (s *Service) runPostHook(hookCtx map[string]any, status, storedAs string, pruned int, duplicate bool) {
+	final := map[string]any{}
+	maps.Copy(final, hookCtx)
 	final["status"] = status
 	final["stored_as"] = storedAs
 	final["pruned"] = pruned
 	final["duplicate"] = duplicate
 	s.hooks.RunCommand(s.settings.HookPostCommand, "post", final)
-	if status == "ok" {
-		s.ntfy.PublishBestEffort(s.settings, final)
-	}
+	s.ntfy.PublishBestEffort(s.settings, final)
 }
 
-func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]interface{} {
-	return map[string]interface{}{
+func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]any {
+	return map[string]any{
 		"edge_id":            session.EdgeID,
 		"edge_instance_id":   session.EdgeInstanceID,
 		"job_name":           session.JobName,
@@ -699,10 +717,7 @@ func (s *Service) buildSessionResponse(sess *UploadSession) *SessionResponse {
 	if sess.Status == "completed" {
 		nextOffset = sess.ArchiveSizeBytes
 	}
-	chunkSize := s.settings.UploadChunkSizeBytes()
-	if chunkSize > sess.ArchiveSizeBytes {
-		chunkSize = sess.ArchiveSizeBytes
-	}
+	chunkSize := min(s.settings.UploadChunkSizeBytes(), sess.ArchiveSizeBytes)
 	if chunkSize < 1 {
 		chunkSize = 1
 	}
@@ -719,10 +734,7 @@ func (s *Service) buildSessionResponse(sess *UploadSession) *SessionResponse {
 }
 
 func (s *Service) buildCommittedDuplicateResponse(archiveSizeBytes int64, storedAs string) *SessionResponse {
-	chunkSize := s.settings.UploadChunkSizeBytes()
-	if chunkSize > archiveSizeBytes {
-		chunkSize = archiveSizeBytes
-	}
+	chunkSize := min(s.settings.UploadChunkSizeBytes(), archiveSizeBytes)
 	if chunkSize < 1 {
 		chunkSize = 1
 	}
@@ -953,7 +965,7 @@ func storageFilesToIndexFiles(files []storage.StorageFile) []store.StorageFile {
 // HTTPError wraps an HTTP error with status code.
 type HTTPError struct {
 	Code    int
-	Message interface{}
+	Message any
 }
 
 func (e *HTTPError) Error() string {
@@ -971,7 +983,7 @@ func httpError(code int, msg string) *HTTPError {
 	return &HTTPError{Code: code, Message: msg}
 }
 
-func httpErrorJSON(code int, body interface{}) *HTTPError {
+func httpErrorJSON(code int, body any) *HTTPError {
 	return &HTTPError{Code: code, Message: body}
 }
 
@@ -986,7 +998,7 @@ func SourceAddress(r *http.Request) *string {
 	}
 	if fwd := r.Header.Get("Forwarded"); fwd != "" {
 		first := strings.SplitN(fwd, ",", 2)[0]
-		for _, part := range strings.Split(first, ";") {
+		for part := range strings.SplitSeq(first, ";") {
 			p := strings.TrimSpace(part)
 			if !strings.HasPrefix(strings.ToLower(p), "for=") {
 				continue

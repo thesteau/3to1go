@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -30,7 +30,7 @@ func (j *JobDefinition) StateKey() string {
 }
 
 // DiscoverJobs walks scanRoot up to maxDepth levels looking for .upload_dir markers.
-func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...interface{})) ([]*JobDefinition, error) {
+func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...any)) ([]*JobDefinition, error) {
 	type entry struct {
 		dir   string
 		depth int
@@ -79,8 +79,8 @@ func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...interface
 				children = append(children, filepath.Join(cur.dir, e.Name()))
 			}
 		}
-		sort.Slice(children, func(i, j int) bool {
-			return strings.ToLower(filepath.Base(children[i])) < strings.ToLower(filepath.Base(children[j]))
+		slices.SortFunc(children, func(a, b string) int {
+			return strings.Compare(strings.ToLower(filepath.Base(a)), strings.ToLower(filepath.Base(b)))
 		})
 		for _, child := range children {
 			queue = append(queue, entry{child, cur.depth + 1})
@@ -90,7 +90,7 @@ func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...interface
 }
 
 // LoadJobDefinition reads a .upload_dir marker and returns the job, or nil on error.
-func LoadJobDefinition(dir, markerPath string, warnf func(string, ...interface{})) (*JobDefinition, error) {
+func LoadJobDefinition(dir, markerPath string, warnf func(string, ...any)) (*JobDefinition, error) {
 	payload, err := ReadUploadDirPayload(markerPath)
 	if err != nil {
 		if warnf != nil {
@@ -109,27 +109,27 @@ func LoadJobDefinition(dir, markerPath string, warnf func(string, ...interface{}
 }
 
 // ReadUploadDirPayload reads and parses the YAML content of a .upload_dir file.
-func ReadUploadDirPayload(markerPath string) (map[string]interface{}, error) {
+func ReadUploadDirPayload(markerPath string) (map[string]any, error) {
 	raw, err := os.ReadFile(markerPath)
 	if err != nil {
 		return nil, err
 	}
 	content := strings.TrimSpace(string(raw))
 	if content == "" {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
-	var payload map[string]interface{}
+	var payload map[string]any
 	if err := yaml.Unmarshal(raw, &payload); err != nil {
 		return nil, fmt.Errorf("invalid yaml: %w", err)
 	}
 	if payload == nil {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
 	return payload, nil
 }
 
 // BuildJobDefinition constructs a JobDefinition from a directory path and YAML payload.
-func BuildJobDefinition(dir string, payload map[string]interface{}) (*JobDefinition, error) {
+func BuildJobDefinition(dir string, payload map[string]any) (*JobDefinition, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -159,10 +159,10 @@ func BuildJobDefinition(dir string, payload map[string]interface{}) (*JobDefinit
 }
 
 // JobDefinitionToPayload converts a JobDefinition to a serializable map.
-func JobDefinitionToPayload(job *JobDefinition) map[string]interface{} {
+func JobDefinitionToPayload(job *JobDefinition) map[string]any {
 	exclude := make([]string, len(job.ExcludePatterns))
 	copy(exclude, job.ExcludePatterns)
-	return map[string]interface{}{
+	return map[string]any{
 		"job_name":        job.JobName,
 		"exclude":         exclude,
 		"include_hidden":  job.IncludeHidden,
@@ -171,7 +171,7 @@ func JobDefinitionToPayload(job *JobDefinition) map[string]interface{} {
 }
 
 // WriteUploadDir serializes a payload and writes it to directory/.upload_dir.
-func WriteUploadDir(dir string, payload map[string]interface{}) error {
+func WriteUploadDir(dir string, payload map[string]any) error {
 	job, err := BuildJobDefinition(dir, payload)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func DeleteUploadDir(dir string) error {
 	return nil
 }
 
-func stringVal(v interface{}, def string) string {
+func stringVal(v any, def string) string {
 	if v == nil {
 		return def
 	}
@@ -204,7 +204,7 @@ func stringVal(v interface{}, def string) string {
 	return s
 }
 
-func boolVal(v interface{}, def bool) bool {
+func boolVal(v any, def bool) bool {
 	if v == nil {
 		return def
 	}
@@ -214,11 +214,11 @@ func boolVal(v interface{}, def bool) bool {
 	return def
 }
 
-func parseStringList(v interface{}) ([]string, error) {
+func parseStringList(v any) ([]string, error) {
 	if v == nil {
 		return nil, nil
 	}
-	list, ok := v.([]interface{})
+	list, ok := v.([]any)
 	if !ok {
 		return nil, fmt.Errorf("not a list")
 	}

@@ -2,14 +2,16 @@ package backup
 
 import (
 	"archive/tar"
+	"cmp"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -40,8 +42,8 @@ func CreateArchive(archivePath string, files []*DiscoveredFile) error {
 
 	sorted := make([]*DiscoveredFile, len(files))
 	copy(sorted, files)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ArchivePath < sorted[j].ArchivePath
+	slices.SortFunc(sorted, func(a, b *DiscoveredFile) int {
+		return cmp.Compare(a.ArchivePath, b.ArchivePath)
 	})
 
 	f, err := os.Create(archivePath)
@@ -100,7 +102,7 @@ func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
 }
 
 // ListArchiveEntries streams the zstd+tar archive and returns a summary of its contents.
-func ListArchiveEntries(archivePath, targetRoot string) (map[string]interface{}, error) {
+func ListArchiveEntries(archivePath, targetRoot string) (map[string]any, error) {
 	absTarget, err := filepath.Abs(targetRoot)
 	if err != nil {
 		return nil, err
@@ -162,16 +164,16 @@ func ListArchiveEntries(archivePath, targetRoot string) (map[string]interface{},
 		})
 	}
 
-	result := make([]interface{}, len(entries))
+	result := make([]any, len(entries))
 	for i, e := range entries {
-		result[i] = map[string]interface{}{
+		result[i] = map[string]any{
 			"path":   e.Path,
 			"size":   e.Size,
 			"mtime":  e.Mtime,
 			"action": e.Action,
 		}
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"entries":       result,
 		"total_files":   len(entries),
 		"replace_count": replaceCount,
@@ -255,12 +257,11 @@ func writeAtomic(tmp, dest string, mtime time.Time, r io.Reader) error {
 
 func archiveDestination(targetRoot, memberName string) (string, error) {
 	cleaned := filepath.Clean(memberName)
-	if strings.HasPrefix(cleaned, "..") {
+	if filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, "..") {
 		return "", fmt.Errorf("invalid archive entry: %s", memberName)
 	}
-	dest := filepath.Join(targetRoot, cleaned)
-	rel, err := filepath.Rel(targetRoot, dest)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	dest, err := securejoin.SecureJoin(targetRoot, cleaned)
+	if err != nil {
 		return "", fmt.Errorf("invalid archive entry: %s", memberName)
 	}
 	return dest, nil

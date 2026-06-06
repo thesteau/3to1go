@@ -14,7 +14,10 @@ import (
 	"github.com/3to1go/central/internal/api"
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/services/certificates"
+	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/services/locks"
+	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -71,7 +74,7 @@ func run(logger *slog.Logger) error {
 	if err := uploadSessionStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("upload session schema: %w", err)
 	}
-	if err := userStore.EnsureDefaultAdmin(ctx); err != nil {
+	if err := userStore.EnsureDefaultAdmin(ctx, initialAdminPassword()); err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
 	}
 
@@ -102,19 +105,19 @@ func run(logger *slog.Logger) error {
 	}
 
 	// Services
-	lockMgr := services.NewNamespaceLockManager()
-	hooks := services.NewHookManager(config.HookScriptsDir(), logger)
-	certs := services.NewCertManager(config.TrustedCertificatesDir())
-	ntfy := services.NewNtfyPublisher(logger)
+	lockMgr := locks.NewNamespaceLockManager()
+	hookMgr := hooks.NewHookManager(config.HookScriptsDir(), logger)
+	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
+	ntfyPub := ntfy.NewNtfyPublisher(logger)
 
-	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hooks, ntfy, uploadSessionStore)
+	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hookMgr, ntfyPub, uploadSessionStore)
 	if err != nil {
 		return fmt.Errorf("initialize ingest service: %w", err)
 	}
 
 	app := api.NewApp(
 		settings, userStore, credStore, settingsStore, snapIndex,
-		backend, ingestSvc, hooks, certs, ntfy, logger,
+		backend, ingestSvc, hookMgr, certMgr, ntfyPub, logger,
 	)
 	app.RestartCleanupLoop(settings.UploadCleanupIntervalS)
 	app.StartCredentialCleanupLoop()
@@ -163,4 +166,11 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func initialAdminPassword() string {
+	if value := os.Getenv("INITIAL_ADMIN_PASSWORD"); value != "" {
+		return value
+	}
+	return store.DefaultAdminPassword
 }

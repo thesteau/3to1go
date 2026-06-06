@@ -1,7 +1,6 @@
 package api
 
 import (
-	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -55,7 +54,7 @@ func (l *rateLimiter) allow(key string, spec rateSpec) (bool, int) {
 		b = rateBucket{tokens: spec.burst, last: now}
 	}
 	elapsed := now.Sub(b.last).Seconds()
-	b.tokens = math.Min(spec.burst, b.tokens+elapsed*spec.perSecond)
+	b.tokens = min(spec.burst, b.tokens+elapsed*spec.perSecond)
 	b.last = now
 
 	if b.tokens < 1 {

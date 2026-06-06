@@ -239,7 +239,7 @@ func TestPublicUser(t *testing.T) {
 }
 
 func TestBoolPtr(t *testing.T) {
-	b := boolPtr(true)
+	b := new(true)
 	if b == nil || !*b {
 		t.Error("boolPtr(true) should return non-nil pointer to true")
 	}
@@ -765,7 +765,7 @@ func TestUserStore_EnsureDefaultAdmin_AlreadyExists(t *testing.T) {
 	s := newUserStore(&mockPool{queryFn: func(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
 		return rows, nil
 	}})
-	if err := s.EnsureDefaultAdmin(context.Background()); err != nil {
+	if err := s.EnsureDefaultAdmin(context.Background(), DefaultAdminPassword); err != nil {
 		t.Fatalf("EnsureDefaultAdmin: %v", err)
 	}
 }

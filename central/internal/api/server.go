@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/ed25519"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -9,11 +11,82 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services"
+	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/central/internal/services/certificates"
+	"github.com/3to1go/central/internal/services/hooks"
+	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 	"github.com/3to1go/central/static"
+	"github.com/go-chi/chi/v5"
 )
+
+type userStorer interface {
+	UserForSession(ctx context.Context, token string) (*store.User, error)
+	Authenticate(ctx context.Context, username, password string) (*store.User, error)
+	CreateSession(ctx context.Context, userID int) (string, error)
+	DeleteSession(ctx context.Context, token string) error
+	DeleteSessionsForUser(ctx context.Context, userID int) error
+	ListUsers(ctx context.Context) ([]*store.User, error)
+	CreateUser(ctx context.Context, username, password string, isAdmin bool) (*store.User, error)
+	UpdateUser(ctx context.Context, userID int, username, password *string, isAdmin, mustChangePassword *bool) (*store.User, error)
+	DeleteUser(ctx context.Context, userID int) error
+	ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) (*store.User, error)
+}
+
+type credStorer interface {
+	Verify(ctx context.Context, token string, pub ed25519.PublicKey) (*store.CredentialRecord, error)
+	Mint(ctx context.Context, priv ed25519.PrivateKey, ttlDays int, scopes ...signing.CredentialScope) (string, error)
+	Revoke(ctx context.Context, tokenHash string) (int64, error)
+	CleanupExpired(ctx context.Context) (int64, error)
+}
+
+type settingsStorer interface {
+	Save(ctx context.Context, p *config.SettingsPayload) error
+}
+
+type snapIndexer interface {
+	GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*store.EdgeRegistration, error)
+	DeleteEdgeRegistration(ctx context.Context, edgeID, instID string) error
+	HasNamespaceEntries(ctx context.Context, edgeID, instID string) (bool, error)
+	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
+	ListEdgeRegistrations(ctx context.Context, edgeIDFilter *string) ([]store.EdgeRegistration, error)
+	ListNamespaces(ctx context.Context) ([]store.NamespaceEntry, error)
+}
+
+type ingestSvc interface {
+	StartUpload(ctx context.Context, req ingest.UploadInitRequest, sourceAddr, credHash *string) (*ingest.SessionResponse, error)
+	AppendChunk(ctx context.Context, uploadID string, offset int64, body io.Reader) (*ingest.ChunkResponse, error)
+	FinalizeUpload(ctx context.Context, uploadID string) (*ingest.FinalizeResponse, error)
+	ReconcileNamespace(ctx context.Context, namespace string)
+	CleanupLoop(ctx context.Context, intervalSeconds int)
+	MigrateLegacyUploadSessions(ctx context.Context) (int, error)
+	UpdateSettings(settings *config.Settings)
+}
+
+type storageBackend interface {
+	Healthcheck() bool
+	DiskInfo() (total, used, free int64)
+	List(namespace string) ([]storage.StorageFile, error)
+}
+
+type certManager interface {
+	Snapshot() map[string]any
+	SaveUploadedFile(filename string, content []byte) (certificates.CertFileInfo, error)
+	DeleteFile(filename string) error
+}
+
+type hookManager interface {
+	Snapshot(preCommand, postCommand string) map[string]any
+	SaveUploadedFile(filename string, content []byte) (hooks.HookFileInfo, error)
+	ReadTextFile(filename string) (string, string, error)
+	DeleteFile(filename string) error
+}
+
+type ntfyPublisher interface {
+	Snapshot(s *config.Settings) map[string]any
+	PublishTest(cfg map[string]any) error
+}
 
 // App holds all server state.
 type App struct {
@@ -23,11 +96,11 @@ type App struct {
 	credStore     credStorer
 	settingsStore settingsStorer
 	snapIndex     snapIndexer
-	backend       *storage.LocalBackend
+	backend       storageBackend
 	ingest        ingestSvc
-	hooks         *services.HookManager
-	certs         *services.CertManager
-	ntfy          *services.NtfyPublisher
+	hooks         hookManager
+	certs         certManager
+	ntfy          ntfyPublisher
 	logger        *slog.Logger
 
 	cleanupCancel     context.CancelFunc
@@ -40,11 +113,11 @@ func NewApp(
 	credStore credStorer,
 	settingsStore settingsStorer,
 	snapIndex snapIndexer,
-	backend *storage.LocalBackend,
+	backend storageBackend,
 	ingestSvc ingestSvc,
-	hooks *services.HookManager,
-	certs *services.CertManager,
-	ntfy *services.NtfyPublisher,
+	hooks hookManager,
+	certs certManager,
+	ntfy ntfyPublisher,
 	logger *slog.Logger,
 ) *App {
 	return &App{
@@ -115,75 +188,84 @@ func (a *App) Shutdown() {
 	}
 }
 
-// Handler builds and returns the HTTP ServeMux.
+// Handler builds and returns the HTTP router.
 func (a *App) Handler() http.Handler {
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
 	// Static files (app.js, app.css)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
 
 	// SPA root
-	mux.HandleFunc("GET /", a.handleIndex)
-	mux.HandleFunc("GET /health", a.handleHealth)
-	mux.HandleFunc("GET /health/ready", a.handleHealthReady)
+	r.Get("/", a.handleIndex)
+	r.Get("/health", a.handleHealth)
+	r.Get("/health/ready", a.handleHealthReady)
 
 	// Session (public)
-	mux.HandleFunc("GET /api/session/me", a.handleSessionMe)
-	mux.HandleFunc("POST /api/session/login", a.handleLogin)
-	mux.HandleFunc("POST /api/session/logout", a.handleLogout)
-	mux.HandleFunc("POST /api/session/change-password", a.handleChangePassword)
+	r.Get("/api/session/me", a.handleSessionMe)
+	r.Post("/api/session/login", a.handleLogin)
+	r.Post("/api/session/logout", a.handleLogout)
+	r.Post("/api/session/change-password", a.handleChangePassword)
 
 	// Users (auth required)
-	mux.HandleFunc("GET /api/users", a.handleListUsers)
-	mux.HandleFunc("POST /api/users", a.handleCreateUser)
-	mux.HandleFunc("PUT /api/users/{user_id}", a.handleUpdateUser)
-	mux.HandleFunc("DELETE /api/users/{user_id}", a.handleDeleteUser)
-	mux.HandleFunc("POST /api/migrations/upload-sessions", a.handleMigrateUploadSessions)
+	r.Get("/api/users", a.handleListUsers)
+	r.Post("/api/users", a.handleCreateUser)
+	r.Put("/api/users/{user_id}", withPathValues(a.handleUpdateUser, "user_id"))
+	r.Delete("/api/users/{user_id}", withPathValues(a.handleDeleteUser, "user_id"))
+	r.Post("/api/migrations/upload-sessions", a.handleMigrateUploadSessions)
 
 	// Overview + settings
-	mux.HandleFunc("GET /api/overview", a.handleOverview)
-	mux.HandleFunc("POST /api/settings", a.handleSaveSettings)
+	r.Get("/api/overview", a.handleOverview)
+	r.Post("/api/settings", a.handleSaveSettings)
 
 	// Instances
-	mux.HandleFunc("DELETE /api/instances/{edge_id}/{edge_instance_id}", a.handleDeleteInstance)
+	r.Delete("/api/instances/{edge_id}/{edge_instance_id}", withPathValues(a.handleDeleteInstance, "edge_id", "edge_instance_id"))
 
 	// Credentials
-	mux.HandleFunc("POST /api/credentials/mint", a.handleMintCredential)
-	mux.HandleFunc("DELETE /api/credentials/instances/{edge_id}/{edge_instance_id}", a.handleRevokeCredential)
+	r.Post("/api/credentials/mint", a.handleMintCredential)
+	r.Delete("/api/credentials/instances/{edge_id}/{edge_instance_id}", withPathValues(a.handleRevokeCredential, "edge_id", "edge_instance_id"))
 
 	// Certificates
-	mux.HandleFunc("GET /api/certificates", a.handleGetCertificates)
-	mux.HandleFunc("POST /api/certificates/files", a.handleUploadCertificate)
-	mux.HandleFunc("DELETE /api/certificates/files/{filename}", a.handleDeleteCertificate)
+	r.Get("/api/certificates", a.handleGetCertificates)
+	r.Post("/api/certificates/files", a.handleUploadCertificate)
+	r.Delete("/api/certificates/files/{filename}", withPathValues(a.handleDeleteCertificate, "filename"))
 
 	// Ntfy
-	mux.HandleFunc("GET /api/ntfy", a.handleGetNtfy)
-	mux.HandleFunc("POST /api/ntfy", a.handleSaveNtfy)
-	mux.HandleFunc("POST /api/ntfy/test", a.handleTestNtfy)
+	r.Get("/api/ntfy", a.handleGetNtfy)
+	r.Post("/api/ntfy", a.handleSaveNtfy)
+	r.Post("/api/ntfy/test", a.handleTestNtfy)
 
 	// Hooks
-	mux.HandleFunc("GET /api/hooks", a.handleGetHooks)
-	mux.HandleFunc("POST /api/hooks", a.handleSaveHooks)
-	mux.HandleFunc("POST /api/hooks/files", a.handleUploadHookFile)
-	mux.HandleFunc("GET /api/hooks/files/{filename}", a.handleViewHookFile)
-	mux.HandleFunc("DELETE /api/hooks/files/{filename}", a.handleDeleteHookFile)
+	r.Get("/api/hooks", a.handleGetHooks)
+	r.Post("/api/hooks", a.handleSaveHooks)
+	r.Post("/api/hooks/files", a.handleUploadHookFile)
+	r.Get("/api/hooks/files/{filename}", withPathValues(a.handleViewHookFile, "filename"))
+	r.Delete("/api/hooks/files/{filename}", withPathValues(a.handleDeleteHookFile, "filename"))
 
 	// Snapshots (auth required for UI downloads)
-	mux.HandleFunc("GET /api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", a.handleDownloadSnapshotForInstance)
-	mux.HandleFunc("DELETE /api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", a.handleDeleteSnapshotForInstance)
-	mux.HandleFunc("GET /api/snapshots/{edge_id}/{job_name}/{filename}", a.handleDownloadSnapshot)
-	mux.HandleFunc("DELETE /api/snapshots/{edge_id}/{job_name}/{filename}", a.handleDeleteSnapshot)
+	r.Get("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", withPathValues(a.handleDownloadSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
+	r.Delete("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", withPathValues(a.handleDeleteSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
+	r.Get("/api/snapshots/{edge_id}/{job_name}/{filename}", withPathValues(a.handleDownloadSnapshot, "edge_id", "job_name", "filename"))
+	r.Delete("/api/snapshots/{edge_id}/{job_name}/{filename}", withPathValues(a.handleDeleteSnapshot, "edge_id", "job_name", "filename"))
 
 	// Backup uploads (Bearer JWT auth, no session)
-	mux.HandleFunc("POST /backup/uploads/initiate", a.handleInitiateUpload)
-	mux.HandleFunc("PUT /backup/uploads/{upload_id}/chunk", a.handleAppendChunk)
-	mux.HandleFunc("POST /backup/uploads/{upload_id}/finalize", a.handleFinalizeUpload)
+	r.Post("/backup/uploads/initiate", a.handleInitiateUpload)
+	r.Put("/backup/uploads/{upload_id}/chunk", withPathValues(a.handleAppendChunk, "upload_id"))
+	r.Post("/backup/uploads/{upload_id}/finalize", withPathValues(a.handleFinalizeUpload, "upload_id"))
 
 	// Recovery (Bearer JWT auth)
-	mux.HandleFunc("GET /backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", a.handleDownloadLatest)
-	mux.HandleFunc("GET /backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", a.handleDownloadByFingerprint)
+	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", withPathValues(a.handleDownloadLatest, "edge_id", "edge_instance_id", "job_name"))
+	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", withPathValues(a.handleDownloadByFingerprint, "edge_id", "edge_instance_id", "job_name"))
 
-	return newRateLimiter().middleware(a.sessionMiddleware(mux))
+	return newRateLimiter().middleware(a.sessionMiddleware(r))
+}
+
+func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, name := range names {
+			r.SetPathValue(name, chi.URLParam(r, name))
+		}
+		next(w, r)
+	}
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
