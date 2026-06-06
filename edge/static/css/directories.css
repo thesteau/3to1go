@@ -1,0 +1,128 @@
+.directory-tree {
+  display: grid;
+  gap: 12px;
+}
+
+.dir-branch,
+.dir-leaf {
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.dir-branch {
+  overflow: clip;
+}
+
+.dir-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.dir-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dir-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+}
+
+.dir-main {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+
+.dir-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dir-name {
+  font-weight: 700;
+}
+
+.dir-caret {
+  width: 0.8rem;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.dir-caret::before {
+  content: "▸";
+}
+
+.dir-caret-placeholder::before {
+  content: "•";
+  opacity: 0;
+}
+
+.dir-branch[open] > .dir-summary .dir-caret::before {
+  content: "▾";
+}
+
+.dir-count {
+  display: inline-block;
+  padding: 0.22rem 0.56rem;
+  border-radius: 999px;
+  background: var(--help-bg);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dir-state {
+  font-size: 0.88rem;
+}
+
+.dir-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dir-actions button {
+  white-space: nowrap;
+}
+
+.dir-action-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: right;
+}
+
+.dir-children {
+  display: grid !important;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms ease;
+}
+
+.dir-branch[open] > .dir-children {
+  grid-template-rows: 1fr;
+}
+
+.dir-children-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px 28px;
+  border-top: 1px solid var(--line-soft);
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.08), rgba(15, 118, 110, 0.02) 18px, transparent 18px);
+}
+
+.dir-children-inner > *:first-child {
+  margin-top: 12px;
+}

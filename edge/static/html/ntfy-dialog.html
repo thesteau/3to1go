@@ -1,0 +1,34 @@
+<dialog id="ntfy-dialog" class="modal" aria-labelledby="ntfy-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="ntfy-dialog-title">Configure ntfy</h2>
+        <p class="hint">Publishing is optional and best-effort. Failed ntfy posts never block Edge uploads.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Close</button>
+    </div>
+
+    <div class="split-row">
+      <div>
+        <label for="ntfy_url">ntfy Server URL</label>
+        <input id="ntfy_url" type="url" placeholder="https://ntfy.example.com">
+      </div>
+      <div>
+        <label for="ntfy_topic">Topic</label>
+        <input id="ntfy_topic" type="text" placeholder="uploads">
+      </div>
+    </div>
+
+    <label for="ntfy_message_template">Message Template</label>
+    <textarea id="ntfy_message_template"></textarea>
+    <p class="hint">Available placeholders: <code>{{ "{{" }} edge_id {{ "}}" }}</code>, <code>{{ "{{" }} edge_instance_id {{ "}}" }}</code>, <code>{{ "{{" }} job_name {{ "}}" }}</code>, <code>{{ "{{" }} stored_as {{ "}}" }}</code>.</p>
+
+    <div class="toolbar">
+      <button type="button" onclick="saveNtfyConfig()">Save</button>
+      <button type="button" class="secondary" onclick="testNtfyConfig()">Test</button>
+      <button type="button" class="secondary" onclick="resetNtfyDefaults()">Defaults</button>
+      <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
+      <span class="hint status-line" id="ntfy-status"></span>
+    </div>
+  </div>
+</dialog>

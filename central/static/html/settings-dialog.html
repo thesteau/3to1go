@@ -1,0 +1,76 @@
+<dialog id="settings-dialog" class="modal" aria-labelledby="settings-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="settings-dialog-title">Edit Central Settings</h2>
+        <p class="hint">These values are saved locally by Central and persist across container restarts.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
+    </div>
+
+    <label class="checkbox" for="settings_theme_dark">
+      <input id="settings_theme_dark" type="checkbox">
+      <span>Dark Mode</span>
+    </label>
+
+    <div class="split-row">
+      <div>
+        <label for="settings_retention_keep_last">Keep Last Snapshots</label>
+        <input id="settings_retention_keep_last" type="number" min="1">
+      </div>
+      <div>
+        <label for="settings_log_level">Log Level</label>
+        <select id="settings_log_level">
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="split-row">
+      <div>
+        <label for="settings_max_upload_size_mb">Max Upload Size MB</label>
+        <input id="settings_max_upload_size_mb" type="number" min="1">
+      </div>
+      <div>
+        <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
+        <input id="settings_upload_chunk_size_mb" type="number" min="1">
+      </div>
+    </div>
+
+    <div class="split-row">
+      <div>
+        <label for="settings_upload_session_ttl_hours">Upload Session TTL Hours</label>
+        <input id="settings_upload_session_ttl_hours" type="number" min="1">
+      </div>
+      <div>
+        <label for="settings_upload_cleanup_interval_seconds">Cleanup Interval Seconds</label>
+        <input id="settings_upload_cleanup_interval_seconds" type="number" min="10">
+      </div>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <div>
+          <h3>Trusted Certificates</h3>
+          <p class="hint">Upload internal CA certificates for HTTPS endpoints such as ntfy.</p>
+        </div>
+        <span class="hint">10 files max. Supports .crt PEM files. Directory: <code id="certificate-dir">loading...</code></span>
+      </div>
+      <div class="hook-upload-row">
+        <input id="certificate_file_input" type="file" accept=".crt">
+        <button type="button" class="secondary" onclick="uploadCertificateFile()">Upload</button>
+      </div>
+      <div id="certificate-files" class="hook-files"></div>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" onclick="saveSettings()">Save Central Settings</button>
+      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
+      <span class="hint status-line" id="settings-status"></span>
+      <span class="hint status-line" id="certificates-status"></span>
+    </div>
+  </div>
+</dialog>

@@ -1,0 +1,69 @@
+.recover-preview {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.recover-preview[hidden] {
+  display: none;
+}
+
+.recover-preview-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.recover-preview-summary span {
+  padding: 0.18rem 0.52rem;
+  border-radius: 999px;
+  background: var(--help-bg);
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.recover-preview-list {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.recover-preview-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: var(--field-bg);
+}
+
+.recover-preview-action {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.recover-preview-action.replace {
+  color: var(--warn-ink);
+}
+
+.recover-preview-action.add {
+  color: #2f66c9;
+}
+
+.recover-preview-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+.recover-preview-more {
+  padding: 5px 8px;
+}

@@ -1,0 +1,49 @@
+<dialog id="hooks-dialog" class="modal" aria-labelledby="hooks-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="hooks-dialog-title">Custom Scripts</h2>
+        <p class="hint">You may be able to upload .sh and .txt files to be executed. Only the first 3 files in the volume are shown here.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('hooks-dialog')">Close</button>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Pre Command</h3>
+        <div class="hook-inline-actions">
+          <button type="button" class="secondary" onclick="clearHookCommand('pre')">Clear</button>
+          <button type="button" class="secondary" onclick="saveHookCommands()">Save</button>
+        </div>
+      </div>
+      <textarea id="hook_pre_command" placeholder="Optional command or script filename"></textarea>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Post Command</h3>
+        <div class="hook-inline-actions">
+          <button type="button" class="secondary" onclick="clearHookCommand('post')">Clear</button>
+          <button type="button" class="secondary" onclick="saveHookCommands()">Save</button>
+        </div>
+      </div>
+      <textarea id="hook_post_command" placeholder="Optional command or script filename"></textarea>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Uploaded Items</h3>
+        <span class="hint">3 files max. Supports .sh scripts and .txt helper files. Directory: <code id="hook-script-dir">loading...</code></span>
+      </div>
+      <div class="hook-upload-row">
+        <input id="hook_file_input" type="file" accept=".sh,.txt">
+        <button type="button" class="secondary" onclick="uploadHookFile()">Upload</button>
+      </div>
+      <div id="hook-files" class="hook-files"></div>
+    </div>
+
+    <div class="toolbar">
+      <span class="hint status-line" id="hooks-status"></span>
+    </div>
+  </div>
+</dialog>

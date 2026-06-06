@@ -1,0 +1,45 @@
+@media (max-width: 640px) {
+  .page-shell {
+    padding: 14px;
+  }
+
+  .split-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dir-row,
+  .modal-head {
+    flex-direction: column;
+  }
+
+  .hook-file-row,
+  .hook-section-head {
+    align-items: flex-start;
+  }
+
+  .dir-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .job-card-body {
+    flex-direction: column;
+  }
+
+  .job-card-actions {
+    justify-content: flex-start;
+  }
+
+  .recover-preview-row {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .modal-card {
+    padding: 18px;
+  }
+}

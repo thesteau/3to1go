@@ -1,0 +1,25 @@
+<dialog id="recover-dialog" class="modal" aria-labelledby="recover-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="recover-dialog-title">Restore from Central</h2>
+        <p class="hint">Files in the backup will overwrite local copies. Files not in the backup stay untouched.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Close</button>
+    </div>
+
+    <p>Job: <strong id="recover-dialog-job-name"></strong></p>
+
+    <label for="recover-fingerprint">Snapshot fingerprint</label>
+    <input id="recover-fingerprint" placeholder="Leave empty to restore the latest snapshot">
+    <p class="hint">Enter a content fingerprint ID to restore a specific snapshot. Each job only allows restoring its own snapshots — you cannot mix jobs.</p>
+
+    <div id="recover-preview" class="recover-preview" hidden></div>
+
+    <div class="toolbar">
+      <button id="recover-confirm-btn" type="button" onclick="confirmRecover()">Preview Restore</button>
+      <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Cancel</button>
+      <span class="hint status-line" id="recover-status"></span>
+    </div>
+  </div>
+</dialog>

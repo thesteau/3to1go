@@ -1,0 +1,148 @@
+<dialog id="settings-dialog" class="modal" aria-labelledby="settings-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="settings-dialog-title">Edit Edge Settings</h2>
+        <p class="hint">These settings are saved locally by Edge, so users do not need to manage an environment file.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
+    </div>
+
+    <label for="settings_edge_id">Edge ID</label>
+    <input id="settings_edge_id" placeholder="edge-01">
+    <p class="hint">Use the same Edge ID if you want Central to group multiple installations together. Central still keeps snapshots and registration metadata separated per instance.</p>
+
+    <label for="settings_scan_root">Scan Root</label>
+    <input id="settings_scan_root" placeholder="/home or C:/Users">
+
+    <label for="settings_central_url">Central URL</label>
+    <input id="settings_central_url" placeholder="http://127.0.0.1:6555">
+
+    <label for="settings_advertised_url">Advertised Edge URL</label>
+    <input id="settings_advertised_url" placeholder="https://edge.example.com or http://192.168.1.20:6556">
+    <p class="hint">Optional. Central displays this URL as a link to this Edge instance.</p>
+
+    <label for="settings_edge_credential">Edge Credential</label>
+    <input id="settings_edge_credential" type="password" placeholder="JWT credential minted from Central">
+
+    <label for="settings_cron_schedule">Cron Schedule</label>
+    <input id="settings_cron_schedule" placeholder="0 2 * * 0">
+    <p class="hint" id="settings-cron-help">Fields are minute, hour, day of month, month, and day of week.</p>
+
+    <div class="split-row">
+      <div>
+        <label for="settings_max_depth">Max Depth</label>
+        <input id="settings_max_depth" type="number" min="0">
+      </div>
+      <div>
+        <label for="settings_log_level">Log Level</label>
+        <select id="settings_log_level">
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="checkbox" for="settings_theme_dark">
+      <input id="settings_theme_dark" type="checkbox">
+      <span>Dark Mode</span>
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" id="settings_keep_local_pending">
+      <span>Keep failed-upload archives for retry</span>
+    </label>
+
+    <details class="settings-advanced">
+      <summary>Advanced Settings</summary>
+
+      <label for="settings_state_dir">State Directory</label>
+      <input id="settings_state_dir">
+
+      <label for="settings_spool_dir">Spool Directory</label>
+      <input id="settings_spool_dir">
+
+      <div class="split-row">
+        <div>
+          <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
+          <input id="settings_upload_chunk_size_mb" type="number" min="1">
+        </div>
+        <div>
+          <label for="settings_min_upload_chunk_size_mb">Min Upload Chunk MB</label>
+          <input id="settings_min_upload_chunk_size_mb" type="number" min="1">
+        </div>
+      </div>
+
+      <div class="split-row">
+        <div>
+          <label for="settings_max_upload_chunk_size_mb">Max Upload Chunk MB</label>
+          <input id="settings_max_upload_chunk_size_mb" type="number" min="1">
+        </div>
+        <div>
+          <label for="settings_upload_retry_max_attempts">Upload Retry Attempts</label>
+          <input id="settings_upload_retry_max_attempts" type="number" min="1">
+        </div>
+      </div>
+
+      <div class="split-row">
+        <div>
+          <label for="settings_upload_retry_base_delay_seconds">Retry Base Delay Seconds</label>
+          <input id="settings_upload_retry_base_delay_seconds" type="number" min="1">
+        </div>
+        <div>
+          <label for="settings_upload_retry_max_delay_seconds">Retry Max Delay Seconds</label>
+          <input id="settings_upload_retry_max_delay_seconds" type="number" min="1">
+        </div>
+      </div>
+
+      <div class="split-row">
+        <div>
+          <label for="settings_upload_connect_timeout_seconds">Connect Timeout Seconds</label>
+          <input id="settings_upload_connect_timeout_seconds" type="number" min="1">
+        </div>
+        <div>
+          <label for="settings_upload_read_timeout_padding_seconds">Read Timeout Padding Seconds</label>
+          <input id="settings_upload_read_timeout_padding_seconds" type="number" min="5">
+        </div>
+      </div>
+
+      <div class="split-row">
+        <div>
+          <label for="settings_upload_min_throughput_bytes_per_second">Min Throughput Bytes/Second</label>
+          <input id="settings_upload_min_throughput_bytes_per_second" type="number" min="1024">
+        </div>
+        <div>
+          <label for="settings_circuit_breaker_failure_threshold">Circuit Breaker Failure Threshold</label>
+          <input id="settings_circuit_breaker_failure_threshold" type="number" min="1">
+        </div>
+      </div>
+
+      <label for="settings_circuit_breaker_cooldown_seconds">Circuit Breaker Cooldown Seconds</label>
+      <input id="settings_circuit_breaker_cooldown_seconds" type="number" min="1">
+    </details>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <div>
+          <h3>Trusted Certificates</h3>
+          <p class="hint">Upload internal CA certificates for HTTPS endpoints such as Central or ntfy.</p>
+        </div>
+        <span class="hint">10 files max. Supports .crt PEM files. Directory: <code id="certificate-dir">loading...</code></span>
+      </div>
+      <div class="hook-upload-row">
+        <input id="certificate_file_input" type="file" accept=".crt">
+        <button type="button" class="secondary" onclick="uploadCertificateFile()">Upload</button>
+      </div>
+      <div id="certificate-files" class="hook-files"></div>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" onclick="saveSettings()">Save Edge Settings</button>
+      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
+      <span class="hint status-line" id="settings-status"></span>
+      <span class="hint status-line" id="certificates-status"></span>
+    </div>
+  </div>
+</dialog>
