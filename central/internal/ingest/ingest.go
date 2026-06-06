@@ -633,9 +633,7 @@ func (s *Service) runPostHook(hookCtx map[string]any, status, storedAs string, p
 	final["pruned"] = pruned
 	final["duplicate"] = duplicate
 	s.hooks.RunCommand(s.settings.HookPostCommand, "post", final)
-	if status == "ok" {
-		s.ntfy.PublishBestEffort(s.settings, final)
-	}
+	s.ntfy.PublishBestEffort(s.settings, final)
 }
 
 func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]any {

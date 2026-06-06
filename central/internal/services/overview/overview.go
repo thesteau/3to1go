@@ -13,9 +13,10 @@ type SnapshotIndexer interface {
 	ListNamespaces(ctx context.Context) ([]store.NamespaceEntry, error)
 }
 
-// StorageProbe is the health-check contract used by BuildOverview.
+// StorageProbe is the health-check and disk-info contract used by BuildOverview.
 type StorageProbe interface {
 	Healthcheck() bool
+	DiskInfo() (total, used, free int64)
 }
 
 // BuildOverview assembles the dashboard data.
@@ -110,10 +111,15 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe
 		}
 	}
 
+	diskTotal, diskUsed, diskFree := backend.DiskInfo()
+
 	return map[string]any{
 		"status":              statusString(backend),
 		"backup_dir":          s.BackupRoot,
 		"retention_keep_last": s.RetentionKeepLast,
+		"disk_total_bytes":    diskTotal,
+		"disk_used_bytes":     diskUsed,
+		"disk_free_bytes":     diskFree,
 		"settings":            config.SettingsToPayload(s),
 		"edges":               edgesOut,
 	}, nil

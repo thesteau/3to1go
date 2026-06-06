@@ -142,6 +142,17 @@ func isCrossDeviceError(err error) bool {
 	return ok && linkErr.Err == crossDeviceError
 }
 
+// DiskInfo returns total filesystem capacity, bytes used by the backup directory tree,
+// and free bytes on the filesystem — all relative to BackupRoot.
+func (b *LocalBackend) DiskInfo() (total, used, free int64) {
+	total, _, free, err := DiskUsage(b.BackupRoot)
+	if err != nil {
+		total, free = 0, 0
+	}
+	used = DirSize(b.BackupRoot)
+	return total, used, free
+}
+
 // DiskUsage returns (total, used, free) for the filesystem containing path.
 func DiskUsage(path string) (total, used, free int64, err error) {
 	return diskUsage(path)

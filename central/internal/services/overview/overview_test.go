@@ -41,6 +41,31 @@ func (m *mockSnapshotIndexer) ListNamespaces(_ context.Context) ([]store.Namespa
 	return m.namespaces, m.nsErr
 }
 
+func TestBuildOverview_DiskInfoIncluded(t *testing.T) {
+	backend := storage.NewLocalBackend(t.TempDir())
+	idx := &mockSnapshotIndexer{}
+	s := &config.Settings{BackupRoot: t.TempDir()}
+
+	result, err := BuildOverview(context.Background(), s, backend, idx)
+	if err != nil {
+		t.Fatalf("BuildOverview: %v", err)
+	}
+	for _, key := range []string{"disk_total_bytes", "disk_used_bytes", "disk_free_bytes"} {
+		if _, ok := result[key]; !ok {
+			t.Errorf("expected key %q in overview result", key)
+		}
+	}
+	// Free must be non-negative; total must be >= free
+	free, _ := result["disk_free_bytes"].(int64)
+	total, _ := result["disk_total_bytes"].(int64)
+	if free < 0 {
+		t.Errorf("disk_free_bytes = %d, must be >= 0", free)
+	}
+	if total < free {
+		t.Errorf("disk_total_bytes (%d) < disk_free_bytes (%d)", total, free)
+	}
+}
+
 func TestBuildOverview_Empty(t *testing.T) {
 	backend := storage.NewLocalBackend(t.TempDir())
 	idx := &mockSnapshotIndexer{}

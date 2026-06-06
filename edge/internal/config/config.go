@@ -163,7 +163,7 @@ type SettingsPayload struct {
 	LogLevel                          string `json:"log_level"`
 	Theme                             string `json:"theme"`
 	MaxDepth                          int    `json:"max_depth"`
-	KeepLocalPending                  bool   `json:"keep_local_pending"`
+	KeepLocalPending                  *bool  `json:"keep_local_pending"`
 	UploadChunkSizeMB                 int    `json:"upload_chunk_size_mb"`
 	MinUploadChunkSizeMB              int    `json:"min_upload_chunk_size_mb"`
 	MaxUploadChunkSizeMB              int    `json:"max_upload_chunk_size_mb"`
@@ -197,7 +197,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		LogLevel:                          s.LogLevel,
 		Theme:                             s.Theme,
 		MaxDepth:                          s.MaxDepth,
-		KeepLocalPending:                  s.KeepLocalPending,
+		KeepLocalPending:                  boolPtr(s.KeepLocalPending),
 		UploadChunkSizeMB:                 s.UploadChunkSizeMB,
 		MinUploadChunkSizeMB:              s.MinUploadChunkSizeMB,
 		MaxUploadChunkSizeMB:              s.MaxUploadChunkSizeMB,
@@ -265,7 +265,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		LogLevel:                          strings.ToUpper(coerceText(raw.LogLevel, "INFO")),
 		Theme:                             coerceTheme(raw.Theme),
 		MaxDepth:                          coerceInt(raw.MaxDepth, 10, 0),
-		KeepLocalPending:                  coerceBool(raw.KeepLocalPending, true),
+		KeepLocalPending:                  coerceBoolPtr(raw.KeepLocalPending, true),
 		UploadChunkSizeMB:                 coerceInt(raw.UploadChunkSizeMB, 8, 1),
 		MinUploadChunkSizeMB:              coerceInt(raw.MinUploadChunkSizeMB, 1, 1),
 		MaxUploadChunkSizeMB:              coerceInt(raw.MaxUploadChunkSizeMB, 16, 1),
@@ -312,7 +312,12 @@ func applyEnvOverrides(p *SettingsPayload) {
 		}
 	}
 	if v := os.Getenv("KEEP_LOCAL_PENDING"); v != "" {
-		p.KeepLocalPending = parseBoolEnv(v, p.KeepLocalPending)
+		var existing bool
+		if p.KeepLocalPending != nil {
+			existing = *p.KeepLocalPending
+		}
+		b := parseBoolEnv(v, existing)
+		p.KeepLocalPending = &b
 	}
 	if v := os.Getenv("UPLOAD_CHUNK_SIZE_MB"); v != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
@@ -420,9 +425,14 @@ func coerceTheme(value string) string {
 	return "dark"
 }
 
-func coerceBool(value bool, def bool) bool {
-	return value
+func coerceBoolPtr(value *bool, def bool) bool {
+	if value == nil {
+		return def
+	}
+	return *value
 }
+
+func boolPtr(b bool) *bool { return &b }
 
 func parseBoolEnv(s string, def bool) bool {
 	switch strings.ToLower(strings.TrimSpace(s)) {
