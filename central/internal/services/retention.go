@@ -1,7 +1,8 @@
 package services
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/3to1go/central/internal/storage"
 )
@@ -17,11 +18,11 @@ func PruneOldSnapshots(backend *storage.LocalBackend, namespace string, keepLast
 		return 0, nil
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].Mtime != files[j].Mtime {
-			return files[i].Mtime > files[j].Mtime
+	slices.SortFunc(files, func(a, b storage.StorageFile) int {
+		if a.Mtime != b.Mtime {
+			return cmp.Compare(b.Mtime, a.Mtime)
 		}
-		return files[i].Filename > files[j].Filename
+		return cmp.Compare(b.Filename, a.Filename)
 	})
 
 	toDelete := files[keepLast:]
