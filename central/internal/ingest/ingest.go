@@ -631,6 +631,7 @@ func (s *Service) hookContext(session *UploadSession, stagedPath string) map[str
 		"archive_sha256":     session.ArchiveSHA256,
 		"archive_size_bytes": session.ArchiveSizeBytes,
 		"source_address":     session.SourceAddress,
+		"advertised_url":     advertisedURLValue(session.AdvertisedURL),
 		"staged_path":        stagedPath,
 	}
 }
@@ -957,6 +958,13 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("http %d: %v", e.Code, e.Message)
+}
+
+func advertisedURLValue(u *string) string {
+	if u == nil || strings.TrimSpace(*u) == "" {
+		return "missing_advertised_url"
+	}
+	return *u
 }
 
 func httpError(code int, msg string) *HTTPError {

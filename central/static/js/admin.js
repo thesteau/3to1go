@@ -164,7 +164,7 @@ function collectNtfyPayload() {
 
 function resetNtfyDefaults() {
   const defaults = _centralNtfyConfig || {};
-  document.getElementById("ntfy_url").value = "";
+  document.getElementById("ntfy_url").value = "https://ntfy.sh";
   document.getElementById("ntfy_topic").value = "";
   document.getElementById("ntfy_match_edge_id").value = "";
   document.getElementById("ntfy_match_edge_instance_id").value = "";
