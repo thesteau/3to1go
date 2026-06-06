@@ -1,5 +1,12 @@
 # 3to1go
 
+<p align="center">
+  <img src="assets/3to1go.png" alt="Go gophers racing — 3, 2, 1, Go!" width="480"><br>
+  <sup>Go Gopher artwork <a href="#attr-1">[1]</a></sup>
+</p>
+
+The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage)<sup><a href="#attr-2">[2]</a></sup> (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown — 3, 2, 1, Go! — and the "Go" is the literal Go language [Go](https://go.dev/)<sup><a href="#attr-3">[3]</a></sup>.
+
 3to1go is a simple backup system with two parts:
 
 - `Edge` runs on the machine that has the files you care about.
@@ -20,6 +27,24 @@ If you want the shortest mental model:
 - **Instance-aware storage** - Central tracks both `edge_id` and `edge_instance_id`, letting related machines be grouped without mixing their snapshots or pruning each other.
 - **Persistent operational state** - Central keeps metadata, users, settings, Edge registrations, minted credentials, and revocations in PostgreSQL; Edge keeps its local settings in its own persisted database.
 - **Operator-friendly credentials** - Central mints Edge JWT credentials from the UI, Edge saves the pasted credential locally, and Central can revoke a token without deleting snapshots.
+
+## 3-2-1 In Practice
+
+3to1go covers the first two copies. The third is up to you — and it may already be covered depending on where you put Central.
+
+| Copy | What | Covered by |
+|------|------|------------|
+| 1 — live data | The original files on your machine | Edge |
+| 2 — second copy, different media | Encrypted snapshots on a separate machine | **3to1go: Edge → Central** |
+| 3 — offsite | A copy that survives a local disaster | Your choice (see below) |
+
+Central is always your own infrastructure, so it counts as "offsite" only if you run it at a genuinely separate location. Two common approaches:
+
+**Central is already offsite** — run Central on a VPS, a machine at a family member's place, or any host physically separate from your Edge machines. Edge → Central already satisfies copy 3.
+
+**Central is local** — run Central on a home NAS or local server for fast access, then sync Central's `BACKUP_ROOT` elsewhere to get the offsite copy. Because Central stores encrypted archives, you can push that data to any storage you like without exposing plaintext files.
+
+Because Edge encrypts archives before upload, Central never sees your plaintext files. That makes it practical to run Central on hardware you do not fully control, such as a shared home server or an inexpensive remote host.
 
 ## What It Feels Like To Use
 
@@ -155,19 +180,43 @@ Central groups snapshots by `EDGE_ID`, but newer builds keep each Edge installat
 
 ### Storage Scope
 
-Central stores backups on the local filesystem. It is not trying to be an S3, Dropbox, or Google Drive sync engine.
+`BACKUP_ROOT` is just a directory path. Central writes plain files there and does not care what is behind it, so you can point it at any mounted filesystem:
 
-If you want off-site copies, the expected pattern is:
+- **Local disk** — the default; fast and simple.
+- **Mounted NAS** — works out of the box. Central already handles cross-device moves when the backup root is on a different filesystem than the system temp directory.
+- **Removable hard drive** — same as above; mount it and point `BACKUP_ROOT` at it.
+- **Dropbox / Google Drive / OneDrive** — point `BACKUP_ROOT` at the local sync folder. The desktop client replicates files to the cloud automatically. Because Central stores encrypted archives, the cloud provider never has access to plaintext data.
+- **S3 / Backblaze B2 / other object storage** — mount the bucket as a local filesystem first (e.g. with `rclone mount`) and point `BACKUP_ROOT` at the mount point. Alternatively, keep `BACKUP_ROOT` on a local disk and run `rclone sync` or `aws s3 sync` on a schedule to push completed backups to the bucket.
 
-1. Let 3to1go write to Central's local `BACKUP_ROOT`.
-2. Use a separate sync or replication tool to copy that storage elsewhere.
+Central is not trying to be a sync engine itself — it just writes files. Any tool that can replicate a directory can handle the rest.
 
 ## Repo Layout
 
 - [`deploy-example/central/`](deploy-example/central/) - user-facing Central Compose setup with the published image
 - [`deploy-example/edge/`](deploy-example/edge/) - user-facing Edge Compose setup with the published image
-- [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go)
-- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Go)
+- [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go<sup><a href="#attr-3">[3]</a></sup>)
+- [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Go<sup><a href="#attr-3">[3]</a></sup>)
+
+## Author
+
+Created by [thesteau](https://github.com/thesteau).
+
+## Attribution
+
+<a id="attr-1"></a>**[1] Go Gopher artwork** — The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community.
+
+<a id="attr-2"></a>**[2] 3-2-1 backup rule** — The backup strategy referenced by this project's name is a widely documented industry practice. See the [Wikipedia article on backup storage](https://en.wikipedia.org/wiki/Backup#Storage) for background.
+
+<a id="attr-3"></a>**[3] Go programming language** — This project is written in [Go](https://go.dev/). Go and the Go logo are trademarks of Google LLC. This project is not affiliated with, endorsed by, or sponsored by Google or the Go team.
+
+## Disclaimers
+
+3to1go is provided as-is for personal and home lab use. It is not a substitute for a comprehensive disaster recovery plan. You are responsible for:
+
+- Verifying that your backups are complete and recoverable.
+- Securing the machine running Central and the network path between Edge and Central.
+- Keeping your `encryption.key` safe — losing it means losing access to encrypted snapshots permanently.
+- Complying with any applicable laws or regulations regarding the storage of your data.
 
 ## License
 

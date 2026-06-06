@@ -33,6 +33,23 @@ code {
   margin-bottom: 22px;
 }
 
+.hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-gopher {
+  height: 120px;
+  flex-shrink: 0;
+}
+
 .hero h1,
 h2,
 h3 {
