@@ -75,7 +75,7 @@ func TestUploadPendingArchiveSuccessUpdatesState(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/backup/uploads/initiate":
-			writeTestJSON(t, w, map[string]interface{}{"upload_id": "u1", "status": "initiated", "next_offset": 0, "recommended_chunk_size_bytes": 3})
+			writeTestJSON(t, w, map[string]any{"upload_id": "u1", "status": "initiated", "next_offset": 0, "recommended_chunk_size_bytes": 3})
 		case "/backup/uploads/u1/chunk":
 			var received int64
 			if r.URL.Query().Get("offset") == "3" {
@@ -83,9 +83,9 @@ func TestUploadPendingArchiveSuccessUpdatesState(t *testing.T) {
 			} else {
 				received = 3
 			}
-			writeTestJSON(t, w, map[string]interface{}{"next_offset": received})
+			writeTestJSON(t, w, map[string]any{"next_offset": received})
 		case "/backup/uploads/u1/finalize":
-			writeTestJSON(t, w, map[string]interface{}{"status": "ok", "stored_as": "stored.tar.zst", "pruned": 1, "duplicate": true})
+			writeTestJSON(t, w, map[string]any{"status": "ok", "stored_as": "stored.tar.zst", "pruned": 1, "duplicate": true})
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -134,7 +134,7 @@ func TestUploadPendingArchiveFailureSchedulesRetryAndDiscard(t *testing.T) {
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]interface{}{"detail": "service unavailable"})
+		json.NewEncoder(w).Encode(map[string]any{"detail": "service unavailable"})
 	}))
 	defer server.Close()
 	client := testUploadClient(server.URL)
@@ -302,7 +302,7 @@ func TestProcessJobLockedAndForceSendValidation(t *testing.T) {
 	if err := os.MkdirAll(jobRoot, 0o755); err != nil {
 		t.Fatalf("mkdir job: %v", err)
 	}
-	if err := backup.WriteUploadDir(jobRoot, map[string]interface{}{"job_name": "job"}); err != nil {
+	if err := backup.WriteUploadDir(jobRoot, map[string]any{"job_name": "job"}); err != nil {
 		t.Fatalf("WriteUploadDir: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(jobRoot, "data.txt"), []byte("payload"), 0o644); err != nil {
@@ -311,11 +311,11 @@ func TestProcessJobLockedAndForceSendValidation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/backup/uploads/initiate":
-			writeTestJSON(t, w, map[string]interface{}{"upload_id": "u1", "status": "initiated", "next_offset": 0, "recommended_chunk_size_bytes": 10})
+			writeTestJSON(t, w, map[string]any{"upload_id": "u1", "status": "initiated", "next_offset": 0, "recommended_chunk_size_bytes": 10})
 		case r.URL.Path == "/backup/uploads/u1/chunk":
-			writeTestJSON(t, w, map[string]interface{}{"next_offset": 999999})
+			writeTestJSON(t, w, map[string]any{"next_offset": 999999})
 		case r.URL.Path == "/backup/uploads/u1/finalize":
-			writeTestJSON(t, w, map[string]interface{}{"status": "ok", "stored_as": "stored.tar.zst"})
+			writeTestJSON(t, w, map[string]any{"status": "ok", "stored_as": "stored.tar.zst"})
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -443,6 +443,7 @@ func TestDownloadLatestSnapshotPath(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func ptrInt64(v int64) *int64 {
-	return &v
+	return new(v)
 }

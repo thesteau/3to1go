@@ -18,8 +18,8 @@ func (a *App) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		RelativePath string                 `json:"relative_path" validate:"required"`
-		Config       map[string]interface{} `json:"config"`
+		RelativePath string         `json:"relative_path" validate:"required"`
+		Config       map[string]any `json:"config"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -30,14 +30,14 @@ func (a *App) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Config == nil {
-		body.Config = map[string]interface{}{}
+		body.Config = map[string]any{}
 	}
 	entry, err := a.runner.SaveJob(body.RelativePath, body.Config)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "directory": entry})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "directory": entry})
 }
 
 func (a *App) handleDeleteJob(w http.ResponseWriter, r *http.Request) {

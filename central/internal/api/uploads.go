@@ -52,10 +52,7 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 			used++
 		}
 	}
-	limit := cred.MaxRegistrations
-	if limit < 1 {
-		limit = 1
-	}
+	limit := max(cred.MaxRegistrations, 1)
 	if !cred.Shared {
 		limit = 1
 	}
@@ -182,9 +179,8 @@ func (a *App) handleFinalizeUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeHTTPError(w http.ResponseWriter, err error) {
-	var he *ingest.HTTPError
-	if errors.As(err, &he) {
-		writeJSON(w, he.Code, map[string]interface{}{"detail": he.Message})
+	if he, ok := errors.AsType[*ingest.HTTPError](err); ok {
+		writeJSON(w, he.Code, map[string]any{"detail": he.Message})
 		return
 	}
 	writeError(w, http.StatusInternalServerError, err.Error())

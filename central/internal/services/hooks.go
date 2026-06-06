@@ -36,8 +36,8 @@ type HookFileInfo struct {
 	Viewable   bool   `json:"viewable"`
 }
 
-func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]interface{} {
-	return map[string]interface{}{
+func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]any {
+	return map[string]any{
 		"pre_command":  preCommand,
 		"post_command": postCommand,
 		"script_dir":   h.ScriptsDir,
@@ -129,7 +129,7 @@ func (h *HookManager) DeleteFile(filename string) error {
 	return err
 }
 
-func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]interface{}) {
+func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) {
 	normalized := strings.TrimSpace(command)
 	if normalized == "" {
 		return

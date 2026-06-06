@@ -68,7 +68,7 @@ func TestHookManager_SaveUploadedFile_NonUTF8(t *testing.T) {
 func TestHookManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 	h := newTestHookManager(t)
 	// Fill up to the limit.
-	for i := 0; i < MaxHookFiles; i++ {
+	for i := range MaxHookFiles {
 		name := filepath.Join(h.ScriptsDir, "file"+string(rune('a'+i))+".sh")
 		os.WriteFile(name, []byte("#!/bin/sh\n"), 0o644)
 	}

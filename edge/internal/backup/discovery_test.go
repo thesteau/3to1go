@@ -10,7 +10,7 @@ import (
 
 func TestBuildJobDefinition_DefaultsToBasename(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{})
+	job, err := BuildJobDefinition(dir, map[string]any{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestBuildJobDefinition_DefaultsToBasename(t *testing.T) {
 
 func TestBuildJobDefinition_CustomJobName(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{"job_name": "my-backup"})
+	job, err := BuildJobDefinition(dir, map[string]any{"job_name": "my-backup"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,29 +34,29 @@ func TestBuildJobDefinition_CustomJobName(t *testing.T) {
 
 func TestBuildJobDefinition_InvalidJobName_Spaces(t *testing.T) {
 	dir := t.TempDir()
-	if _, err := BuildJobDefinition(dir, map[string]interface{}{"job_name": "has spaces"}); err == nil {
+	if _, err := BuildJobDefinition(dir, map[string]any{"job_name": "has spaces"}); err == nil {
 		t.Error("expected error for job_name with spaces")
 	}
 }
 
 func TestBuildJobDefinition_InvalidJobName_Slash(t *testing.T) {
 	dir := t.TempDir()
-	if _, err := BuildJobDefinition(dir, map[string]interface{}{"job_name": "has/slash"}); err == nil {
+	if _, err := BuildJobDefinition(dir, map[string]any{"job_name": "has/slash"}); err == nil {
 		t.Error("expected error for job_name with slash")
 	}
 }
 
 func TestBuildJobDefinition_InvalidJobName_AtSign(t *testing.T) {
 	dir := t.TempDir()
-	if _, err := BuildJobDefinition(dir, map[string]interface{}{"job_name": "at@sign"}); err == nil {
+	if _, err := BuildJobDefinition(dir, map[string]any{"job_name": "at@sign"}); err == nil {
 		t.Error("expected error for job_name with @")
 	}
 }
 
 func TestBuildJobDefinition_ExcludePatterns(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{
-		"exclude": []interface{}{"*.log", "tmp/"},
+	job, err := BuildJobDefinition(dir, map[string]any{
+		"exclude": []any{"*.log", "tmp/"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -68,14 +68,14 @@ func TestBuildJobDefinition_ExcludePatterns(t *testing.T) {
 
 func TestBuildJobDefinition_ExcludeNotList(t *testing.T) {
 	dir := t.TempDir()
-	if _, err := BuildJobDefinition(dir, map[string]interface{}{"exclude": "not-a-list"}); err == nil {
+	if _, err := BuildJobDefinition(dir, map[string]any{"exclude": "not-a-list"}); err == nil {
 		t.Error("expected error when exclude is a string, not a list")
 	}
 }
 
 func TestBuildJobDefinition_IncludeHiddenDefault(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{})
+	job, err := BuildJobDefinition(dir, map[string]any{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestBuildJobDefinition_IncludeHiddenDefault(t *testing.T) {
 
 func TestBuildJobDefinition_IncludeHiddenFalse(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{"include_hidden": false})
+	job, err := BuildJobDefinition(dir, map[string]any{"include_hidden": false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestBuildJobDefinition_IncludeHiddenFalse(t *testing.T) {
 
 func TestBuildJobDefinition_FollowSymlinksDefault(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{})
+	job, err := BuildJobDefinition(dir, map[string]any{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestBuildJobDefinition_FollowSymlinksDefault(t *testing.T) {
 
 func TestBuildJobDefinition_FollowSymlinksTrue(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{"follow_symlinks": true})
+	job, err := BuildJobDefinition(dir, map[string]any{"follow_symlinks": true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestBuildJobDefinition_FollowSymlinksTrue(t *testing.T) {
 
 func TestBuildJobDefinition_AbsoluteRootPath(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{})
+	job, err := BuildJobDefinition(dir, map[string]any{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestDiscoverJobs_FindsMarkerAtRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, UploadDirFilename), []byte(""), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	jobs, err := DiscoverJobs(dir, 2, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(dir, 2, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestDiscoverJobs_FindsMarkerInSubdir(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	jobs, err := DiscoverJobs(root, 2, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(root, 2, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestDiscoverJobs_MaxDepthRespected(t *testing.T) {
 		t.Fatal(err)
 	}
 	// maxDepth=1: marker is at depth 2, should not be found
-	jobs, err := DiscoverJobs(root, 1, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(root, 1, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestDiscoverJobs_MaxDepthRespected(t *testing.T) {
 		t.Errorf("maxDepth=1: got %d jobs, want 0", len(jobs))
 	}
 	// maxDepth=2: should find it
-	jobs, err = DiscoverJobs(root, 2, func(string, ...interface{}) {})
+	jobs, err = DiscoverJobs(root, 2, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestDiscoverJobs_MultipleJobs(t *testing.T) {
 		os.Mkdir(sub, 0o755)
 		os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644)
 	}
-	jobs, err := DiscoverJobs(root, 2, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(root, 2, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestDiscoverJobs_MultipleJobs(t *testing.T) {
 func TestDiscoverJobs_NoMarkers(t *testing.T) {
 	root := t.TempDir()
 	os.MkdirAll(filepath.Join(root, "sub1", "sub2"), 0o755)
-	jobs, err := DiscoverJobs(root, 5, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(root, 5, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestDiscoverJobs_StopsRecursingAtMarker(t *testing.T) {
 	os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644)
 	os.WriteFile(filepath.Join(nested, UploadDirFilename), []byte(""), 0o644)
 
-	jobs, err := DiscoverJobs(root, 5, func(string, ...interface{}) {})
+	jobs, err := DiscoverJobs(root, 5, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -308,9 +308,9 @@ func TestDiscoverJobs_StopsRecursingAtMarker(t *testing.T) {
 
 func TestJobDefinitionToPayload_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	job, err := BuildJobDefinition(dir, map[string]interface{}{
+	job, err := BuildJobDefinition(dir, map[string]any{
 		"job_name":        "backup-job",
-		"exclude":         []interface{}{"*.tmp"},
+		"exclude":         []any{"*.tmp"},
 		"include_hidden":  false,
 		"follow_symlinks": true,
 	})
@@ -328,7 +328,7 @@ func TestJobDefinitionToPayload_RoundTrip(t *testing.T) {
 
 func TestWriteUploadDir_CreatesFile(t *testing.T) {
 	dir := t.TempDir()
-	err := WriteUploadDir(dir, map[string]interface{}{"job_name": "test-write"})
+	err := WriteUploadDir(dir, map[string]any{"job_name": "test-write"})
 	if err != nil {
 		t.Fatalf("WriteUploadDir: %v", err)
 	}

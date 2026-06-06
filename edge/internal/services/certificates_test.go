@@ -78,7 +78,7 @@ func TestCertManager_SaveUploadedFile_EmptyFilename(t *testing.T) {
 func TestCertManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 	c := newTestCertManager(t)
 	// Fill to the limit.
-	for i := 0; i < MaxCertificateFiles; i++ {
+	for i := range MaxCertificateFiles {
 		name := filepath.Join(c.StorageDir, "ca"+string(rune('a'+i))+".crt")
 		os.WriteFile(name, []byte(fakePEM), 0o644)
 	}

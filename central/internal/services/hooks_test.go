@@ -108,7 +108,7 @@ func TestSaveUploadedFile_TxtFile_CRLFPreserved(t *testing.T) {
 func TestSaveUploadedFile_MaxFilesLimit(t *testing.T) {
 	hm, _ := newHookManager(t)
 	// Fill to max
-	for i := 0; i < MaxHookFiles; i++ {
+	for i := range MaxHookFiles {
 		name := strings.Repeat("x", i+1) + ".sh"
 		hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n"))
 	}
@@ -122,7 +122,7 @@ func TestSaveUploadedFile_MaxFilesLimit(t *testing.T) {
 func TestSaveUploadedFile_OverwriteExisting(t *testing.T) {
 	hm, _ := newHookManager(t)
 	// Fill to max
-	for i := 0; i < MaxHookFiles; i++ {
+	for i := range MaxHookFiles {
 		name := strings.Repeat("x", i+1) + ".sh"
 		hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n"))
 	}

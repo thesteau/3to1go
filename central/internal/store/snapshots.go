@@ -261,14 +261,14 @@ func (s *SnapshotIndex) DeleteEdgeRegistration(ctx context.Context, edgeID, inst
 func (s *SnapshotIndex) ListEdgeRegistrations(ctx context.Context, edgeIDFilter *string) ([]EdgeRegistration, error) {
 	var (
 		query string
-		args  []interface{}
+		args  []any
 	)
 	if edgeIDFilter != nil {
 		query = `SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
 			first_seen_at, last_seen_at, credential_hash
 			FROM edge_registration WHERE edge_id = $1
 			ORDER BY lower(edge_instance_id)`
-		args = []interface{}{*edgeIDFilter}
+		args = []any{*edgeIDFilter}
 	} else {
 		query = `SELECT edge_id, edge_instance_id, encryption_key_fingerprint, advertised_url,
 			first_seen_at, last_seen_at, credential_hash

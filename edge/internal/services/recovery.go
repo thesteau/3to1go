@@ -23,16 +23,16 @@ func (e *RecoveryError) Error() string { return e.Message }
 
 // RecoveryResult is returned on successful recovery or preview.
 type RecoveryResult struct {
-	Status              string        `json:"status"`
-	JobName             string        `json:"job_name"`
-	RelativePath        string        `json:"relative_path,omitempty"`
-	SnapshotFilename    string        `json:"snapshot_filename"`
-	SnapshotFingerprint string        `json:"snapshot_fingerprint"`
-	RestoredFiles       int           `json:"restored_files,omitempty"`
-	Entries             interface{}   `json:"entries,omitempty"`
-	TotalFiles          int           `json:"total_files,omitempty"`
-	ReplaceCount        int           `json:"replace_count,omitempty"`
-	AddCount            int           `json:"add_count,omitempty"`
+	Status              string `json:"status"`
+	JobName             string `json:"job_name"`
+	RelativePath        string `json:"relative_path,omitempty"`
+	SnapshotFilename    string `json:"snapshot_filename"`
+	SnapshotFingerprint string `json:"snapshot_fingerprint"`
+	RestoredFiles       int    `json:"restored_files,omitempty"`
+	Entries             any    `json:"entries,omitempty"`
+	TotalFiles          int    `json:"total_files,omitempty"`
+	ReplaceCount        int    `json:"replace_count,omitempty"`
+	AddCount            int    `json:"add_count,omitempty"`
 }
 
 // RecoveryService downloads and optionally restores archives from central.

@@ -32,11 +32,11 @@ func (n *NtfyPublisher) SetLogger(logger *slog.Logger) {
 	n.logger = logger
 }
 
-func (n *NtfyPublisher) Snapshot(cfg *config.Settings) map[string]interface{} {
-	return map[string]interface{}{
-		"ntfy_url":                cfg.NtfyURL,
-		"ntfy_topic":              cfg.NtfyTopic,
-		"ntfy_message_template":   cfg.NtfyMessageTemplate,
+func (n *NtfyPublisher) Snapshot(cfg *config.Settings) map[string]any {
+	return map[string]any{
+		"ntfy_url":                 cfg.NtfyURL,
+		"ntfy_topic":               cfg.NtfyTopic,
+		"ntfy_message_template":    cfg.NtfyMessageTemplate,
 		"default_message_template": DefaultNtfyMessageTemplate,
 	}
 }
@@ -129,7 +129,7 @@ func extractNtfyError(body []byte) string {
 	if len(body) == 0 {
 		return ""
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal(body, &m); err == nil {
 		for _, key := range []string{"error", "message"} {
 			if s, ok := m[key].(string); ok && s != "" {

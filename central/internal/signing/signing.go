@@ -132,7 +132,7 @@ func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPay
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		claims,
-		func(token *jwt.Token) (interface{}, error) {
+		func(token *jwt.Token) (any, error) {
 			if token.Method.Alg() != jwt.SigningMethodEdDSA.Alg() {
 				return nil, fmt.Errorf("unexpected signing method %q", token.Method.Alg())
 			}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,30 +12,30 @@ const stateFilename = "edge-state.json"
 
 // JobState holds the persistent state for a single backup job.
 type JobState struct {
-	JobName                   string  `json:"job_name,omitempty"`
-	LastSuccessfulFingerprint string  `json:"last_successful_fingerprint,omitempty"`
-	LastSuccessfulUpload      string  `json:"last_successful_upload,omitempty"`
-	PendingArchive            string  `json:"pending_archive,omitempty"`
-	PendingArchiveSize        *int64  `json:"pending_archive_size,omitempty"`
-	PendingArchiveSHA256      string  `json:"pending_archive_sha256,omitempty"`
-	PendingFingerprint        string  `json:"pending_fingerprint,omitempty"`
-	PendingTimestamp          string  `json:"pending_timestamp,omitempty"`
-	UploadID                  string  `json:"upload_id,omitempty"`
-	UploadOffset              int64   `json:"upload_offset"`
-	UploadAttemptCount        int     `json:"upload_attempt_count"`
-	CurrentChunkSizeBytes     *int64  `json:"current_chunk_size_bytes,omitempty"`
-	NextRetryAt               string  `json:"next_retry_at,omitempty"`
-	LastErrorDetail           string  `json:"last_error_detail,omitempty"`
-	LastErrorCategory         string  `json:"last_error_category,omitempty"`
-	LastUploadStartedAt       string  `json:"last_upload_started_at,omitempty"`
-	LastUploadUpdatedAt       string  `json:"last_upload_updated_at,omitempty"`
-	ActivePhase               string  `json:"active_phase,omitempty"`
-	ActivePhasePercent        int     `json:"active_phase_percent"`
+	JobName                    string `json:"job_name,omitempty"`
+	LastSuccessfulFingerprint  string `json:"last_successful_fingerprint,omitempty"`
+	LastSuccessfulUpload       string `json:"last_successful_upload,omitempty"`
+	PendingArchive             string `json:"pending_archive,omitempty"`
+	PendingArchiveSize         *int64 `json:"pending_archive_size,omitempty"`
+	PendingArchiveSHA256       string `json:"pending_archive_sha256,omitempty"`
+	PendingFingerprint         string `json:"pending_fingerprint,omitempty"`
+	PendingTimestamp           string `json:"pending_timestamp,omitempty"`
+	UploadID                   string `json:"upload_id,omitempty"`
+	UploadOffset               int64  `json:"upload_offset"`
+	UploadAttemptCount         int    `json:"upload_attempt_count"`
+	CurrentChunkSizeBytes      *int64 `json:"current_chunk_size_bytes,omitempty"`
+	NextRetryAt                string `json:"next_retry_at,omitempty"`
+	LastErrorDetail            string `json:"last_error_detail,omitempty"`
+	LastErrorCategory          string `json:"last_error_category,omitempty"`
+	LastUploadStartedAt        string `json:"last_upload_started_at,omitempty"`
+	LastUploadUpdatedAt        string `json:"last_upload_updated_at,omitempty"`
+	ActivePhase                string `json:"active_phase,omitempty"`
+	ActivePhasePercent         int    `json:"active_phase_percent"`
 	ManualInterventionRequired bool   `json:"manual_intervention_required"`
-	LastStatus                string  `json:"last_status,omitempty"`
-	LastStoredAs              string  `json:"last_stored_as,omitempty"`
-	LastPruned                int     `json:"last_pruned"`
-	LastDuplicate             bool    `json:"last_duplicate"`
+	LastStatus                 string `json:"last_status,omitempty"`
+	LastStoredAs               string `json:"last_stored_as,omitempty"`
+	LastPruned                 int    `json:"last_pruned"`
+	LastDuplicate              bool   `json:"last_duplicate"`
 }
 
 // StateStore is a thread-safe, JSON-backed store for JobState values.
@@ -102,9 +103,7 @@ func (s *StateStore) Snapshot() map[string]JobState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make(map[string]JobState, len(s.data))
-	for k, v := range s.data {
-		out[k] = v
-	}
+	maps.Copy(out, s.data)
 	return out
 }
 

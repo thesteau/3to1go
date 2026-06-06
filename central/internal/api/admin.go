@@ -28,7 +28,7 @@ func (a *App) handleSessionMe(w http.ResponseWriter, r *http.Request) {
 		token = cookie.Value
 	}
 	user, _ := a.userStore.UserForSession(r.Context(), token)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": user != nil,
 		"user":          user,
 	})
@@ -61,7 +61,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   7 * 24 * 60 * 60,
 		Path:     "/",
 	})
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "user": user})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": user})
 }
 
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +102,7 @@ func (a *App) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "user": updated})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": updated})
 }
 
 func (a *App) handleListUsers(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func (a *App) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"users": users})
+	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
 func (a *App) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +146,7 @@ func (a *App) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "user": user})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": user})
 }
 
 func (a *App) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +209,7 @@ func (a *App) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if passPtr != nil {
 		a.userStore.DeleteSessionsForUser(r.Context(), userID)
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "user": updated})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": updated})
 }
 
 func (a *App) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +237,7 @@ func (a *App) handleMigrateUploadSessions(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, "failed to migrate upload sessions")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"migrated": migrated,
 	})

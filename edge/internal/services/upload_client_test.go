@@ -42,7 +42,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 	if err := os.WriteFile(archivePath, []byte("abcdef"), 0o644); err != nil {
 		t.Fatalf("write archive: %v", err)
 	}
-	var gotInitiate map[string]interface{}
+	var gotInitiate map[string]any
 	var chunkOffsets []int64
 	finalized := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +54,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&gotInitiate); err != nil {
 				t.Fatalf("decode initiate: %v", err)
 			}
-			writeTestJSON(t, w, map[string]interface{}{
+			writeTestJSON(t, w, map[string]any{
 				"upload_id":                    "upload-1",
 				"status":                       "initiated",
 				"next_offset":                  0,
@@ -65,7 +65,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 			chunkOffsets = append(chunkOffsets, offset)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(r.Body)
-			writeTestJSON(t, w, map[string]interface{}{
+			writeTestJSON(t, w, map[string]any{
 				"upload_id":       "upload-1",
 				"status":          "in_progress",
 				"received_bytes":  offset + int64(buf.Len()),
@@ -77,7 +77,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 			})
 		case r.Method == http.MethodPost && r.URL.Path == "/backup/uploads/upload-1/finalize":
 			finalized = true
-			writeTestJSON(t, w, map[string]interface{}{
+			writeTestJSON(t, w, map[string]any{
 				"status":    "ok",
 				"stored_as": "job__2024-01-01T00-00-00Z__abcdef12.tar.zst",
 				"pruned":    2,
@@ -123,7 +123,7 @@ func TestUploadArchiveCompletedDuplicateSkipsChunks(t *testing.T) {
 		if r.URL.Path != "/backup/uploads/initiate" {
 			t.Fatalf("unexpected request %s", r.URL.Path)
 		}
-		writeTestJSON(t, w, map[string]interface{}{
+		writeTestJSON(t, w, map[string]any{
 			"upload_id":   "upload-dup",
 			"status":      "completed",
 			"stored_as":   "already.tar.zst",
@@ -174,17 +174,17 @@ func TestRetryPhaseAndDoRequestFailures(t *testing.T) {
 	client := testUploadClient("http://example.invalid")
 	attempts := 0
 	one := 1
-	result, err := client.retryPhase("retryable", func() (map[string]interface{}, error) {
+	result, err := client.retryPhase("retryable", func() (map[string]any, error) {
 		attempts++
 		if attempts == 1 {
 			return nil, &UploadFailure{Message: "try again", Category: "server", Retryable: true, RetryAfterSeconds: &one}
 		}
-		return map[string]interface{}{"status": "ok"}, nil
+		return map[string]any{"status": "ok"}, nil
 	})
 	if err != nil || result["status"] != "ok" || attempts != 2 {
 		t.Fatalf("retryPhase success = %+v, %v, attempts=%d", result, err, attempts)
 	}
-	_, err = client.retryPhase("validation", func() (map[string]interface{}, error) {
+	_, err = client.retryPhase("validation", func() (map[string]any, error) {
 		return nil, &UploadFailure{Message: "bad", Category: "validation", Retryable: false}
 	})
 	if err == nil || !strings.Contains(err.Error(), "validation: bad") {
@@ -251,13 +251,13 @@ func TestUploadFailureClassificationAndHelpers(t *testing.T) {
 		t.Fatal("expected missing file error")
 	}
 
-	if v := int64Field(map[string]interface{}{"a": float64(3), "b": int64(4), "c": 5}, "a"); v != 3 {
+	if v := int64Field(map[string]any{"a": float64(3), "b": int64(4), "c": 5}, "a"); v != 3 {
 		t.Fatalf("int64Field float = %d", v)
 	}
-	if int64Field(map[string]interface{}{"b": int64(4)}, "b") != 4 || intField(map[string]interface{}{"c": 5}, "c") != 5 {
+	if int64Field(map[string]any{"b": int64(4)}, "b") != 4 || intField(map[string]any{"c": 5}, "c") != 5 {
 		t.Fatal("numeric helpers failed")
 	}
-	if !boolField(map[string]interface{}{"ok": true}, "ok") || stringField(map[string]interface{}{"s": "x"}, "s") != "x" {
+	if !boolField(map[string]any{"ok": true}, "ok") || stringField(map[string]any{"s": "x"}, "s") != "x" {
 		t.Fatal("field helpers failed")
 	}
 }
@@ -298,7 +298,7 @@ func TestChunkSizingTimeoutAndRequestTimeout(t *testing.T) {
 	}
 }
 
-func writeTestJSON(t *testing.T, w http.ResponseWriter, payload map[string]interface{}) {
+func writeTestJSON(t *testing.T, w http.ResponseWriter, payload map[string]any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(payload); err != nil {

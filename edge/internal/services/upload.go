@@ -65,10 +65,7 @@ func (cb *CircuitBreaker) BeforeRequest() *UploadFailure {
 		cb.openedUntil = time.Time{}
 		return nil
 	}
-	remaining := int(math.Ceil(time.Until(cb.openedUntil).Seconds()))
-	if remaining < 1 {
-		remaining = 1
-	}
+	remaining := max(int(math.Ceil(time.Until(cb.openedUntil).Seconds())), 1)
 	return &UploadFailure{
 		Message:           "central circuit breaker is open",
 		Category:          "circuit_open",
@@ -94,25 +91,22 @@ func (cb *CircuitBreaker) RecordFailure() {
 }
 
 // Snapshot returns a JSON-ready status of the circuit breaker.
-func (cb *CircuitBreaker) Snapshot() map[string]interface{} {
+func (cb *CircuitBreaker) Snapshot() map[string]any {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	if cb.openedUntil.IsZero() {
-		return map[string]interface{}{
+		return map[string]any{
 			"state":                      "closed",
 			"consecutive_failures":       cb.consecutiveFailures,
 			"cooldown_remaining_seconds": 0,
 		}
 	}
-	remaining := int(time.Until(cb.openedUntil).Seconds())
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := max(int(time.Until(cb.openedUntil).Seconds()), 0)
 	state := "open"
 	if remaining == 0 {
 		state = "closed"
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"state":                      state,
 		"consecutive_failures":       cb.consecutiveFailures,
 		"cooldown_remaining_seconds": remaining,
@@ -155,10 +149,7 @@ func NewUploadClient(cfg *config.Settings, encKey []byte, certs *CertManager) *U
 	}
 	httpClient := &http.Client{Transport: transport}
 
-	maxChunk := cfg.MaxUploadChunkSizeBytes()
-	if maxChunk < cfg.UploadChunkSizeBytes() {
-		maxChunk = cfg.UploadChunkSizeBytes()
-	}
+	maxChunk := max(cfg.MaxUploadChunkSizeBytes(), cfg.UploadChunkSizeBytes())
 
 	return &UploadClient{
 		centralURL:                  cfg.CentralURL,
@@ -214,7 +205,7 @@ func (c *UploadClient) UploadArchive(
 
 	idempotencyKey := buildIdempotencyKey(edgeID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256)
 
-	initiate := func() (map[string]interface{}, error) {
+	initiate := func() (map[string]any, error) {
 		return c.initiateSession(ctx, edgeID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256, idempotencyKey)
 	}
 	sessionInfo, err := c.retryPhase("initiate", initiate)
@@ -315,7 +306,7 @@ func (c *UploadClient) UploadArchive(
 		attempt = 0
 	}
 
-	finalResp, err := c.retryPhase("finalize", func() (map[string]interface{}, error) {
+	finalResp, err := c.retryPhase("finalize", func() (map[string]any, error) {
 		return c.finalizeSession(ctx, uploadID)
 	})
 	if err != nil {
@@ -379,7 +370,7 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 	return filename, nil
 }
 
-func (c *UploadClient) retryPhase(phase string, op func() (map[string]interface{}, error)) (map[string]interface{}, error) {
+func (c *UploadClient) retryPhase(phase string, op func() (map[string]any, error)) (map[string]any, error) {
 	for attempt := 0; ; attempt++ {
 		result, err := op()
 		if err == nil {
@@ -399,8 +390,8 @@ func (c *UploadClient) retryPhase(phase string, op func() (map[string]interface{
 	}
 }
 
-func (c *UploadClient) initiateSession(ctx context.Context, edgeID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum, idempotencyKey string) (map[string]interface{}, error) {
-	body := map[string]interface{}{
+func (c *UploadClient) initiateSession(ctx context.Context, edgeID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum, idempotencyKey string) (map[string]any, error) {
+	body := map[string]any{
 		"edge_id":                    edgeID,
 		"edge_instance_id":           c.edgeInstanceID,
 		"job_name":                   jobName,
@@ -417,7 +408,7 @@ func (c *UploadClient) initiateSession(ctx context.Context, edgeID, jobName, fin
 		c.timeoutForBytes(c.chunkSizeBytes))
 }
 
-func (c *UploadClient) sendChunk(ctx context.Context, uploadID string, offset int64, chunk []byte) (map[string]interface{}, error) {
+func (c *UploadClient) sendChunk(ctx context.Context, uploadID string, offset int64, chunk []byte) (map[string]any, error) {
 	url := fmt.Sprintf("%s/backup/uploads/%s/chunk?offset=%d", c.centralURL, uploadID, offset)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(chunk))
 	if err != nil {
@@ -439,7 +430,7 @@ func (c *UploadClient) sendChunk(ctx context.Context, uploadID string, offset in
 	return decodeJSON(resp.Body)
 }
 
-func (c *UploadClient) finalizeSession(ctx context.Context, uploadID string) (map[string]interface{}, error) {
+func (c *UploadClient) finalizeSession(ctx context.Context, uploadID string) (map[string]any, error) {
 	url := fmt.Sprintf("%s/backup/uploads/%s/finalize", c.centralURL, uploadID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(nil))
 	if err != nil {
@@ -460,7 +451,7 @@ func (c *UploadClient) finalizeSession(ctx context.Context, uploadID string) (ma
 	return decodeJSON(resp.Body)
 }
 
-func (c *UploadClient) jsonPost(ctx context.Context, path string, body interface{}, phase string, readTimeout time.Duration) (map[string]interface{}, error) {
+func (c *UploadClient) jsonPost(ctx context.Context, path string, body any, phase string, readTimeout time.Duration) (map[string]any, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -517,10 +508,10 @@ func (c *UploadClient) doRequest(req *http.Request, phase string) (*http.Respons
 
 func buildUploadFailure(resp *http.Response, phase string) *UploadFailure {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	var payload map[string]interface{}
+	var payload map[string]any
 	_ = json.Unmarshal(body, &payload)
 
-	var detail interface{}
+	var detail any
 	if payload != nil {
 		detail = payload["detail"]
 	}
@@ -596,10 +587,7 @@ func (c *UploadClient) timeoutForBytes(size int64) time.Duration {
 	if c.minThroughputBytesPerSecond <= 0 {
 		return c.readTimeoutPadding
 	}
-	seconds := int64(math.Ceil(float64(size) / float64(c.minThroughputBytesPerSecond)))
-	if seconds < 1 {
-		seconds = 1
-	}
+	seconds := max(int64(math.Ceil(float64(size)/float64(c.minThroughputBytesPerSecond))), 1)
 	return time.Duration(seconds)*time.Second + c.readTimeoutPadding
 }
 
@@ -638,19 +626,19 @@ func sha256File(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func decodeJSON(r io.Reader) (map[string]interface{}, error) {
-	var m map[string]interface{}
+func decodeJSON(r io.Reader) (map[string]any, error) {
+	var m map[string]any
 	if err := json.NewDecoder(r).Decode(&m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func detailMessage(detail interface{}) string {
+func detailMessage(detail any) string {
 	if s, ok := detail.(string); ok {
 		return s
 	}
-	if m, ok := detail.(map[string]interface{}); ok {
+	if m, ok := detail.(map[string]any); ok {
 		if msg, ok := m["message"].(string); ok && msg != "" {
 			return msg
 		}
@@ -664,8 +652,8 @@ func detailMessage(detail interface{}) string {
 	return ""
 }
 
-func detailNextOffset(detail interface{}) *int64 {
-	if m, ok := detail.(map[string]interface{}); ok {
+func detailNextOffset(detail any) *int64 {
+	if m, ok := detail.(map[string]any); ok {
 		if v, ok := m["next_offset"].(float64); ok {
 			n := int64(v)
 			return &n
@@ -674,8 +662,8 @@ func detailNextOffset(detail interface{}) *int64 {
 	return nil
 }
 
-func detailStatusStr(detail interface{}) string {
-	if m, ok := detail.(map[string]interface{}); ok {
+func detailStatusStr(detail any) string {
+	if m, ok := detail.(map[string]any); ok {
 		if s, ok := m["status"].(string); ok {
 			return s
 		}
@@ -695,7 +683,7 @@ func retryAfterSeconds(resp *http.Response) *int {
 	return &n
 }
 
-func stringField(m map[string]interface{}, key string) string {
+func stringField(m map[string]any, key string) string {
 	if m == nil {
 		return ""
 	}
@@ -703,7 +691,7 @@ func stringField(m map[string]interface{}, key string) string {
 	return s
 }
 
-func int64Field(m map[string]interface{}, key string) int64 {
+func int64Field(m map[string]any, key string) int64 {
 	if m == nil {
 		return 0
 	}
@@ -718,17 +706,14 @@ func int64Field(m map[string]interface{}, key string) int64 {
 	return 0
 }
 
-func intField(m map[string]interface{}, key string) int {
+func intField(m map[string]any, key string) int {
 	return int(int64Field(m, key))
 }
 
-func boolField(m map[string]interface{}, key string) bool {
+func boolField(m map[string]any, key string) bool {
 	if m == nil {
 		return false
 	}
 	b, _ := m[key].(bool)
 	return b
 }
-
-
-

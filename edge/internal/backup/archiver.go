@@ -2,10 +2,10 @@ package backup
 
 import (
 	"archive/tar"
+	"cmp"
 	"fmt"
 	"io"
 	"os"
-	"cmp"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -102,7 +102,7 @@ func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
 }
 
 // ListArchiveEntries streams the zstd+tar archive and returns a summary of its contents.
-func ListArchiveEntries(archivePath, targetRoot string) (map[string]interface{}, error) {
+func ListArchiveEntries(archivePath, targetRoot string) (map[string]any, error) {
 	absTarget, err := filepath.Abs(targetRoot)
 	if err != nil {
 		return nil, err
@@ -164,16 +164,16 @@ func ListArchiveEntries(archivePath, targetRoot string) (map[string]interface{},
 		})
 	}
 
-	result := make([]interface{}, len(entries))
+	result := make([]any, len(entries))
 	for i, e := range entries {
-		result[i] = map[string]interface{}{
+		result[i] = map[string]any{
 			"path":   e.Path,
 			"size":   e.Size,
 			"mtime":  e.Mtime,
 			"action": e.Action,
 		}
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"entries":       result,
 		"total_files":   len(entries),
 		"replace_count": replaceCount,

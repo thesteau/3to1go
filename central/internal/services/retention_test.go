@@ -91,7 +91,7 @@ func TestPruneOldSnapshots_DeleteAll(t *testing.T) {
 	os.MkdirAll(nsDir, 0o755)
 
 	now := time.Now()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		name := "file" + string(rune('a'+i)) + ".tar.zst"
 		writeFile(t, filepath.Join(nsDir, name), "data")
 		setMtime(t, filepath.Join(nsDir, name), now.Add(time.Duration(i)*time.Minute))

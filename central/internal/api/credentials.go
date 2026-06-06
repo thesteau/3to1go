@@ -68,7 +68,7 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to mint credential")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"credential":        credential,
 		"ttl_days":          ttlDays,
 		"shared":            shared,
@@ -137,7 +137,7 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":             "revoked",
 		"revoked_rows":       revoked,
 		"affected_instances": affected,

@@ -50,7 +50,7 @@ func TestBuildOverview_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildOverview: %v", err)
 	}
-	edges, ok := result["edges"].([]interface{})
+	edges, ok := result["edges"].([]any)
 	if !ok {
 		t.Fatalf("edges not []interface{}: %T", result["edges"])
 	}
@@ -78,15 +78,15 @@ func TestBuildOverview_WithRegistrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildOverview: %v", err)
 	}
-	edges := result["edges"].([]interface{})
+	edges := result["edges"].([]any)
 	if len(edges) != 1 {
 		t.Fatalf("expected 1 edge, got %d", len(edges))
 	}
-	edge := edges[0].(map[string]interface{})
+	edge := edges[0].(map[string]any)
 	if edge["edge_id"] != "edge1" {
 		t.Errorf("edge_id = %v, want edge1", edge["edge_id"])
 	}
-	instances := edge["instances"].([]interface{})
+	instances := edge["instances"].([]any)
 	if len(instances) != 1 {
 		t.Fatalf("expected 1 instance, got %d", len(instances))
 	}
@@ -128,11 +128,11 @@ func TestBuildOverview_NamespaceWithNewEdge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildOverview: %v", err)
 	}
-	edges := result["edges"].([]interface{})
+	edges := result["edges"].([]any)
 	if len(edges) != 1 {
 		t.Fatalf("expected 1 edge from namespace-only, got %d", len(edges))
 	}
-	edge := edges[0].(map[string]interface{})
+	edge := edges[0].(map[string]any)
 	if edge["edge_id"] != "edge2" {
 		t.Errorf("edge_id = %v, want edge2", edge["edge_id"])
 	}
@@ -156,16 +156,16 @@ func TestBuildOverview_MultipleRegistrationsSameEdge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildOverview: %v", err)
 	}
-	edges := result["edges"].([]interface{})
+	edges := result["edges"].([]any)
 	if len(edges) != 1 {
 		t.Fatalf("expected 1 edge, got %d", len(edges))
 	}
-	edge := edges[0].(map[string]interface{})
-	instances := edge["instances"].([]interface{})
+	edge := edges[0].(map[string]any)
+	instances := edge["instances"].([]any)
 	if len(instances) != 1 {
 		t.Fatalf("expected 1 instance, got %d", len(instances))
 	}
-	inst := instances[0].(map[string]interface{})
+	inst := instances[0].(map[string]any)
 	if inst["credential_configured"] != true {
 		t.Errorf("credential_configured should be true")
 	}

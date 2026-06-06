@@ -31,7 +31,7 @@ func (a *App) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload := config.SettingsToPayload(a.runner.CurrentSettings())
-	writeJSON(w, http.StatusOK, map[string]interface{}{"settings": payload})
+	writeJSON(w, http.StatusOK, map[string]any{"settings": payload})
 }
 
 func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +55,7 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if err := a.scheduler.ReloadSettings(newSettings.CronSchedule); err != nil {
 		a.logger.Warn("scheduler_reload_failed", "error", err)
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"settings": config.SettingsToPayload(newSettings),
 	})
@@ -145,7 +145,7 @@ func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "file": info})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": info})
 }
 
 func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +220,7 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "file": info})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": info})
 }
 
 func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {

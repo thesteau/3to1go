@@ -176,7 +176,7 @@ func TestHTTPError_Error(t *testing.T) {
 }
 
 func TestHTTPErrorJSON(t *testing.T) {
-	body := map[string]interface{}{"status": "offset_mismatch", "next_offset": 100}
+	body := map[string]any{"status": "offset_mismatch", "next_offset": 100}
 	e := httpErrorJSON(409, body)
 	if e.Code != 409 {
 		t.Errorf("Code = %d", e.Code)
@@ -876,7 +876,7 @@ func TestHookContext(t *testing.T) {
 func TestRunPostHook_NoOp(t *testing.T) {
 	svc := newTestService(t)
 	// No pre/post command configured, ntfy has no URL - should be a no-op
-	ctx := map[string]interface{}{"edge_id": "e1"}
+	ctx := map[string]any{"edge_id": "e1"}
 	svc.runPostHook(ctx, "ok", "file.tar.zst", 0, false)
 }
 

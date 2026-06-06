@@ -10,7 +10,7 @@ func (r *EdgeRunner) CurrentSettings() *config.Settings {
 }
 
 // StatusSnapshot returns the /api/status payload.
-func (r *EdgeRunner) StatusSnapshot() map[string]interface{} {
+func (r *EdgeRunner) StatusSnapshot() map[string]any {
 	r.mu.Lock()
 	s := r.Settings
 	r.mu.Unlock()
@@ -18,7 +18,7 @@ func (r *EdgeRunner) StatusSnapshot() map[string]interface{} {
 }
 
 // DirectoriesSnapshot returns the /api/directories payload.
-func (r *EdgeRunner) DirectoriesSnapshot() map[string]interface{} {
+func (r *EdgeRunner) DirectoriesSnapshot() map[string]any {
 	r.mu.Lock()
 	s := r.Settings
 	r.mu.Unlock()
@@ -26,7 +26,7 @@ func (r *EdgeRunner) DirectoriesSnapshot() map[string]interface{} {
 }
 
 // NtfySnapshot delegates to the embedded NtfyPublisher.
-func (r *EdgeRunner) NtfySnapshot(cfg *config.Settings) map[string]interface{} {
+func (r *EdgeRunner) NtfySnapshot(cfg *config.Settings) map[string]any {
 	return r.NtfyPublisher.Snapshot(cfg)
 }
 
@@ -36,12 +36,12 @@ func (r *EdgeRunner) TestNtfy(ntfyURL, ntfyTopic, messageTemplate string) error 
 }
 
 // CertSnapshot delegates to the embedded CertManager.
-func (r *EdgeRunner) CertSnapshot() map[string]interface{} {
+func (r *EdgeRunner) CertSnapshot() map[string]any {
 	return r.CertManager.Snapshot()
 }
 
 // SaveCertFile delegates to the embedded CertManager.
-func (r *EdgeRunner) SaveCertFile(filename string, content []byte) (interface{}, error) {
+func (r *EdgeRunner) SaveCertFile(filename string, content []byte) (any, error) {
 	return r.CertManager.SaveUploadedFile(filename, content)
 }
 
@@ -51,12 +51,12 @@ func (r *EdgeRunner) DeleteCertFile(filename string) error {
 }
 
 // HookSnapshot delegates to the embedded HookManager.
-func (r *EdgeRunner) HookSnapshot(preCmd, postCmd string) map[string]interface{} {
+func (r *EdgeRunner) HookSnapshot(preCmd, postCmd string) map[string]any {
 	return r.HookManager.Snapshot(preCmd, postCmd)
 }
 
 // SaveHookFile delegates to the embedded HookManager.
-func (r *EdgeRunner) SaveHookFile(filename string, content []byte) (interface{}, error) {
+func (r *EdgeRunner) SaveHookFile(filename string, content []byte) (any, error) {
 	return r.HookManager.SaveUploadedFile(filename, content)
 }
 
@@ -71,7 +71,7 @@ func (r *EdgeRunner) DeleteHookFile(filename string) error {
 }
 
 // SaveJob delegates to the embedded DirectoryService.
-func (r *EdgeRunner) SaveJob(relativePath string, cfg map[string]interface{}) (interface{}, error) {
+func (r *EdgeRunner) SaveJob(relativePath string, cfg map[string]any) (any, error) {
 	return r.DirService.SaveJob(relativePath, cfg)
 }
 

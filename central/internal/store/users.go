@@ -23,7 +23,7 @@ const (
 	BootstrapAdminID     = 1
 	SessionCookie        = "three_to_one_go_session"
 	sessionDays          = 7
-	bcryptCost          = 12
+	bcryptCost           = 12
 	pbkdf2Iterations     = 260_000
 )
 
@@ -83,7 +83,7 @@ func (s *UserStore) EnsureDefaultAdmin(ctx context.Context, initialPassword stri
 	if err != nil {
 		return err
 	}
-	_, err = s.UpdateUser(ctx, user.ID, nil, nil, nil, boolPtr(true))
+	_, err = s.UpdateUser(ctx, user.ID, nil, nil, nil, new(true))
 	return err
 }
 
@@ -326,7 +326,7 @@ func (s *UserStore) ChangePassword(ctx context.Context, userID int, currentPassw
 	if !verifyPassword(currentPassword, user.PasswordHash) {
 		return nil, errors.New("current password is incorrect")
 	}
-	return s.UpdateUser(ctx, userID, nil, &newPassword, nil, boolPtr(false))
+	return s.UpdateUser(ctx, userID, nil, &newPassword, nil, new(false))
 }
 
 func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
@@ -337,7 +337,7 @@ func (s *UserStore) withDefaultPasswordChangeRequired(ctx context.Context, user 
 	if user.MustChangePassword || !verifyPassword(DefaultAdminPassword, user.PasswordHash) {
 		return user, nil
 	}
-	updated, err := s.UpdateUser(ctx, user.ID, nil, nil, nil, boolPtr(true))
+	updated, err := s.UpdateUser(ctx, user.ID, nil, nil, nil, new(true))
 	if err != nil {
 		return user, nil
 	}
@@ -445,4 +445,5 @@ func randomToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }

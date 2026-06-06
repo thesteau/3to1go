@@ -21,10 +21,10 @@ import (
 type EdgeRunner struct {
 	mu sync.Mutex
 
-	Settings     *config.Settings
-	logger       *slog.Logger
-	encKey       []byte
-	cycleLock    sync.Mutex
+	Settings  *config.Settings
+	logger    *slog.Logger
+	encKey    []byte
+	cycleLock sync.Mutex
 
 	StateStore    *StateStore
 	UploadClient  *UploadClient
@@ -109,7 +109,7 @@ func (r *EdgeRunner) RunCycle() bool {
 		return false
 	}
 
-	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, func(format string, args ...interface{}) {
+	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))
 	})
 	if len(jobs) == 0 {
@@ -195,7 +195,7 @@ func (r *EdgeRunner) finishJob(job *backup.JobDefinition, settings *config.Setti
 }
 
 // ForceSendJob forces a single named job through the upload pipeline.
-func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[string]interface{}, error) {
+func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[string]any, error) {
 	r.mu.Lock()
 	settings := r.Settings
 	r.mu.Unlock()
@@ -221,7 +221,7 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 	job := matched[0]
 
 	if !r.cycleLock.TryLock() {
-		return map[string]interface{}{"status": "already_running", "job_name": normalized}, nil
+		return map[string]any{"status": "already_running", "job_name": normalized}, nil
 	}
 	defer r.cycleLock.Unlock()
 
@@ -235,7 +235,7 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 	}
 	r.processJobLocked(job, &state, settings, true)
 
-	return map[string]interface{}{
+	return map[string]any{
 		"status":               "started",
 		"job_name":             normalized,
 		"manual_retry_cleared": cleared,
@@ -243,13 +243,13 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 }
 
 // RecoverJob runs recovery for a job identified by relative_path.
-func (r *EdgeRunner) RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]interface{}, error) {
+func (r *EdgeRunner) RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error) {
 	job, err := r.DirService.LoadJob(relativePath)
 	if err != nil {
 		return nil, err
 	}
 	if !r.cycleLock.TryLock() {
-		return map[string]interface{}{"status": "already_running", "relative_path": relativePath}, nil
+		return map[string]any{"status": "already_running", "relative_path": relativePath}, nil
 	}
 	defer r.cycleLock.Unlock()
 
@@ -258,7 +258,7 @@ func (r *EdgeRunner) RecoverJob(ctx context.Context, relativePath, fingerprint s
 		return nil, err
 	}
 	result.RelativePath = relativePath
-	return map[string]interface{}{
+	return map[string]any{
 		"status":               result.Status,
 		"job_name":             result.JobName,
 		"relative_path":        result.RelativePath,
@@ -269,13 +269,13 @@ func (r *EdgeRunner) RecoverJob(ctx context.Context, relativePath, fingerprint s
 }
 
 // PreviewRecovery returns the list of files that would be restored without writing.
-func (r *EdgeRunner) PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]interface{}, error) {
+func (r *EdgeRunner) PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error) {
 	job, err := r.DirService.LoadJob(relativePath)
 	if err != nil {
 		return nil, err
 	}
 	if !r.cycleLock.TryLock() {
-		return map[string]interface{}{"status": "already_running", "relative_path": relativePath}, nil
+		return map[string]any{"status": "already_running", "relative_path": relativePath}, nil
 	}
 	defer r.cycleLock.Unlock()
 
@@ -283,7 +283,7 @@ func (r *EdgeRunner) PreviewRecovery(ctx context.Context, relativePath, fingerpr
 	if err != nil {
 		return nil, err
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"status":               result.Status,
 		"job_name":             result.JobName,
 		"relative_path":        relativePath,
@@ -362,7 +362,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, state *JobS
 	state.LastErrorCategory = ""
 	r.StateStore.Set(job.RootPath, *state)
 
-	files, err := backup.BuildFileList(job, func(format string, args ...interface{}) {
+	files, err := backup.BuildFileList(job, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))
 	})
 	if err != nil {
@@ -736,8 +736,8 @@ func (r *EdgeRunner) cleanupStaleArchives(settings *config.Settings) {
 	}
 }
 
-func (r *EdgeRunner) hookContext(job *backup.JobDefinition, state *JobState, settings *config.Settings) map[string]interface{} {
-	return map[string]interface{}{
+func (r *EdgeRunner) hookContext(job *backup.JobDefinition, state *JobState, settings *config.Settings) map[string]any {
+	return map[string]any{
 		"edge_id":             settings.EdgeID,
 		"edge_instance_id":    identity.LoadOrCreate(config.InstallationIDPath()),
 		"job_name":            job.JobName,
@@ -781,10 +781,7 @@ func uploadPhasePercent(uploaded int64, total *int64) int {
 	if total == nil || *total <= 0 {
 		return 50
 	}
-	pct := int(float64(uploaded) / float64(*total) * 100)
-	if pct > 100 {
-		pct = 100
-	}
+	pct := min(int(float64(uploaded)/float64(*total)*100), 100)
 	if pct < 0 {
 		pct = 0
 	}

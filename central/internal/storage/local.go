@@ -138,11 +138,8 @@ func copyAcrossFilesystems(src, dst string) error {
 }
 
 func isCrossDeviceError(err error) bool {
-	var linkErr *os.LinkError
-	if errors.As(err, &linkErr) {
-		return linkErr.Err == crossDeviceError
-	}
-	return false
+	linkErr, ok := errors.AsType[*os.LinkError](err)
+	return ok && linkErr.Err == crossDeviceError
 }
 
 // DiskUsage returns (total, used, free) for the filesystem containing path.

@@ -66,7 +66,7 @@ func (s *CronSchedule) validateMinimumSpacing() error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < 128; i++ {
+	for range 128 {
 		current, err := s.NextAfter(previous)
 		if err != nil {
 			return err

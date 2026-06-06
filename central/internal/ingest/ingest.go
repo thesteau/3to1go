@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -288,7 +289,7 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 	}
 
 	if offset != currentSize {
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "offset_mismatch",
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
@@ -385,7 +386,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	}
 	currentSize := s.currentUploadSize(uploadID)
 	if currentSize != session.ArchiveSizeBytes {
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "incomplete_upload",
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
@@ -406,7 +407,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		if err := s.saveSessionContext(ctx, session); err != nil {
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
-		return nil, httpErrorJSON(http.StatusConflict, map[string]interface{}{
+		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
 			"status":      "checksum_mismatch",
 			"next_offset": 0,
 			"upload_id":   uploadID,
@@ -606,11 +607,9 @@ func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHas
 	return s.index.UpsertEdgeRegistration(ctx, reg)
 }
 
-func (s *Service) runPostHook(hookCtx map[string]interface{}, status, storedAs string, pruned int, duplicate bool) {
-	final := map[string]interface{}{}
-	for k, v := range hookCtx {
-		final[k] = v
-	}
+func (s *Service) runPostHook(hookCtx map[string]any, status, storedAs string, pruned int, duplicate bool) {
+	final := map[string]any{}
+	maps.Copy(final, hookCtx)
 	final["status"] = status
 	final["stored_as"] = storedAs
 	final["pruned"] = pruned
@@ -621,8 +620,8 @@ func (s *Service) runPostHook(hookCtx map[string]interface{}, status, storedAs s
 	}
 }
 
-func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]interface{} {
-	return map[string]interface{}{
+func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]any {
+	return map[string]any{
 		"edge_id":            session.EdgeID,
 		"edge_instance_id":   session.EdgeInstanceID,
 		"job_name":           session.JobName,
@@ -702,10 +701,7 @@ func (s *Service) buildSessionResponse(sess *UploadSession) *SessionResponse {
 	if sess.Status == "completed" {
 		nextOffset = sess.ArchiveSizeBytes
 	}
-	chunkSize := s.settings.UploadChunkSizeBytes()
-	if chunkSize > sess.ArchiveSizeBytes {
-		chunkSize = sess.ArchiveSizeBytes
-	}
+	chunkSize := min(s.settings.UploadChunkSizeBytes(), sess.ArchiveSizeBytes)
 	if chunkSize < 1 {
 		chunkSize = 1
 	}
@@ -722,10 +718,7 @@ func (s *Service) buildSessionResponse(sess *UploadSession) *SessionResponse {
 }
 
 func (s *Service) buildCommittedDuplicateResponse(archiveSizeBytes int64, storedAs string) *SessionResponse {
-	chunkSize := s.settings.UploadChunkSizeBytes()
-	if chunkSize > archiveSizeBytes {
-		chunkSize = archiveSizeBytes
-	}
+	chunkSize := min(s.settings.UploadChunkSizeBytes(), archiveSizeBytes)
 	if chunkSize < 1 {
 		chunkSize = 1
 	}
@@ -956,7 +949,7 @@ func storageFilesToIndexFiles(files []storage.StorageFile) []store.StorageFile {
 // HTTPError wraps an HTTP error with status code.
 type HTTPError struct {
 	Code    int
-	Message interface{}
+	Message any
 }
 
 func (e *HTTPError) Error() string {
@@ -974,7 +967,7 @@ func httpError(code int, msg string) *HTTPError {
 	return &HTTPError{Code: code, Message: msg}
 }
 
-func httpErrorJSON(code int, body interface{}) *HTTPError {
+func httpErrorJSON(code int, body any) *HTTPError {
 	return &HTTPError{Code: code, Message: body}
 }
 
@@ -989,7 +982,7 @@ func SourceAddress(r *http.Request) *string {
 	}
 	if fwd := r.Header.Get("Forwarded"); fwd != "" {
 		first := strings.SplitN(fwd, ",", 2)[0]
-		for _, part := range strings.Split(first, ";") {
+		for part := range strings.SplitSeq(first, ";") {
 			p := strings.TrimSpace(part)
 			if !strings.HasPrefix(strings.ToLower(p), "for=") {
 				continue

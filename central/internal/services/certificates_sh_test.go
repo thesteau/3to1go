@@ -40,7 +40,7 @@ func TestCertSave_Success(t *testing.T) {
 func TestCertSave_OverwriteExisting(t *testing.T) {
 	cm := newCertManagerWithShell(t)
 	// Fill to max
-	for i := 0; i < MaxCertificateFiles; i++ {
+	for i := range MaxCertificateFiles {
 		name := string(rune('a'+i)) + ".crt"
 		writeFile(t, filepath.Join(cm.StorageDir, name), validPEM)
 	}

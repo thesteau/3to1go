@@ -20,5 +20,5 @@ type snapshotDownloader interface {
 // circuitSnapshotter provides upload circuit breaker status.
 // Consumers define this interface; *CircuitBreaker satisfies it.
 type circuitSnapshotter interface {
-	Snapshot() map[string]interface{}
+	Snapshot() map[string]any
 }

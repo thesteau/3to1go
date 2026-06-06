@@ -47,8 +47,8 @@ func NewCertManager(storageDir string) *CertManager {
 	}
 }
 
-func (c *CertManager) Snapshot() map[string]interface{} {
-	return map[string]interface{}{
+func (c *CertManager) Snapshot() map[string]any {
+	return map[string]any{
 		"cert_dir":  c.StorageDir,
 		"max_files": MaxCertificateFiles,
 		"files":     c.ListFiles(),

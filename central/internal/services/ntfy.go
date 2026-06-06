@@ -30,8 +30,8 @@ func NewNtfyPublisher(logger *slog.Logger) *NtfyPublisher {
 	}
 }
 
-func (n *NtfyPublisher) Snapshot(s *config.Settings) map[string]interface{} {
-	return map[string]interface{}{
+func (n *NtfyPublisher) Snapshot(s *config.Settings) map[string]any {
+	return map[string]any{
 		"ntfy_url":                    s.NtfyURL,
 		"ntfy_topic":                  s.NtfyTopic,
 		"ntfy_message_template":       s.NtfyMessageTemplate,
@@ -42,12 +42,12 @@ func (n *NtfyPublisher) Snapshot(s *config.Settings) map[string]interface{} {
 	}
 }
 
-func (n *NtfyPublisher) PublishTest(cfg map[string]interface{}) error {
+func (n *NtfyPublisher) PublishTest(cfg map[string]any) error {
 	tmpl := strings.TrimSpace(fmt.Sprintf("%v", orEmpty(cfg["ntfy_message_template"])))
 	if tmpl == "" {
 		tmpl = DefaultNtfyMessageTemplate
 	}
-	msg := RenderMessage(tmpl, map[string]interface{}{
+	msg := RenderMessage(tmpl, map[string]any{
 		"edge_id":          orDefault(cfg["ntfy_match_edge_id"], "edge-01"),
 		"edge_instance_id": orDefault(cfg["ntfy_match_edge_instance_id"], "edgeinstance0001"),
 		"job_name":         "test-job",
@@ -62,7 +62,7 @@ func (n *NtfyPublisher) PublishTest(cfg map[string]interface{}) error {
 	)
 }
 
-func (n *NtfyPublisher) PublishBestEffort(s *config.Settings, ctx map[string]interface{}) {
+func (n *NtfyPublisher) PublishBestEffort(s *config.Settings, ctx map[string]any) {
 	if !n.matches(s, ctx) {
 		return
 	}
@@ -80,7 +80,7 @@ func (n *NtfyPublisher) PublishBestEffort(s *config.Settings, ctx map[string]int
 	}
 }
 
-func RenderMessage(template string, ctx map[string]interface{}) string {
+func RenderMessage(template string, ctx map[string]any) string {
 	norm := strings.TrimSpace(template)
 	if norm == "" {
 		norm = DefaultNtfyMessageTemplate
@@ -91,7 +91,7 @@ func RenderMessage(template string, ctx map[string]interface{}) string {
 	})
 }
 
-func (n *NtfyPublisher) matches(s *config.Settings, ctx map[string]interface{}) bool {
+func (n *NtfyPublisher) matches(s *config.Settings, ctx map[string]any) bool {
 	if s.NtfyURL == "" || s.NtfyTopic == "" {
 		return false
 	}
@@ -107,7 +107,7 @@ func (n *NtfyPublisher) matches(s *config.Settings, ctx map[string]interface{}) 
 	return true
 }
 
-func ctxString(ctx map[string]interface{}, key string) string {
+func ctxString(ctx map[string]any, key string) string {
 	v, ok := ctx[key]
 	if !ok || v == nil {
 		return ""
@@ -149,14 +149,14 @@ func (n *NtfyPublisher) publish(ntfyURL, ntfyTopic, message string) error {
 	return nil
 }
 
-func orEmpty(v interface{}) interface{} {
+func orEmpty(v any) any {
 	if v == nil {
 		return ""
 	}
 	return v
 }
 
-func orDefault(v interface{}, def string) interface{} {
+func orDefault(v any, def string) any {
 	if v == nil {
 		return def
 	}

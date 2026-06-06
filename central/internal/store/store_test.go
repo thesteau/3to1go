@@ -239,7 +239,7 @@ func TestPublicUser(t *testing.T) {
 }
 
 func TestBoolPtr(t *testing.T) {
-	b := boolPtr(true)
+	b := new(true)
 	if b == nil || !*b {
 		t.Error("boolPtr(true) should return non-nil pointer to true")
 	}

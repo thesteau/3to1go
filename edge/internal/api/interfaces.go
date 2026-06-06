@@ -28,31 +28,31 @@ type edgeRunner interface {
 	EncryptionKeyFingerprint() string
 	EncryptionKeyBase64() string
 
-	StatusSnapshot() map[string]interface{}
-	DirectoriesSnapshot() map[string]interface{}
+	StatusSnapshot() map[string]any
+	DirectoriesSnapshot() map[string]any
 
-	NtfySnapshot(cfg *config.Settings) map[string]interface{}
+	NtfySnapshot(cfg *config.Settings) map[string]any
 	TestNtfy(ntfyURL, ntfyTopic, messageTemplate string) error
 
-	CertSnapshot() map[string]interface{}
-	SaveCertFile(filename string, content []byte) (interface{}, error)
+	CertSnapshot() map[string]any
+	SaveCertFile(filename string, content []byte) (any, error)
 	DeleteCertFile(filename string) error
 
-	HookSnapshot(preCmd, postCmd string) map[string]interface{}
-	SaveHookFile(filename string, content []byte) (interface{}, error)
+	HookSnapshot(preCmd, postCmd string) map[string]any
+	SaveHookFile(filename string, content []byte) (any, error)
 	ReadHookFile(filename string) (string, string, error)
 	DeleteHookFile(filename string) error
 
-	SaveJob(relativePath string, cfg map[string]interface{}) (interface{}, error)
+	SaveJob(relativePath string, cfg map[string]any) (any, error)
 	DeleteJob(relativePath string) error
 
-	ForceSendJob(ctx context.Context, jobName string) (map[string]interface{}, error)
-	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]interface{}, error)
-	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]interface{}, error)
+	ForceSendJob(ctx context.Context, jobName string) (map[string]any, error)
+	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
+	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 }
 
 type schedulerFacade interface {
-	Snapshot() map[string]interface{}
+	Snapshot() map[string]any
 	RequestRunNow() string
 	ReloadSettings(cronSchedule string) error
 }

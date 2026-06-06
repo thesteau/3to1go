@@ -73,7 +73,7 @@ func newDirService(t *testing.T, scanRoot string) (*DirectoryService, *mockState
 	return svc, ms
 }
 
-func writeMarker(t *testing.T, dir string, payload map[string]interface{}) {
+func writeMarker(t *testing.T, dir string, payload map[string]any) {
 	t.Helper()
 	if err := backup.WriteUploadDir(dir, payload); err != nil {
 		t.Fatalf("WriteUploadDir: %v", err)
@@ -118,7 +118,7 @@ func TestListDirectories_WithMarkerFile(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
 	os.Mkdir(photoDir, fs.ModePerm)
-	writeMarker(t, photoDir, map[string]interface{}{"job_name": "photos"})
+	writeMarker(t, photoDir, map[string]any{"job_name": "photos"})
 
 	svc, _ := newDirService(t, root)
 	entries, err := svc.ListDirectories()
@@ -149,7 +149,7 @@ func TestListDirectories_ChildBlockedByParentWithMarker(t *testing.T) {
 	parentDir := filepath.Join(root, "parent")
 	childDir := filepath.Join(parentDir, "child")
 	os.MkdirAll(childDir, fs.ModePerm)
-	writeMarker(t, parentDir, map[string]interface{}{"job_name": "parent"})
+	writeMarker(t, parentDir, map[string]any{"job_name": "parent"})
 
 	svc, _ := newDirService(t, root)
 	entries, err := svc.ListDirectories()
@@ -182,7 +182,7 @@ func TestSaveJob_CreatesMarkerFile(t *testing.T) {
 	os.Mkdir(photoDir, fs.ModePerm)
 
 	svc, _ := newDirService(t, root)
-	entry, err := svc.SaveJob("photos", map[string]interface{}{"job_name": "myphotos"})
+	entry, err := svc.SaveJob("photos", map[string]any{"job_name": "myphotos"})
 	if err != nil {
 		t.Fatalf("SaveJob: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestSaveJob_NestedUnderExistingJob(t *testing.T) {
 	parentDir := filepath.Join(root, "parent")
 	childDir := filepath.Join(parentDir, "child")
 	os.MkdirAll(childDir, fs.ModePerm)
-	writeMarker(t, parentDir, map[string]interface{}{})
+	writeMarker(t, parentDir, map[string]any{})
 
 	svc, _ := newDirService(t, root)
 	_, err := svc.SaveJob("parent/child", nil)
@@ -236,7 +236,7 @@ func TestDeleteJob_RemovesMarkerAndClearsState(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
 	os.Mkdir(photoDir, fs.ModePerm)
-	writeMarker(t, photoDir, map[string]interface{}{"job_name": "photos"})
+	writeMarker(t, photoDir, map[string]any{"job_name": "photos"})
 
 	svc, ms := newDirService(t, root)
 	// Pre-seed some state.
@@ -272,7 +272,7 @@ func TestLoadJob_Success(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
 	os.Mkdir(photoDir, fs.ModePerm)
-	writeMarker(t, photoDir, map[string]interface{}{"job_name": "myphotos"})
+	writeMarker(t, photoDir, map[string]any{"job_name": "myphotos"})
 
 	svc, _ := newDirService(t, root)
 	job, err := svc.LoadJob("photos")

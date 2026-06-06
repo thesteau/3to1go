@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	startupDelayMinutes  = 5
-	minimumCycleGap      = schedule.MinimumScheduleMinutes * time.Minute
+	startupDelayMinutes = 5
+	minimumCycleGap     = schedule.MinimumScheduleMinutes * time.Minute
 )
 
 // CycleRunner is anything that can execute one backup cycle.
@@ -24,14 +24,14 @@ type CycleRunner interface {
 type SchedulerController struct {
 	runner CycleRunner
 
-	mu                 sync.Mutex
-	sched              *schedule.CronSchedule
-	state              string
-	nextRunAt          *time.Time
-	lastStartedAt      *time.Time
-	lastCompletedAt    *time.Time
-	runNowRequested    bool
-	startupDelayUntil  time.Time
+	mu                sync.Mutex
+	sched             *schedule.CronSchedule
+	state             string
+	nextRunAt         *time.Time
+	lastStartedAt     *time.Time
+	lastCompletedAt   *time.Time
+	runNowRequested   bool
+	startupDelayUntil time.Time
 
 	stopCh chan struct{}
 	wakeCh chan struct{}
@@ -109,17 +109,17 @@ func (s *SchedulerController) ReloadSettings(newSchedule string) error {
 	return nil
 }
 
-func (s *SchedulerController) Snapshot() map[string]interface{} {
+func (s *SchedulerController) Snapshot() map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result := map[string]interface{}{
-		"state":                    s.state,
-		"cron_schedule":            s.sched.Expression,
+	result := map[string]any{
+		"state":                     s.state,
+		"cron_schedule":             s.sched.Expression,
 		"minimum_cycle_gap_minutes": schedule.MinimumScheduleMinutes,
-		"next_run_at":              formatTime(s.nextRunAt),
-		"last_started_at":          formatTime(s.lastStartedAt),
-		"last_completed_at":        formatTime(s.lastCompletedAt),
-		"run_now_requested":        s.runNowRequested,
+		"next_run_at":               formatTime(s.nextRunAt),
+		"last_started_at":           formatTime(s.lastStartedAt),
+		"last_completed_at":         formatTime(s.lastCompletedAt),
+		"run_now_requested":         s.runNowRequested,
 	}
 	if s.lastCompletedAt == nil {
 		t := s.startupDelayUntil
@@ -154,10 +154,7 @@ func (s *SchedulerController) loop() {
 		s.nextRunAt = &nextRunAt
 		s.mu.Unlock()
 
-		timeout := time.Until(nextRunAt)
-		if timeout < 0 {
-			timeout = 0
-		}
+		timeout := max(time.Until(nextRunAt), 0)
 
 		select {
 		case <-s.stopCh:
@@ -232,7 +229,7 @@ func (s *SchedulerController) runCycle(trigger string) {
 	s.runner.RunCycle()
 }
 
-func formatTime(t *time.Time) interface{} {
+func formatTime(t *time.Time) any {
 	if t == nil {
 		return nil
 	}

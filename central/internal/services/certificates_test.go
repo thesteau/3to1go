@@ -46,7 +46,7 @@ func TestCertListFiles_SkipsDirectories(t *testing.T) {
 
 func TestCertListFiles_MaxFiles(t *testing.T) {
 	cm, dir := newCertManager(t)
-	for i := 0; i < MaxCertificateFiles+2; i++ {
+	for i := range MaxCertificateFiles + 2 {
 		name := strings.Repeat("x", i+1) + ".crt"
 		writeFile(t, filepath.Join(dir, name), validPEM)
 	}
@@ -111,7 +111,7 @@ func TestCertSave_PathTraversal(t *testing.T) {
 
 func TestCertSave_MaxFilesLimit(t *testing.T) {
 	cm, dir := newCertManager(t)
-	for i := 0; i < MaxCertificateFiles; i++ {
+	for i := range MaxCertificateFiles {
 		name := strings.Repeat("a", i+1) + ".crt"
 		writeFile(t, filepath.Join(dir, name), validPEM)
 	}

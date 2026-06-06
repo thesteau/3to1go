@@ -38,8 +38,8 @@ func NewHookManager(scriptsDir string, logger *slog.Logger) *HookManager {
 	return &HookManager{ScriptsDir: scriptsDir, logger: logger}
 }
 
-func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]interface{} {
-	return map[string]interface{}{
+func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]any {
+	return map[string]any{
 		"pre_command":  preCommand,
 		"post_command": postCommand,
 		"script_dir":   h.ScriptsDir,
@@ -131,7 +131,7 @@ func (h *HookManager) DeleteFile(filename string) error {
 }
 
 // RunCommand executes command in the hook scripts directory with THREETOONEGO_* env vars.
-func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]interface{}) {
+func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) {
 	normalized := strings.TrimSpace(command)
 	if normalized == "" {
 		return

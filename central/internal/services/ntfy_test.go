@@ -19,7 +19,7 @@ func discardLogger() *slog.Logger {
 
 func TestRenderMessage_BasicInterpolation(t *testing.T) {
 	tmpl := "Job {{ job_name }} from {{ edge_id }}."
-	ctx := map[string]interface{}{
+	ctx := map[string]any{
 		"job_name": "backup",
 		"edge_id":  "edge01",
 	}
@@ -31,7 +31,7 @@ func TestRenderMessage_BasicInterpolation(t *testing.T) {
 
 func TestRenderMessage_MissingKey(t *testing.T) {
 	tmpl := "Hello {{ missing_key }} world"
-	got := RenderMessage(tmpl, map[string]interface{}{})
+	got := RenderMessage(tmpl, map[string]any{})
 	if got != "Hello  world" {
 		t.Errorf("got %q", got)
 	}
@@ -39,7 +39,7 @@ func TestRenderMessage_MissingKey(t *testing.T) {
 
 func TestRenderMessage_NilValue(t *testing.T) {
 	tmpl := "Value: {{ key }}"
-	ctx := map[string]interface{}{"key": nil}
+	ctx := map[string]any{"key": nil}
 	got := RenderMessage(tmpl, ctx)
 	if got != "Value: " {
 		t.Errorf("got %q", got)
@@ -47,14 +47,14 @@ func TestRenderMessage_NilValue(t *testing.T) {
 }
 
 func TestRenderMessage_EmptyTemplateUsesDefault(t *testing.T) {
-	got := RenderMessage("", map[string]interface{}{})
+	got := RenderMessage("", map[string]any{})
 	if !strings.Contains(got, "Central received") {
 		t.Errorf("expected default template, got %q", got)
 	}
 }
 
 func TestRenderMessage_WhitespaceTemplateUsesDefault(t *testing.T) {
-	got := RenderMessage("   ", map[string]interface{}{})
+	got := RenderMessage("   ", map[string]any{})
 	if !strings.Contains(got, "Central received") {
 		t.Errorf("expected default template, got %q", got)
 	}
@@ -62,7 +62,7 @@ func TestRenderMessage_WhitespaceTemplateUsesDefault(t *testing.T) {
 
 func TestRenderMessage_SpacesInPlaceholder(t *testing.T) {
 	tmpl := "Hello {{  name  }}"
-	ctx := map[string]interface{}{"name": "world"}
+	ctx := map[string]any{"name": "world"}
 	got := RenderMessage(tmpl, ctx)
 	if got != "Hello world" {
 		t.Errorf("got %q", got)
@@ -70,7 +70,7 @@ func TestRenderMessage_SpacesInPlaceholder(t *testing.T) {
 }
 
 func TestRenderMessage_NoPlaceholders(t *testing.T) {
-	got := RenderMessage("plain text", map[string]interface{}{})
+	got := RenderMessage("plain text", map[string]any{})
 	if got != "plain text" {
 		t.Errorf("got %q", got)
 	}
@@ -82,13 +82,13 @@ func TestPublishBestEffort_NoURLSkips(t *testing.T) {
 	n := NewNtfyPublisher(discardLogger())
 	s := &config.Settings{NtfyURL: "", NtfyTopic: "topic"}
 	// Should not panic or call anything
-	n.PublishBestEffort(s, map[string]interface{}{"edge_id": "e1"})
+	n.PublishBestEffort(s, map[string]any{"edge_id": "e1"})
 }
 
 func TestPublishBestEffort_NoTopicSkips(t *testing.T) {
 	n := NewNtfyPublisher(discardLogger())
 	s := &config.Settings{NtfyURL: "https://ntfy.sh", NtfyTopic: ""}
-	n.PublishBestEffort(s, map[string]interface{}{"edge_id": "e1"})
+	n.PublishBestEffort(s, map[string]any{"edge_id": "e1"})
 }
 
 func TestPublishBestEffort_EdgeIDFilterMatch(t *testing.T) {
@@ -105,7 +105,7 @@ func TestPublishBestEffort_EdgeIDFilterMatch(t *testing.T) {
 		NtfyTopic:       "alerts",
 		NtfyMatchEdgeID: "edge01",
 	}
-	n.PublishBestEffort(s, map[string]interface{}{"edge_id": "edge01"})
+	n.PublishBestEffort(s, map[string]any{"edge_id": "edge01"})
 	if !called {
 		t.Error("expected ntfy to be called when edge_id matches")
 	}
@@ -125,7 +125,7 @@ func TestPublishBestEffort_EdgeIDFilterNoMatch(t *testing.T) {
 		NtfyTopic:       "alerts",
 		NtfyMatchEdgeID: "edge01",
 	}
-	n.PublishBestEffort(s, map[string]interface{}{"edge_id": "other-edge"})
+	n.PublishBestEffort(s, map[string]any{"edge_id": "other-edge"})
 	if called {
 		t.Error("expected ntfy to be skipped when edge_id doesn't match")
 	}
@@ -145,7 +145,7 @@ func TestPublishBestEffort_InstIDFilterNoMatch(t *testing.T) {
 		NtfyTopic:           "alerts",
 		NtfyMatchEdgeInstID: "inst1",
 	}
-	n.PublishBestEffort(s, map[string]interface{}{"edge_instance_id": "inst2"})
+	n.PublishBestEffort(s, map[string]any{"edge_instance_id": "inst2"})
 	if called {
 		t.Error("expected ntfy to be skipped when instance_id doesn't match")
 	}
@@ -165,7 +165,7 @@ func TestPublishBestEffort_SourceFilterNoMatch(t *testing.T) {
 		NtfyTopic:       "alerts",
 		NtfyMatchSource: "1.2.3.4",
 	}
-	n.PublishBestEffort(s, map[string]interface{}{"source_address": "5.6.7.8"})
+	n.PublishBestEffort(s, map[string]any{"source_address": "5.6.7.8"})
 	if called {
 		t.Error("expected ntfy to be skipped when source doesn't match")
 	}
@@ -181,7 +181,7 @@ func TestPublishBestEffort_ServerError(t *testing.T) {
 	n := NewNtfyPublisher(discardLogger())
 	s := &config.Settings{NtfyURL: srv.URL, NtfyTopic: "alerts"}
 	// Should not panic, just log the error
-	n.PublishBestEffort(s, map[string]interface{}{})
+	n.PublishBestEffort(s, map[string]any{})
 }
 
 // --- publish ---
@@ -261,7 +261,7 @@ func TestPublishTest_Success(t *testing.T) {
 	defer srv.Close()
 
 	n := NewNtfyPublisher(discardLogger())
-	cfg := map[string]interface{}{
+	cfg := map[string]any{
 		"ntfy_url":              srv.URL,
 		"ntfy_topic":            "testtopic",
 		"ntfy_message_template": "Test {{ job_name }}",
@@ -281,7 +281,7 @@ func TestPublishTest_DefaultTemplate(t *testing.T) {
 	defer srv.Close()
 
 	n := NewNtfyPublisher(discardLogger())
-	cfg := map[string]interface{}{
+	cfg := map[string]any{
 		"ntfy_url":   srv.URL,
 		"ntfy_topic": "testtopic",
 	}

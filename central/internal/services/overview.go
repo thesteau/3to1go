@@ -15,7 +15,7 @@ type SnapshotIndexer interface {
 }
 
 // BuildOverview assembles the dashboard data.
-func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.LocalBackend, idx SnapshotIndexer) (map[string]interface{}, error) {
+func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.LocalBackend, idx SnapshotIndexer) (map[string]any, error) {
 	registrations, err := idx.ListEdgeRegistrations(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -26,15 +26,15 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 	}
 
 	type edgeEntry struct {
-		EdgeID    string        `json:"edge_id"`
-		Instances []interface{} `json:"instances"`
+		EdgeID    string `json:"edge_id"`
+		Instances []any  `json:"instances"`
 	}
 
 	edgeMap := map[string]*edgeEntry{}
 	var edges []*edgeEntry
 
 	type instKey struct{ edgeID, instID string }
-	instMap := map[instKey]map[string]interface{}{}
+	instMap := map[instKey]map[string]any{}
 
 	for _, reg := range registrations {
 		edge := edgeMap[reg.EdgeID]
@@ -46,7 +46,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 		key := instKey{reg.EdgeID, reg.EdgeInstanceID}
 		inst := instMap[key]
 		if inst == nil {
-			inst = map[string]interface{}{
+			inst = map[string]any{
 				"edge_instance_id":           reg.EdgeInstanceID,
 				"instance_label":             reg.EdgeInstanceID,
 				"advertised_url":             reg.AdvertisedURL,
@@ -54,7 +54,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 				"first_seen_at":              reg.FirstSeenAt,
 				"last_seen_at":               reg.LastSeenAt,
 				"credential_configured":      reg.CredentialHash != nil && *reg.CredentialHash != "",
-				"jobs":                       []interface{}{},
+				"jobs":                       []any{},
 			}
 			instMap[key] = inst
 			edge.Instances = append(edge.Instances, inst)
@@ -81,7 +81,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 		key := instKey{ns.EdgeID, ns.EdgeInstanceID}
 		inst := instMap[key]
 		if inst == nil {
-			inst = map[string]interface{}{
+			inst = map[string]any{
 				"edge_instance_id":           ns.EdgeInstanceID,
 				"instance_label":             ns.EdgeInstanceID,
 				"advertised_url":             nil,
@@ -89,7 +89,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 				"first_seen_at":              nil,
 				"last_seen_at":               nil,
 				"credential_configured":      false,
-				"jobs":                       []interface{}{},
+				"jobs":                       []any{},
 			}
 			instMap[key] = inst
 			edge.Instances = append(edge.Instances, inst)
@@ -98,15 +98,15 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend *storage.Loc
 	}
 
 	// Convert edge slice to []interface{}
-	edgesOut := make([]interface{}, len(edges))
+	edgesOut := make([]any, len(edges))
 	for i, e := range edges {
-		edgesOut[i] = map[string]interface{}{
+		edgesOut[i] = map[string]any{
 			"edge_id":   e.EdgeID,
 			"instances": e.Instances,
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"status":              statusString(backend),
 		"backup_dir":          s.BackupRoot,
 		"retention_keep_last": s.RetentionKeepLast,

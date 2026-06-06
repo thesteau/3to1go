@@ -25,13 +25,13 @@ func NewDirectoryService(settings *config.Settings, logger *slog.Logger, stateSt
 
 // DirectoryEntry is the JSON representation of a scanned directory.
 type DirectoryEntry struct {
-	RelativePath    string                 `json:"relative_path"`
-	AbsolutePath    string                 `json:"absolute_path"`
-	Selected        bool                   `json:"selected"`
-	BlockedByParent interface{}            `json:"blocked_by_parent"`
-	Config          interface{}            `json:"config"`
-	ConfigError     interface{}            `json:"config_error"`
-	State           JobState               `json:"state"`
+	RelativePath    string   `json:"relative_path"`
+	AbsolutePath    string   `json:"absolute_path"`
+	Selected        bool     `json:"selected"`
+	BlockedByParent any      `json:"blocked_by_parent"`
+	Config          any      `json:"config"`
+	ConfigError     any      `json:"config_error"`
+	State           JobState `json:"state"`
 }
 
 // ListDirectories walks the scan root up to max_depth and returns directory info.
@@ -43,8 +43,8 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 
 	var entries []DirectoryEntry
 
-	var walk func(dir string, depth int, blockedBy interface{})
-	walk = func(dir string, depth int, blockedBy interface{}) {
+	var walk func(dir string, depth int, blockedBy any)
+	walk = func(dir string, depth int, blockedBy any) {
 		if depth > d.settings.MaxDepth {
 			return
 		}
@@ -63,8 +63,8 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 			selected = true
 		}
 
-		var cfg interface{}
-		var cfgErr interface{}
+		var cfg any
+		var cfgErr any
 		if selected {
 			payload, err := backup.ReadUploadDirPayload(markerPath)
 			if err == nil {
@@ -110,7 +110,7 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 }
 
 // SaveJob writes the upload_dir marker for relative_path.
-func (d *DirectoryService) SaveJob(relativePath string, payload map[string]interface{}) (DirectoryEntry, error) {
+func (d *DirectoryService) SaveJob(relativePath string, payload map[string]any) (DirectoryEntry, error) {
 	dir, err := d.resolveDirectory(relativePath)
 	if err != nil {
 		return DirectoryEntry{}, err
@@ -181,8 +181,8 @@ func (d *DirectoryService) serializeDirectory(dir string) (DirectoryEntry, error
 
 	markerPath := filepath.Join(dir, backup.UploadDirFilename)
 	selected := false
-	var cfg interface{}
-	var cfgErr interface{}
+	var cfg any
+	var cfgErr any
 	if fi, err := os.Stat(markerPath); err == nil && !fi.IsDir() {
 		selected = true
 		payload, err := backup.ReadUploadDirPayload(markerPath)
@@ -200,7 +200,7 @@ func (d *DirectoryService) serializeDirectory(dir string) (DirectoryEntry, error
 
 	state := d.stateStore.Get(dir)
 	blocker := d.findBlockingAncestor(dir)
-	var blockedByParent interface{}
+	var blockedByParent any
 	if blocker != "" {
 		blockedByParent = blocker
 	}
