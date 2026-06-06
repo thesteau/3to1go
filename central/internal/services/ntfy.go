@@ -14,7 +14,7 @@ import (
 	"github.com/3to1go/central/internal/config"
 )
 
-const DefaultNtfyMessageTemplate = "Central received {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} from {{ source_address }} as {{ stored_as }}."
+const DefaultNtfyMessageTemplate = "Central received {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} from {{ advertised_url }} as {{ stored_as }}."
 
 var templatePattern = regexp.MustCompile(`{{\s*([a-zA-Z0-9_]+)\s*}}`)
 
@@ -51,6 +51,7 @@ func (n *NtfyPublisher) PublishTest(cfg map[string]interface{}) error {
 		"edge_id":          orDefault(cfg["ntfy_match_edge_id"], "edge-01"),
 		"edge_instance_id": orDefault(cfg["ntfy_match_edge_instance_id"], "edgeinstance0001"),
 		"job_name":         "test-job",
+		"advertised_url":   "https://edge.example.com",
 		"source_address":   orDefault(cfg["ntfy_match_source"], "127.0.0.1"),
 		"stored_as":        "test-upload.tar.zst",
 	})
@@ -86,11 +87,7 @@ func RenderMessage(template string, ctx map[string]interface{}) string {
 	}
 	return templatePattern.ReplaceAllStringFunc(norm, func(match string) string {
 		key := strings.TrimSpace(match[2 : len(match)-2])
-		v, ok := ctx[key]
-		if !ok || v == nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", v)
+		return ctxString(ctx, key)
 	})
 }
 
@@ -98,16 +95,30 @@ func (n *NtfyPublisher) matches(s *config.Settings, ctx map[string]interface{}) 
 	if s.NtfyURL == "" || s.NtfyTopic == "" {
 		return false
 	}
-	if s.NtfyMatchEdgeID != "" && s.NtfyMatchEdgeID != strings.TrimSpace(fmt.Sprintf("%v", orEmpty(ctx["edge_id"]))) {
+	if s.NtfyMatchEdgeID != "" && s.NtfyMatchEdgeID != ctxString(ctx, "edge_id") {
 		return false
 	}
-	if s.NtfyMatchEdgeInstID != "" && s.NtfyMatchEdgeInstID != strings.TrimSpace(fmt.Sprintf("%v", orEmpty(ctx["edge_instance_id"]))) {
+	if s.NtfyMatchEdgeInstID != "" && s.NtfyMatchEdgeInstID != ctxString(ctx, "edge_instance_id") {
 		return false
 	}
-	if s.NtfyMatchSource != "" && s.NtfyMatchSource != strings.TrimSpace(fmt.Sprintf("%v", orEmpty(ctx["source_address"]))) {
+	if s.NtfyMatchSource != "" && s.NtfyMatchSource != ctxString(ctx, "source_address") {
 		return false
 	}
 	return true
+}
+
+func ctxString(ctx map[string]interface{}, key string) string {
+	v, ok := ctx[key]
+	if !ok || v == nil {
+		return ""
+	}
+	if sp, ok := v.(*string); ok {
+		if sp == nil {
+			return ""
+		}
+		return *sp
+	}
+	return strings.TrimSpace(fmt.Sprintf("%v", v))
 }
 
 func (n *NtfyPublisher) publish(ntfyURL, ntfyTopic, message string) error {

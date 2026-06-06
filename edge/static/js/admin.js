@@ -81,7 +81,7 @@ function collectNtfyPayload() {
 }
 
 function resetNtfyDefaults() {
-  document.getElementById("ntfy_url").value = "";
+  document.getElementById("ntfy_url").value = "https://ntfy.sh";
   document.getElementById("ntfy_topic").value = "";
   document.getElementById("ntfy_message_template").value = edgeNtfyConfig?.default_message_template || "";
 }

@@ -11,7 +11,7 @@
     <div class="split-row">
       <div>
         <label for="ntfy_url">ntfy Server URL</label>
-        <input id="ntfy_url" type="url" placeholder="https://ntfy.example.com">
+        <input id="ntfy_url" type="url" placeholder="https://ntfy.sh">
       </div>
       <div>
         <label for="ntfy_topic">Topic</label>
@@ -19,9 +19,11 @@
       </div>
     </div>
 
-    <label for="ntfy_message_template">Message Template</label>
+    <div class="label-row">
+      <label for="ntfy_message_template">Message Template</label>
+      <button type="button" class="secondary" onclick="openDialog('ntfy-placeholder-guide')">Placeholder Guide</button>
+    </div>
     <textarea id="ntfy_message_template"></textarea>
-    <p class="hint">Available placeholders: <code>{{ "{{" }} edge_id {{ "}}" }}</code>, <code>{{ "{{" }} edge_instance_id {{ "}}" }}</code>, <code>{{ "{{" }} job_name {{ "}}" }}</code>, <code>{{ "{{" }} stored_as {{ "}}" }}</code>.</p>
 
     <div class="toolbar">
       <button type="button" onclick="saveNtfyConfig()">Save</button>
@@ -30,5 +32,40 @@
       <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
       <span class="hint status-line" id="ntfy-status"></span>
     </div>
+  </div>
+</dialog>
+
+<dialog id="ntfy-placeholder-guide" class="modal" aria-labelledby="ntfy-guide-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="ntfy-guide-title">Message Template Placeholders</h2>
+      <button type="button" class="secondary" onclick="closeDialog('ntfy-placeholder-guide')">Close</button>
+    </div>
+    <table class="placeholder-table">
+      <thead>
+        <tr>
+          <th>Placeholder</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>{{ edge_id }}</code></td>
+          <td>Friendly name identifying this Edge instance</td>
+        </tr>
+        <tr>
+          <td><code>{{ edge_instance_id }}</code></td>
+          <td>Unique instance ID for this Edge installation</td>
+        </tr>
+        <tr>
+          <td><code>{{ job_name }}</code></td>
+          <td>Name of the upload job</td>
+        </tr>
+        <tr>
+          <td><code>{{ stored_as }}</code></td>
+          <td>Filename as stored on Central</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </dialog>
