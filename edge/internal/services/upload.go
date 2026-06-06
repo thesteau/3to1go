@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -40,11 +41,11 @@ func (e *UploadFailure) Error() string {
 
 // CircuitBreaker tracks consecutive failures and opens after a threshold.
 type CircuitBreaker struct {
-	mu                   sync.Mutex
-	failureThreshold     int
-	cooldownSeconds      int
-	consecutiveFailures  int
-	openedUntilMonotonic float64 // 0 = closed
+	mu                  sync.Mutex
+	failureThreshold    int
+	cooldownSeconds     int
+	consecutiveFailures int
+	openedUntil         time.Time // zero = closed
 }
 
 func NewCircuitBreaker(threshold, cooldownSeconds int) *CircuitBreaker {
@@ -57,15 +58,14 @@ func NewCircuitBreaker(threshold, cooldownSeconds int) *CircuitBreaker {
 func (cb *CircuitBreaker) BeforeRequest() *UploadFailure {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	if cb.openedUntilMonotonic == 0 {
+	if cb.openedUntil.IsZero() {
 		return nil
 	}
-	now := monoNow()
-	if now >= cb.openedUntilMonotonic {
-		cb.openedUntilMonotonic = 0
+	if !time.Now().Before(cb.openedUntil) {
+		cb.openedUntil = time.Time{}
 		return nil
 	}
-	remaining := int(math.Ceil(cb.openedUntilMonotonic - now))
+	remaining := int(math.Ceil(time.Until(cb.openedUntil).Seconds()))
 	if remaining < 1 {
 		remaining = 1
 	}
@@ -81,7 +81,7 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	cb.consecutiveFailures = 0
-	cb.openedUntilMonotonic = 0
+	cb.openedUntil = time.Time{}
 }
 
 func (cb *CircuitBreaker) RecordFailure() {
@@ -89,7 +89,7 @@ func (cb *CircuitBreaker) RecordFailure() {
 	defer cb.mu.Unlock()
 	cb.consecutiveFailures++
 	if cb.consecutiveFailures >= cb.failureThreshold {
-		cb.openedUntilMonotonic = monoNow() + float64(cb.cooldownSeconds)
+		cb.openedUntil = time.Now().Add(time.Duration(cb.cooldownSeconds) * time.Second)
 	}
 }
 
@@ -97,14 +97,17 @@ func (cb *CircuitBreaker) RecordFailure() {
 func (cb *CircuitBreaker) Snapshot() map[string]interface{} {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	if cb.openedUntilMonotonic == 0 {
+	if cb.openedUntil.IsZero() {
 		return map[string]interface{}{
 			"state":                      "closed",
 			"consecutive_failures":       cb.consecutiveFailures,
 			"cooldown_remaining_seconds": 0,
 		}
 	}
-	remaining := int(math.Max(0, cb.openedUntilMonotonic-monoNow()))
+	remaining := int(time.Until(cb.openedUntil).Seconds())
+	if remaining < 0 {
+		remaining = 0
+	}
 	state := "open"
 	if remaining == 0 {
 		state = "closed"
@@ -220,7 +223,7 @@ func (c *UploadClient) UploadArchive(
 	}
 
 	uploadID = stringField(sessionInfo, "upload_id")
-	offset := maxInt64(uploadOffset, int64Field(sessionInfo, "next_offset"))
+	offset := max(uploadOffset, int64Field(sessionInfo, "next_offset"))
 
 	if stringField(sessionInfo, "status") == "completed" {
 		return &UploadResult{
@@ -249,7 +252,7 @@ func (c *UploadClient) UploadArchive(
 		if _, err := f.Seek(offset, io.SeekStart); err != nil {
 			return nil, err
 		}
-		buf := make([]byte, min64(chunkSize, archiveSize-offset))
+		buf := make([]byte, min(chunkSize, archiveSize-offset))
 		n, err := io.ReadFull(f, buf)
 		if err != nil && err != io.ErrUnexpectedEOF {
 			return nil, err
@@ -300,10 +303,10 @@ func (c *UploadClient) UploadArchive(
 			return nil, err
 		}
 
-		offset = maxInt64(offset+int64(len(buf)), int64Field(resp, "next_offset"))
+		offset = max(offset+int64(len(buf)), int64Field(resp, "next_offset"))
 		successStreak++
 		if successStreak >= 2 {
-			chunkSize = min64(c.maxChunkSizeBytes, chunkSize*2)
+			chunkSize = min(c.maxChunkSizeBytes, chunkSize*2)
 			successStreak = 0
 		}
 		if progress != nil {
@@ -362,7 +365,7 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 		filename = destPath
 	}
 
-	if err := os.MkdirAll(getDir(destPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return "", err
 	}
 	f, err := os.Create(destPath)
@@ -727,29 +730,5 @@ func boolField(m map[string]interface{}, key string) bool {
 	return b
 }
 
-func maxInt64(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
 
-func min64(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
 
-func getDir(path string) string {
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' || path[i] == '\\' {
-			return path[:i]
-		}
-	}
-	return "."
-}
-
-func monoNow() float64 {
-	return float64(time.Now().UnixNano()) / 1e9
-}

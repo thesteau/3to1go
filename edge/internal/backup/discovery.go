@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -79,8 +79,8 @@ func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...interface
 				children = append(children, filepath.Join(cur.dir, e.Name()))
 			}
 		}
-		sort.Slice(children, func(i, j int) bool {
-			return strings.ToLower(filepath.Base(children[i])) < strings.ToLower(filepath.Base(children[j]))
+		slices.SortFunc(children, func(a, b string) int {
+			return strings.Compare(strings.ToLower(filepath.Base(a)), strings.ToLower(filepath.Base(b)))
 		})
 		for _, child := range children {
 			queue = append(queue, entry{child, cur.depth + 1})

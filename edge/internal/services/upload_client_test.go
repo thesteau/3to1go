@@ -260,12 +260,6 @@ func TestUploadFailureClassificationAndHelpers(t *testing.T) {
 	if !boolField(map[string]interface{}{"ok": true}, "ok") || stringField(map[string]interface{}{"s": "x"}, "s") != "x" {
 		t.Fatal("field helpers failed")
 	}
-	if maxInt64(1, 2) != 2 || min64(1, 2) != 1 {
-		t.Fatal("min/max helpers failed")
-	}
-	if getDir("file.txt") != "." || getDir("a/b/file.txt") != "a/b" || getDir(`a\b\file.txt`) != `a\b` {
-		t.Fatal("getDir failed")
-	}
 }
 
 func TestChunkSizingTimeoutAndRequestTimeout(t *testing.T) {

@@ -1,9 +1,10 @@
 package backup
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -112,8 +113,8 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...interface{})) ([]*D
 		}
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].ArchivePath < files[j].ArchivePath
+	slices.SortFunc(files, func(a, b *DiscoveredFile) int {
+		return cmp.Compare(a.ArchivePath, b.ArchivePath)
 	})
 	return files, nil
 }

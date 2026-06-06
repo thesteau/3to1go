@@ -84,13 +84,10 @@ func TestCircuitBreaker_SuccessResetsConsecutiveFailures(t *testing.T) {
 }
 
 func TestCircuitBreaker_ZeroCooldownClosedImmediately(t *testing.T) {
-	// With 0 cooldown, the circuit opens but monoNow() >= openedUntil immediately on next call.
-	// This is an edge case - threshold=1, cooldown=0 means the circuit opens
-	// but the next BeforeRequest will see it as already closed.
+	// With cooldown=0, openedUntil = time.Now() + 0 = time.Now().
+	// On next call: !time.Now().Before(openedUntil) → resets to closed.
 	cb := NewCircuitBreaker(1, 0)
 	cb.RecordFailure()
-	// With cooldown=0: openedUntilMonotonic = monoNow() + 0 = monoNow()
-	// On next call: monoNow() >= openedUntilMonotonic → resets to closed
 	fail := cb.BeforeRequest()
 	if fail != nil {
 		// The circuit may or may not be closed depending on nanosecond timing.

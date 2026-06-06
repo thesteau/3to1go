@@ -1,9 +1,10 @@
 package backup
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -11,8 +12,8 @@ import (
 func ComputeFingerprint(files []*DiscoveredFile) string {
 	sorted := make([]*DiscoveredFile, len(files))
 	copy(sorted, files)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ArchivePath < sorted[j].ArchivePath
+	slices.SortFunc(sorted, func(a, b *DiscoveredFile) int {
+		return cmp.Compare(a.ArchivePath, b.ArchivePath)
 	})
 
 	var lines []string

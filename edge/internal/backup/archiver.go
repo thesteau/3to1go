@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"cmp"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,8 +42,8 @@ func CreateArchive(archivePath string, files []*DiscoveredFile) error {
 
 	sorted := make([]*DiscoveredFile, len(files))
 	copy(sorted, files)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ArchivePath < sorted[j].ArchivePath
+	slices.SortFunc(sorted, func(a, b *DiscoveredFile) int {
+		return cmp.Compare(a.ArchivePath, b.ArchivePath)
 	})
 
 	f, err := os.Create(archivePath)

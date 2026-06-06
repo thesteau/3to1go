@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/3to1go/edge/internal/backup"
@@ -278,8 +278,8 @@ func readSortedSubdirs(dir string) ([]string, error) {
 			dirs = append(dirs, filepath.Join(dir, e.Name()))
 		}
 	}
-	sort.Slice(dirs, func(i, j int) bool {
-		return strings.ToLower(filepath.Base(dirs[i])) < strings.ToLower(filepath.Base(dirs[j]))
+	slices.SortFunc(dirs, func(a, b string) int {
+		return strings.Compare(strings.ToLower(filepath.Base(a)), strings.ToLower(filepath.Base(b)))
 	})
 	return dirs, nil
 }

@@ -121,11 +121,9 @@ func (r *EdgeRunner) RunCycle() bool {
 
 	var wg sync.WaitGroup
 	for _, job := range jobs {
-		wg.Add(1)
-		go func(j *backup.JobDefinition) {
-			defer wg.Done()
-			r.prepareJob(j, settings, workCh)
-		}(job)
+		wg.Go(func() {
+			r.prepareJob(job, settings, workCh)
+		})
 	}
 
 	go func() {
@@ -665,7 +663,7 @@ func (r *EdgeRunner) retryDelaySeconds(attemptCount int, uf *UploadFailure) int 
 	if uf != nil && uf.RetryAfterSeconds != nil {
 		return *uf.RetryAfterSeconds
 	}
-	exp := math.Pow(2, math.Max(0, float64(attemptCount-1)))
+	exp := math.Pow(2, max(0.0, float64(attemptCount-1)))
 	delay := float64(settings.UploadRetryBaseDelaySeconds) * exp
 	if delay > float64(settings.UploadRetryMaxDelaySeconds) {
 		delay = float64(settings.UploadRetryMaxDelaySeconds)
