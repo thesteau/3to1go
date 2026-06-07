@@ -36,3 +36,29 @@
 .admin-only[hidden] {
   display: none;
 }
+
+.dialog-icon-links {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.icon-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.icon-link:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
