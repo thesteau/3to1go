@@ -148,6 +148,9 @@ func (s *StateStore) saveLocked() error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(s.stateDir, 0o755); err != nil {
+		return err
+	}
 	tmp := s.path + ".tmp"
 	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
 		return err
