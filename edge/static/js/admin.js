@@ -5,7 +5,6 @@ let hookDraftDirty = { pre: false, post: false };
 
 const EDGE_SETTINGS_HELP = {
   settings_edge_id: "A friendly name Central uses to group this Edge with related installations.",
-  settings_scan_root: "Edge scans this folder tree for .upload_dir files and available directories.",
   settings_central_url: "The Central server URL Edge uploads backups to.",
   settings_advertised_url: "Optional URL Central displays as a link to this Edge instance.",
   settings_edge_credential: "JWT credential minted from Central. Edge includes this when uploading.",
@@ -378,7 +377,6 @@ function getToggle(id) {
 function fillSettings(settings) {
   const data = settings || {};
   document.getElementById("settings_edge_id").value = data.edge_id || "";
-  document.getElementById("settings_scan_root").value = data.scan_root || "";
   document.getElementById("settings_central_url").value = data.central_url || "";
   document.getElementById("settings_advertised_url").value = data.advertised_url || "";
   document.getElementById("settings_edge_credential").value = data.edge_credential || "";
@@ -407,7 +405,6 @@ function fillSettings(settings) {
 function collectSettingsPayload(overrides = {}) {
   return {
     edge_id: document.getElementById("settings_edge_id").value.trim(),
-    scan_root: document.getElementById("settings_scan_root").value.trim(),
     central_url: document.getElementById("settings_central_url").value.trim(),
     advertised_url: document.getElementById("settings_advertised_url").value.trim(),
     edge_credential: document.getElementById("settings_edge_credential").value,
