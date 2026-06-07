@@ -21,7 +21,10 @@ function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title
   if (!text) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
-  if (region.showPopover && !region.matches(":popover-open")) region.showPopover();
+  if (region.showPopover) {
+    if (region.matches(":popover-open")) region.hidePopover();
+    region.showPopover();
+  }
 
   const defaultTitle = kind === "error" ? "Something needs attention" : kind === "success" ? "Done" : "Notice";
   const toast = document.createElement("div");
@@ -63,6 +66,11 @@ function openDialog(id) {
   if (!dialog?.showModal) return;
   if (dialog.open) return;
   dialog.showModal();
+  const region = document.getElementById("toast-region");
+  if (region?.showPopover && region.matches(":popover-open")) {
+    region.hidePopover();
+    region.showPopover();
+  }
 }
 
 function closeDialog(id) {
