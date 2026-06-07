@@ -84,9 +84,17 @@ func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
 	}
 	defer src.Close()
 
+	// Re-stat after open to get the actual current size; the size recorded at
+	// scan time may be stale if the file changed (e.g. an active SQLite DB).
+	info, err := src.Stat()
+	if err != nil {
+		return err
+	}
+	size := info.Size()
+
 	hdr := &tar.Header{
 		Name:    file.ArchivePath,
-		Size:    file.Size,
+		Size:    size,
 		ModTime: time.Unix(0, file.MtimeNs),
 		Mode:    0o644,
 		Uid:     0, Gid: 0,
@@ -97,7 +105,14 @@ func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}
-	_, err = io.Copy(tw, src)
+	written, err := io.Copy(tw, io.LimitReader(src, size))
+	if err != nil {
+		return err
+	}
+	if written < size {
+		// File shrank after stat — pad with zeros so the tar entry is consistent.
+		_, err = tw.Write(make([]byte, size-written))
+	}
 	return err
 }
 
