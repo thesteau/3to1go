@@ -209,7 +209,7 @@ func (r *EdgeRunner) finishJob(job *backup.JobDefinition, settings *config.Setti
 	}
 }
 
-// ForceSendJob forces a single named job through the upload pipeline.
+// ForceSendJob forces a single named job through the upload pipeline synchronously.
 func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[string]any, error) {
 	r.mu.Lock()
 	settings := r.Settings
@@ -252,6 +252,58 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 
 	return map[string]any{
 		"status":               "started",
+		"job_name":             normalized,
+		"manual_retry_cleared": cleared,
+	}, nil
+}
+
+// StartForceSendAsync validates the job, acquires the lock, and dispatches the upload
+// in a background goroutine. Returns immediately without waiting for the upload to complete.
+func (r *EdgeRunner) StartForceSendAsync(jobName string) (map[string]any, error) {
+	r.mu.Lock()
+	settings := r.Settings
+	r.mu.Unlock()
+
+	normalized := strings.TrimSpace(jobName)
+	if normalized == "" {
+		return nil, fmt.Errorf("job_name is required")
+	}
+
+	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, nil)
+	var matched []*backup.JobDefinition
+	for _, j := range jobs {
+		if j.JobName == normalized {
+			matched = append(matched, j)
+		}
+	}
+	if len(matched) == 0 {
+		return nil, fmt.Errorf("job not found")
+	}
+	if len(matched) > 1 {
+		return nil, fmt.Errorf("multiple jobs share that job_name")
+	}
+	job := matched[0]
+
+	if !r.cycleLock.TryLock() {
+		return map[string]any{"status": "already_running", "job_name": normalized}, nil
+	}
+
+	s := r.StateStore.Get(job.RootPath)
+	cleared := s.ManualInterventionRequired
+	if cleared {
+		s.ManualInterventionRequired = false
+		s.NextRetryAt = ""
+		s.LastStatus = "manual_retry_requested"
+		r.StateStore.Set(job.RootPath, s)
+	}
+
+	go func() {
+		defer r.cycleLock.Unlock()
+		r.processJobLocked(job, &s, settings, true)
+	}()
+
+	return map[string]any{
+		"status":               "queued",
 		"job_name":             normalized,
 		"manual_retry_cleared": cleared,
 	}, nil

@@ -129,8 +129,10 @@ function jobActivityDetails(entry) {
           : formatStatusLabel(status);
   const detail = status === "success"
     ? (state.last_duplicate ? "Already stored" : "Completed")
-    : status === "compressing" || status === "encrypting" || status === "archive_created"
-      ? `${Math.min(50, percent)}% compression`
+    : status === "compressing" || status === "encrypting"
+      ? (phasePercent > 0 ? `${phasePercent}%` : "In progress")
+    : status === "archive_created"
+      ? "Compressed, awaiting upload"
     : status === "retry_scheduled"
       ? (state.next_retry_at ? `Retry at ${formatLocalDateTime(state.next_retry_at)}` : "Retry scheduled")
       : status === "manual_intervention_required"
@@ -293,6 +295,7 @@ function renderSelectedJobs(directories) {
     }).join("")
     : '<p class="hint">No directories are selected yet.</p>';
   setHtmlIfChanged("selected-jobs", html);
+  setHtmlIfChanged("selected-jobs-count", String(selected.length));
 }
 
 function renderDirectoryTree(directories) {

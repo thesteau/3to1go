@@ -77,7 +77,7 @@ func (a *App) handleForceSend(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid job request")
 		return
 	}
-	result, err := a.runner.ForceSendJob(r.Context(), body.JobName)
+	result, err := a.runner.StartForceSendAsync(body.JobName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

@@ -93,8 +93,8 @@ async function forceUpload(jobName, btn) {
 
     setActionStatus(
       body.manual_retry_cleared
-        ? `Forced upload for ${label}. A manual block was cleared first.`
-        : `Forced upload for ${label}. Central may still reject it as a duplicate.`,
+        ? `Force upload queued for ${label}. A manual block was cleared first.`
+        : `Force upload queued for ${label}.`,
       "success",
     );
     await loadData({ silent: true });
