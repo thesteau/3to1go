@@ -77,6 +77,25 @@ The full flow looks like this:
 7. Central verifies the upload, stores it by `edge_id/edge_instance_id/job_name`, and prunes old snapshots per instance.
 8. You browse and download snapshots from Central's web UI.
 
+```mermaid
+sequenceDiagram
+    participant Edge
+    participant Central
+
+    loop Every scan interval
+        Edge->>Edge: Scan for .upload_dir markers
+        Edge->>Edge: Compare content fingerprint
+        alt Content changed
+            Edge->>Edge: Create tar.zst archive
+            Edge->>Edge: Encrypt archive
+            Edge->>Central: POST encrypted archive
+            Central-->>Edge: 200 OK
+            Central->>Central: Store by edge_id / instance_id / job
+            Central->>Central: Prune old snapshots
+        end
+    end
+```
+
 Central never needs your plaintext files in order to store them. Decryption happens in the browser when you download an encrypted snapshot.
 
 ## Quick Start
