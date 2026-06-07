@@ -170,7 +170,7 @@ func (r *EdgeRunner) prepareJob(job *backup.JobDefinition, settings *config.Sett
 	s.JobName = job.JobName
 	r.HookManager.RunCommand(settings.HookPreCommand, "pre", r.hookContext(job, &s, settings))
 
-	ready, err := r.prepareArchiveLocked(job, &s, settings)
+	ready, err := r.prepareArchiveLocked(job, &s, settings, false)
 	if err != nil {
 		r.logger.Error("unexpected_exception", "job_name", job.JobName, "path", job.RootPath, "error", err)
 		s.LastStatus = "unexpected_exception"
@@ -388,7 +388,7 @@ func (r *EdgeRunner) InstallationID() string {
 
 // ----- internal job processing -----
 
-func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.JobState, settings *config.Settings) (bool, error) {
+func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.JobState, settings *config.Settings, forceSend bool) (bool, error) {
 	if !s.ManualInterventionRequired {
 		retry := r.checkRetry(job, s)
 		if retry == "waiting" {
@@ -420,7 +420,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	}
 
 	fingerprint := backup.ComputeFingerprint(files)
-	if fingerprint == s.LastSuccessfulFingerprint {
+	if !forceSend && fingerprint == s.LastSuccessfulFingerprint {
 		r.clearPendingArchive(s)
 		s.LastStatus = "skipped_unchanged"
 		s.ManualInterventionRequired = false
@@ -559,7 +559,7 @@ func (r *EdgeRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSta
 		}
 	}
 
-	ready, err := r.prepareArchiveLocked(job, s, settings)
+	ready, err := r.prepareArchiveLocked(job, s, settings, forceSend)
 	if err != nil {
 		r.logger.Error("unexpected_exception", "job_name", job.JobName, "error", err)
 		return

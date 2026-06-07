@@ -267,7 +267,7 @@ func TestPrepareArchiveLockedPaths(t *testing.T) {
 	}
 
 	emptyState := &state.JobState{}
-	ready, err := runner.prepareArchiveLocked(job, emptyState, settings)
+	ready, err := runner.prepareArchiveLocked(job, emptyState, settings, false)
 	if err != nil {
 		t.Fatalf("prepare empty: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestPrepareArchiveLockedPaths(t *testing.T) {
 		t.Fatalf("write data: %v", err)
 	}
 	s := &state.JobState{}
-	ready, err = runner.prepareArchiveLocked(job, s, settings)
+	ready, err = runner.prepareArchiveLocked(job, s, settings, false)
 	if err != nil {
 		t.Fatalf("prepare archive: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestPrepareArchiveLockedPaths(t *testing.T) {
 		PendingFingerprint:         s.PendingFingerprint,
 		LastErrorDetail:            "needs attention",
 	}
-	ready, err = runner.prepareArchiveLocked(job, manual, settings)
+	ready, err = runner.prepareArchiveLocked(job, manual, settings, false)
 	if err != nil {
 		t.Fatalf("prepare manual: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestPrepareArchiveLockedPaths(t *testing.T) {
 	}
 
 	unchanged := &state.JobState{LastSuccessfulFingerprint: s.PendingFingerprint, PendingArchive: pendingArchive}
-	ready, err = runner.prepareArchiveLocked(job, unchanged, settings)
+	ready, err = runner.prepareArchiveLocked(job, unchanged, settings, false)
 	if err != nil {
 		t.Fatalf("prepare unchanged: %v", err)
 	}

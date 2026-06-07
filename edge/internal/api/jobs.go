@@ -91,7 +91,7 @@ func (a *App) handleRecoveryPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		RelativePath string `json:"relative_path" validate:"required"`
-		Fingerprint  string `json:"fingerprint" validate:"required"`
+		Fingerprint  string `json:"fingerprint"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -120,7 +120,7 @@ func (a *App) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		RelativePath string `json:"relative_path" validate:"required"`
-		Fingerprint  string `json:"fingerprint" validate:"required"`
+		Fingerprint  string `json:"fingerprint"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
