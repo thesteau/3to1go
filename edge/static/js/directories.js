@@ -284,7 +284,7 @@ function renderSelectedJobs(directories) {
           </div>
           <div class="job-card-actions">
             <span class="hint-with-help">
-              <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+              <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
               <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
             </span>
             <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
