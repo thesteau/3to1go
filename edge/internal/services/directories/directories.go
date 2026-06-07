@@ -34,13 +34,13 @@ func NewDirectoryService(settings *config.Settings, logger *slog.Logger, stateSt
 
 // DirectoryEntry is the JSON representation of a scanned directory.
 type DirectoryEntry struct {
-	RelativePath    string          `json:"relative_path"`
-	AbsolutePath    string          `json:"absolute_path"`
-	Selected        bool            `json:"selected"`
-	BlockedByParent any             `json:"blocked_by_parent"`
-	Config          any             `json:"config"`
-	ConfigError     any             `json:"config_error"`
-	State           state.JobState  `json:"state"`
+	RelativePath    string         `json:"relative_path"`
+	AbsolutePath    string         `json:"absolute_path"`
+	Selected        bool           `json:"selected"`
+	BlockedByParent any            `json:"blocked_by_parent"`
+	Config          any            `json:"config"`
+	ConfigError     any            `json:"config_error"`
+	State           state.JobState `json:"state"`
 }
 
 // ListDirectories walks the scan root up to max_depth and returns directory info.

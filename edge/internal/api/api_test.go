@@ -106,10 +106,10 @@ type mockRunner struct {
 	forceSendErr      error
 	previewResult     map[string]any
 	previewErr        error
-	recoverResult      map[string]any
-	recoverErr         error
-	rotateKeyResult    string
-	rotateKeyErr       error
+	recoverResult     map[string]any
+	recoverErr        error
+	rotateKeyResult   string
+	rotateKeyErr      error
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }

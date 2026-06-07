@@ -23,7 +23,7 @@ const (
 	BootstrapAdminID     = 1
 	SessionCookie        = "three_to_one_go_edge_session"
 	sessionDays          = 7
-	bcryptCost          = 12
+	bcryptCost           = 12
 	pbkdf2Iterations     = 260_000
 )
 

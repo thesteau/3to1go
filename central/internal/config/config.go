@@ -16,31 +16,31 @@ const AppDirName = "3to1goCentral"
 
 // Settings holds all runtime configuration for the central server.
 type Settings struct {
-	IssuerKeyPath          string
-	IssuerPublicKey        ed25519.PublicKey
-	StorageBackend         string
-	BackupRoot             string
-	StagingDir             string
-	RetentionKeepLast      int
-	LogLevel               string
-	MaxUploadSizeMB        int
-	UploadChunkSizeMB      int
-	UploadSessionTTLHours  int
-	UploadCleanupIntervalS int
-	NtfyURL                string
-	NtfyTopic              string
-	NtfyMessageTemplate    string
-	NtfyMatchEdgeID        string
-	NtfyMatchEdgeInstID    string
-	NtfyMatchSource        string
-	HookPreCommand         string
-	HookPostCommand        string
-	Theme                        string
-	IndexDatabaseURL             string
-	HTTPHost                     string
-	HTTPPort                     int
-	SnapshotVerifyIntervalHours  int
-	UploadsPaused                bool
+	IssuerKeyPath               string
+	IssuerPublicKey             ed25519.PublicKey
+	StorageBackend              string
+	BackupRoot                  string
+	StagingDir                  string
+	RetentionKeepLast           int
+	LogLevel                    string
+	MaxUploadSizeMB             int
+	UploadChunkSizeMB           int
+	UploadSessionTTLHours       int
+	UploadCleanupIntervalS      int
+	NtfyURL                     string
+	NtfyTopic                   string
+	NtfyMessageTemplate         string
+	NtfyMatchEdgeID             string
+	NtfyMatchEdgeInstID         string
+	NtfyMatchSource             string
+	HookPreCommand              string
+	HookPostCommand             string
+	Theme                       string
+	IndexDatabaseURL            string
+	HTTPHost                    string
+	HTTPPort                    int
+	SnapshotVerifyIntervalHours int
+	UploadsPaused               bool
 }
 
 func (s *Settings) MaxUploadSizeBytes() int64 {
@@ -129,19 +129,19 @@ func coerceTheme(value string) string {
 
 // SettingsPayload is the serializable subset stored in the database.
 type SettingsPayload struct {
-	RetentionKeepLast      int    `json:"retention_keep_last"`
-	LogLevel               string `json:"log_level"`
-	Theme                  string `json:"theme"`
-	MaxUploadSizeMB        int    `json:"max_upload_size_mb"`
-	UploadChunkSizeMB      int    `json:"upload_chunk_size_mb"`
-	UploadSessionTTLHours  int    `json:"upload_session_ttl_hours"`
-	UploadCleanupIntervalS int    `json:"upload_cleanup_interval_seconds"`
-	NtfyURL                string `json:"ntfy_url"`
-	NtfyTopic              string `json:"ntfy_topic"`
-	NtfyMessageTemplate    string `json:"ntfy_message_template"`
-	NtfyMatchEdgeID        string `json:"ntfy_match_edge_id"`
-	NtfyMatchEdgeInstID    string `json:"ntfy_match_edge_instance_id"`
-	NtfyMatchSource        string `json:"ntfy_match_source"`
+	RetentionKeepLast           int    `json:"retention_keep_last"`
+	LogLevel                    string `json:"log_level"`
+	Theme                       string `json:"theme"`
+	MaxUploadSizeMB             int    `json:"max_upload_size_mb"`
+	UploadChunkSizeMB           int    `json:"upload_chunk_size_mb"`
+	UploadSessionTTLHours       int    `json:"upload_session_ttl_hours"`
+	UploadCleanupIntervalS      int    `json:"upload_cleanup_interval_seconds"`
+	NtfyURL                     string `json:"ntfy_url"`
+	NtfyTopic                   string `json:"ntfy_topic"`
+	NtfyMessageTemplate         string `json:"ntfy_message_template"`
+	NtfyMatchEdgeID             string `json:"ntfy_match_edge_id"`
+	NtfyMatchEdgeInstID         string `json:"ntfy_match_edge_instance_id"`
+	NtfyMatchSource             string `json:"ntfy_match_source"`
 	HookPreCommand              string `json:"hook_pre_command"`
 	HookPostCommand             string `json:"hook_post_command"`
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
@@ -150,19 +150,19 @@ type SettingsPayload struct {
 
 func SettingsToPayload(s *Settings) SettingsPayload {
 	return SettingsPayload{
-		RetentionKeepLast:      s.RetentionKeepLast,
-		LogLevel:               s.LogLevel,
-		Theme:                  s.Theme,
-		MaxUploadSizeMB:        s.MaxUploadSizeMB,
-		UploadChunkSizeMB:      s.UploadChunkSizeMB,
-		UploadSessionTTLHours:  s.UploadSessionTTLHours,
-		UploadCleanupIntervalS: s.UploadCleanupIntervalS,
-		NtfyURL:                s.NtfyURL,
-		NtfyTopic:              s.NtfyTopic,
-		NtfyMessageTemplate:    s.NtfyMessageTemplate,
-		NtfyMatchEdgeID:        s.NtfyMatchEdgeID,
-		NtfyMatchEdgeInstID:    s.NtfyMatchEdgeInstID,
-		NtfyMatchSource:        s.NtfyMatchSource,
+		RetentionKeepLast:           s.RetentionKeepLast,
+		LogLevel:                    s.LogLevel,
+		Theme:                       s.Theme,
+		MaxUploadSizeMB:             s.MaxUploadSizeMB,
+		UploadChunkSizeMB:           s.UploadChunkSizeMB,
+		UploadSessionTTLHours:       s.UploadSessionTTLHours,
+		UploadCleanupIntervalS:      s.UploadCleanupIntervalS,
+		NtfyURL:                     s.NtfyURL,
+		NtfyTopic:                   s.NtfyTopic,
+		NtfyMessageTemplate:         s.NtfyMessageTemplate,
+		NtfyMatchEdgeID:             s.NtfyMatchEdgeID,
+		NtfyMatchEdgeInstID:         s.NtfyMatchEdgeInstID,
+		NtfyMatchSource:             s.NtfyMatchSource,
 		HookPreCommand:              s.HookPreCommand,
 		HookPostCommand:             s.HookPostCommand,
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
@@ -245,25 +245,25 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	port := coerceInt(os.Getenv("HTTP_PORT"), 6555, 1)
 
 	return &Settings{
-		IssuerKeyPath:          keyPath,
-		IssuerPublicKey:        pub,
-		StorageBackend:         coerceText(strings.ToLower(os.Getenv("STORAGE_BACKEND")), "local"),
-		IndexDatabaseURL:       dbURL,
-		BackupRoot:             coerceText(os.Getenv("BACKUP_ROOT"), "/backups"),
-		StagingDir:             coerceText(os.Getenv("STAGING_DIR"), "/staging"),
-		RetentionKeepLast:      retentionKeepLast,
-		LogLevel:               logLevel,
-		Theme:                  theme,
-		MaxUploadSizeMB:        maxUploadSizeMB,
-		UploadChunkSizeMB:      uploadChunkSizeMB,
-		UploadSessionTTLHours:  uploadSessionTTLHours,
-		UploadCleanupIntervalS: uploadCleanupIntervalS,
-		NtfyURL:                ntfyURL,
-		NtfyTopic:              ntfyTopic,
-		NtfyMessageTemplate:    ntfyTemplate,
-		NtfyMatchEdgeID:        ntfyMatchEdge,
-		NtfyMatchEdgeInstID:    ntfyMatchInst,
-		NtfyMatchSource:        ntfyMatchSrc,
+		IssuerKeyPath:               keyPath,
+		IssuerPublicKey:             pub,
+		StorageBackend:              coerceText(strings.ToLower(os.Getenv("STORAGE_BACKEND")), "local"),
+		IndexDatabaseURL:            dbURL,
+		BackupRoot:                  coerceText(os.Getenv("BACKUP_ROOT"), "/backups"),
+		StagingDir:                  coerceText(os.Getenv("STAGING_DIR"), "/staging"),
+		RetentionKeepLast:           retentionKeepLast,
+		LogLevel:                    logLevel,
+		Theme:                       theme,
+		MaxUploadSizeMB:             maxUploadSizeMB,
+		UploadChunkSizeMB:           uploadChunkSizeMB,
+		UploadSessionTTLHours:       uploadSessionTTLHours,
+		UploadCleanupIntervalS:      uploadCleanupIntervalS,
+		NtfyURL:                     ntfyURL,
+		NtfyTopic:                   ntfyTopic,
+		NtfyMessageTemplate:         ntfyTemplate,
+		NtfyMatchEdgeID:             ntfyMatchEdge,
+		NtfyMatchEdgeInstID:         ntfyMatchInst,
+		NtfyMatchSource:             ntfyMatchSrc,
 		HookPreCommand:              hookPre,
 		HookPostCommand:             hookPost,
 		HTTPHost:                    coerceText(os.Getenv("HTTP_HOST"), "0.0.0.0"),
