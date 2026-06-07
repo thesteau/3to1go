@@ -121,6 +121,9 @@ func (m *mockSnapIndex) GetEdgeRegistration(_ context.Context, _, _ string) (*st
 func (m *mockSnapIndex) DeleteEdgeRegistration(_ context.Context, _, _ string) error {
 	return m.deleteErr
 }
+func (m *mockSnapIndex) DeleteInstanceEntries(_ context.Context, _, _ string) error {
+	return m.deleteErr
+}
 func (m *mockSnapIndex) HasNamespaceEntries(_ context.Context, _, _ string) (bool, error) {
 	return m.hasEntries, m.hasErr
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/store"
@@ -157,7 +158,40 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/encryption-key", a.handleGetEncryptionKey)
 	r.Post("/api/encryption-key/rotate", a.handleRotateEncryptionKey)
 
-	return newRateLimiter().middleware(a.sessionMiddleware(r))
+	return a.requestLogger(newRateLimiter().middleware(a.sessionMiddleware(r)))
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (a *App) requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/static/") || path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		level := slog.LevelDebug
+		if r.Method != http.MethodGet {
+			level = slog.LevelInfo
+		}
+		a.logger.Log(r.Context(), level, "request",
+			"method", r.Method,
+			"path", path,
+			"status", rec.status,
+			"ms", time.Since(start).Milliseconds(),
+		)
+	})
 }
 
 func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {

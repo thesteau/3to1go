@@ -111,26 +111,35 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to inspect instance registration")
 			return
 		}
-		if reg != nil {
-			if cleanupMissing {
-				if err := a.snapIndex.DeleteEdgeRegistration(r.Context(), edgeID, instID); err != nil {
-					writeError(w, http.StatusInternalServerError, "failed to clean instance registration")
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]string{
-					"status":           "cleaned",
-					"edge_id":          edgeID,
-					"edge_instance_id": instID,
-				})
-				return
-			}
+		hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), edgeID, instID)
+		if reg == nil && !hasEntries {
+			writeError(w, http.StatusNotFound, "instance not found")
+			return
+		}
+		if !cleanupMissing {
 			writeError(w, http.StatusConflict, map[string]any{
 				"message":           "instance files not found",
 				"cleanup_available": true,
 			})
 			return
 		}
-		writeError(w, http.StatusNotFound, "instance not found")
+		if reg != nil {
+			if err := a.snapIndex.DeleteEdgeRegistration(r.Context(), edgeID, instID); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to clean instance registration")
+				return
+			}
+		}
+		if hasEntries {
+			if err := a.snapIndex.DeleteInstanceEntries(r.Context(), edgeID, instID); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to clean instance index entries")
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status":           "cleaned",
+			"edge_id":          edgeID,
+			"edge_instance_id": instID,
+		})
 		return
 	}
 
