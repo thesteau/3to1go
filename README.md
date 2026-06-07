@@ -234,6 +234,12 @@ Edge determines whether a new snapshot is needed by comparing the folder's conte
 
 Created by [thesteau](https://github.com/thesteau).
 
+## Support
+
+If this project is useful to you, consider buying me a coffee — it keeps the project going.
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-thesteau-yellow)](https://buymeacoffee.com/thesteau)
+
 ## Attribution
 
 <a id="attr-1"></a>**[1] Go Gopher artwork** — The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community.
@@ -241,13 +247,6 @@ Created by [thesteau](https://github.com/thesteau).
 <a id="attr-2"></a>**[2] 3-2-1 backup rule** — The backup strategy referenced by this project's name is a widely documented industry practice. See the [Wikipedia article on backup storage](https://en.wikipedia.org/wiki/Backup#Storage) for background.
 
 <a id="attr-3"></a>**[3] Go programming language** — This project is written in [Go](https://go.dev/). Go and the Go logo are trademarks of Google LLC. This project is not affiliated with, endorsed by, or sponsored by Google or the Go team.
-
-## Support
-
-If this project is useful to you, consider buying me a coffee — it keeps the project going.
-
-<!-- TODO: replace with real link -->
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-placeholder-yellow)](https://buymeacoffee.com)
 
 ## Disclaimers
 
