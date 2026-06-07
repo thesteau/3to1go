@@ -62,7 +62,6 @@ type ingestSvc interface {
 	FinalizeUpload(ctx context.Context, uploadID string) (*ingest.FinalizeResponse, error)
 	ReconcileNamespace(ctx context.Context, namespace string)
 	CleanupLoop(ctx context.Context, intervalSeconds int)
-	MigrateLegacyUploadSessions(ctx context.Context) (int, error)
 	UpdateSettings(settings *config.Settings)
 }
 
@@ -216,8 +215,6 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/users", a.handleCreateUser)
 	r.Put("/api/users/{user_id}", withPathValues(a.handleUpdateUser, "user_id"))
 	r.Delete("/api/users/{user_id}", withPathValues(a.handleDeleteUser, "user_id"))
-	r.Post("/api/migrations/upload-sessions", a.handleMigrateUploadSessions)
-
 	// Overview + settings
 	r.Get("/api/overview", a.handleOverview)
 	r.Post("/api/settings", a.handleSaveSettings)

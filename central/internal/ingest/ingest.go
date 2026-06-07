@@ -536,49 +536,6 @@ func (s *Service) CleanupLoop(ctx context.Context, intervalSeconds int) {
 	}
 }
 
-func (s *Service) MigrateLegacyUploadSessions(ctx context.Context) (int, error) {
-	entries, err := os.ReadDir(s.uploadRoot)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
-		return 0, fmt.Errorf("read legacy upload sessions: %w", err)
-	}
-
-	var migrated int
-	for _, e := range entries {
-		if !e.IsDir() || e.Name() == "keys" {
-			continue
-		}
-		uploadID := e.Name()
-		if _, err := s.sessionStore().Load(ctx, uploadID); err == nil {
-			continue
-		} else if !errors.Is(err, ErrSessionNotFound) {
-			return migrated, fmt.Errorf("check existing upload session %q: %w", uploadID, err)
-		}
-
-		data, err := os.ReadFile(s.metadataPath(uploadID))
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return migrated, fmt.Errorf("read legacy upload session %q: %w", uploadID, err)
-		}
-		var sess UploadSession
-		if err := json.Unmarshal(data, &sess); err != nil {
-			return migrated, fmt.Errorf("parse legacy upload session %q: %w", uploadID, err)
-		}
-		if strings.TrimSpace(sess.UploadID) == "" {
-			sess.UploadID = uploadID
-		}
-		if err := s.saveSessionContext(ctx, &sess); err != nil {
-			return migrated, fmt.Errorf("save migrated upload session %q: %w", sess.UploadID, err)
-		}
-		migrated++
-	}
-	return migrated, nil
-}
-
 func (s *Service) ReconcileNamespace(ctx context.Context, namespace string) {
 	files, _ := s.backend.List(namespace)
 	s.index.ReconcileNamespace(ctx, namespace, storageFilesToIndexFiles(files))
