@@ -169,8 +169,8 @@ h3 {
   margin-top: 16px;
 }
 
-.toolbar > :nth-last-child(2) {
-  margin-left: auto;
+.toolbar-spacer {
+  flex: 1;
 }
 
 .hint-with-help {
@@ -265,17 +265,6 @@ textarea {
   width: auto;
 }
 
-.status-line {
-  min-height: 1.3em;
-}
-
-.status-line[data-kind="error"] {
-  color: var(--danger);
-}
-
-.status-line[data-kind="success"] {
-  color: var(--accent);
-}
 
 .section-loading {
   display: flex;

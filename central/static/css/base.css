@@ -87,8 +87,8 @@ h1, h2 { margin: 0; }
   margin-top: 16px;
 }
 
-.toolbar > :nth-last-child(2) {
-  margin-left: auto;
+.toolbar-spacer {
+  flex: 1;
 }
 
 .section-head { margin-bottom: 14px; }
@@ -212,17 +212,6 @@ button.danger {
   color: #fff;
 }
 
-.status-line {
-  min-height: 1.3em;
-}
-
-.status-line[data-kind="error"] {
-  color: var(--red);
-}
-
-.status-line[data-kind="success"] {
-  color: var(--green);
-}
 
 .section-loading {
   display: flex;

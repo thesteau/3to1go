@@ -466,8 +466,8 @@ function renderVerifyResult(data) {
   const hasFailures = data.failure_count > 0;
   const barClass = hasFailures ? "verify-bar-fail" : "verify-bar-ok";
   const summary = hasFailures
-    ? `${data.failure_count} failure${data.failure_count !== 1 ? "s" : ""} out of ${data.total_checked} checked`
-    : `${data.total_checked} snapshot${data.total_checked !== 1 ? "s" : ""} verified OK`;
+    ? `${data.failure_count} failure${data.failure_count !== 1 ? "s" : ""} out of ${data.total_checked} latest snapshot${data.total_checked !== 1 ? "s" : ""} checked`
+    : `${data.total_checked} latest snapshot${data.total_checked !== 1 ? "s" : ""} verified OK`;
   const failureDetail = hasFailures && data.last_failure
     ? `<span class="verify-failure-detail" title="${escapeHtml(data.last_failure_msg || "")}">Last failure: ${escapeHtml(data.last_failure)}</span>`
     : "";

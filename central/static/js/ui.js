@@ -21,6 +21,7 @@ function showToast(message, kind = "info", { duration = TOAST_DURATION_MS, title
   if (!text) return;
   const region = document.getElementById("toast-region");
   if (!region) return;
+  if (region.showPopover && !region.matches(":popover-open")) region.showPopover();
 
   const defaultTitle = kind === "error" ? "Something needs attention" : kind === "success" ? "Done" : "Notice";
   const toast = document.createElement("div");
@@ -41,20 +42,11 @@ function setActionStatus(message, kind = "info") {
 }
 
 function setStatus(id, message, kind = "info") {
-  const element = document.getElementById(id);
-  if (!element) return;
   const text = formatMessage(message);
-  element.textContent = text;
-  if (text) {
-    element.dataset.kind = kind;
-  } else {
-    delete element.dataset.kind;
-  }
+  if (text) showToast(text, kind);
 }
 
-function clearStatus(id) {
-  setStatus(id, "", "info");
-}
+function clearStatus(id) {}
 
 function openDialog(id) {
   const dialog = document.getElementById(id);
