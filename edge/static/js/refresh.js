@@ -74,7 +74,6 @@ async function loadData({ silent = false, includeKey = true, refreshDirectoryTre
       if (!document.getElementById("settings-dialog")?.open) {
         fillSettings(latestData.settings || {});
       }
-    updateUploadsPauseButton(latestData.settings?.uploads_paused || false);
   })().catch(() => {});
 
   const dirFetch = (async () => {

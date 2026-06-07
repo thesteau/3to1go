@@ -373,7 +373,6 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     if (!document.getElementById("settings-dialog")?.open) {
       applyTheme(window.__centralSettings.theme || "dark");
     }
-    updateUploadsPauseButton(window.__centralSettings.uploads_paused || false);
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
     const diskFree = typeof data.disk_free_bytes === "number" ? formatBytes(data.disk_free_bytes) : null;
@@ -474,38 +473,6 @@ async function loadVerifyStatus() {
     el.innerHTML = renderVerifyResult(data);
   } catch {
     // non-critical, don't surface errors
-  }
-}
-
-function updateUploadsPauseButton(paused) {
-  const btn = document.getElementById("uploads-pause-btn");
-  if (!btn) return;
-  if (paused) {
-    btn.textContent = "Resume Uploads";
-    btn.classList.add("warn");
-  } else {
-    btn.textContent = "Pause Uploads";
-    btn.classList.remove("warn");
-  }
-}
-
-async function toggleUploadsPause() {
-  const paused = !!(window.__centralSettings && window.__centralSettings.uploads_paused);
-  const endpoint = paused ? "/api/admin/uploads/resume" : "/api/admin/uploads/pause";
-  const btn = document.getElementById("uploads-pause-btn");
-  if (btn) btn.disabled = true;
-  try {
-    const res = await fetch(endpoint, { method: "POST" });
-    if (!res.ok) {
-      setActionStatus("Failed to update upload pause state.", "error");
-      return;
-    }
-    await loadOverview({ silent: true, force: true });
-    setActionStatus(paused ? "Uploads resumed." : "Uploads paused.", "success");
-  } catch {
-    setActionStatus("Failed to update upload pause state.", "error");
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 

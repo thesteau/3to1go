@@ -1,4 +1,5 @@
 let edgeNtfyConfig = null;
+let _settingsSnapshot = null;
 let edgeHookConfig = null;
 let hookDraftDirty = { pre: false, post: false };
 
@@ -32,8 +33,22 @@ async function manualRefresh() {
   setActionStatus("Refreshed.", "success");
 }
 
+async function cancelSettings() {
+  if (_settingsSnapshot !== null && JSON.stringify(collectSettingsPayload()) !== _settingsSnapshot) {
+    const confirmed = await confirmApp({
+      title: "Unsaved Changes",
+      message: "You have unsaved changes. Use the Save button to apply them, or discard and close.",
+      confirmLabel: "Discard & Close",
+    });
+    if (!confirmed) return;
+  }
+  _settingsSnapshot = null;
+  closeDialog("settings-dialog");
+}
+
 async function openSettingsDialog() {
   fillSettings(latestData?.settings || {});
+  _settingsSnapshot = JSON.stringify(collectSettingsPayload());
   clearStatus("settings-status");
   clearStatus("certificates-status");
   const httpWarning = document.getElementById("settings-http-warning");
@@ -343,6 +358,23 @@ async function deleteHookFile(filename) {
   }
 }
 
+function toggleSettingSwitch(btn) {
+  const on = btn.getAttribute("aria-checked") !== "true";
+  btn.setAttribute("aria-checked", on ? "true" : "false");
+  btn.classList.toggle("toggle-on", on);
+}
+
+function setToggle(id, on) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.setAttribute("aria-checked", on ? "true" : "false");
+  btn.classList.toggle("toggle-on", on);
+}
+
+function getToggle(id) {
+  return document.getElementById(id)?.getAttribute("aria-checked") === "true";
+}
+
 function fillSettings(settings) {
   const data = settings || {};
   document.getElementById("settings_edge_id").value = data.edge_id || "";
@@ -356,7 +388,8 @@ function fillSettings(settings) {
   document.getElementById("settings_log_level").value = data.log_level || "INFO";
   applyTheme(data.theme || "dark");
   document.getElementById("settings_max_depth").value = data.max_depth ?? 10;
-  document.getElementById("settings_keep_local_pending").checked = data.keep_local_pending ?? true;
+  setToggle("settings_keep_local_pending", data.keep_local_pending ?? true);
+  setToggle("settings_uploads_paused", data.uploads_paused || false);
   document.getElementById("settings_upload_chunk_size_mb").value = data.upload_chunk_size_mb ?? 8;
   document.getElementById("settings_min_upload_chunk_size_mb").value = data.min_upload_chunk_size_mb ?? 1;
   document.getElementById("settings_max_upload_chunk_size_mb").value = data.max_upload_chunk_size_mb ?? 16;
@@ -382,9 +415,10 @@ function collectSettingsPayload(overrides = {}) {
     state_dir: document.getElementById("settings_state_dir").value.trim(),
     spool_dir: document.getElementById("settings_spool_dir").value.trim(),
     log_level: document.getElementById("settings_log_level").value,
-    theme: document.getElementById("settings_theme_dark")?.checked ? "dark" : "light",
+    theme: getToggle("settings_theme_dark") ? "dark" : "light",
     max_depth: Number(document.getElementById("settings_max_depth").value || 0),
-    keep_local_pending: document.getElementById("settings_keep_local_pending").checked,
+    keep_local_pending: getToggle("settings_keep_local_pending"),
+    uploads_paused: getToggle("settings_uploads_paused"),
     upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
     min_upload_chunk_size_mb: Number(document.getElementById("settings_min_upload_chunk_size_mb").value || 1),
     max_upload_chunk_size_mb: Number(document.getElementById("settings_max_upload_chunk_size_mb").value || 1),
@@ -437,6 +471,7 @@ async function saveSettings() {
       latestData.settings = body.settings;
     }
     applyTheme(latestData?.settings?.theme || payload.theme);
+    _settingsSnapshot = null;
     setActionStatus("Edge settings saved.", "success");
     await pause(350);
     closeDialog("settings-dialog");

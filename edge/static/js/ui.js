@@ -10,7 +10,9 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = resolved;
   const setting = document.getElementById("settings_theme_dark");
   if (setting) {
-    setting.checked = resolved === "dark";
+    const on = resolved === "dark";
+    setting.setAttribute("aria-checked", on ? "true" : "false");
+    setting.classList.toggle("toggle-on", on);
   }
 }
 

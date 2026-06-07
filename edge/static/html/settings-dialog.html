@@ -5,8 +5,31 @@
         <h2 id="settings-dialog-title">Edit Edge Settings</h2>
         <p class="hint">Settings are persisted in Edge's local database.</p>
       </div>
-      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Close</button>
+      <div class="modal-head-actions">
+        <button type="button" onclick="saveSettings()">Save</button>
+        <button type="button" class="secondary" onclick="cancelSettings()">Cancel</button>
+      </div>
     </div>
+
+    <div class="modal-body">
+
+    <button type="button" class="toggle-btn" id="settings_theme_dark" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">Dark Mode</span>
+      <span class="hover-hint" tabindex="0" aria-label="Switch between dark and light color scheme." title="Switch between dark and light color scheme.">?</span>
+    </button>
+
+    <button type="button" class="toggle-btn" id="settings_keep_local_pending" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">Keep failed-upload archives for retry</span>
+      <span class="hover-hint" tabindex="0" aria-label="Keeps local archive files on disk after a failed upload so Edge can retry them later." title="Keeps local archive files on disk after a failed upload so Edge can retry them later.">?</span>
+    </button>
+
+    <button type="button" class="toggle-btn" id="settings_uploads_paused" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">Pause uploads (skip backup cycles)</span>
+      <span class="hover-hint" tabindex="0" aria-label="When on, Edge skips all scheduled and manual backup cycles without stopping the scheduler." title="When on, Edge skips all scheduled and manual backup cycles without stopping the scheduler.">?</span>
+    </button>
 
     <label for="settings_edge_id">Edge ID</label>
     <input id="settings_edge_id" placeholder="edge-01">
@@ -47,16 +70,6 @@
         </select>
       </div>
     </div>
-
-    <label class="checkbox" for="settings_theme_dark">
-      <input id="settings_theme_dark" type="checkbox">
-      <span>Dark Mode</span>
-    </label>
-
-    <label class="checkbox">
-      <input type="checkbox" id="settings_keep_local_pending">
-      <span>Keep failed-upload archives for retry</span>
-    </label>
 
     <details class="settings-advanced">
       <summary>Advanced Settings</summary>
@@ -142,10 +155,10 @@
     </div>
 
     <div class="toolbar">
-      <button type="button" onclick="saveSettings()">Save Edge Settings</button>
-      <button type="button" class="secondary" onclick="closeDialog('settings-dialog')">Cancel</button>
       <span class="hint status-line" id="settings-status"></span>
       <span class="hint status-line" id="certificates-status"></span>
     </div>
+
+    </div><!-- modal-body -->
   </div>
 </dialog>
