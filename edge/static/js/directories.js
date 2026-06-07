@@ -273,6 +273,7 @@ function renderSelectedJobs(directories) {
             <div class="job-card-header">
               <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
               <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+              ${entry.state?.last_backup_size_bytes ? `<div class="hint">Last backup: ${formatBytes(entry.state.last_backup_size_bytes)}</div>` : ""}
             </div>
             <div class="hint job-card-last-state ${lastStateClass(entry)}">${escapeHtml(lastStateLabel || "Last state: —")}</div>
             ${activity}

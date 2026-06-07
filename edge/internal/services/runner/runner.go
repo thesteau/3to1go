@@ -740,6 +740,10 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	s.LastDuplicate = result.Duplicate
 	s.NextRetryAt = ""
 	s.ManualInterventionRequired = false
+	if s.PendingArchiveSize != nil {
+		n := *s.PendingArchiveSize
+		s.LastBackupSizeBytes = &n
+	}
 	r.clearPendingArchive(s)
 	s.LastUploadUpdatedAt = utcNow()
 	r.StateStore.Set(job.RootPath, *s)

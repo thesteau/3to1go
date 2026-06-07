@@ -258,3 +258,4 @@
 .verify-hint { flex: 1; min-width: 160px; }
 .verify-failure-detail { flex: 1 0 100%; font-size: 0.82em; opacity: 0.85; }
 .verify-run-btn { margin-left: auto; flex-shrink: 0; }
+.verify-spinner { width: 16px; height: 16px; flex-shrink: 0; border-width: 2px; }
