@@ -33,6 +33,7 @@
 <button type="button" class="secondary" onclick="openCredentialDialog()">Mint Edge Credential</button>
         <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <span class="toolbar-spacer"></span>
         <button type="button" class="secondary" onclick="openUserManagementDialog()">Admin</button>
         <button type="button" onclick="openSettingsDialog()">Edit Central Settings</button>
       </div>
@@ -48,7 +49,7 @@
     </section>
   </main>
 
-  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+  <div id="toast-region" class="toast-region" popover="manual" aria-live="polite" aria-atomic="false"></div>
 
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/crypto.js"></script>

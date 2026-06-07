@@ -1,11 +1,18 @@
 .toast-region {
+  /* Reset popover UA defaults so our positioning is not overridden */
+  inset: unset;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+
   position: fixed;
   top: 18px;
   right: 18px;
   display: grid;
   gap: 10px;
   width: min(360px, calc(100vw - 24px));
-  z-index: 1000;
   pointer-events: none;
 }
 
