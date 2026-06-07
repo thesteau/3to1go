@@ -117,6 +117,63 @@ select {
   width: auto;
 }
 
+button.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.toggle-track {
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ccc;
+  position: relative;
+  transition: background 160ms ease;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--field-bg);
+  transition: transform 160ms ease;
+}
+
+button.toggle-btn.toggle-on .toggle-track {
+  background: var(--accent);
+}
+
+button.toggle-btn.toggle-on .toggle-thumb {
+  transform: translateX(16px);
+}
+
+.hover-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: help;
+  user-select: none;
+}
+
 button, .btn {
   border: 0;
   border-radius: 10px;

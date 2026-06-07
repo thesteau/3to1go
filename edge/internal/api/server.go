@@ -63,12 +63,17 @@ type schedulerFacade interface {
 	ReloadSettings(cronSchedule string) error
 }
 
+type settingsStorer interface {
+	Save(ctx context.Context, payload *config.SettingsPayload) error
+}
+
 // App holds all edge server state.
 type App struct {
-	runner    edgeRunner
-	scheduler schedulerFacade
-	userStore userStorer
-	logger    *slog.Logger
+	runner        edgeRunner
+	scheduler     schedulerFacade
+	userStore     userStorer
+	settingsStore settingsStorer
+	logger        *slog.Logger
 }
 
 // NewApp constructs the App from its dependencies.
@@ -76,13 +81,15 @@ func NewApp(
 	runner edgeRunner,
 	scheduler schedulerFacade,
 	userStore userStorer,
+	settingsStore settingsStorer,
 	logger *slog.Logger,
 ) *App {
 	return &App{
-		runner:    runner,
-		scheduler: scheduler,
-		userStore: userStore,
-		logger:    logger,
+		runner:        runner,
+		scheduler:     scheduler,
+		userStore:     userStore,
+		settingsStore: settingsStore,
+		logger:        logger,
 	}
 }
 
@@ -112,6 +119,8 @@ func (a *App) Handler() http.Handler {
 	// System status + scheduler
 	r.Get("/api/status", a.handleStatus)
 	r.Post("/api/run-now", a.handleRunNow)
+	r.Post("/api/uploads/pause", a.handlePauseUploads)
+	r.Post("/api/uploads/resume", a.handleResumeUploads)
 
 	// Directories + jobs
 	r.Get("/api/directories", a.handleListDirectories)

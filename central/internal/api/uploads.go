@@ -66,6 +66,10 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 }
 
 func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
+	if a.Settings().UploadsPaused {
+		writeError(w, http.StatusServiceUnavailable, "uploads are paused")
+		return
+	}
 	cred, err := a.authorizeBearer(r)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized")

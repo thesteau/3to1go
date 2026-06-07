@@ -57,6 +57,34 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) handlePauseUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, true)
+}
+
+func (a *App) handleResumeUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, false)
+}
+
+func (a *App) setUploadsPaused(w http.ResponseWriter, r *http.Request, paused bool) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	s := a.Settings()
+	payload := config.SettingsToPayload(s)
+	payload.UploadsPaused = paused
+	newSettings, err := config.BuildSettings(&payload)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to build settings")
+		return
+	}
+	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		return
+	}
+	a.ApplySettings(newSettings)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
+}
+
 func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return

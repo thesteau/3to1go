@@ -464,4 +464,3 @@ func TestDownloadLatestSnapshotPath(t *testing.T) {
 		t.Fatalf("fallback filename = %q", filename)
 	}
 }
-

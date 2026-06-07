@@ -923,17 +923,17 @@ func TestValidateNewReservation_InsufficientStagingSpace(t *testing.T) {
 
 func TestDiskFree_ExistingDir(t *testing.T) {
 	dir := t.TempDir()
-	got := diskFree(dir)
-	if got <= 0 {
-		t.Errorf("diskFree = %d, expected positive value", got)
+	got, ok := diskFree(dir)
+	if !ok || got <= 0 {
+		t.Errorf("diskFree = %d ok=%v, expected positive value and ok=true", got, ok)
 	}
 }
 
 func TestDiskFree_NonexistentPath(t *testing.T) {
 	// Should walk up to an existing parent
-	got := diskFree("/nonexistent/very/deep/path")
-	if got <= 0 {
-		t.Errorf("diskFree nonexistent = %d, expected positive value (walks up to root)", got)
+	got, ok := diskFree("/nonexistent/very/deep/path")
+	if !ok || got <= 0 {
+		t.Errorf("diskFree nonexistent = %d ok=%v, expected positive value (walks up to root)", got, ok)
 	}
 }
 

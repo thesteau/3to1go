@@ -1,8 +1,26 @@
 let _centralNtfyConfig = null;
+let _settingsSnapshot = null;
 let _centralHookConfig = null;
 let _hookDraftDirty = { pre: false, post: false };
 
 // --- Settings ---
+
+function toggleSettingSwitch(btn) {
+  const on = btn.getAttribute("aria-checked") !== "true";
+  btn.setAttribute("aria-checked", on ? "true" : "false");
+  btn.classList.toggle("toggle-on", on);
+}
+
+function setToggle(id, on) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.setAttribute("aria-checked", on ? "true" : "false");
+  btn.classList.toggle("toggle-on", on);
+}
+
+function getToggle(id) {
+  return document.getElementById(id)?.getAttribute("aria-checked") === "true";
+}
 
 function fillSettings(settings) {
   const data = settings || {};
@@ -14,18 +32,20 @@ function fillSettings(settings) {
   document.getElementById("settings_upload_session_ttl_hours").value = data.upload_session_ttl_hours ?? 24;
   document.getElementById("settings_upload_cleanup_interval_seconds").value = data.upload_cleanup_interval_seconds ?? 300;
   document.getElementById("settings_snapshot_verify_interval_hours").value = data.snapshot_verify_interval_hours ?? 0;
+  setToggle("settings_uploads_paused", data.uploads_paused || false);
 }
 
 function collectSettingsPayload(overrides = {}) {
   return {
     retention_keep_last: Number(document.getElementById("settings_retention_keep_last").value || 1),
     log_level: document.getElementById("settings_log_level").value,
-    theme: document.getElementById("settings_theme_dark")?.checked ? "dark" : "light",
+    theme: getToggle("settings_theme_dark") ? "dark" : "light",
     max_upload_size_mb: Number(document.getElementById("settings_max_upload_size_mb").value || 1),
     upload_chunk_size_mb: Number(document.getElementById("settings_upload_chunk_size_mb").value || 1),
     upload_session_ttl_hours: Number(document.getElementById("settings_upload_session_ttl_hours").value || 1),
     upload_cleanup_interval_seconds: Number(document.getElementById("settings_upload_cleanup_interval_seconds").value || 10),
     snapshot_verify_interval_hours: Number(document.getElementById("settings_snapshot_verify_interval_hours").value || 0),
+    uploads_paused: getToggle("settings_uploads_paused"),
     ntfy_url: window.__centralSettings?.ntfy_url || "",
     ntfy_topic: window.__centralSettings?.ntfy_topic || "",
     ntfy_message_template: window.__centralSettings?.ntfy_message_template || "",
@@ -48,8 +68,22 @@ async function postSettings(payload) {
   return { response, body };
 }
 
+async function cancelSettings() {
+  if (_settingsSnapshot !== null && JSON.stringify(collectSettingsPayload()) !== _settingsSnapshot) {
+    const confirmed = await confirmApp({
+      title: "Unsaved Changes",
+      message: "You have unsaved changes. Use the Save button to apply them, or discard and close.",
+      confirmLabel: "Discard & Close",
+    });
+    if (!confirmed) return;
+  }
+  _settingsSnapshot = null;
+  closeDialog("settings-dialog");
+}
+
 async function openSettingsDialog() {
   fillSettings(window.__centralSettings || {});
+  _settingsSnapshot = JSON.stringify(collectSettingsPayload());
   clearStatus("settings-status");
   clearStatus("certificates-status");
   openDialog("settings-dialog");
@@ -68,6 +102,7 @@ async function saveSettings() {
   if (response.ok) {
     window.__centralSettings = body.settings || { ...window.__centralSettings, ...payload };
     applyTheme(window.__centralSettings.theme);
+    _settingsSnapshot = null;
     await loadOverview({ silent: true, force: true });
     setActionStatus("Central settings saved.", "success");
     await pause(450);
