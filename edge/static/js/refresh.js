@@ -59,6 +59,7 @@ async function loadData({ silent = false, includeKey = true, refreshDirectoryTre
   if (!silent) {
     const spinner = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
     setHtmlIfChanged("selected-jobs", spinner);
+    setHtmlIfChanged("selected-jobs-count", "-");
     setHtmlIfChanged("directory-tree", spinner);
   }
 

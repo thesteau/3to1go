@@ -53,7 +53,7 @@ type edgeRunner interface {
 	SaveJob(relativePath string, cfg map[string]any) (any, error)
 	DeleteJob(relativePath string) error
 
-	ForceSendJob(ctx context.Context, jobName string) (map[string]any, error)
+	StartForceSendAsync(jobName string) (map[string]any, error)
 	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 }

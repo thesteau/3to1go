@@ -147,7 +147,7 @@ func (m *mockRunner) SaveJob(_ string, _ map[string]any) (any, error) {
 	return m.saveJobResult, m.saveJobErr
 }
 func (m *mockRunner) DeleteJob(_ string) error { return m.deleteJobErr }
-func (m *mockRunner) ForceSendJob(_ context.Context, _ string) (map[string]any, error) {
+func (m *mockRunner) StartForceSendAsync(_ string) (map[string]any, error) {
 	return m.forceSendResult, m.forceSendErr
 }
 func (m *mockRunner) RotateEncryptionKey() (string, error) {
