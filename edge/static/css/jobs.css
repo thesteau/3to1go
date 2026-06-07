@@ -163,13 +163,24 @@ button.toggle-btn.toggle-on .toggle-thumb {
   gap: 4px;
 }
 
+.job-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.job-card-size {
+  text-align: right;
+}
+
 .job-card-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .job-card-actions button,

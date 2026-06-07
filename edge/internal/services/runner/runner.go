@@ -54,8 +54,8 @@ type uploadWork struct {
 	unlock func()
 }
 
-// NewEdgeRunner creates and initialises the runner from settings and a cert manager.
-func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *certificates.CertManager) (*EdgeRunner, error) {
+// NewEdgeRunner creates and initialises the runner from settings, a cert manager, and a state store.
+func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *certificates.CertManager, stateStore *state.StateStore) (*EdgeRunner, error) {
 	if err := os.MkdirAll(settings.StateDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}
@@ -66,11 +66,6 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 	encKey, err := encryption.LoadOrCreate(config.EncryptionKeyPath())
 	if err != nil {
 		return nil, fmt.Errorf("encryption key: %w", err)
-	}
-
-	stateStore, err := state.NewStateStore(settings.StateDir)
-	if err != nil {
-		return nil, fmt.Errorf("state store: %w", err)
 	}
 
 	uploadClient := upload.NewUploadClient(settings, encKey, certMgr)
@@ -361,17 +356,12 @@ func (r *EdgeRunner) applySettings(settings *config.Settings) error {
 	os.MkdirAll(settings.StateDir, 0o755)
 	os.MkdirAll(settings.SpoolDir, 0o755)
 
-	stateStore, err := state.NewStateStore(settings.StateDir)
-	if err != nil {
-		return err
-	}
 	uploadClient := upload.NewUploadClient(settings, r.encKey, r.CertManager)
-	recoverySvc := recovery.NewRecoveryService(settings, r.logger, stateStore, uploadClient, r.encKey)
-	dirSvc := directories.NewDirectoryService(settings, r.logger, stateStore)
+	recoverySvc := recovery.NewRecoveryService(settings, r.logger, r.StateStore, uploadClient, r.encKey)
+	dirSvc := directories.NewDirectoryService(settings, r.logger, r.StateStore)
 
 	r.mu.Lock()
 	r.Settings = settings
-	r.StateStore = stateStore
 	r.UploadClient = uploadClient
 	r.DirService = dirSvc
 	r.Recovery = recoverySvc

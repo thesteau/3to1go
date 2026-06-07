@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/3to1go/edge/internal/services/certificates"
 	"github.com/3to1go/edge/internal/services/runner"
 	"github.com/3to1go/edge/internal/services/scheduler"
+	"github.com/3to1go/edge/internal/services/state"
 	"github.com/3to1go/edge/internal/store"
 )
 
@@ -47,12 +49,16 @@ func run(logger *slog.Logger) error {
 	// Initialise stores.
 	userStore := store.NewUserStore(db)
 	settingsStore := store.NewSettingsStore(db)
+	stateStore := state.NewStateStore(db)
 
 	if err := userStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("user schema: %w", err)
 	}
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)
+	}
+	if err := stateStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("state schema: %w", err)
 	}
 	if err := userStore.EnsureDefaultAdmin(ctx, initialAdminPassword()); err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
@@ -74,11 +80,16 @@ func run(logger *slog.Logger) error {
 	// Adjust log level now that settings are known.
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLogLevel(settings.LogLevel)}))
 
+	// Migrate job state from the legacy JSON file (no-op if already done or not present).
+	if err := stateStore.MigrateFromFile(filepath.Join(settings.StateDir, "edge-state.json")); err != nil {
+		logger.Warn("state migration from file failed", "error", err)
+	}
+
 	// Certificate manager (needed before runner for TLS transport).
 	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
 
 	// Build the runner.
-	edgeRunner, err := runner.NewEdgeRunner(settings, logger, certMgr)
+	edgeRunner, err := runner.NewEdgeRunner(settings, logger, certMgr, stateStore)
 	if err != nil {
 		return fmt.Errorf("init runner: %w", err)
 	}

@@ -1,18 +1,31 @@
 package state
 
 import (
+	"context"
+	"database/sql"
+	"path/filepath"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
-// ---------------------------------------------------------------------------
-// StateStore
-// ---------------------------------------------------------------------------
+func newTestStore(t *testing.T) *StateStore {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	s := NewStateStore(db)
+	if err := s.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return s
+}
 
 func TestStateStore_GetMissingKey_ReturnsZeroValue(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	got := s.Get("/no/such/path")
 	if got.LastStatus != "" {
 		t.Errorf("expected zero-value JobState, got %+v", got)
@@ -20,10 +33,7 @@ func TestStateStore_GetMissingKey_ReturnsZeroValue(t *testing.T) {
 }
 
 func TestStateStore_SetAndGet(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	st := JobState{LastStatus: "success", JobName: "photos"}
 	if err := s.Set("/data/photos", st); err != nil {
 		t.Fatalf("Set: %v", err)
@@ -38,10 +48,7 @@ func TestStateStore_SetAndGet(t *testing.T) {
 }
 
 func TestStateStore_DeleteRemovesKey(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/photos", JobState{LastStatus: "success"})
 	if err := s.Delete("/data/photos"); err != nil {
 		t.Fatalf("Delete: %v", err)
@@ -53,20 +60,14 @@ func TestStateStore_DeleteRemovesKey(t *testing.T) {
 }
 
 func TestStateStore_DeleteNonExistentKey_NoError(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	if err := s.Delete("/no/such/path"); err != nil {
 		t.Errorf("Delete missing key should not error, got %v", err)
 	}
 }
 
 func TestStateStore_ReferencedPendingArchives(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/photos", JobState{PendingArchive: "/spool/photos.tar.zst"})
 	s.Set("/data/docs", JobState{PendingArchive: "/spool/docs.tar.zst"})
 	s.Set("/data/empty", JobState{})
@@ -84,16 +85,13 @@ func TestStateStore_ReferencedPendingArchives(t *testing.T) {
 }
 
 func TestStateStore_Snapshot_ReturnsCopy(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/photos", JobState{LastStatus: "success"})
 	snap := s.Snapshot()
 	if len(snap) != 1 {
 		t.Errorf("snapshot len = %d, want 1", len(snap))
 	}
-	// Mutating the snapshot should not affect the store.
+	// Mutating the snapshot map should not affect the store.
 	delete(snap, "/data/photos")
 	got := s.Get("/data/photos")
 	if got.LastStatus != "success" {
@@ -102,10 +100,7 @@ func TestStateStore_Snapshot_ReturnsCopy(t *testing.T) {
 }
 
 func TestStateStore_ClearManualInterventions(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/a", JobState{ManualInterventionRequired: true, LastStatus: "manual_intervention_required"})
 	s.Set("/data/b", JobState{ManualInterventionRequired: true, LastStatus: "manual_intervention_required"})
 	s.Set("/data/c", JobState{ManualInterventionRequired: false, LastStatus: "success"})
@@ -129,10 +124,7 @@ func TestStateStore_ClearManualInterventions(t *testing.T) {
 }
 
 func TestStateStore_ClearManualIntervention_Single(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/a", JobState{ManualInterventionRequired: true})
 
 	cleared, err := s.ClearManualIntervention("/data/a")
@@ -149,10 +141,7 @@ func TestStateStore_ClearManualIntervention_Single(t *testing.T) {
 }
 
 func TestStateStore_ClearManualIntervention_NotPending(t *testing.T) {
-	s, err := NewStateStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
-	}
+	s := newTestStore(t)
 	s.Set("/data/a", JobState{ManualInterventionRequired: false})
 	cleared, err := s.ClearManualIntervention("/data/a")
 	if err != nil {
@@ -164,18 +153,28 @@ func TestStateStore_ClearManualIntervention_NotPending(t *testing.T) {
 }
 
 func TestStateStore_PersistenceAcrossReload(t *testing.T) {
-	dir := t.TempDir()
-	s1, err := NewStateStore(dir)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	db1, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("NewStateStore: %v", err)
+		t.Fatalf("open db1: %v", err)
+	}
+	db1.SetMaxOpenConns(1)
+	s1 := NewStateStore(db1)
+	if err := s1.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
 	}
 	s1.Set("/data/photos", JobState{LastStatus: "success", JobName: "photos"})
+	db1.Close()
 
-	// Reload from same directory.
-	s2, err := NewStateStore(dir)
+	db2, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("NewStateStore reload: %v", err)
+		t.Fatalf("open db2: %v", err)
 	}
+	db2.SetMaxOpenConns(1)
+	defer db2.Close()
+	s2 := NewStateStore(db2)
+
 	got := s2.Get("/data/photos")
 	if got.LastStatus != "success" {
 		t.Errorf("after reload: LastStatus = %q, want success", got.LastStatus)
