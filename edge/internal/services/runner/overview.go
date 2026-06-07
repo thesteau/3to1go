@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"os"
+
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/identity"
 	"github.com/3to1go/edge/internal/schedule"
@@ -27,7 +29,7 @@ func BuildStatusResponse(settings *config.Settings, keyFingerprint string, circu
 		"edge_id":                    settings.EdgeID,
 		"edge_instance_id":           instID,
 		"encryption_key_fingerprint": keyFingerprint,
-		"scan_root":                  settings.ScanRoot,
+		"scan_root":                  scanDir(settings.ScanRoot),
 		"central_url":                settings.CentralURL,
 		"advertised_url":             settings.AdvertisedURL,
 		"cron_schedule":              settings.CronSchedule,
@@ -41,6 +43,14 @@ func BuildStatusResponse(settings *config.Settings, keyFingerprint string, circu
 	}
 }
 
+// Returns the user-configured SCAN_DIR value rather than the container-internal path.
+func scanDir(fallback string) string {
+	if v := os.Getenv("SCAN_DIR"); v != "" {
+		return v
+	}
+	return fallback
+}
+
 // BuildDirectoryResponse returns the directory list payload for /api/directories.
 func BuildDirectoryResponse(settings *config.Settings, dirService dirLister) map[string]any {
 	dirs, err := dirService.ListDirectories()
@@ -48,7 +58,7 @@ func BuildDirectoryResponse(settings *config.Settings, dirService dirLister) map
 		dirs = nil
 	}
 	return map[string]any{
-		"scan_root":   settings.ScanRoot,
+		"scan_root":   scanDir(settings.ScanRoot),
 		"directories": dirs,
 	}
 }

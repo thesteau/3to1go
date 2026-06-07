@@ -102,10 +102,15 @@
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.edge-card-collapsible[open] .edge-expand-label {
-  visibility: hidden;
+.edge-expand-label::before {
+  content: "Show";
+}
+
+.edge-card-collapsible[open] .edge-expand-label::before {
+  content: "Hide";
 }
 
 .edge-key-panel {

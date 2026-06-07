@@ -2,6 +2,7 @@ package overview
 
 import (
 	"context"
+	"os"
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/store"
@@ -116,7 +117,7 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe
 
 	return map[string]any{
 		"status":              statusString(backend),
-		"backup_dir":          s.BackupRoot,
+		"backup_dir":          backupDir(s.BackupRoot),
 		"retention_keep_last": s.RetentionKeepLast,
 		"disk_total_bytes":    diskTotal,
 		"disk_used_bytes":     diskUsed,
@@ -124,6 +125,14 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe
 		"settings":            config.SettingsToPayload(s),
 		"edges":               edgesOut,
 	}, nil
+}
+
+// Returns the user-configured BACKUP_DIR value rather than the container-internal path.
+func backupDir(fallback string) string {
+	if v := os.Getenv("BACKUP_DIR"); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func statusString(backend StorageProbe) string {

@@ -378,15 +378,6 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     const diskFree = typeof data.disk_free_bytes === "number" ? formatBytes(data.disk_free_bytes) : null;
     const diskUsed = typeof data.disk_used_bytes === "number" ? formatBytes(data.disk_used_bytes) : null;
     const diskTotal = typeof data.disk_total_bytes === "number" ? formatBytes(data.disk_total_bytes) : null;
-    document.getElementById("meta").innerHTML = `
-      <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
-      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
-      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
-      ${diskUsed !== null ? `<div><strong>Backups Used</strong><br>${escapeHtml(diskUsed)}</div>` : ""}
-      ${diskFree !== null ? `<div><strong>Disk Free</strong><br>${escapeHtml(diskFree)}</div>` : ""}
-      ${diskTotal !== null ? `<div><strong>Disk Total</strong><br>${escapeHtml(diskTotal)}</div>` : ""}
-    `;
-
     const edges = data.edges || [];
     const allInstances = edges.flatMap((edge) => (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })));
     _edgeKeyFingerprints = Object.fromEntries(
@@ -395,16 +386,36 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
         .map(({ edgeId, instance }) => [buildEdgeKeyId(edgeId, instance.edge_instance_id), instance.encryption_key_fingerprint || ""]),
     );
 
+    const totalEdges = edges.length;
+    const totalInstances = edges.reduce((t, e) => t + (e.instances || []).length, 0);
+    const totalJobs = edges.reduce((t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).length, 0), 0);
+    const totalSnapshots = edges.reduce((t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).reduce((ttt, j) => ttt + (j.snapshot_count || 0), 0), 0), 0);
+
+    document.getElementById("meta").innerHTML = `
+      <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
+      <div><strong>Edges</strong><br>${totalEdges}</div>
+      <div><strong>Instances</strong><br>${totalInstances}</div>
+      <div><strong>Jobs</strong><br>${totalJobs}</div>
+      <div><strong>Snapshots</strong><br>${totalSnapshots}</div>
+      <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
+      <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
+      ${diskUsed !== null ? `<div><strong>Backups Used</strong><br>${escapeHtml(diskUsed)}</div>` : ""}
+      ${diskFree !== null ? `<div><strong>Disk Free</strong><br>${escapeHtml(diskFree)}</div>` : ""}
+      ${diskTotal !== null ? `<div><strong>Disk Total</strong><br>${escapeHtml(diskTotal)}</div>` : ""}
+    `;
+
     document.getElementById("namespaces").innerHTML = edges.length
       ? edges.map((edge) => `
           <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(edge.edge_id)}"${uiState.expandedEdges.has(edge.edge_id) ? " open" : ""}>
             <summary class="edge-header edge-card-summary">
               <div class="edge-header-main">
                 <span class="edge-id">${escapeHtml(edge.edge_id)}</span>
-                <div class="edge-submeta">${escapeHtml(String((edge.instances || []).length))} instance${edge.instances.length !== 1 ? "s" : ""}</div>
-                <span class="edge-expand-label">Expand</span>
+                <div class="edge-submeta">
+                  <span>${escapeHtml(String((edge.instances || []).length))} instance${edge.instances.length !== 1 ? "s" : ""}</span>
+                  <span>${(edge.instances || []).reduce((t, i) => t + (i.jobs || []).length, 0)} job${(edge.instances || []).reduce((t, i) => t + (i.jobs || []).length, 0) !== 1 ? "s" : ""}</span>
+                </div>
               </div>
-              <span class="edge-count">${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0)} job${(edge.instances || []).reduce((total, instance) => total + (instance.jobs || []).length, 0) !== 1 ? "s" : ""}</span>
+              <span class="edge-expand-label"></span>
             </summary>
             <div class="edge-card-body">
               ${(edge.instances || []).map((instance) => renderInstanceCard(edge.edge_id, instance)).join("") || '<p class="no-snapshots">No instances registered yet.</p>'}

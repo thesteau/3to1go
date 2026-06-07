@@ -242,6 +242,13 @@ Created by [thesteau](https://github.com/thesteau).
 
 <a id="attr-3"></a>**[3] Go programming language** — This project is written in [Go](https://go.dev/). Go and the Go logo are trademarks of Google LLC. This project is not affiliated with, endorsed by, or sponsored by Google or the Go team.
 
+## Support
+
+If this project is useful to you, consider buying me a coffee — it keeps the project going.
+
+<!-- TODO: replace with real link -->
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-placeholder-yellow)](https://buymeacoffee.com)
+
 ## Disclaimers
 
 3to1go is provided as-is for personal and home lab use. It is not a substitute for a comprehensive disaster recovery plan. You are responsible for:
