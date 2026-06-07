@@ -49,6 +49,7 @@ type settingsStorer interface {
 type snapIndexer interface {
 	GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*store.EdgeRegistration, error)
 	DeleteEdgeRegistration(ctx context.Context, edgeID, instID string) error
+	DeleteInstanceEntries(ctx context.Context, edgeID, instID string) error
 	HasNamespaceEntries(ctx context.Context, edgeID, instID string) (bool, error)
 	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
 	ListEdgeRegistrations(ctx context.Context, edgeIDFilter *string) ([]store.EdgeRegistration, error)
@@ -266,7 +267,40 @@ func (a *App) Handler() http.Handler {
 	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", withPathValues(a.handleDownloadLatest, "edge_id", "edge_instance_id", "job_name"))
 	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", withPathValues(a.handleDownloadByFingerprint, "edge_id", "edge_instance_id", "job_name"))
 
-	return newRateLimiter().middleware(a.sessionMiddleware(r))
+	return a.requestLogger(newRateLimiter().middleware(a.sessionMiddleware(r)))
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (a *App) requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		level := slog.LevelDebug
+		if r.Method != http.MethodGet {
+			level = slog.LevelInfo
+		}
+		a.logger.Log(r.Context(), level, "request",
+			"method", r.Method,
+			"path", path,
+			"status", rec.status,
+			"ms", time.Since(start).Milliseconds(),
+		)
+	})
 }
 
 func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {

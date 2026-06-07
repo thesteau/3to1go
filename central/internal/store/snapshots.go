@@ -261,6 +261,13 @@ func (s *SnapshotIndex) DeleteEdgeRegistration(ctx context.Context, edgeID, inst
 	return err
 }
 
+func (s *SnapshotIndex) DeleteInstanceEntries(ctx context.Context, edgeID, instID string) error {
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM snapshot_index WHERE edge_id = $1 AND edge_instance_id = $2`,
+		edgeID, instID)
+	return err
+}
+
 func (s *SnapshotIndex) ListEdgeRegistrations(ctx context.Context, edgeIDFilter *string) ([]EdgeRegistration, error) {
 	var (
 		query string
