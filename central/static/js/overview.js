@@ -393,10 +393,10 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
 
     document.getElementById("meta").innerHTML = `
       <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
-      <div><strong>Edges</strong><br>${totalEdges}</div>
-      <div><strong>Instances</strong><br>${totalInstances}</div>
-      <div><strong>Jobs</strong><br>${totalJobs}</div>
-      <div><strong>Snapshots</strong><br>${totalSnapshots}</div>
+      <div><strong>Edges</strong> ${renderHelpHint("Unique Edge device IDs that have stored at least one snapshot on this Central.")}<br>${totalEdges}</div>
+      <div><strong>Instances</strong> ${renderHelpHint("Each reinstall or unique Edge setup shows as a separate instance under the same Edge ID.")}<br>${totalInstances}</div>
+      <div><strong>Jobs</strong> ${renderHelpHint("Named backup jobs across all instances. Each job backs up one source directory on an Edge device.")}<br>${totalJobs}</div>
+      <div><strong>Snapshots</strong> ${renderHelpHint("Total backup snapshots stored on Central, across all edges, instances, and jobs.")}<br>${totalSnapshots}</div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
       ${diskUsed !== null ? `<div><strong>Backups Used</strong><br>${escapeHtml(diskUsed)}</div>` : ""}
@@ -405,14 +405,19 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     `;
 
     document.getElementById("namespaces").innerHTML = edges.length
-      ? edges.map((edge) => `
+      ? edges.map((edge) => {
+          const edgeInstances = edge.instances || [];
+          const edgeJobCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).length, 0);
+          const edgeSnapCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).reduce((tt, j) => tt + (j.snapshot_count || 0), 0), 0);
+          return `
           <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(edge.edge_id)}"${uiState.expandedEdges.has(edge.edge_id) ? " open" : ""}>
             <summary class="edge-header edge-card-summary">
               <div class="edge-header-main">
                 <span class="edge-id">${escapeHtml(edge.edge_id)}</span>
                 <div class="edge-submeta">
-                  <span>${escapeHtml(String((edge.instances || []).length))} instance${edge.instances.length !== 1 ? "s" : ""}</span>
-                  <span>${(edge.instances || []).reduce((t, i) => t + (i.jobs || []).length, 0)} job${(edge.instances || []).reduce((t, i) => t + (i.jobs || []).length, 0) !== 1 ? "s" : ""}</span>
+                  <span>${escapeHtml(String(edgeInstances.length))} instance${edgeInstances.length !== 1 ? "s" : ""}</span>
+                  <span>${edgeJobCount} job${edgeJobCount !== 1 ? "s" : ""}</span>
+                  <span>${edgeSnapCount} snapshot${edgeSnapCount !== 1 ? "s" : ""}</span>
                 </div>
               </div>
               <span class="edge-expand-label"></span>
@@ -421,7 +426,8 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
               ${(edge.instances || []).map((instance) => renderInstanceCard(edge.edge_id, instance)).join("") || '<p class="no-snapshots">No instances registered yet.</p>'}
             </div>
           </details>
-        `).join("")
+        `;
+        }).join("")
       : '<p class="hint">No snapshots have been stored yet.</p>';
 
     restoreKeyDrafts(uiState.keyDrafts);
@@ -492,7 +498,7 @@ async function runVerifyNow() {
   if (btn) btn.disabled = true;
   const el = document.getElementById("verify-status");
   if (el) {
-    el.innerHTML = `<div class="verify-bar verify-bar-idle"><span class="verify-label">Running integrity check…</span></div>`;
+    el.innerHTML = `<div class="verify-bar verify-bar-idle"><span class="section-spinner verify-spinner" aria-hidden="true"></span><span class="verify-label">Running integrity check…</span></div>`;
   }
   try {
     const res = await fetch("/api/admin/verify", { method: "POST" });

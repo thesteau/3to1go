@@ -61,7 +61,7 @@ async function deleteByPath(relativePath) {
   }
 }
 
-async function forceUpload(jobName, btn) {
+async function forceUpload(relativePath, jobName, btn) {
   const label = jobName || "this job";
   if (!await confirmApp({
     title: "Force Upload",
@@ -77,7 +77,7 @@ async function forceUpload(jobName, btn) {
     const responsePromise = fetch("/api/directories/force-send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_name: jobName }),
+      body: JSON.stringify({ relative_path: relativePath }),
     });
     window.setTimeout(() => loadData({ silent: true, includeKey: false }), 250);
     const response = await responsePromise;
@@ -90,14 +90,12 @@ async function forceUpload(jobName, btn) {
       setActionStatus("A backup or recovery operation is already running on this Edge.", "error");
       return;
     }
-
     setActionStatus(
       body.manual_retry_cleared
         ? `Force upload queued for ${label}. A manual block was cleared first.`
         : `Force upload queued for ${label}.`,
       "success",
     );
-    await loadData({ silent: true });
   } catch (error) {
     setActionStatus(error.message || `Force upload failed for ${label}.`, "error");
   } finally {
@@ -105,9 +103,9 @@ async function forceUpload(jobName, btn) {
   }
 }
 
-function forceUploadFromEvent(event, jobName, btn) {
+function forceUploadFromEvent(event, relativePath, jobName, btn) {
   stopActionEvent(event);
-  forceUpload(jobName, btn);
+  forceUpload(relativePath, jobName, btn);
   return false;
 }
 

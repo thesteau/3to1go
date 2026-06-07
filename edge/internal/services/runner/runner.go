@@ -259,33 +259,18 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 
 // StartForceSendAsync validates the job, acquires the lock, and dispatches the upload
 // in a background goroutine. Returns immediately without waiting for the upload to complete.
-func (r *EdgeRunner) StartForceSendAsync(jobName string) (map[string]any, error) {
+func (r *EdgeRunner) StartForceSendAsync(relativePath string) (map[string]any, error) {
 	r.mu.Lock()
 	settings := r.Settings
 	r.mu.Unlock()
 
-	normalized := strings.TrimSpace(jobName)
-	if normalized == "" {
-		return nil, fmt.Errorf("job_name is required")
+	job, err := r.DirService.LoadJob(relativePath)
+	if err != nil {
+		return nil, err
 	}
-
-	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, nil)
-	var matched []*backup.JobDefinition
-	for _, j := range jobs {
-		if j.JobName == normalized {
-			matched = append(matched, j)
-		}
-	}
-	if len(matched) == 0 {
-		return nil, fmt.Errorf("job not found")
-	}
-	if len(matched) > 1 {
-		return nil, fmt.Errorf("multiple jobs share that job_name")
-	}
-	job := matched[0]
 
 	if !r.cycleLock.TryLock() {
-		return map[string]any{"status": "already_running", "job_name": normalized}, nil
+		return map[string]any{"status": "already_running", "job_name": job.JobName}, nil
 	}
 
 	s := r.StateStore.Get(job.RootPath)
@@ -304,7 +289,7 @@ func (r *EdgeRunner) StartForceSendAsync(jobName string) (map[string]any, error)
 
 	return map[string]any{
 		"status":               "queued",
-		"job_name":             normalized,
+		"job_name":             job.JobName,
 		"manual_retry_cleared": cleared,
 	}, nil
 }
@@ -740,6 +725,10 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	s.LastDuplicate = result.Duplicate
 	s.NextRetryAt = ""
 	s.ManualInterventionRequired = false
+	if s.PendingArchiveSize != nil {
+		n := *s.PendingArchiveSize
+		s.LastBackupSizeBytes = &n
+	}
 	r.clearPendingArchive(s)
 	s.LastUploadUpdatedAt = utcNow()
 	r.StateStore.Set(job.RootPath, *s)

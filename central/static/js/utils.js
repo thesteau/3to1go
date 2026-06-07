@@ -83,3 +83,7 @@ function pause(ms) {
 async function readJson(response) {
   return response.json().catch(() => ({}));
 }
+
+function renderHelpHint(message) {
+  return `<span class="hover-hint" tabindex="0" aria-label="${escapeHtml(message)}" title="${escapeHtml(message)}">?</span>`;
+}

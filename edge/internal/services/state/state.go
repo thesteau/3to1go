@@ -36,6 +36,7 @@ type JobState struct {
 	LastStoredAs               string `json:"last_stored_as,omitempty"`
 	LastPruned                 int    `json:"last_pruned"`
 	LastDuplicate              bool   `json:"last_duplicate"`
+	LastBackupSizeBytes        *int64 `json:"last_backup_size_bytes,omitempty"`
 }
 
 // StateStore is a thread-safe, JSON-backed store for JobState values.
@@ -146,6 +147,9 @@ func (s *StateStore) ClearManualIntervention(key string) (bool, error) {
 func (s *StateStore) saveLocked() error {
 	raw, err := json.MarshalIndent(s.data, "", "  ")
 	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.stateDir, 0o755); err != nil {
 		return err
 	}
 	tmp := s.path + ".tmp"

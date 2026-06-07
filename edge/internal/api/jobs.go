@@ -67,7 +67,7 @@ func (a *App) handleForceSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		JobName string `json:"job_name" validate:"required"`
+		RelativePath string `json:"relative_path" validate:"required"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -77,7 +77,7 @@ func (a *App) handleForceSend(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid job request")
 		return
 	}
-	result, err := a.runner.StartForceSendAsync(body.JobName)
+	result, err := a.runner.StartForceSendAsync(body.RelativePath)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

@@ -273,6 +273,7 @@ function renderSelectedJobs(directories) {
             <div class="job-card-header">
               <div class="job-card-title">${renderStaticClipValue("", jobName, { className: "clip-title", clipLength: 34 })}</div>
               <div class="hint">${renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 42 })}</div>
+              ${entry.state?.last_backup_size_bytes ? `<div class="hint">Last backup: ${formatBytes(entry.state.last_backup_size_bytes)}</div>` : ""}
             </div>
             <div class="hint job-card-last-state ${lastStateClass(entry)}">${escapeHtml(lastStateLabel || "Last state: —")}</div>
             ${activity}
@@ -283,7 +284,7 @@ function renderSelectedJobs(directories) {
           </div>
           <div class="job-card-actions">
             <span class="hint-with-help">
-              <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+              <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
               <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
             </span>
             <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>

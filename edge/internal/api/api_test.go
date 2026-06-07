@@ -1193,7 +1193,7 @@ func TestHandleForceSend_Success(t *testing.T) {
 	runner.forceSendResult = map[string]any{"status": "started", "job_name": "photos"}
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/force-send", map[string]string{
-		"job_name": "photos",
+		"relative_path": "photos",
 	})
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
@@ -1205,7 +1205,7 @@ func TestHandleForceSend_NotFound(t *testing.T) {
 	runner.forceSendErr = errors.New("job not found")
 	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/directories/force-send", map[string]string{
-		"job_name": "ghost",
+		"relative_path": "ghost",
 	})
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rr.Code)
