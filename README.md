@@ -230,6 +230,19 @@ Edge determines whether a new snapshot is needed by comparing the folder's conte
 - [`central/`](central/) - 3to1go Central: receiver API, storage logic, and web UI (Go<sup><a href="#attr-3">[3]</a></sup>)
 - [`edge/`](edge/) - 3to1go Edge: scan agent, upload logic, encryption, and web UI (Go<sup><a href="#attr-3">[3]</a></sup>)
 
+### Developing Both Apps Together
+
+The repository uses three Go modules joined by [`go.work`](go.work): `central`,
+`edge`, and the small [`shared/`](shared/) protocol module. The shared module
+contains only Edge↔Central wire types and constants; the applications remain
+independently deployable.
+
+From the repository root, use `go test ./central/...` or `go test ./edge/...`.
+The app directories also remain valid working directories for the same commands
+because Go discovers the parent workspace. Local app Compose files build from
+the repository root so Docker can include `shared/`; published-image deployment
+continues to use `deploy-example/` unchanged.
+
 ## Author
 
 Created by [thesteau](https://github.com/thesteau).

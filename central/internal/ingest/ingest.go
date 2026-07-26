@@ -23,6 +23,7 @@ import (
 	"github.com/3to1go/central/internal/services/retention"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/protocol"
 )
 
 const timeFormat = "2006-01-02T15:04:05Z"
@@ -101,19 +102,7 @@ type UploadMetadata struct {
 	SourceTLS                bool
 }
 
-type UploadInitRequest struct {
-	EdgeID                   string  `json:"edge_id"`
-	EdgeInstanceID           string  `json:"edge_instance_id,omitempty"`
-	JobName                  string  `json:"job_name"`
-	Fingerprint              string  `json:"fingerprint"`
-	Timestamp                string  `json:"timestamp"`
-	ArchiveFormat            string  `json:"archive_format"`
-	ArchiveSizeBytes         int64   `json:"archive_size_bytes"`
-	ArchiveSHA256            string  `json:"archive_sha256"`
-	IdempotencyKey           string  `json:"idempotency_key"`
-	EncryptionKeyFingerprint *string `json:"encryption_key_fingerprint,omitempty"`
-	AdvertisedURL            *string `json:"advertised_url,omitempty"`
-}
+type UploadInitRequest = protocol.UploadInitRequest
 
 type SessionResponse struct {
 	UploadID                  string  `json:"upload_id"`
@@ -153,6 +142,7 @@ type Service struct {
 	uploadRoot   string
 	keyRoot      string
 	sessionLocks sync.Map
+	reservationMu sync.Mutex
 	mu           sync.Mutex
 }
 
@@ -239,6 +229,12 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		return s.buildCommittedDuplicateResponse(req.ArchiveSizeBytes, dup.StoredAs), nil
 	}
 
+	// Serialize the capacity check with the reservation write. Without this,
+	// concurrent initiations can all observe the same free space and overbook
+	// staging/backup storage before their session rows are committed.
+	s.reservationMu.Lock()
+	defer s.reservationMu.Unlock()
+
 	// Validate capacity
 	if err := s.validateNewReservationContext(ctx, req.ArchiveSizeBytes); err != nil {
 		return nil, err
@@ -302,7 +298,7 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 
 	if offset != currentSize {
 		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
-			"status":      "offset_mismatch",
+			"status":      protocol.StatusOffsetMismatch,
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
 		})
@@ -420,7 +416,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
-			"status":      "checksum_mismatch",
+			"status":      protocol.StatusChecksumMismatch,
 			"next_offset": 0,
 			"upload_id":   uploadID,
 		})

@@ -34,7 +34,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./central
+          context: .
           file: ./central/Dockerfile
           push: true
           tags: |

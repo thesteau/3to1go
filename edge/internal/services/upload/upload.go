@@ -20,6 +20,7 @@ import (
 	"github.com/3to1go/edge/internal/encryption"
 	"github.com/3to1go/edge/internal/identity"
 	"github.com/3to1go/edge/internal/services/certificates"
+	"github.com/3to1go/shared/protocol"
 )
 
 // UploadFailure is a structured error returned by UploadClient.
@@ -419,20 +420,16 @@ func (c *UploadClient) retryPhase(phase string, op func() (map[string]any, error
 }
 
 func (c *UploadClient) initiateSession(ctx context.Context, edgeID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum, idempotencyKey string) (map[string]any, error) {
-	body := map[string]any{
-		"edge_id":                    edgeID,
-		"edge_instance_id":           c.edgeInstanceID,
-		"job_name":                   jobName,
-		"fingerprint":                fingerprint,
-		"timestamp":                  timestamp,
-		"archive_format":             "tar.zst",
-		"archive_size_bytes":         archiveSize,
-		"archive_sha256":             sha256sum,
-		"idempotency_key":            idempotencyKey,
-		"encryption_key_fingerprint": c.encryptionKeyFingerprint,
-		"advertised_url":             c.advertisedURL,
+	keyFingerprint := c.encryptionKeyFingerprint
+	advertisedURL := c.advertisedURL
+	body := protocol.UploadInitRequest{
+		EdgeID: edgeID, EdgeInstanceID: c.edgeInstanceID, JobName: jobName,
+		Fingerprint: fingerprint, Timestamp: timestamp,
+		ArchiveFormat: protocol.ArchiveFormatTarZst, ArchiveSizeBytes: archiveSize,
+		ArchiveSHA256: sha256sum, IdempotencyKey: idempotencyKey,
+		EncryptionKeyFingerprint: &keyFingerprint, AdvertisedURL: &advertisedURL,
 	}
-	return c.jsonPost(ctx, "/backup/uploads/initiate", body, "initiate",
+	return c.jsonPost(ctx, protocol.UploadInitiatePath, body, "initiate",
 		c.timeoutForBytes(c.chunkSizeBytes))
 }
 
@@ -566,8 +563,10 @@ func buildUploadFailure(resp *http.Response, phase string) *UploadFailure {
 	}
 
 	switch {
-	case sc == 409 && detailStatus == "checksum_mismatch":
+	case sc == 409 && detailStatus == protocol.StatusChecksumMismatch:
 		uf.Category, uf.Retryable = "integrity", true
+	case sc == 409 && detailStatus == protocol.StatusOffsetMismatch:
+		uf.Category, uf.Retryable = "offset_mismatch", true
 	case sc == 409 && nextOffset != nil:
 		uf.Category, uf.Retryable = "offset_mismatch", true
 	case sc == 429:

@@ -1,7 +1,9 @@
 services:
   central:
     container_name: 3to1go-central
-    build: .
+    build:
+      context: ..
+      dockerfile: central/Dockerfile
     env_file:
       - ./.env
     depends_on:

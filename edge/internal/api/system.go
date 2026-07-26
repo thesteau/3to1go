@@ -123,6 +123,10 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := a.settingsStore.Save(r.Context(), &existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		return
+	}
 	if err := a.runner.UpdateSettings(newSettings); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
@@ -131,7 +135,7 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	var body struct {
@@ -223,6 +227,10 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 	newSettings, err := config.BuildSettings(&existing)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.settingsStore.Save(r.Context(), &existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
 	if err := a.runner.UpdateSettings(newSettings); err != nil {

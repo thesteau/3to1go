@@ -77,7 +77,10 @@ func TestLoadOrCreate_IgnoresEmptyFile(t *testing.T) {
 
 func TestRandomHex_CorrectLength(t *testing.T) {
 	for _, n := range []int{8, 16, 32} {
-		got := randomHex(n)
+		got, err := randomHex(n)
+		if err != nil {
+			t.Fatalf("randomHex(%d): %v", n, err)
+		}
 		if len(got) != n*2 {
 			t.Errorf("randomHex(%d): len=%d, want %d", n, len(got), n*2)
 		}
@@ -85,8 +88,14 @@ func TestRandomHex_CorrectLength(t *testing.T) {
 }
 
 func TestRandomHex_Unique(t *testing.T) {
-	a := randomHex(16)
-	b := randomHex(16)
+	a, err := randomHex(16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := randomHex(16)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if a == b {
 		t.Error("two randomHex calls should not produce identical output")
 	}

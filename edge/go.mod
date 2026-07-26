@@ -2,7 +2,10 @@ module github.com/3to1go/edge
 
 go 1.26.0
 
+replace github.com/3to1go/shared => ../shared
+
 require (
+	github.com/3to1go/shared v0.0.0
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-playground/validator/v10 v10.30.3

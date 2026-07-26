@@ -8,6 +8,7 @@ import (
 
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/protocol"
 )
 
 func (a *App) authorizeBearer(r *http.Request) (*store.CredentialRecord, error) {
@@ -128,7 +129,7 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if body.ArchiveFormat != "tar.zst" {
+	if body.ArchiveFormat != protocol.ArchiveFormatTarZst {
 		writeError(w, http.StatusBadRequest, "archive_format must be tar.zst")
 		return
 	}

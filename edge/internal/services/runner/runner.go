@@ -56,6 +56,9 @@ type uploadWork struct {
 
 // NewEdgeRunner creates and initialises the runner from settings, a cert manager, and a state store.
 func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *certificates.CertManager, stateStore *state.StateStore) (*EdgeRunner, error) {
+	if _, err := identity.LoadOrCreateChecked(config.InstallationIDPath()); err != nil {
+		return nil, fmt.Errorf("installation identity: %w", err)
+	}
 	if err := os.MkdirAll(settings.StateDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}
