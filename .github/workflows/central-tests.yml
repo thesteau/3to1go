@@ -3,13 +3,8 @@ name: Central Tests
 on:
   push:
     branches: ["main"]
-    paths:
-      - "central/**"
-      - ".github/workflows/central-tests.yml"
   pull_request:
-    paths:
-      - "central/**"
-      - ".github/workflows/central-tests.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

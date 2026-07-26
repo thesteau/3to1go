@@ -60,6 +60,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   7 * 24 * 60 * 60,
 		Path:     "/",
+		Secure:   sessionCookieSecure(),
 	})
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": user})
 }
@@ -74,6 +75,7 @@ func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Value:  "",
 		MaxAge: -1,
 		Path:   "/",
+		Secure: sessionCookieSecure(),
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
