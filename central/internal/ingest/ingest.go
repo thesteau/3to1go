@@ -23,6 +23,7 @@ import (
 	"github.com/3to1go/central/internal/services/retention"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/protocol"
 )
 
 const timeFormat = "2006-01-02T15:04:05Z"
@@ -101,19 +102,7 @@ type UploadMetadata struct {
 	SourceTLS                bool
 }
 
-type UploadInitRequest struct {
-	EdgeID                   string  `json:"edge_id"`
-	EdgeInstanceID           string  `json:"edge_instance_id,omitempty"`
-	JobName                  string  `json:"job_name"`
-	Fingerprint              string  `json:"fingerprint"`
-	Timestamp                string  `json:"timestamp"`
-	ArchiveFormat            string  `json:"archive_format"`
-	ArchiveSizeBytes         int64   `json:"archive_size_bytes"`
-	ArchiveSHA256            string  `json:"archive_sha256"`
-	IdempotencyKey           string  `json:"idempotency_key"`
-	EncryptionKeyFingerprint *string `json:"encryption_key_fingerprint,omitempty"`
-	AdvertisedURL            *string `json:"advertised_url,omitempty"`
-}
+type UploadInitRequest = protocol.UploadInitRequest
 
 type SessionResponse struct {
 	UploadID                  string  `json:"upload_id"`
@@ -153,6 +142,7 @@ type Service struct {
 	uploadRoot   string
 	keyRoot      string
 	sessionLocks sync.Map
+	reservationMu sync.Mutex
 	mu           sync.Mutex
 }
 
@@ -216,19 +206,11 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		return nil, err
 	}
 
-	// Check idempotency
-	existing := s.loadSessionForKeyContext(ctx, req.IdempotencyKey)
-	if existing != nil {
-		if s.sessionReferencesMissingSnapshot(ctx, existing) {
-			s.reconcileNamespace(ctx, existing.Namespace)
-			s.discardSessionContext(ctx, existing)
-			existing = nil
-		}
+	existing, err := s.resolveIdempotentSession(ctx, req.IdempotencyKey, req.ArchiveSHA256)
+	if err != nil {
+		return nil, err
 	}
 	if existing != nil {
-		if existing.ArchiveSHA256 != req.ArchiveSHA256 {
-			return nil, httpError(http.StatusConflict, "idempotency key reused with different archive checksum")
-		}
 		existing.UploadedBytes = s.currentUploadSize(existing.UploadID)
 		existing.UpdatedAt = utcNow()
 		existing.ExpiresAt = utcAfter(s.sessionTTL())
@@ -246,6 +228,12 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 	if dup != nil {
 		return s.buildCommittedDuplicateResponse(req.ArchiveSizeBytes, dup.StoredAs), nil
 	}
+
+	// Serialize the capacity check with the reservation write. Without this,
+	// concurrent initiations can all observe the same free space and overbook
+	// staging/backup storage before their session rows are committed.
+	s.reservationMu.Lock()
+	defer s.reservationMu.Unlock()
 
 	// Validate capacity
 	if err := s.validateNewReservationContext(ctx, req.ArchiveSizeBytes); err != nil {
@@ -310,7 +298,7 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 
 	if offset != currentSize {
 		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
-			"status":      "offset_mismatch",
+			"status":      protocol.StatusOffsetMismatch,
 			"next_offset": currentSize,
 			"upload_id":   uploadID,
 		})
@@ -428,7 +416,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 		}
 		return nil, httpErrorJSON(http.StatusConflict, map[string]any{
-			"status":      "checksum_mismatch",
+			"status":      protocol.StatusChecksumMismatch,
 			"next_offset": 0,
 			"upload_id":   uploadID,
 		})
@@ -437,81 +425,26 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	hookCtx := s.hookContext(session, stagedPath)
 	s.hooks.RunCommand(s.settings.HookPreCommand, "pre", hookCtx)
 
-	hookStatus := "error"
-	hookStoredAs := session.Filename
-	hookPruned := 0
-	hookDuplicate := false
-	var result *FinalizeResponse
-
-	// Check duplicate again under lock
 	dup, err := s.index.FindDuplicate(ctx, session.Namespace, actualSHA)
 	if err != nil {
 		return nil, httpError(http.StatusInternalServerError, "failed to check duplicate upload")
 	}
+
+	var result *FinalizeResponse
 	if dup != nil {
-		os.Remove(stagedPath)
-		session.UploadedBytes = session.ArchiveSizeBytes
-		session.Status = "completed"
-		storedAs := dup.StoredAs
-		session.StoredAs = &storedAs
-		session.Pruned = 0
-		session.UpdatedAt = utcNow()
-		session.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSessionContext(ctx, session); err != nil {
-			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
+		result, err = s.commitDuplicate(ctx, session, dup, stagedPath)
+		if err != nil {
+			return nil, err
 		}
-		hookStatus = "ok"
-		hookStoredAs = dup.StoredAs
-		hookDuplicate = true
-		result = &FinalizeResponse{Status: "ok", StoredAs: dup.StoredAs, Pruned: 0, Duplicate: true}
 	} else {
-		storedAs, storeErr := s.backend.Store(session.Namespace, session.Filename, stagedPath)
-		if storeErr != nil {
-			s.runPostHook(hookCtx, hookStatus, hookStoredAs, hookPruned, hookDuplicate)
-			return nil, httpError(http.StatusInternalServerError, "failed to store archive")
+		result, err = s.commitNewArchive(ctx, session, stagedPath, actualSHA)
+		if err != nil {
+			s.runPostHook(hookCtx, "error", session.Filename, 0, false)
+			return nil, err
 		}
-
-		pruned, _ := retention.PruneOldSnapshots(s.backend, session.Namespace, s.settings.RetentionKeepLast)
-
-		files, _ := s.backend.List(session.Namespace)
-		var sizeBytes int64
-		var mtime float64
-		for _, f := range files {
-			if f.Filename == storedAs {
-				sizeBytes = f.SizeBytes
-				mtime = f.Mtime
-				break
-			}
-		}
-
-		s.index.UpsertSnapshot(ctx, session.Namespace, store.SnapshotEntry{
-			StoredAs:    storedAs,
-			ArchiveSHA:  actualSHA,
-			Fingerprint: session.Fingerprint,
-			Timestamp:   session.Timestamp,
-			SizeBytes:   sizeBytes,
-			Mtime:       mtime,
-		})
-		storageFiles := storageFilesToIndexFiles(files)
-		s.index.ReconcileNamespace(ctx, session.Namespace, storageFiles)
-
-		session.UploadedBytes = session.ArchiveSizeBytes
-		session.Status = "completed"
-		session.StoredAs = &storedAs
-		session.Pruned = pruned
-		session.UpdatedAt = utcNow()
-		session.ExpiresAt = utcAfter(s.sessionTTL())
-		if err := s.saveSessionContext(ctx, session); err != nil {
-			return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
-		}
-
-		hookStatus = "ok"
-		hookStoredAs = storedAs
-		hookPruned = pruned
-		result = &FinalizeResponse{Status: "ok", StoredAs: storedAs, Pruned: pruned}
 	}
 
-	s.runPostHook(hookCtx, hookStatus, hookStoredAs, hookPruned, hookDuplicate)
+	s.runPostHook(hookCtx, "ok", result.StoredAs, result.Pruned, result.Duplicate)
 	return result, nil
 }
 
@@ -709,6 +642,77 @@ func (s *Service) buildCommittedDuplicateResponse(archiveSizeBytes int64, stored
 		Pruned:                    0,
 		Duplicate:                 true,
 	}
+}
+
+func (s *Service) resolveIdempotentSession(ctx context.Context, key, archiveSHA256 string) (*UploadSession, error) {
+	sess := s.loadSessionForKeyContext(ctx, key)
+	if sess == nil {
+		return nil, nil
+	}
+	if s.sessionReferencesMissingSnapshot(ctx, sess) {
+		s.reconcileNamespace(ctx, sess.Namespace)
+		s.discardSessionContext(ctx, sess)
+		return nil, nil
+	}
+	if sess.ArchiveSHA256 != archiveSHA256 {
+		return nil, httpError(http.StatusConflict, "idempotency key reused with different archive checksum")
+	}
+	return sess, nil
+}
+
+func (s *Service) commitDuplicate(ctx context.Context, sess *UploadSession, dup *store.SnapshotEntry, stagedPath string) (*FinalizeResponse, error) {
+	os.Remove(stagedPath)
+	storedAs := dup.StoredAs
+	sess.UploadedBytes = sess.ArchiveSizeBytes
+	sess.Status = "completed"
+	sess.StoredAs = &storedAs
+	sess.Pruned = 0
+	sess.UpdatedAt = utcNow()
+	sess.ExpiresAt = utcAfter(s.sessionTTL())
+	if err := s.saveSessionContext(ctx, sess); err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
+	}
+	return &FinalizeResponse{Status: "ok", StoredAs: storedAs, Pruned: 0, Duplicate: true}, nil
+}
+
+func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, stagedPath, actualSHA string) (*FinalizeResponse, error) {
+	storedAs, err := s.backend.Store(sess.Namespace, sess.Filename, stagedPath)
+	if err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to store archive")
+	}
+
+	pruned, _ := retention.PruneOldSnapshots(s.backend, sess.Namespace, s.settings.RetentionKeepLast)
+
+	files, _ := s.backend.List(sess.Namespace)
+	var sizeBytes int64
+	var mtime float64
+	for _, f := range files {
+		if f.Filename == storedAs {
+			sizeBytes = f.SizeBytes
+			mtime = f.Mtime
+			break
+		}
+	}
+	s.index.UpsertSnapshot(ctx, sess.Namespace, store.SnapshotEntry{
+		StoredAs:    storedAs,
+		ArchiveSHA:  actualSHA,
+		Fingerprint: sess.Fingerprint,
+		Timestamp:   sess.Timestamp,
+		SizeBytes:   sizeBytes,
+		Mtime:       mtime,
+	})
+	s.index.ReconcileNamespace(ctx, sess.Namespace, storageFilesToIndexFiles(files))
+
+	sess.UploadedBytes = sess.ArchiveSizeBytes
+	sess.Status = "completed"
+	sess.StoredAs = &storedAs
+	sess.Pruned = pruned
+	sess.UpdatedAt = utcNow()
+	sess.ExpiresAt = utcAfter(s.sessionTTL())
+	if err := s.saveSessionContext(ctx, sess); err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
+	}
+	return &FinalizeResponse{Status: "ok", StoredAs: storedAs, Pruned: pruned}, nil
 }
 
 func (s *Service) sessionReferencesMissingSnapshot(ctx context.Context, sess *UploadSession) bool {

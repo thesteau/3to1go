@@ -1,7 +1,9 @@
 services:
   edge:
     container_name: 3to1go-edge
-    build: .
+    build:
+      context: ..
+      dockerfile: edge/Dockerfile
     env_file:
       - ./.env
     ports:

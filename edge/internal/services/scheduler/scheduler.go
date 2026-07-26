@@ -36,6 +36,9 @@ type SchedulerController struct {
 	stopCh chan struct{}
 	wakeCh chan struct{}
 	doneCh chan struct{}
+	startOnce sync.Once
+	stopOnce  sync.Once
+	started   bool
 }
 
 func NewSchedulerController(runner CycleRunner) (*SchedulerController, error) {
@@ -55,20 +58,38 @@ func NewSchedulerController(runner CycleRunner) (*SchedulerController, error) {
 }
 
 func (s *SchedulerController) Start() {
-	go s.loop()
+	s.startOnce.Do(func() {
+		s.mu.Lock()
+		if s.state == "stopped" {
+			s.mu.Unlock()
+			return
+		}
+		s.started = true
+		s.mu.Unlock()
+		go s.loop()
+	})
 }
 
 func (s *SchedulerController) Stop() {
-	close(s.stopCh)
-	select {
-	case s.wakeCh <- struct{}{}:
-	default:
-	}
-	<-s.doneCh
-	s.mu.Lock()
-	s.state = "stopped"
-	s.nextRunAt = nil
-	s.mu.Unlock()
+	s.stopOnce.Do(func() {
+		s.mu.Lock()
+		started := s.started
+		s.mu.Unlock()
+		close(s.stopCh)
+		if started {
+			select {
+			case s.wakeCh <- struct{}{}:
+			default:
+			}
+			<-s.doneCh
+		} else {
+			close(s.doneCh)
+		}
+		s.mu.Lock()
+		s.state = "stopped"
+		s.nextRunAt = nil
+		s.mu.Unlock()
+	})
 }
 
 func (s *SchedulerController) RequestRunNow() string {
@@ -216,7 +237,10 @@ func (s *SchedulerController) runCycle(trigger string) {
 	s.lastStartedAt = &now
 	s.mu.Unlock()
 
-	s.runner.Logger().Info("cycle_started", "trigger", trigger, "schedule", s.sched.Expression)
+	s.mu.Lock()
+	schedule := s.sched.Expression
+	s.mu.Unlock()
+	s.runner.Logger().Info("cycle_started", "trigger", trigger, "schedule", schedule)
 	defer func() {
 		completed := time.Now()
 		s.mu.Lock()

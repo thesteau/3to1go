@@ -819,7 +819,7 @@ func TestHandleSaveNtfy_UpdateFailure(t *testing.T) {
 
 func TestHandleTestNtfy_Success(t *testing.T) {
 	runner := defaultRunner()
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy/test", map[string]string{
 		"ntfy_url":   "https://ntfy.example.com",
 		"ntfy_topic": "backups",
@@ -832,7 +832,7 @@ func TestHandleTestNtfy_Success(t *testing.T) {
 func TestHandleTestNtfy_Failure(t *testing.T) {
 	runner := defaultRunner()
 	runner.testNtfyErr = errors.New("connection refused")
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy/test", map[string]string{
 		"ntfy_url": "https://ntfy.example.com",
 	})

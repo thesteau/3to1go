@@ -2,10 +2,16 @@ FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 
-COPY go.mod go.sum ./
+COPY go.work ./
+COPY shared/go.mod ./shared/go.mod
+COPY edge/go.mod edge/go.sum ./edge/
+COPY central/go.mod ./central/go.mod
+COPY shared ./shared
+COPY edge ./edge
+WORKDIR /build/edge
 RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
-COPY . .
+WORKDIR /build/edge
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /3to1go-edge ./cmd/server
 
@@ -20,7 +26,7 @@ ENV XDG_CACHE_HOME=/data/cache
 WORKDIR /srv/3to1go-edge
 
 COPY --from=builder /3to1go-edge /usr/local/bin/3to1go-edge
-COPY docker-entrypoint.sh /usr/local/bin/3to1go-edge-entrypoint
+COPY edge/docker-entrypoint.sh /usr/local/bin/3to1go-edge-entrypoint
 RUN sed -i 's/\r$//' /usr/local/bin/3to1go-edge-entrypoint \
     && chmod +x /usr/local/bin/3to1go-edge-entrypoint
 
