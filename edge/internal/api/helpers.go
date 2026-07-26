@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -26,4 +28,13 @@ func readJSON(r *http.Request, v any) error {
 
 func validateStruct(v any) error {
 	return requestValidator.Struct(v)
+}
+
+func sessionCookieSecure() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SESSION_COOKIE_SECURE"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

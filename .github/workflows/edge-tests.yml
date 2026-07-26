@@ -3,13 +3,8 @@ name: Edge Tests
 on:
   push:
     branches: ["main"]
-    paths:
-      - "edge/**"
-      - ".github/workflows/edge-tests.yml"
   pull_request:
-    paths:
-      - "edge/**"
-      - ".github/workflows/edge-tests.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

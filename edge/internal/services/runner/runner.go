@@ -59,6 +59,9 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 	if _, err := identity.LoadOrCreateChecked(config.InstallationIDPath()); err != nil {
 		return nil, fmt.Errorf("installation identity: %w", err)
 	}
+	stateStore.SetErrorHandler(func(err error) {
+		logger.Error("state_store_error", "error", err)
+	})
 	if err := os.MkdirAll(settings.StateDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}

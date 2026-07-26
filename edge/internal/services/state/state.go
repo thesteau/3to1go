@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 )
 
 // JobState holds the persistent state for a single backup job.
@@ -40,11 +41,33 @@ type JobState struct {
 // StateStore is a SQLite-backed store for JobState values.
 type StateStore struct {
 	db *sql.DB
+	errMu sync.RWMutex
+	onError func(error)
 }
 
 // NewStateStore creates a StateStore backed by the given database.
 func NewStateStore(db *sql.DB) *StateStore {
 	return &StateStore{db: db}
+}
+
+// SetErrorHandler installs a callback for persistence errors that would
+// otherwise be returned only through best-effort snapshot helpers.
+func (s *StateStore) SetErrorHandler(fn func(error)) {
+	s.errMu.Lock()
+	defer s.errMu.Unlock()
+	s.onError = fn
+}
+
+func (s *StateStore) reportError(err error) {
+	if err == nil {
+		return
+	}
+	s.errMu.RLock()
+	fn := s.onError
+	s.errMu.RUnlock()
+	if fn != nil {
+		fn(err)
+	}
 }
 
 // EnsureSchema creates the job_states table if it does not exist.
@@ -151,6 +174,9 @@ func (s *StateStore) Get(key string) JobState {
 	row := s.db.QueryRow(`SELECT `+selectCols+` FROM job_states WHERE key = ?`, key)
 	_, js, err := scanJobState(row.Scan)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			s.reportError(err)
+		}
 		return JobState{}
 	}
 	return js
@@ -218,6 +244,7 @@ func (s *StateStore) Delete(key string) error {
 func (s *StateStore) ReferencedPendingArchives() map[string]bool {
 	rows, err := s.db.Query(`SELECT pending_archive FROM job_states WHERE pending_archive != ''`)
 	if err != nil {
+		s.reportError(err)
 		return map[string]bool{}
 	}
 	defer rows.Close()
@@ -228,6 +255,9 @@ func (s *StateStore) ReferencedPendingArchives() map[string]bool {
 			result[archive] = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		s.reportError(err)
+	}
 	return result
 }
 
@@ -235,6 +265,7 @@ func (s *StateStore) ReferencedPendingArchives() map[string]bool {
 func (s *StateStore) Snapshot() map[string]JobState {
 	rows, err := s.db.Query(`SELECT ` + selectCols + ` FROM job_states`)
 	if err != nil {
+		s.reportError(err)
 		return map[string]JobState{}
 	}
 	defer rows.Close()
@@ -244,6 +275,9 @@ func (s *StateStore) Snapshot() map[string]JobState {
 		if err == nil {
 			out[key] = js
 		}
+	}
+	if err := rows.Err(); err != nil {
+		s.reportError(err)
 	}
 	return out
 }
