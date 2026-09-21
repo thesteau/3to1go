@@ -10,12 +10,38 @@ cookie_central="$root/central.cookies"
 cookie_edge="$root/edge.cookies"
 
 cleanup() {
+  local result=$?
+  if [ "$result" -ne 0 ]; then
+    for container in "$postgres" "$central" "$edge"; do
+      if docker inspect "$container" >/dev/null 2>&1; then
+        echo "--- $container startup diagnostics ---" >&2
+        docker inspect --format '{{json .State}}' "$container" >&2 || true
+        docker logs --tail 200 "$container" >&2 || true
+      fi
+    done
+  fi
   docker rm -f "$edge" "$central" "$postgres" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
   docker run --rm -v "$root:/cleanup" alpine:3.21 sh -c 'rm -rf /cleanup/*' >/dev/null 2>&1 || true
   rm -rf "$root"
+  return "$result"
 }
 trap cleanup EXIT
+
+wait_for_service() {
+  local container="$1"
+  shift
+  for _ in $(seq 1 60); do
+    if [ "$(docker inspect --format '{{.State.Running}}' "$container")" != true ]; then
+      echo "$container exited before becoming ready" >&2
+      return 1
+    fi
+    if "$@" >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  echo "Timed out waiting for $container to become ready" >&2
+  return 1
+}
 
 mkdir -p "$root/central-config" "$root/backups" "$root/staging" \
   "$root/edge-config" "$root/edge-state" "$root/edge-spool" "$root/scan"
@@ -29,10 +55,11 @@ docker run -d --name "$postgres" --network "$network" \
   -e POSTGRES_PASSWORD=e2e-password \
   postgres:17-alpine >/dev/null
 
-for _ in $(seq 1 60); do
-  if docker exec "$postgres" pg_isready -U three_to_one_go -d three_to_one_go >/dev/null 2>&1; then break; fi
-  sleep 1
-done
+# The initialization server only listens on a Unix socket. Require TCP and a
+# successful query so Central starts only after the final server is ready.
+wait_for_service "$postgres" docker exec -e PGPASSWORD=e2e-password "$postgres" \
+  psql -h 127.0.0.1 -U three_to_one_go -d three_to_one_go \
+  -w -v ON_ERROR_STOP=1 -c 'SELECT 1'
 
 docker run -d --name "$central" --network "$network" -p 16555:6555 \
   -e INDEX_DATABASE_URL="postgresql://three_to_one_go:e2e-password@$postgres:5432/three_to_one_go" \
@@ -44,10 +71,7 @@ docker run -d --name "$central" --network "$network" -p 16555:6555 \
   -v "$root/staging:/staging" \
   3to1go-central-validation >/dev/null
 
-for _ in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:16555/health >/dev/null; then break; fi
-  sleep 1
-done
+wait_for_service "$central" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16555/health
 
 curl -fsS -c "$cookie_central" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' \
@@ -68,10 +92,7 @@ docker run -d --name "$edge" --network "$network" -p 16556:6556 \
   -v "$root/edge-spool:/data/spool" -v "$root/scan:/scan" \
   3to1go-edge-validation >/dev/null
 
-for _ in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:16556/health >/dev/null; then break; fi
-  sleep 1
-done
+wait_for_service "$edge" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
 
 curl -fsS -c "$cookie_edge" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' \
