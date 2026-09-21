@@ -64,6 +64,112 @@ You do not write a giant backup config file up front.
 
 Instead, Edge scans a root folder such as `/home`, `/Users`, or `C:\Users`. Any directory that contains a `.upload_dir` file becomes a backup job. That makes setup feel more like "drop a marker into the folder I want backed up" than "build a big central manifest."
 
+### Multiple Folders Or Drives With Docker
+
+**Add one volume entry in `docker-compose.yml` for each folder you want Edge to
+see.** Docker makes those folders visible beneath `/scan` inside Edge. Your files
+stay in their original locations on your computer, including on different drives.
+
+Each entry follows this pattern:
+
+```text
+"folder on your computer:folder inside Edge"
+```
+
+For example, `"D:/Projects:/scan/projects"` makes your computer's `D:\Projects`
+folder appear as `/scan/projects` in Edge. Use forward slashes in Compose entries,
+including for Windows paths.
+
+**1. Open your Edge `docker-compose.yml`.**
+
+Use [`deploy-example/edge/docker-compose.yml`](deploy-example/edge/docker-compose.yml)
+for the published image, or [`edge/docker-compose.yml`](edge/docker-compose.yml)
+for development. Find the `volumes:` section under the `edge` service.
+
+**2. Replace the single-folder entry.**
+
+Find this line:
+
+```yaml
+      - ${SCAN_DIR:-./scan}:/scan
+```
+
+Remove it and put one entry per folder in its place. For example:
+
+```yaml
+      - "C:/Users/Alice:/scan/main"
+      - "D:/Projects:/scan/projects"
+```
+
+Replace the paths on the left with folders that exist on your computer. Give each
+folder on the right a different name beneath `/scan`. Keep the other volume
+entries unchanged. The complete `volumes` section would look like this:
+
+```yaml
+    volumes:
+      - ./config:/config
+      - ./hook-scripts:/hook-scripts
+      - "C:/Users/Alice:/scan/main"
+      - "D:/Projects:/scan/projects"
+      - ./state:/data/state
+      - ./spool:/data/spool
+```
+
+The Compose files include these examples as comments. If you use them, remove
+the `#` before each volume entry to activate it, and remove the original
+`${SCAN_DIR:-./scan}:/scan` entry. A commented line does nothing.
+
+On Linux, the same pattern works with paths such as
+`"/home/alice:/scan/main"` and `"/mnt/data/projects:/scan/projects"`.
+For just one folder, keep the original default entry; no extra grouping is needed.
+
+**3. Update `.env` and recreate the Edge container.**
+
+Remove `SCAN_DIR` from `.env` when using the explicit folder entries above; those
+entries now specify the host folders directly. Edge should still scan `/scan`.
+That is the container default; if you have set `SCAN_ROOT`, keep it at `/scan`.
+
+Run this from the folder containing your Edge Compose file:
+
+```sh
+docker compose up -d --force-recreate edge
+```
+
+**4. Select the folders to back up in Edge.**
+
+Open or refresh Edge's UI. Its folder browser now shows:
+
+```text
+/scan
+  main       (C:\Users\Alice on your computer)
+  projects   (D:\Projects on your computer)
+```
+
+Select the folders you want backed up using the existing job editor, or create
+`.upload_dir` markers in those folders. Adding a volume makes a folder visible;
+selecting it for backup creates a job. Leave `/scan` itself unselected so it does
+not become one combined job covering all mounted folders.
+
+**To add another drive later**, add another line under the same `volumes` section:
+
+```yaml
+      - "E:/Photos:/scan/photos"
+```
+
+Run the recreate command again, refresh Edge, and select the new folder for backup.
+
+**Job names must be unique across all mounted folders on that Edge instance.**
+For example, use `main-photos` and `projects-photos` for two folders otherwise
+named `photos`. The `main` and `projects` folder labels do not automatically
+separate same-named jobs on Central.
+
+Mounts need write access for Edge to save markers and restore files. The grouping
+folders add one scan-depth level, so increase Max Depth if needed. Central still
+stores snapshots by `edge_id/edge_instance_id/job_name`; no Central upgrade or
+storage migration is needed. When moving an existing folder under a new mount
+label, keep its job name to retain its Central history. Edge's local path-based
+state will be new, so its next scan may upload again.
+
 ## How The System Works
 
 The full flow looks like this:
