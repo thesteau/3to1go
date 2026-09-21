@@ -11,7 +11,24 @@ services:
     volumes:
       - ./config:/config
       - ./hook-scripts:/hook-scripts
+      # ONE FOLDER: keep this default entry; set SCAN_DIR in .env.
       - ${SCAN_DIR:-./scan}:/scan
+      # MULTIPLE FOLDERS / DRIVES:
+      # 1. Remove the default entry above.
+      # 2. Remove the # before the example entries below and use your own paths.
+      #    Format: "folder on your computer:folder inside Edge"
+      # - "C:/Users/Alice:/scan/main"
+      # - "D:/Projects:/scan/projects"
+      #    To add another drive later, add another entry, for example:
+      # - "E:/Photos:/scan/photos"
+      #    Use a different /scan/<name> for each folder. Keep other volumes intact.
+      # 3. Remove SCAN_DIR from .env. Keep SCAN_ROOT=/scan if explicitly set.
+      # 4. From this directory, run: docker compose up -d --force-recreate edge
+      # 5. Refresh Edge's UI: main, projects, etc. appear beneath /scan.
+      #    Select the folders to back up; adding a volume alone does not select it.
+      #    Leave /scan itself unselected. Give every backup job a unique name.
+      # Commented entries are examples only; they are not active mounts.
+      # Full walkthrough: root README.md, "Multiple Folders Or Drives With Docker".
       - ./state:/data/state
       - ./spool:/data/spool
     restart: unless-stopped
