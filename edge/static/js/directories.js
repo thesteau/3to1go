@@ -284,10 +284,10 @@ function renderSelectedJobs(directories) {
           <div class="job-card-side">
             <div class="job-card-actions">
               <span class="hint-with-help">
-                <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'), this)">Force Upload</button>
+                <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">Force Upload</button>
                 <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
               </span>
-              <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodeURIComponent(jobName)}'))">Restore</button>
+              <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'))">Restore</button>
               ${entry.blocked_by_parent ? "" : `<button type="button" class="btn-edit" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}
             </div>
             ${entry.state?.last_backup_size_bytes ? `<div class="hint job-card-size">Last backup: ${formatBytes(entry.state.last_backup_size_bytes)}</div>` : ""}

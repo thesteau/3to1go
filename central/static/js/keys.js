@@ -1,5 +1,22 @@
 const _encKeys = {};
 let _edgeKeyFingerprints = {};
+let _keySessionGeneration = 0;
+
+function clearSessionEncKeys() {
+  // Invalidate key validation and prompts already in flight as well as stored keys.
+  _keySessionGeneration += 1;
+  Object.keys(_encKeys).forEach((key) => delete _encKeys[key]);
+  for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith("3to1go_enc_")) sessionStorage.removeItem(key);
+  }
+  document.querySelectorAll("[data-edge-key-input], #app-dialog-input").forEach((input) => {
+    input.value = "";
+  });
+  document.querySelectorAll("[data-edge-key-status]").forEach((element) => {
+    element.textContent = "";
+  });
+}
 
 function buildEdgeKeyId(edgeId, edgeInstanceId) {
   return `${edgeId}::${edgeInstanceId || "_legacy"}`;
@@ -50,8 +67,10 @@ function setKeyStatus(edgeId, edgeInstanceId, message, kind = "info") {
 }
 
 async function storeEncKey(edgeId, edgeInstanceId, key, { alertOnError = false } = {}) {
+  const generation = _keySessionGeneration;
   try {
     const actualFingerprint = await fingerprintKey(key);
+    if (generation !== _keySessionGeneration) return null;
     const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
     if (expectedFingerprint && actualFingerprint !== expectedFingerprint) {
       clearStoredEncKey(edgeId, edgeInstanceId);
@@ -72,6 +91,7 @@ async function storeEncKey(edgeId, edgeInstanceId, key, { alertOnError = false }
     );
     return key;
   } catch {
+    if (generation !== _keySessionGeneration) return null;
     clearStoredEncKey(edgeId, edgeInstanceId);
     const message = "Encryption key was not valid base64url text.";
     setKeyStatus(edgeId, edgeInstanceId, message, "error");
@@ -115,6 +135,7 @@ function clearEncKey(edgeId, edgeInstanceId) {
 }
 
 async function refreshKeyPanel(edgeId, edgeInstanceId) {
+  const generation = _keySessionGeneration;
   const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);
   const key = getEncKey(edgeId, edgeInstanceId);
 
@@ -132,6 +153,7 @@ async function refreshKeyPanel(edgeId, edgeInstanceId) {
 
   try {
     const actualFingerprint = await fingerprintKey(key);
+    if (generation !== _keySessionGeneration) return;
     if (expectedFingerprint && actualFingerprint !== expectedFingerprint) {
       clearStoredEncKey(edgeId, edgeInstanceId);
       setKeyStatus(
@@ -152,12 +174,14 @@ async function refreshKeyPanel(edgeId, edgeInstanceId) {
       "ok",
     );
   } catch {
+    if (generation !== _keySessionGeneration) return;
     clearStoredEncKey(edgeId, edgeInstanceId);
     setKeyStatus(edgeId, edgeInstanceId, "Saved key was invalid and has been cleared.", "error");
   }
 }
 
 async function resolveEncKey(edgeId, edgeInstanceId) {
+  const generation = _keySessionGeneration;
   const saved = getEncKey(edgeId, edgeInstanceId);
   if (saved) return saved;
 
@@ -179,6 +203,6 @@ async function resolveEncKey(edgeId, edgeInstanceId) {
     inputType: "secret",
     confirmLabel: "Use Key",
   });
-  if (!prompted) return null;
+  if (!prompted || generation !== _keySessionGeneration) return null;
   return storeEncKey(edgeId, edgeInstanceId, prompted, { alertOnError: true });
 }

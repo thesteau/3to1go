@@ -25,8 +25,9 @@ function formatDate(d) {
 }
 
 async function manualRefresh() {
-  await loadOverview({ force: true, notifyNewSnapshots: true });
-  setActionStatus("Refreshed.", "success");
+  if (await loadOverview({ force: true, notifyNewSnapshots: true })) {
+    setActionStatus("Refreshed.", "success");
+  }
 }
 
 async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
@@ -392,7 +393,7 @@ function updateOverviewDom(container, html) {
 
 async function loadOverview({ silent = false, force = false, notifyNewSnapshots = false } = {}) {
   if (_overviewLoading) {
-    return;
+    return false;
   }
 
   _overviewLoading = true;
@@ -482,10 +483,12 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     if (!silent) {
       setActionStatus(error.message || "Refresh failed.", "error");
     }
+    return false;
   } finally {
     _overviewLoading = false;
   }
   loadVerifyStatus();
+  return true;
 }
 
 function renderVerifyResult(data) {
