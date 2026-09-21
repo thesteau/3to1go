@@ -176,7 +176,7 @@ async function resolveEncKey(edgeId, edgeInstanceId) {
     message: promptMessage,
     input: true,
     inputLabel: "Encryption key",
-    inputType: "password",
+    inputType: "secret",
     confirmLabel: "Use Key",
   });
   if (!prompted) return null;

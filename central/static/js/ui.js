@@ -84,7 +84,11 @@ function appDialog({ title, message, input = false, inputLabel = "", inputType =
   const inputElement = document.getElementById("app-dialog-input");
   document.getElementById("app-dialog-input-label").textContent = inputLabel || "";
   inputWrap.hidden = !input;
-  inputElement.type = inputType;
+  inputElement.type = inputType === "secret" ? "text" : inputType;
+  inputElement.classList.toggle("secret-value", inputType === "secret");
+  inputElement.autocomplete = "off";
+  inputElement.spellcheck = false;
+  inputElement.autocapitalize = "none";
   inputElement.value = "";
   const confirmButton = document.getElementById("app-dialog-confirm");
   confirmButton.textContent = confirmLabel;

@@ -233,3 +233,8 @@ button.danger {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Tokens and encryption keys are secrets, but are not account passwords. */
+.secret-value {
+  -webkit-text-security: disc;
+}

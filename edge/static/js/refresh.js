@@ -72,9 +72,6 @@ async function loadData({ silent = false, includeKey = true, refreshDirectoryTre
         applyTheme(latestData.settings?.theme || "dark");
       }
     fillMetaFromDir(latestData);
-      if (!document.getElementById("settings-dialog")?.open) {
-        fillSettings(latestData.settings || {});
-      }
   })().catch(() => {});
 
   const dirFetch = (async () => {
