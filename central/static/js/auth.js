@@ -25,6 +25,8 @@ async function refreshSession() {
 }
 
 function openLoginDialog() {
+  clearSessionEncKeys();
+  resolveAppDialog(false);
   clearStatus("login-status");
   openDialog("login-dialog");
   window.setTimeout(() => document.getElementById("login_password")?.focus(), 0);
@@ -109,7 +111,15 @@ async function changeOwnPassword() {
 }
 
 async function logoutUser() {
-  await rawFetch("/api/session/logout", { method: "POST" });
+  clearSessionEncKeys();
+  resolveAppDialog(false);
+  try {
+    const response = await rawFetch("/api/session/logout", { method: "POST" });
+    if (!response.ok) throw new Error("Sign out failed. Please try again.");
+  } catch (error) {
+    setActionStatus(error.message || "Sign out failed. Please try again.", "error");
+    return;
+  }
   currentUser = null;
   closeDialog("users-dialog");
   openLoginDialog();

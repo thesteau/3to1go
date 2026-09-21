@@ -31,7 +31,8 @@ function formatMessage(value, fallback = "") {
 }
 
 function encodedPath(value) {
-  return encodeURIComponent(value ?? ".");
+  // encodeURIComponent leaves apostrophes intact; our inline handlers use single quotes.
+  return encodeURIComponent(value ?? ".").replaceAll("'", "%27");
 }
 
 function statusBadge(entry) {

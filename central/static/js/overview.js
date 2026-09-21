@@ -25,8 +25,9 @@ function formatDate(d) {
 }
 
 async function manualRefresh() {
-  await loadOverview({ force: true, notifyNewSnapshots: true });
-  setActionStatus("Refreshed.", "success");
+  if (await loadOverview({ force: true, notifyNewSnapshots: true })) {
+    setActionStatus("Refreshed.", "success");
+  }
 }
 
 async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
@@ -136,14 +137,14 @@ function renderKeyManager(ns) {
   const edgeKeyId = buildEdgeKeyId(edgeId, edgeInstanceId);
   const expectedFingerprint = ns.encryption_key_fingerprint || "";
   return `
-    <div class="edge-key-panel">
+    <div class="edge-key-panel" data-key-panel="${escapeHtml(edgeKeyId)}">
       <div class="edge-key-head">
         <strong>Decryption Key</strong>
         ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "edge-detail", clipLength: 24 })}
       </div>
       <div class="edge-key-controls">
         <input
-          type="password"
+          type="text" class="secret-value" autocomplete="off" spellcheck="false" autocapitalize="none"
           placeholder="Paste the Edge encryption key"
           data-edge-key-input="${escapeHtml(edgeKeyId)}">
         <button class="btn btn-key" type="button" onclick="rememberEncKey('${escapeHtml(edgeId)}','${escapeHtml(edgeInstanceId)}')">Save Key</button>
@@ -171,7 +172,7 @@ function renderInstanceCard(edgeId, instance) {
     ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential('${escapeHtml(edgeId)}','${escapeHtml(instanceId)}',this)">Revoke Token</button>`
     : "";
   return `
-    <section class="instance-card">
+    <section class="instance-card" data-instance-id="${escapeHtml(instanceId || "_legacy")}">
       <div class="instance-head">
         <div>
           <div class="instance-title">${escapeHtml(instanceId || "Legacy snapshots")}</div>
@@ -331,37 +332,74 @@ function captureOverviewUiState() {
   const expandedEdges = Array.from(document.querySelectorAll("#namespaces details[data-edge-id][open]"))
     .map((element) => element.dataset.edgeId)
     .filter(Boolean);
-  const keyDrafts = Object.fromEntries(
-    Array.from(document.querySelectorAll("[data-edge-key-input]"))
-      .map((input) => [input.dataset.edgeKeyInput, input.value])
-      .filter(([, value]) => value),
-  );
   return {
     expandedEdges: new Set(expandedEdges),
-    keyDrafts,
   };
 }
 
-function restoreKeyDrafts(keyDrafts) {
-  Object.entries(keyDrafts || {}).forEach(([edgeKeyId, value]) => {
-    const [edgeId, rawInstanceId] = String(edgeKeyId).split("::", 2);
-    const input = keyInputElement(edgeId, rawInstanceId === "_legacy" ? null : rawInstanceId);
-    if (input && !input.value) {
-      input.value = value;
+// Reconcile existing cards in place so refresh never replaces a surviving key input.
+// Its value, focus and selection belong to the user, not the overview response.
+function updateOverviewDom(container, html) {
+  const focusedInput = container.contains(document.activeElement) && document.activeElement.matches("[data-edge-key-input]")
+    ? document.activeElement : null;
+  const selection = focusedInput ? [focusedInput.selectionStart, focusedInput.selectionEnd, focusedInput.selectionDirection] : null;
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const nodeKey = (node) => node.nodeType === 1
+    ? node.getAttribute("data-edge-id") ?? node.getAttribute("data-instance-id") ?? node.getAttribute("data-key-panel") ?? node.getAttribute("data-edge-key-input")
+    : null;
+  function syncChildren(target, source) {
+    let cursor = target.firstChild;
+    for (const next of Array.from(source.childNodes)) {
+      const key = nodeKey(next);
+      let existing = cursor;
+      if (key !== null) {
+        existing = Array.from(target.childNodes).find((node) => nodeKey(node) === key && node.nodeName === next.nodeName);
+      }
+      if (!existing || existing.nodeName !== next.nodeName || nodeKey(existing) !== key) {
+        target.insertBefore(next.cloneNode(true), cursor);
+        continue;
+      }
+      if (existing !== cursor) target.insertBefore(existing, cursor);
+      if (next.nodeType === 1) {
+        // Key inputs are deliberately left untouched, including their live value.
+        if (!existing.matches("[data-edge-key-input]")) {
+          for (const attr of Array.from(existing.attributes)) {
+            if (!next.hasAttribute(attr.name)) existing.removeAttribute(attr.name);
+          }
+          for (const attr of Array.from(next.attributes)) {
+            if (existing.getAttribute(attr.name) !== attr.value) existing.setAttribute(attr.name, attr.value);
+          }
+          syncChildren(existing, next);
+        }
+      } else if (existing.nodeValue !== next.nodeValue) {
+        existing.nodeValue = next.nodeValue;
+      }
+      cursor = existing.nextSibling;
     }
-  });
+    while (cursor) {
+      const obsolete = cursor;
+      cursor = cursor.nextSibling;
+      obsolete.remove();
+    }
+  }
+  syncChildren(container, template.content);
+  // Moving a card after server-side reordering can blur a retained input.
+  if (focusedInput?.isConnected && document.activeElement !== focusedInput) {
+    focusedInput.focus({ preventScroll: true });
+    focusedInput.setSelectionRange(...selection);
+  }
 }
 
 async function loadOverview({ silent = false, force = false, notifyNewSnapshots = false } = {}) {
   if (_overviewLoading) {
-    return;
+    return false;
   }
 
   _overviewLoading = true;
-  if (!silent) {
+  if (!silent && !document.getElementById("namespaces").children.length) {
     document.getElementById("namespaces").innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
   }
-  const uiState = captureOverviewUiState();
 
   try {
     const res = await fetch("/api/overview");
@@ -404,7 +442,9 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
       ${diskTotal !== null ? `<div><strong>Disk Total</strong><br>${escapeHtml(diskTotal)}</div>` : ""}
     `;
 
-    document.getElementById("namespaces").innerHTML = edges.length
+    // Capture after the request: edits and expanded cards may change while it is in flight.
+    const uiState = captureOverviewUiState();
+    const overviewHtml = edges.length
       ? edges.map((edge) => {
           const edgeInstances = edge.instances || [];
           const edgeJobCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).length, 0);
@@ -430,7 +470,7 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
         }).join("")
       : '<p class="hint">No snapshots have been stored yet.</p>';
 
-    restoreKeyDrafts(uiState.keyDrafts);
+    updateOverviewDom(document.getElementById("namespaces"), overviewHtml);
     if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(data.settings || {});
     }
@@ -443,10 +483,12 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     if (!silent) {
       setActionStatus(error.message || "Refresh failed.", "error");
     }
+    return false;
   } finally {
     _overviewLoading = false;
   }
   loadVerifyStatus();
+  return true;
 }
 
 function renderVerifyResult(data) {

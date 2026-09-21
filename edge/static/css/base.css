@@ -287,6 +287,11 @@ textarea {
   to { transform: rotate(360deg); }
 }
 
+/* Tokens and encryption keys are secrets, but are not account passwords. */
+.secret-value {
+  -webkit-text-security: disc;
+}
+
 @keyframes energy-flow {
   to { background-position: -180% 0; }
 }

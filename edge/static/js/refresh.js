@@ -6,6 +6,7 @@ let _edgeRefreshBurstRemaining = 0;
 
 const ACTIVE_JOB_STATUSES = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
 const EDGE_ACTIVE_REFRESH_MS = 2500;
+const EDGE_IDLE_REFRESH_MS = 15000;
 const EDGE_ACTIVE_REFRESH_BURST_COUNT = 6;
 const EDGE_PAUSED_REFRESH_CHECK_MS = 2000;
 
@@ -22,11 +23,7 @@ function scheduleEdgeRefresh(delay = EDGE_ACTIVE_REFRESH_MS, { force = false } =
   if (!_edgeAutoRefreshStarted) return;
   const shouldRefresh = force || edgeHasActiveWork() || _edgeRefreshBurstRemaining > 0;
   if (!shouldRefresh) {
-    if (_edgeRefreshTimer) {
-      window.clearTimeout(_edgeRefreshTimer);
-      _edgeRefreshTimer = null;
-    }
-    return;
+    delay = EDGE_IDLE_REFRESH_MS;
   }
   if (_edgeRefreshTimer) {
     window.clearTimeout(_edgeRefreshTimer);
@@ -72,9 +69,6 @@ async function loadData({ silent = false, includeKey = true, refreshDirectoryTre
         applyTheme(latestData.settings?.theme || "dark");
       }
     fillMetaFromDir(latestData);
-      if (!document.getElementById("settings-dialog")?.open) {
-        fillSettings(latestData.settings || {});
-      }
   })().catch(() => {});
 
   const dirFetch = (async () => {
