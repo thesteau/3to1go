@@ -295,3 +295,8 @@ textarea {
 @keyframes energy-flow {
   to { background-position: -180% 0; }
 }
+
+.section-loading { gap: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .section-spinner { animation: none; }
+}

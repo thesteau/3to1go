@@ -6,20 +6,20 @@
         <p class="hint">These values are saved locally by Central and persist across container restarts.</p>
       </div>
       <div class="modal-head-actions">
-        <button type="button" onclick="saveSettings()">Save</button>
+        <button type="button" onclick="saveSettings()" data-requires="settings" disabled>Save</button>
         <button type="button" class="secondary" onclick="cancelSettings()">Cancel</button>
       </div>
     </div>
 
     <div class="modal-body">
 
-    <button type="button" class="toggle-btn" id="settings_theme_dark" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)">
+    <button type="button" class="toggle-btn" id="settings_theme_dark" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-label">Dark Mode</span>
       <span class="hover-hint" tabindex="0" aria-label="Switch between dark and light color scheme." title="Switch between dark and light color scheme.">?</span>
     </button>
 
-    <button type="button" class="toggle-btn" id="settings_uploads_paused" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)">
+    <button type="button" class="toggle-btn" id="settings_uploads_paused" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-label">Pause incoming uploads</span>
       <span class="hover-hint" tabindex="0" aria-label="When on, Central rejects new upload sessions with 503. In-progress uploads are not interrupted." title="When on, Central rejects new upload sessions with 503. In-progress uploads are not interrupted.">?</span>
@@ -28,11 +28,11 @@
     <div class="split-row">
       <div>
         <label for="settings_retention_keep_last">Keep Last Snapshots</label>
-        <input id="settings_retention_keep_last" type="number" min="1">
+        <input id="settings_retention_keep_last" type="number" min="1" data-requires="settings" disabled>
       </div>
       <div>
         <label for="settings_log_level">Log Level</label>
-        <select id="settings_log_level">
+        <select id="settings_log_level" data-requires="settings" disabled>
           <option value="DEBUG">DEBUG</option>
           <option value="INFO">INFO</option>
           <option value="WARNING">WARNING</option>
@@ -44,28 +44,28 @@
     <div class="split-row">
       <div>
         <label for="settings_max_upload_size_mb">Max Upload Size MB</label>
-        <input id="settings_max_upload_size_mb" type="number" min="1">
+        <input id="settings_max_upload_size_mb" type="number" min="1" data-requires="settings" disabled>
       </div>
       <div>
         <label for="settings_upload_chunk_size_mb">Upload Chunk Size MB</label>
-        <input id="settings_upload_chunk_size_mb" type="number" min="1">
+        <input id="settings_upload_chunk_size_mb" type="number" min="1" data-requires="settings" disabled>
       </div>
     </div>
 
     <div class="split-row">
       <div>
         <label for="settings_upload_session_ttl_hours">Upload Session TTL Hours</label>
-        <input id="settings_upload_session_ttl_hours" type="number" min="1">
+        <input id="settings_upload_session_ttl_hours" type="number" min="1" data-requires="settings" disabled>
       </div>
       <div>
         <label for="settings_upload_cleanup_interval_seconds">Cleanup Interval Seconds</label>
-        <input id="settings_upload_cleanup_interval_seconds" type="number" min="10">
+        <input id="settings_upload_cleanup_interval_seconds" type="number" min="10" data-requires="settings" disabled>
       </div>
     </div>
 
     <div>
       <label for="settings_snapshot_verify_interval_hours">Snapshot Integrity Check Interval (hours, 0 = disabled)</label>
-      <input id="settings_snapshot_verify_interval_hours" type="number" min="0" placeholder="0">
+      <input id="settings_snapshot_verify_interval_hours" type="number" min="0" placeholder="0" data-requires="settings" disabled>
       <p class="hint">Periodically SHA-256 verifies the latest snapshot per job. Set 0 to disable. Changes take effect on next restart.</p>
     </div>
 
@@ -78,9 +78,10 @@
         <span class="hint">10 files max. Supports .crt PEM files. Directory: <code id="certificate-dir">loading...</code></span>
       </div>
       <div class="hook-upload-row">
-        <input id="certificate_file_input" type="file" accept=".crt">
-        <button type="button" class="secondary" onclick="uploadCertificateFile()">Upload</button>
+        <input id="certificate_file_input" type="file" accept=".crt" data-requires="certificates" disabled>
+        <button type="button" class="secondary" onclick="uploadCertificateFile()" data-requires="certificates" disabled>Upload</button>
       </div>
+      <div id="certificates-load-status" role="status"></div>
       <div id="certificate-files" class="hook-files"></div>
     </div>
 

@@ -2,6 +2,7 @@ package backup
 
 import (
 	"cmp"
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,14 +20,21 @@ type DiscoveredFile struct {
 // BuildFileList walks the job's root directory and returns regular files, applying
 // exclude patterns and hidden-file filtering as configured in the job.
 func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*DiscoveredFile, error) {
+	return BuildFileListContext(context.Background(), job, warnf)
+}
+
+func BuildFileListContext(ctx context.Context, job *JobDefinition, warnf func(string, ...any)) ([]*DiscoveredFile, error) {
 	var files []*DiscoveredFile
 	stack := []string{job.RootPath}
 	visited := make(map[string]bool)
 
 	for len(stack) > 0 {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		curDir := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		if isRuntimePath(curDir) {
+		if IsRuntimePath(curDir) {
 			continue
 		}
 
@@ -50,6 +58,9 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*Discovere
 		}
 
 		for _, entry := range entries {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			entryPath := filepath.Join(curDir, entry.Name())
 			rel, err := filepath.Rel(job.RootPath, entryPath)
 			if err != nil {
@@ -84,7 +95,7 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*Discovere
 						}
 						continue
 					}
-					if isRuntimePath(resolved) {
+					if IsRuntimePath(resolved) {
 						continue
 					}
 					info, err = os.Stat(resolved)
@@ -139,7 +150,23 @@ func matchesExclude(archivePath string, patterns []string) bool {
 
 	for _, pattern := range patterns {
 		normalized := strings.TrimSpace(pattern)
+		if strings.HasPrefix(pattern, "/") {
+			normalized = pattern
+		}
 		if normalized == "" {
+			continue
+		}
+		// Browser-generated paths are rooted at the job and literal, so names
+		// containing glob characters and same-named siblings stay unambiguous.
+		if strings.HasPrefix(normalized, "/") {
+			exact := strings.TrimPrefix(normalized, "/")
+			if prefix, directory := strings.CutSuffix(exact, "/"); directory {
+				if archivePath == prefix || strings.HasPrefix(archivePath, prefix+"/") {
+					return true
+				}
+			} else if archivePath == exact {
+				return true
+			}
 			continue
 		}
 
@@ -164,6 +191,19 @@ func matchesExclude(archivePath string, patterns []string) bool {
 			return true
 		}
 		if matched, _ := filepath.Match(normalized, basename); matched {
+			return true
+		}
+	}
+	return false
+}
+
+// ExcludedByJob also checks ancestors, matching the scanner's directory pruning.
+func ExcludedByJob(job *JobDefinition, relativePath string) bool {
+	if !job.IncludeHidden && containsHidden(relativePath) {
+		return true
+	}
+	for path := relativePath; path != "."; path = filepath.ToSlash(filepath.Dir(path)) {
+		if matchesExclude(path, job.ExcludePatterns) {
 			return true
 		}
 	}

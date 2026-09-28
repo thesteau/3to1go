@@ -237,7 +237,7 @@ func (c *UploadClient) UploadArchive(
 	initiate := func() (map[string]any, error) {
 		return c.initiateSession(ctx, edgeID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256, idempotencyKey)
 	}
-	sessionInfo, err := c.retryPhase("initiate", initiate)
+	sessionInfo, err := c.retryPhaseContext(ctx, "initiate", initiate)
 	if err != nil {
 		return nil, err
 	}
@@ -269,6 +269,9 @@ func (c *UploadClient) UploadArchive(
 	successStreak := 0
 	attempt := 0
 	for offset < archiveSize {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if _, err := f.Seek(offset, io.SeekStart); err != nil {
 			return nil, err
 		}
@@ -298,7 +301,7 @@ func (c *UploadClient) UploadArchive(
 				if !uf.Retryable || attempt >= c.maxRetryAttempts {
 					return nil, uf
 				}
-				reconciled, rerr := c.retryPhase("reconcile", initiate)
+				reconciled, rerr := c.retryPhaseContext(ctx, "reconcile", initiate)
 				if rerr != nil {
 					return nil, rerr
 				}
@@ -317,7 +320,9 @@ func (c *UploadClient) UploadArchive(
 				if offset >= archiveSize {
 					break
 				}
-				c.sleepBeforeRetry(attempt, uf.RetryAfterSeconds)
+				if err := c.sleepBeforeRetry(ctx, attempt, uf.RetryAfterSeconds); err != nil {
+					return nil, err
+				}
 				continue
 			}
 			return nil, err
@@ -335,7 +340,7 @@ func (c *UploadClient) UploadArchive(
 		attempt = 0
 	}
 
-	finalResp, err := c.retryPhase("finalize", func() (map[string]any, error) {
+	finalResp, err := c.retryPhaseContext(ctx, "finalize", func() (map[string]any, error) {
 		return c.finalizeSession(ctx, uploadID)
 	})
 	if err != nil {
@@ -400,7 +405,14 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 }
 
 func (c *UploadClient) retryPhase(phase string, op func() (map[string]any, error)) (map[string]any, error) {
+	return c.retryPhaseContext(context.Background(), phase, op)
+}
+
+func (c *UploadClient) retryPhaseContext(ctx context.Context, phase string, op func() (map[string]any, error)) (map[string]any, error) {
 	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		result, err := op()
 		if err == nil {
 			return result, nil
@@ -415,7 +427,9 @@ func (c *UploadClient) retryPhase(phase string, op func() (map[string]any, error
 		if !uf.Retryable || attempt+1 >= c.maxRetryAttempts {
 			return nil, uf
 		}
-		c.sleepBeforeRetry(attempt+1, uf.RetryAfterSeconds)
+		if err := c.sleepBeforeRetry(ctx, attempt+1, uf.RetryAfterSeconds); err != nil {
+			return nil, err
+		}
 	}
 }
 
@@ -508,12 +522,18 @@ func requestWithTimeout(req *http.Request, timeout time.Duration) (*http.Request
 }
 
 func (c *UploadClient) doRequest(req *http.Request, phase string) (*http.Response, error) {
+	if err := req.Context().Err(); err != nil {
+		return nil, err
+	}
 	if uf := c.CircuitBreaker.BeforeRequest(); uf != nil {
 		uf.Phase = phase
 		return nil, uf
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if req.Context().Err() == context.Canceled {
+			return nil, context.Canceled
+		}
 		c.CircuitBreaker.RecordFailure()
 		return nil, &UploadFailure{Message: err.Error(), Category: "network", Retryable: true, Phase: phase}
 	}
@@ -618,7 +638,7 @@ func (c *UploadClient) timeoutForBytes(size int64) time.Duration {
 	return time.Duration(seconds)*time.Second + c.readTimeoutPadding
 }
 
-func (c *UploadClient) sleepBeforeRetry(attempt int, retryAfter *int) {
+func (c *UploadClient) sleepBeforeRetry(ctx context.Context, attempt int, retryAfter *int) error {
 	var delay time.Duration
 	if retryAfter != nil {
 		delay = time.Duration(*retryAfter) * time.Second
@@ -631,7 +651,14 @@ func (c *UploadClient) sleepBeforeRetry(attempt int, retryAfter *int) {
 		jitter := secs * 0.2 * rand.Float64()
 		delay = time.Duration((secs + jitter) * float64(time.Second))
 	}
-	time.Sleep(delay)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func buildIdempotencyKey(edgeID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum string) string {

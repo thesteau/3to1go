@@ -238,3 +238,8 @@ button.danger {
 .secret-value {
   -webkit-text-security: disc;
 }
+
+.section-loading { gap: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .section-spinner { animation: none; }
+}

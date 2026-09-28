@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/3to1go/edge/internal/config"
+	"github.com/3to1go/edge/internal/services/directories"
 	"github.com/3to1go/edge/internal/services/recovery"
 	"github.com/3to1go/edge/internal/store"
 )
@@ -110,6 +111,24 @@ type mockRunner struct {
 	recoverErr        error
 	rotateKeyResult   string
 	rotateKeyErr      error
+	pathActionErr     error
+	pathActionPath    string
+}
+
+func (m *mockRunner) ClearStagedBackup(path string) error {
+	m.pathActionPath = path
+	return m.pathActionErr
+}
+
+func (m *mockRunner) CancelOperation() bool         { return true }
+func (m *mockRunner) ExcludePath(path string) error { m.pathActionPath = path; return m.pathActionErr }
+func (m *mockRunner) BrowseFiles(path string) ([]directories.FileEntry, error) {
+	m.pathActionPath = path
+	return []directories.FileEntry{{Name: "file.txt", Kind: "file", Size: 42}}, m.pathActionErr
+}
+func (m *mockRunner) FolderSize(_ context.Context, path string) (map[string]any, error) {
+	m.pathActionPath = path
+	return map[string]any{"size": 42, "files": 1}, m.pathActionErr
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }

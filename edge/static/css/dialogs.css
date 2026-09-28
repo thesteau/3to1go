@@ -11,6 +11,13 @@
   backdrop-filter: blur(3px);
 }
 
+#files-dialog { width: min(1100px, calc(100vw - 24px)); }
+#files-dialog .table-wrap { overflow-x: auto; }
+#files-dialog table { width: 100%; border-collapse: collapse; }
+#files-dialog th, #files-dialog td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+#files-dialog td:first-child { overflow-wrap: anywhere; min-width: 140px; }
+#files-path { overflow-wrap: anywhere; }
+
 .modal-card {
   max-height: calc(100vh - 24px);
   overflow: auto;

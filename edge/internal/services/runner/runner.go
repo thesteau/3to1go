@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/3to1go/edge/internal/backup"
+	"github.com/3to1go/edge/internal/cancelio"
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/encryption"
 	"github.com/3to1go/edge/internal/identity"
@@ -32,10 +33,12 @@ import (
 type EdgeRunner struct {
 	mu sync.Mutex
 
-	Settings  *config.Settings
-	logger    *slog.Logger
-	encKey    []byte
-	cycleLock sync.Mutex
+	Settings        *config.Settings
+	logger          *slog.Logger
+	encKey          []byte
+	cycleLock       sync.Mutex
+	operationCtx    context.Context
+	operationCancel context.CancelFunc
 
 	StateStore    *state.StateStore
 	UploadClient  *upload.UploadClient
@@ -112,6 +115,12 @@ func (r *EdgeRunner) CronSchedule() string {
 
 // RunCycle runs one full backup cycle; returns false if skipped.
 func (r *EdgeRunner) RunCycle() bool {
+	if !r.cycleLock.TryLock() {
+		return false
+	}
+	defer r.cycleLock.Unlock()
+	done := r.beginOperation(context.Background())
+	defer done()
 	r.mu.Lock()
 	settings := r.Settings
 	r.mu.Unlock()
@@ -125,7 +134,7 @@ func (r *EdgeRunner) RunCycle() bool {
 		return false
 	}
 
-	jobs, _ := backup.DiscoverJobs(settings.ScanRoot, settings.MaxDepth, func(format string, args ...any) {
+	jobs, _ := backup.DiscoverJobsContext(r.operationContext(), settings.ScanRoot, settings.MaxDepth, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))
 	})
 	if len(jobs) == 0 {
@@ -169,10 +178,15 @@ func (r *EdgeRunner) prepareJob(job *backup.JobDefinition, settings *config.Sett
 
 	s := r.StateStore.Get(job.RootPath)
 	s.JobName = job.JobName
-	r.HookManager.RunCommand(settings.HookPreCommand, "pre", r.hookContext(job, &s, settings))
+	r.HookManager.RunCommandContext(r.operationContext(), settings.HookPreCommand, "pre", r.hookContext(job, &s, settings))
 
 	ready, err := r.prepareArchiveLocked(job, &s, settings, false)
 	if err != nil {
+		if r.operationContext().Err() != nil {
+			r.markCancelled(job, &s)
+			unlock()
+			return
+		}
 		r.logger.Error("unexpected_exception", "job_name", job.JobName, "path", job.RootPath, "error", err)
 		s.LastStatus = "unexpected_exception"
 		s.LastErrorCategory = "unexpected"
@@ -197,10 +211,13 @@ func (r *EdgeRunner) prepareJob(job *backup.JobDefinition, settings *config.Sett
 
 // finishJob runs the post-hook and publishes ntfy if the last status was success.
 func (r *EdgeRunner) finishJob(job *backup.JobDefinition, settings *config.Settings) {
+	if r.operationContext().Err() != nil {
+		return
+	}
 	s := r.StateStore.Get(job.RootPath)
 	s.JobName = job.JobName
 	ctx := r.hookContext(job, &s, settings)
-	r.HookManager.RunCommand(settings.HookPostCommand, "post", ctx)
+	r.HookManager.RunCommandContext(r.operationContext(), settings.HookPostCommand, "post", ctx)
 	if s.LastStatus == "success" {
 		ntfyCtx := make(map[string]string, len(ctx))
 		for k, v := range ctx {
@@ -242,6 +259,8 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 	defer r.cycleLock.Unlock()
 
 	s := r.StateStore.Get(job.RootPath)
+	done := r.beginOperation(ctx)
+	defer done()
 	cleared := s.ManualInterventionRequired
 	if cleared {
 		s.ManualInterventionRequired = false
@@ -273,6 +292,7 @@ func (r *EdgeRunner) StartForceSendAsync(relativePath string) (map[string]any, e
 	if !r.cycleLock.TryLock() {
 		return map[string]any{"status": "already_running", "job_name": job.JobName}, nil
 	}
+	done := r.beginOperation(context.Background())
 
 	s := r.StateStore.Get(job.RootPath)
 	cleared := s.ManualInterventionRequired
@@ -285,6 +305,7 @@ func (r *EdgeRunner) StartForceSendAsync(relativePath string) (map[string]any, e
 
 	go func() {
 		defer r.cycleLock.Unlock()
+		defer done()
 		r.processJobLocked(job, &s, settings, true)
 	}()
 
@@ -426,6 +447,9 @@ func (r *EdgeRunner) InstallationID() string {
 // ----- internal job processing -----
 
 func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.JobState, settings *config.Settings, forceSend bool) (bool, error) {
+	if err := r.operationContext().Err(); err != nil {
+		return false, err
+	}
 	if !s.ManualInterventionRequired {
 		retry := r.checkRetry(job, s)
 		if retry == "waiting" {
@@ -441,7 +465,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	s.LastErrorCategory = ""
 	r.StateStore.Set(job.RootPath, *s)
 
-	files, err := backup.BuildFileList(job, func(format string, args ...any) {
+	files, err := backup.BuildFileListContext(r.operationContext(), job, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))
 	})
 	if err != nil {
@@ -489,7 +513,11 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	if fi != nil {
 		size = fi.Size()
 	}
-	sha256sum, _ := sha256File(archivePath)
+	sha256sum, err := sha256FileContext(r.operationContext(), archivePath)
+	if err != nil {
+		os.Remove(archivePath)
+		return false, err
+	}
 
 	s.PendingArchive = archivePath
 	s.PendingArchiveSize = &size
@@ -527,13 +555,14 @@ func (r *EdgeRunner) createPendingArchive(job *backup.JobDefinition, files []*ba
 	archivePath := filepath.Join(settings.SpoolDir, archiveName)
 
 	r.setActivePhase(job, s, "compressing", 18)
-	if err := backup.CreateArchive(archivePath, files); err != nil {
+	if err := backup.CreateArchiveContext(r.operationContext(), archivePath, files); err != nil {
+		os.Remove(archivePath)
 		return "", "", err
 	}
 
 	r.setActivePhase(job, s, "encrypting", 40)
 	tmpPath := archivePath + ".enc.tmp"
-	if err := encryption.EncryptFile(r.encKey, archivePath, tmpPath); err != nil {
+	if err := encryption.EncryptFileContext(r.operationContext(), r.encKey, archivePath, tmpPath); err != nil {
 		os.Remove(archivePath)
 		return "", "", err
 	}
@@ -598,7 +627,18 @@ func (r *EdgeRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSta
 
 	ready, err := r.prepareArchiveLocked(job, s, settings, forceSend)
 	if err != nil {
+		if r.operationContext().Err() != nil {
+			r.markCancelled(job, s)
+			return
+		}
 		r.logger.Error("unexpected_exception", "job_name", job.JobName, "error", err)
+		s.LastStatus = "unexpected_exception"
+		s.ActivePhase = ""
+		s.ActivePhasePercent = 0
+		s.LastErrorCategory = "unexpected"
+		s.LastErrorDetail = err.Error()
+		s.LastUploadUpdatedAt = utcNow()
+		r.StateStore.Set(job.RootPath, *s)
 		return
 	}
 	if ready {
@@ -607,6 +647,10 @@ func (r *EdgeRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSta
 }
 
 func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.JobState, settings *config.Settings) bool {
+	if r.operationContext().Err() != nil {
+		r.markCancelled(job, s)
+		return false
+	}
 	if s.PendingArchive == "" || s.PendingFingerprint == "" || s.PendingTimestamp == "" {
 		return false
 	}
@@ -628,8 +672,11 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 		}
 	}
 	if s.PendingArchiveSHA256 == "" {
-		if sha, err := sha256File(s.PendingArchive); err == nil {
+		if sha, err := sha256FileContext(r.operationContext(), s.PendingArchive); err == nil {
 			s.PendingArchiveSHA256 = sha
+		} else if r.operationContext().Err() != nil {
+			r.markCancelled(job, s)
+			return false
 		}
 	}
 
@@ -661,7 +708,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	}
 
 	result, err := r.UploadClient.UploadArchive(
-		context.Background(),
+		r.operationContext(),
 		settings.EdgeID, jobName,
 		s.PendingFingerprint, s.PendingTimestamp,
 		s.PendingArchive, s.PendingArchiveSHA256,
@@ -671,6 +718,10 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 
 	archiveName := filepath.Base(s.PendingArchive)
 	if err != nil {
+		if r.operationContext().Err() != nil {
+			r.markCancelled(job, s)
+			return false
+		}
 		uf, isUploadFail := err.(*upload.UploadFailure)
 		cat := "unexpected"
 		if isUploadFail {
@@ -872,13 +923,17 @@ func uploadPhasePercent(uploaded int64, total *int64) int {
 }
 
 func sha256File(path string) (string, error) {
+	return sha256FileContext(context.Background(), path)
+}
+
+func sha256FileContext(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	if _, err := io.Copy(h, cancelio.Reader{Context: ctx, Reader: f}); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil

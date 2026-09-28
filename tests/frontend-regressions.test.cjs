@@ -19,7 +19,7 @@ test('Edge keeps polling while idle, accelerates for work, and pauses for dialog
       requests.push(url);
       return { ok: true, json: async () => url === '/api/status' ? { scheduler: { state: 'running' } } : { directories: [] } };
     },
-    applyTheme() {}, fillMetaFromDir() {}, renderSelectedJobs() {},
+    applyTheme() {}, fillMetaFromDir() {}, renderSelectedJobs() {}, setHtmlIfChanged() {}, setPanelReady() {},
   });
   load(context, 'edge/static/js/refresh.js');
   vm.runInContext('_edgeAutoRefreshStarted = true; latestData = { scheduler: { state: "waiting" }, directories: [] }; scheduleEdgeRefresh()', context);
@@ -56,7 +56,7 @@ function overviewContext(fetch) {
   const context = vm.createContext({
     window: {}, document: { getElementById: id => elements[id] || null, querySelectorAll: () => [] },
     fetch, setActionStatus: (...args) => messages.push(args),
-    applyTheme() {}, renderHelpHint: () => '', fillSettings() {},
+    setPanelReady() {}, applyTheme() {}, renderHelpHint: () => '', fillSettings() {},
   });
   load(context, 'central/static/js/utils.js');
   load(context, 'central/static/js/overview.js');

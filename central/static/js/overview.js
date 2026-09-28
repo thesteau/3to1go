@@ -1,3 +1,24 @@
+let _overviewHasData = false;
+let _storageLoading = false;
+
+async function loadStorageOverview() {
+  const panel = document.getElementById("storage-meta");
+  if (!panel || _storageLoading) return;
+  _storageLoading = true;
+  try {
+    const response = await fetch("/api/overview?section=storage", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    if (!response.ok) throw new Error("Storage status unavailable");
+    const data = await response.json();
+    panel.innerHTML = `<div><strong>Storage status</strong><br>${escapeHtml(data.status)}</div>` +
+      [["Backups Used", data.disk_used_bytes], ["Disk Free", data.disk_free_bytes], ["Disk Total", data.disk_total_bytes]]
+        .map(([label, value]) => `<div><strong>${label}</strong><br>${typeof value === "number" ? formatBytes(value) : "—"}</div>`).join("");
+  } catch {
+    panel.innerHTML = '<p role="status">Storage status could not load. <button type="button" onclick="loadStorageOverview()">Retry</button></p>';
+  } finally {
+    _storageLoading = false;
+  }
+}
+
 let _overviewLoading = false;
 let _knownSnapshotKeys = null;
 const CENTRAL_REFRESH_MS = 15000;
@@ -397,25 +418,24 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
   }
 
   _overviewLoading = true;
+  loadStorageOverview();
   if (!silent && !document.getElementById("namespaces").children.length) {
     document.getElementById("namespaces").innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
   }
 
   try {
-    const res = await fetch("/api/overview");
+    const res = await fetch("/api/overview?section=snapshots", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     if (!res.ok) {
       throw new Error("Refresh failed.");
     }
     const data = await res.json();
     window.__centralSettings = data.settings || {};
+    setPanelReady("settings", Boolean(data.settings && Object.keys(data.settings).length));
     if (!document.getElementById("settings-dialog")?.open) {
       applyTheme(window.__centralSettings.theme || "dark");
     }
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
-    const diskFree = typeof data.disk_free_bytes === "number" ? formatBytes(data.disk_free_bytes) : null;
-    const diskUsed = typeof data.disk_used_bytes === "number" ? formatBytes(data.disk_used_bytes) : null;
-    const diskTotal = typeof data.disk_total_bytes === "number" ? formatBytes(data.disk_total_bytes) : null;
     const edges = data.edges || [];
     const allInstances = edges.flatMap((edge) => (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })));
     _edgeKeyFingerprints = Object.fromEntries(
@@ -430,16 +450,12 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
     const totalSnapshots = edges.reduce((t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).reduce((ttt, j) => ttt + (j.snapshot_count || 0), 0), 0), 0);
 
     document.getElementById("meta").innerHTML = `
-      <div><strong>Status</strong><br><span class="status-${escapeHtml(data.status)}">${escapeHtml(data.status)}</span></div>
       <div><strong>Edges</strong> ${renderHelpHint("Unique Edge device IDs that have stored at least one snapshot on this Central.")}<br>${totalEdges}</div>
       <div><strong>Instances</strong> ${renderHelpHint("Each reinstall or unique Edge setup shows as a separate instance under the same Edge ID.")}<br>${totalInstances}</div>
       <div><strong>Jobs</strong> ${renderHelpHint("Named backup jobs across all instances. Each job backs up one source directory on an Edge device.")}<br>${totalJobs}</div>
       <div><strong>Snapshots</strong> ${renderHelpHint("Total backup snapshots stored on Central, across all edges, instances, and jobs.")}<br>${totalSnapshots}</div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>
-      ${diskUsed !== null ? `<div><strong>Backups Used</strong><br>${escapeHtml(diskUsed)}</div>` : ""}
-      ${diskFree !== null ? `<div><strong>Disk Free</strong><br>${escapeHtml(diskFree)}</div>` : ""}
-      ${diskTotal !== null ? `<div><strong>Disk Total</strong><br>${escapeHtml(diskTotal)}</div>` : ""}
     `;
 
     // Capture after the request: edits and expanded cards may change while it is in flight.
@@ -471,15 +487,22 @@ async function loadOverview({ silent = false, force = false, notifyNewSnapshots 
       : '<p class="hint">No snapshots have been stored yet.</p>';
 
     updateOverviewDom(document.getElementById("namespaces"), overviewHtml);
+    _overviewHasData = true;
     if (!document.getElementById("settings-dialog")?.open) {
       fillSettings(data.settings || {});
     }
-    await Promise.all(
+    Promise.allSettled(
       allInstances
         .filter(({ instance }) => instance.edge_instance_id)
         .map(({ edgeId, instance }) => refreshKeyPanel(edgeId, instance.edge_instance_id)),
     );
   } catch (error) {
+    if (!_overviewHasData) {
+      // Settings loaded earlier stay editable; one failed poll must not lock an open editor.
+      setPanelReady("settings", false);
+      document.getElementById("namespaces").innerHTML = '<p role="status">Snapshots could not load. <button type="button" onclick="loadOverview()">Retry</button></p>';
+      document.getElementById("meta").innerHTML = '<p class="hint">Snapshot summary unavailable.</p>';
+    }
     if (!silent) {
       setActionStatus(error.message || "Refresh failed.", "error");
     }

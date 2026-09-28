@@ -189,6 +189,8 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
         ${progressLabel ? `<div class="dir-state"><span class="hint">${escapeHtml(progressLabel)}</span></div>` : ""}
       </div>
       <div class="dir-actions">
+        <button type="button" class="secondary" onclick="return browseFilesFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Browse files</button>
+        ${entry.blocked_by_parent && currentUser?.is_admin ? `<button type="button" class="secondary" onclick="return excludeFileFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'), this)">Exclude folder</button>` : ""}
         ${actionMarkup}
       </div>
     </div>
@@ -283,6 +285,8 @@ function renderSelectedJobs(directories) {
           </div>
           <div class="job-card-side">
             <div class="job-card-actions">
+              <button type="button" class="secondary" onclick="return browseFilesFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Files &amp; exclusions</button>
+              ${entry.state?.pending_archive || entry.state?.pending_fingerprint ? `<button type="button" class="danger" onclick="return clearStagedFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), this)">Clear staged backup</button>` : ""}
               <span class="hint-with-help">
                 <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">Force Upload</button>
                 <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>

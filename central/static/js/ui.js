@@ -128,3 +128,62 @@ function resolveAppDialog(confirmed) {
 function confirmApp(options) {
   return appDialog(options).then(Boolean);
 }
+
+// Editing controls remain locked until their own data has loaded successfully.
+const readyPanels = new Set();
+function setPanelReady(name, ready) {
+  if (ready) readyPanels.add(name); else readyPanels.delete(name);
+  document.querySelectorAll(`[data-requires="${name}"]`).forEach(control => {
+    control.disabled = !ready;
+    control.title = ready ? "" : "Waiting for this panel to load successfully";
+  });
+}
+function requirePanelReady(name) {
+  if (readyPanels.has(name)) return true;
+  setActionStatus("This panel is still loading or could not load. Retry before making changes.", "error");
+  return false;
+}
+
+const editorLoads = new Map();
+function loadEditorPanel(name, task) {
+  if (editorLoads.has(name)) return editorLoads.get(name);
+  setPanelReady(name, false);
+  const status = document.getElementById(`${name}-load-status`);
+  if (status) status.innerHTML = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span>Loading...</div>';
+  const pending = (async () => {
+    try {
+      const result = await task();
+      setPanelReady(name, true);
+      if (status) status.replaceChildren();
+      return result;
+    } catch (error) {
+      setPanelReady(name, false);
+      if (status) {
+        status.replaceChildren();
+        status.textContent = 'Could not load this panel. Your saved settings have not been changed. ';
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Retry';
+        retry.onclick = () => loadEditorPanel(name, task).catch(() => {});
+        status.appendChild(retry);
+      }
+      throw error;
+    } finally {
+      editorLoads.delete(name);
+    }
+  })();
+  editorLoads.set(name, pending);
+  return pending;
+}
+
+// Last-resort guard: an unexpected failure (e.g. network loss mid-save) is reported
+// instead of silently leaving an action looking stuck. Dialogs stay closable.
+globalThis.addEventListener?.("unhandledrejection", (event) => {
+  const message = event.reason?.name === "TimeoutError"
+    ? "The server took too long to respond. Please retry."
+    : event.reason instanceof TypeError
+      ? "Could not reach the server. Check the connection and retry."
+      : (event.reason?.message || "Something went wrong. Please retry.");
+  setActionStatus(message, "error");
+  event.preventDefault();
+});
