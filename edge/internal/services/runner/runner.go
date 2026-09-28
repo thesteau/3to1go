@@ -62,10 +62,10 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 	stateStore.SetErrorHandler(func(err error) {
 		logger.Error("state_store_error", "error", err)
 	})
-	if err := os.MkdirAll(settings.StateDir, 0o755); err != nil {
+	if err := backup.MarkRuntimeDir(settings.StateDir); err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}
-	if err := os.MkdirAll(settings.SpoolDir, 0o755); err != nil {
+	if err := backup.MarkRuntimeDir(settings.SpoolDir); err != nil {
 		return nil, fmt.Errorf("create spool dir: %w", err)
 	}
 
@@ -359,8 +359,12 @@ func (r *EdgeRunner) UpdateSettings(settings *config.Settings) error {
 }
 
 func (r *EdgeRunner) applySettings(settings *config.Settings) error {
-	os.MkdirAll(settings.StateDir, 0o755)
-	os.MkdirAll(settings.SpoolDir, 0o755)
+	if err := backup.MarkRuntimeDir(settings.StateDir); err != nil {
+		return fmt.Errorf("mark state dir: %w", err)
+	}
+	if err := backup.MarkRuntimeDir(settings.SpoolDir); err != nil {
+		return fmt.Errorf("mark spool dir: %w", err)
+	}
 
 	uploadClient := upload.NewUploadClient(settings, r.encKey, r.CertManager)
 	recoverySvc := recovery.NewRecoveryService(settings, r.logger, r.StateStore, uploadClient, r.encKey)
