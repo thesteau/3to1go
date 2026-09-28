@@ -321,6 +321,11 @@ Central groups snapshots by `EDGE_ID`, but newer builds keep each Edge installat
 
 Each backup produces a complete `tar.zst` archive of the marked folder. Incremental backups, block-level deduplication, and delta chains are not supported. Each snapshot is fully self-contained and can be restored independently without reference to any other snapshot.
 
+Edge automatically marks its spool and state directories with a hidden
+`.3to1go-runtime` file on startup. These directories are excluded when Edge backs
+up itself, including through another mount path; no backup rules or migration
+are needed after updating. Configuration and encryption keys remain included.
+
 ### Count-Based Retention
 
 Central retains the most recent N snapshots per job, where N is controlled by the `retention_keep_last` setting. Time-based retention windows and size-based limits are not supported. The number of recoverable snapshots at any point is always exactly known.

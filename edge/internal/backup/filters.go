@@ -26,6 +26,9 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*Discovere
 	for len(stack) > 0 {
 		curDir := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
+		if isRuntimePath(curDir) {
+			continue
+		}
 
 		visitKey := curDir
 		if job.FollowSymlinks {
@@ -79,6 +82,9 @@ func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*Discovere
 						if warnf != nil {
 							warnf("skipped_missing path=%s detail=%s", entryPath, err)
 						}
+						continue
+					}
+					if isRuntimePath(resolved) {
 						continue
 					}
 					info, err = os.Stat(resolved)

@@ -42,7 +42,7 @@ func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...any)) ([]
 		cur := queue[0]
 		queue = queue[1:]
 
-		if cur.depth > maxDepth {
+		if cur.depth > maxDepth || isRuntimePath(cur.dir) {
 			continue
 		}
 
