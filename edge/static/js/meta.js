@@ -50,7 +50,7 @@ function describeUploadCircuit(uploadCircuit) {
 }
 
 function initMeta() {
-  const pending = '<span class="hint">…</span>';
+  const pending = '<span class="hint" role="status">Loading...</span>';
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br><span id="meta-val-edge-id">${pending}</span></div>
     <div><strong>Instance ID</strong><br><span id="meta-val-instance-id">${pending}</span></div>
@@ -64,8 +64,8 @@ function initMeta() {
       <strong>Encryption Key</strong>
       <div class="enc-key-row">
         <code id="enc-key-value">…</code>
-        <button type="button" class="secondary enc-key-copy" onclick="copyEncKey()">Copy</button>
-        <button type="button" class="danger enc-key-rotate" onclick="rotateEncKey()">Rotate</button>
+        <button type="button" class="secondary enc-key-copy" data-requires="encryption-key" disabled onclick="copyEncKey()">Copy</button>
+        <button type="button" class="danger enc-key-rotate" data-requires="encryption-key" disabled onclick="rotateEncKey()">Rotate</button>
       </div>
       <span class="hint" id="meta-val-enc-fingerprint">…</span>
     </div>
@@ -97,6 +97,7 @@ function fillMetaFromDir(data) {
 }
 
 function fillMetaEncKey(key, fingerprint) {
+  setPanelReady("encryption-key", Boolean(key && fingerprint));
   const keyEl = document.getElementById("enc-key-value");
   if (keyEl) {
     keyEl.dataset.key = key || "";
@@ -131,6 +132,7 @@ async function copyEncKey() {
 }
 
 async function rotateEncKey() {
+  if (!requirePanelReady("encryption-key")) return;
   const confirmed = await confirmApp({
     title: "Rotate Encryption Key",
     message: "This generates a new key for future backups. Existing snapshots on Central remain encrypted with the old key — you will need the old key to decrypt them.\n\nAre you sure?",

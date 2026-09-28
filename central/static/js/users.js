@@ -5,13 +5,17 @@ async function openUserManagementDialog() {
 }
 
 async function loadUsers() {
-  const response = await fetch("/api/users");
-  const body = await readJson(response);
-  if (!response.ok) {
-    setStatus("users-status", body.detail || "Could not load users.", "error");
-    return;
+  try {
+    const response = await fetch("/api/users", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    const body = await readJson(response);
+    if (!response.ok) {
+      setStatus("users-status", body.detail || "Could not load users.", "error");
+      return;
+    }
+    renderUsers(body.users || []);
+  } catch {
+    setStatus("users-status", "Could not load users. Close and reopen to retry.", "error");
   }
-  renderUsers(body.users || []);
 }
 
 function renderUsers(users) {

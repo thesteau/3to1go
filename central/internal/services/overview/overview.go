@@ -22,6 +22,18 @@ type StorageProbe interface {
 
 // BuildOverview assembles the dashboard data.
 func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe, idx SnapshotIndexer) (map[string]any, error) {
+	data, err := BuildSnapshotOverview(ctx, s, idx)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range BuildStorageOverview(backend) {
+		data[key] = value
+	}
+	return data, nil
+}
+
+// BuildSnapshotOverview does not wait for storage health or disk probes.
+func BuildSnapshotOverview(ctx context.Context, s *config.Settings, idx SnapshotIndexer) (map[string]any, error) {
 	registrations, err := idx.ListEdgeRegistrations(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -113,18 +125,17 @@ func BuildOverview(ctx context.Context, s *config.Settings, backend StorageProbe
 		}
 	}
 
-	diskTotal, diskUsed, diskFree := backend.DiskInfo()
-
 	return map[string]any{
-		"status":              statusString(backend),
 		"backup_dir":          backupDir(s.BackupRoot),
 		"retention_keep_last": s.RetentionKeepLast,
-		"disk_total_bytes":    diskTotal,
-		"disk_used_bytes":     diskUsed,
-		"disk_free_bytes":     diskFree,
 		"settings":            config.SettingsToPayload(s),
 		"edges":               edgesOut,
 	}, nil
+}
+
+func BuildStorageOverview(backend StorageProbe) map[string]any {
+	total, used, free := backend.DiskInfo()
+	return map[string]any{"status": statusString(backend), "disk_total_bytes": total, "disk_used_bytes": used, "disk_free_bytes": free}
 }
 
 // Returns the user-configured BACKUP_DIR value rather than the container-internal path.

@@ -682,6 +682,27 @@ func TestHandleOverview_SnapIndexError(t *testing.T) {
 	}
 }
 
+func TestOverviewSectionsAreIndependent(t *testing.T) {
+	t.Run("snapshots do not probe storage", func(t *testing.T) {
+		app := newTestApp(t, nil, nil, nil, &mockSnapIndex{})
+		app.backend = nil
+		rr := httptest.NewRecorder()
+		app.handleOverview(rr, withUser(httptest.NewRequest("GET", "/api/overview?section=snapshots", nil), adminUser()))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status=%d", rr.Code)
+		}
+	})
+	t.Run("storage does not query snapshots", func(t *testing.T) {
+		app := newTestApp(t, nil, nil, nil, nil)
+		app.snapIndex = nil
+		rr := httptest.NewRecorder()
+		app.handleOverview(rr, withUser(httptest.NewRequest("GET", "/api/overview?section=storage", nil), adminUser()))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status=%d", rr.Code)
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // handleSaveSettings
 // ---------------------------------------------------------------------------

@@ -82,6 +82,7 @@ async function cancelSettings() {
 }
 
 async function openSettingsDialog() {
+  if (!requirePanelReady("settings")) return;
   fillSettings(window.__centralSettings || {});
   _settingsSnapshot = JSON.stringify(collectSettingsPayload());
   clearStatus("settings-status");
@@ -95,6 +96,7 @@ async function openSettingsDialog() {
 }
 
 async function saveSettings() {
+  if (!requirePanelReady("settings")) return;
   setStatus("settings-status", "Saving...", "info");
   const payload = collectSettingsPayload();
   const { response, body } = await postSettings(payload);
@@ -205,7 +207,8 @@ function fillNtfyForm(config) {
 }
 
 async function loadNtfyConfig() {
-  const response = await fetch("/api/ntfy");
+  return loadEditorPanel("ntfy", async () => {
+  const response = await fetch("/api/ntfy", { signal: globalThis.AbortSignal?.timeout?.(30000) });
   const body = await response.json();
   if (!response.ok) {
     throw new Error(body.detail || "Failed to load ntfy settings.");
@@ -213,6 +216,7 @@ async function loadNtfyConfig() {
   _centralNtfyConfig = body;
   fillNtfyForm(body);
   return body;
+  });
 }
 
 async function openNtfyDialog() {
@@ -247,6 +251,7 @@ function resetNtfyDefaults() {
 }
 
 async function saveNtfyConfig() {
+  if (!requirePanelReady("ntfy")) return;
   setStatus("ntfy-status", "Saving...", "info");
   const response = await fetch("/api/ntfy", {
     method: "POST",
@@ -265,6 +270,7 @@ async function saveNtfyConfig() {
 }
 
 async function testNtfyConfig() {
+  if (!requirePanelReady("ntfy")) return;
   const response = await fetch("/api/ntfy/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -310,16 +316,19 @@ function fillCertificateForm(config) {
 }
 
 async function loadCertificateConfig() {
-  const response = await fetch("/api/certificates");
+  return loadEditorPanel("certificates", async () => {
+  const response = await fetch("/api/certificates", { signal: globalThis.AbortSignal?.timeout?.(30000) });
   const body = await response.json();
   if (!response.ok) {
     throw new Error(body.detail || "Failed to load certificates.");
   }
   fillCertificateForm(body);
   return body;
+  });
 }
 
 async function uploadCertificateFile() {
+  if (!requirePanelReady("certificates")) return;
   const input = document.getElementById("certificate_file_input");
   const file = input?.files?.[0];
   if (!file) {
@@ -341,6 +350,7 @@ async function uploadCertificateFile() {
 }
 
 async function deleteCertificateFile(filename) {
+  if (!requirePanelReady("certificates")) return;
   if (!await confirmApp({
     title: "Delete Certificate",
     message: `Delete ${filename}?`,
@@ -396,7 +406,8 @@ function fillHookForm(config, { preserveDrafts = true } = {}) {
 }
 
 async function loadHookConfig({ preserveDrafts = true } = {}) {
-  const response = await fetch("/api/hooks");
+  return loadEditorPanel("hooks", async () => {
+  const response = await fetch("/api/hooks", { signal: globalThis.AbortSignal?.timeout?.(30000) });
   const body = await response.json();
   if (!response.ok) {
     throw new Error(body.detail || "Failed to load hook settings.");
@@ -404,6 +415,7 @@ async function loadHookConfig({ preserveDrafts = true } = {}) {
   _centralHookConfig = body;
   fillHookForm(body, { preserveDrafts });
   return body;
+  });
 }
 
 async function openHooksDialog() {
@@ -424,6 +436,7 @@ function clearHookCommand(kind) {
 }
 
 async function saveHookCommands() {
+  if (!requirePanelReady("hooks")) return;
   setStatus("hooks-status", "Saving...", "info");
   const payload = {
     pre_command: document.getElementById("hook_pre_command").value.trim(),
@@ -447,6 +460,7 @@ async function saveHookCommands() {
 }
 
 async function uploadHookFile() {
+  if (!requirePanelReady("hooks")) return;
   const input = document.getElementById("hook_file_input");
   const file = input?.files?.[0];
   if (!file) {
@@ -484,6 +498,7 @@ async function viewHookFile(filename, viewable) {
 }
 
 async function deleteHookFile(filename) {
+  if (!requirePanelReady("hooks")) return;
   if (!await confirmApp({
     title: "Delete Hook File",
     message: `Delete ${filename}?`,

@@ -16,7 +16,16 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := a.Settings()
-	data, err := overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
+	var data map[string]any
+	var err error
+	switch r.URL.Query().Get("section") {
+	case "storage":
+		data = overview.BuildStorageOverview(a.backend)
+	case "snapshots":
+		data, err = overview.BuildSnapshotOverview(r.Context(), s, a.snapIndex)
+	default:
+		data, err = overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to build overview")
 		return

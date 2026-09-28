@@ -1,5 +1,6 @@
 <dialog id="ntfy-dialog" class="modal" aria-labelledby="ntfy-dialog-title">
   <div class="modal-card">
+    <div id="ntfy-load-status" role="status"></div>
     <div class="modal-head">
       <div>
         <h2 id="ntfy-dialog-title">Configure ntfy</h2>
@@ -11,38 +12,38 @@
     <div class="split-row">
       <div>
         <label for="ntfy_url">ntfy Server URL</label>
-        <input id="ntfy_url" type="url" placeholder="https://ntfy.sh">
+        <input id="ntfy_url" type="url" placeholder="https://ntfy.sh" data-requires="ntfy" disabled>
       </div>
       <div>
         <label for="ntfy_topic">Topic</label>
-        <input id="ntfy_topic" type="text" placeholder="uploads">
+        <input id="ntfy_topic" type="text" placeholder="uploads" data-requires="ntfy" disabled>
       </div>
     </div>
 
     <div class="split-row">
       <div>
         <label for="ntfy_match_edge_id">Match Edge ID</label>
-        <input id="ntfy_match_edge_id" type="text" placeholder="Optional">
+        <input id="ntfy_match_edge_id" type="text" placeholder="Optional" data-requires="ntfy" disabled>
       </div>
       <div>
         <label for="ntfy_match_edge_instance_id">Match Instance ID</label>
-        <input id="ntfy_match_edge_instance_id" type="text" placeholder="Optional">
+        <input id="ntfy_match_edge_instance_id" type="text" placeholder="Optional" data-requires="ntfy" disabled>
       </div>
     </div>
 
     <label for="ntfy_match_source">Match Source Address</label>
-    <input id="ntfy_match_source" type="text" placeholder="Optional">
+    <input id="ntfy_match_source" type="text" placeholder="Optional" data-requires="ntfy" disabled>
 
     <div class="label-row">
       <label for="ntfy_message_template">Message Template</label>
-      <button type="button" class="secondary" onclick="openDialog('ntfy-placeholder-guide')">Placeholder Guide</button>
+      <button type="button" class="secondary" onclick="openDialog('ntfy-placeholder-guide')" data-requires="ntfy" disabled>Placeholder Guide</button>
     </div>
-    <textarea id="ntfy_message_template"></textarea>
+    <textarea id="ntfy_message_template" data-requires="ntfy" disabled></textarea>
 
     <div class="toolbar">
-      <button type="button" onclick="saveNtfyConfig()">Save</button>
-      <button type="button" class="secondary" onclick="testNtfyConfig()">Test</button>
-      <button type="button" class="secondary" onclick="resetNtfyDefaults()">Defaults</button>
+      <button type="button" onclick="saveNtfyConfig()" data-requires="ntfy" disabled>Save</button>
+      <button type="button" class="secondary" onclick="testNtfyConfig()" data-requires="ntfy" disabled>Test</button>
+      <button type="button" class="secondary" onclick="resetNtfyDefaults()" data-requires="ntfy" disabled>Defaults</button>
       <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Cancel</button>
     </div>
   </div>

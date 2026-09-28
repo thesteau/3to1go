@@ -17,6 +17,7 @@
 </head>
 <body>
   <main class="page-shell">
+    <div id="connection-status" role="status"></div>
     <section class="hero panel">
       <div class="hero-top">
         <div class="hero-text">
@@ -31,7 +32,8 @@
         </div>
         <img src="/static/img/3to1go.png" alt="Go gophers racing" class="hero-gopher">
       </div>
-      <div class="meta-grid" id="meta"></div>
+      <div class="meta-grid" id="meta"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+      <div id="meta-load-status"></div>
       <div class="toolbar">
         <button type="button" onclick="manualRefresh()">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
@@ -40,7 +42,7 @@
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="secondary" onclick="openUserManagementDialog()">Admin</button>
-        <button type="button" onclick="openSettingsDialog()">Edit Edge Settings</button>
+        <button type="button" data-requires="settings" disabled onclick="openSettingsDialog()">Edit Edge Settings</button>
       </div>
     </section>
 
@@ -49,7 +51,7 @@
         <h2>Selected Jobs <span id="selected-jobs-count" class="dir-count">-</span></h2>
         <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to review or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the job editor.</p>
       </div>
-      <div id="selected-jobs" class="job-list"></div>
+      <div id="selected-jobs" class="job-list"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
 
       <div class="section-head compact">
         <div class="section-head-row">
@@ -69,23 +71,25 @@
         </div>
         <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
       </div>
-      <div id="directory-tree" class="directory-tree"></div>
+      <div id="directory-tree" class="directory-tree"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
     </section>
   </main>
 
   <div id="toast-region" class="toast-region" popover="manual" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="/static/js/utils.js"></script>
-  <script src="/static/js/ui.js"></script>
-  <script src="/static/js/auth.js"></script>
-  <script src="/static/js/users.js"></script>
-  <script src="/static/js/admin.js"></script>
-  <script src="/static/js/meta.js"></script>
-  <script src="/static/js/refresh.js"></script>
-  <script src="/static/js/directories.js"></script>
-  <script src="/static/js/files.js"></script>
-  <script src="/static/js/jobs.js"></script>
-  <script src="/static/js/recovery.js"></script>
-  <script src="/static/js/app.js"></script>
+  <!-- app-dialogs -->
+
+  <script defer src="/static/js/utils.js"></script>
+  <script defer src="/static/js/ui.js"></script>
+  <script defer src="/static/js/auth.js"></script>
+  <script defer src="/static/js/users.js"></script>
+  <script defer src="/static/js/admin.js"></script>
+  <script defer src="/static/js/meta.js"></script>
+  <script defer src="/static/js/refresh.js"></script>
+  <script defer src="/static/js/directories.js"></script>
+  <script defer src="/static/js/files.js"></script>
+  <script defer src="/static/js/jobs.js"></script>
+  <script defer src="/static/js/recovery.js"></script>
+  <script defer src="/static/js/app.js"></script>
 </body>
 </html>
