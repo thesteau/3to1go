@@ -35,6 +35,7 @@
       <div class="toolbar">
         <button type="button" onclick="manualRefresh()">Refresh</button>
         <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
+        <button type="button" class="danger" onclick="cancelOperation(this)">Cancel operation</button>
 <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
         <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
         <span class="toolbar-spacer"></span>
@@ -82,6 +83,7 @@
   <script src="/static/js/meta.js"></script>
   <script src="/static/js/refresh.js"></script>
   <script src="/static/js/directories.js"></script>
+  <script src="/static/js/files.js"></script>
   <script src="/static/js/jobs.js"></script>
   <script src="/static/js/recovery.js"></script>
   <script src="/static/js/app.js"></script>

@@ -3,6 +3,7 @@ package backup
 import (
 	"archive/tar"
 	"cmp"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/3to1go/edge/internal/cancelio"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/klauspost/compress/zstd"
 )
@@ -36,6 +38,13 @@ func BuildArchiveName(jobName string, t time.Time, fingerprint string) string {
 
 // CreateArchive writes a zstd-compressed PAX tar of files to archivePath.
 func CreateArchive(archivePath string, files []*DiscoveredFile) error {
+	return CreateArchiveContext(context.Background(), archivePath, files)
+}
+
+func CreateArchiveContext(ctx context.Context, archivePath string, files []*DiscoveredFile) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
 		return err
 	}
@@ -52,14 +61,14 @@ func CreateArchive(archivePath string, files []*DiscoveredFile) error {
 	}
 	defer f.Close()
 
-	enc, err := zstd.NewWriter(f, zstd.WithEncoderLevel(zstd.SpeedDefault))
+	enc, err := zstd.NewWriter(cancelio.Writer{Context: ctx, Writer: f}, zstd.WithEncoderLevel(zstd.SpeedDefault))
 	if err != nil {
 		return err
 	}
 
 	tw := tar.NewWriter(enc)
 	for _, file := range sorted {
-		if err := addFileToTar(tw, file); err != nil {
+		if err := addFileToTarContext(ctx, tw, file); err != nil {
 			enc.Close()
 			return err
 		}
@@ -78,6 +87,13 @@ func CreateArchive(archivePath string, files []*DiscoveredFile) error {
 }
 
 func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
+	return addFileToTarContext(context.Background(), tw, file)
+}
+
+func addFileToTarContext(ctx context.Context, tw *tar.Writer, file *DiscoveredFile) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	src, err := os.Open(file.SourcePath)
 	if err != nil {
 		return err
@@ -105,7 +121,7 @@ func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}
-	written, err := io.Copy(tw, io.LimitReader(src, size))
+	written, err := io.Copy(tw, io.LimitReader(cancelio.Reader{Context: ctx, Reader: src}, size))
 	if err != nil {
 		return err
 	}

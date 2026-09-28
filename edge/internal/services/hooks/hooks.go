@@ -137,6 +137,10 @@ func (h *HookManager) DeleteFile(filename string) error {
 
 // RunCommand executes command in the hook scripts directory with THREETOONEGO_* env vars.
 func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) {
+	h.RunCommandContext(context.Background(), command, phase, hookCtx)
+}
+
+func (h *HookManager) RunCommandContext(parent context.Context, command, phase string, hookCtx map[string]any) {
 	normalized := strings.TrimSpace(command)
 	if normalized == "" {
 		return
@@ -155,10 +159,11 @@ func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) 
 		env = append3to1goEnv(env, strings.ToUpper(k), val)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), hookTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(parent, hookTimeoutSeconds*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", shellCmd)
+	cmd.WaitDelay = time.Second
 	cmd.Dir = h.ScriptsDir
 	cmd.Env = env
 

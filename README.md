@@ -249,6 +249,26 @@ job_name: photos
 
 An empty `.upload_dir` also works. In that case, Edge uses the folder name as the job name.
 
+In Edge, **Browse files** (or **Files & exclusions** on a selected job) opens
+nested folders and lists individual files with their sizes. **Calculate size**
+totals a folder on demand. Totals show source bytes, including excluded files,
+but omit symlinks and Edge runtime data.
+
+Use **Exclude** for a file or **Exclude folder** for a nested directory. Edge
+updates the owning job's `.upload_dir`. Browser exclusions start with `/` and
+match a literal path relative to that job; a trailing `/` excludes the whole
+subtree. For example, `/photos/cache/` excludes that specific folder, and
+`/photos/image[1].jpg` excludes that exact filename. Existing wildcard patterns
+continue to work. Remove an exclusion in the job editor to include it again.
+
+**Cancel operation** stops the active backup cycle or forced upload, including
+compression and upload retries. Incomplete archives are discarded; completed
+staged archives remain available for retry. **Clear staged backup** is a separate
+job button that deletes the local staged archive and resets retry state while
+preserving source files, successful backup history, and Central snapshots.
+Cancel active work before clearing its archive. Exclusions affect new archives;
+clear an older staged backup to rebuild it with changed exclusions.
+
 ## Important Things To Know
 
 ### Internal HTTPS Certificates

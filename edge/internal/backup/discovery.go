@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +32,10 @@ func (j *JobDefinition) StateKey() string {
 
 // DiscoverJobs walks scanRoot up to maxDepth levels looking for .upload_dir markers.
 func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...any)) ([]*JobDefinition, error) {
+	return DiscoverJobsContext(context.Background(), scanRoot, maxDepth, warnf)
+}
+
+func DiscoverJobsContext(ctx context.Context, scanRoot string, maxDepth int, warnf func(string, ...any)) ([]*JobDefinition, error) {
 	type entry struct {
 		dir   string
 		depth int
@@ -39,16 +44,21 @@ func DiscoverJobs(scanRoot string, maxDepth int, warnf func(string, ...any)) ([]
 	var jobs []*JobDefinition
 
 	for len(queue) > 0 {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		cur := queue[0]
 		queue = queue[1:]
 
-		if cur.depth > maxDepth || isRuntimePath(cur.dir) {
+		if cur.depth > maxDepth || IsRuntimePath(cur.dir) {
 			continue
 		}
 
 		entries, err := os.ReadDir(cur.dir)
 		if err != nil {
-			warnf("skipped_missing path=%s detail=%s", cur.dir, err)
+			if warnf != nil {
+				warnf("skipped_missing path=%s detail=%s", cur.dir, err)
+			}
 			continue
 		}
 

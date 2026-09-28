@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/3to1go/edge/internal/cancelio"
 	"github.com/minio/sio"
 )
 
@@ -42,6 +44,13 @@ func KeyFingerprint(key []byte) string {
 
 // EncryptFile streams src through minio/sio DARE v2 and writes the encrypted file to dst.
 func EncryptFile(key []byte, src, dst string) error {
+	return EncryptFileContext(context.Background(), key, src, dst)
+}
+
+func EncryptFileContext(ctx context.Context, key []byte, src, dst string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open plaintext: %w", err)
@@ -59,7 +68,7 @@ func EncryptFile(key []byte, src, dst string) error {
 		}
 	}()
 
-	if _, err := sio.Encrypt(out, in, sioConfig(key)); err != nil {
+	if _, err := sio.Encrypt(cancelio.Writer{Context: ctx, Writer: out}, cancelio.Reader{Context: ctx, Reader: in}, sioConfig(key)); err != nil {
 		out.Close()
 		os.Remove(dst)
 		return fmt.Errorf("encrypt: %w", err)

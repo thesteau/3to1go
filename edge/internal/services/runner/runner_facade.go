@@ -1,6 +1,10 @@
 package runner
 
-import "github.com/3to1go/edge/internal/config"
+import (
+	"fmt"
+
+	"github.com/3to1go/edge/internal/config"
+)
 
 // CurrentSettings returns the active settings under the runner lock.
 func (r *EdgeRunner) CurrentSettings() *config.Settings {
@@ -72,10 +76,18 @@ func (r *EdgeRunner) DeleteHookFile(filename string) error {
 
 // SaveJob delegates to the embedded DirectoryService.
 func (r *EdgeRunner) SaveJob(relativePath string, cfg map[string]any) (any, error) {
+	if !r.cycleLock.TryLock() {
+		return nil, fmt.Errorf("a backup or recovery operation is running; try again when it finishes")
+	}
+	defer r.cycleLock.Unlock()
 	return r.DirService.SaveJob(relativePath, cfg)
 }
 
 // DeleteJob delegates to the embedded DirectoryService.
 func (r *EdgeRunner) DeleteJob(relativePath string) error {
+	if !r.cycleLock.TryLock() {
+		return fmt.Errorf("a backup or recovery operation is running; try again when it finishes")
+	}
+	defer r.cycleLock.Unlock()
 	return r.DirService.DeleteJob(relativePath)
 }

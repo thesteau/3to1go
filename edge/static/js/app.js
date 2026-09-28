@@ -9,6 +9,7 @@ const DIALOG_FRAGMENTS = [
   "hooks-dialog",
   "hook-view-dialog",
   "job-dialog",
+  "files-dialog",
   "recover-dialog",
   "app-dialog",
 ];

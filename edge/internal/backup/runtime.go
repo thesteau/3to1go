@@ -16,7 +16,7 @@ func MarkRuntimeDir(dir string) error {
 	return os.WriteFile(filepath.Join(dir, RuntimeMarker), []byte("3to1go Edge runtime data; excluded from backups.\n"), 0o644)
 }
 
-func isRuntimePath(path string) bool {
+func IsRuntimePath(path string) bool {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return false
