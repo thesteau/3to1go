@@ -187,3 +187,19 @@ globalThis.addEventListener?.("unhandledrejection", (event) => {
   setActionStatus(message, "error");
   event.preventDefault();
 });
+// Content that replaces a loading placeholder fades in instead of snapping into place.
+// Routine refreshes of already-loaded content are left alone so polling never flickers.
+const LOADING_PLACEHOLDER = ".section-loading, .loading-placeholder";
+function fadeInLoadedContent(mutations) {
+  const faded = new Set();
+  for (const { target, removedNodes } of mutations) {
+    if (faded.has(target) || !target.animate) continue;
+    const replacedPlaceholder = Array.from(removedNodes).some((node) => node.nodeType === 1 && node.matches(LOADING_PLACEHOLDER));
+    if (!replacedPlaceholder || target.querySelector(LOADING_PLACEHOLDER)) continue;
+    faded.add(target);
+    target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+  }
+}
+if (globalThis.MutationObserver && globalThis.document?.body) {
+  new MutationObserver(fadeInLoadedContent).observe(document.body, { childList: true, subtree: true });
+}

@@ -24,13 +24,11 @@
   box-shadow: var(--shadow);
   color: var(--ink);
   opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 260ms ease-out;
 }
 
 .toast.visible {
   opacity: 1;
-  transform: translateY(0);
 }
 
 .toast.success {

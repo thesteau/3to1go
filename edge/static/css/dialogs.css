@@ -193,3 +193,10 @@
   color: var(--warn-ink);
   font-size: 0.85em;
 }
+
+/* Dialogs fade in smoothly rather than popping open. */
+@keyframes soft-fade {
+  from { opacity: 0; }
+}
+.modal[open],
+.modal[open]::backdrop { animation: soft-fade 240ms ease-out; }
