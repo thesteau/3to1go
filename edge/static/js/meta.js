@@ -50,7 +50,7 @@ function describeUploadCircuit(uploadCircuit) {
 }
 
 function initMeta() {
-  const pending = '<span class="hint" role="status">Loading...</span>';
+  const pending = '<span class="hint loading-placeholder" role="status">Loading...</span>';
   document.getElementById("meta").innerHTML = `
     <div><strong>Edge ID</strong><br><span id="meta-val-edge-id">${pending}</span></div>
     <div><strong>Instance ID</strong><br><span id="meta-val-instance-id">${pending}</span></div>
