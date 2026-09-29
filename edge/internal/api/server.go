@@ -105,6 +105,9 @@ func (a *App) Handler() http.Handler {
 	r := chi.NewRouter()
 
 	// Static assets
+	// Send template URLs to the assembled shell.
+	r.Handle("/static/", http.RedirectHandler("/", http.StatusMovedPermanently))
+	r.Handle("/static/index.html", http.RedirectHandler("/", http.StatusMovedPermanently))
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
 
 	// SPA root
