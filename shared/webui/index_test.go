@@ -6,6 +6,20 @@ import (
 	"testing/fstest"
 )
 
+func TestIndexRejectsMissingStylesPlaceholder(t *testing.T) {
+	files := fstest.MapFS{
+		"index.html":   {Data: []byte(`<main>Loading...</main><!-- app-dialogs -->`)},
+		"css/base.css": {Data: []byte("body { color: red; }")},
+	}
+	page, err := Index(files, "css/base.css")
+	if err == nil || !strings.Contains(err.Error(), "<!-- app-styles -->") {
+		t.Fatalf("expected a missing styles placeholder error, got %v", err)
+	}
+	if page != nil {
+		t.Fatal("returned a page despite missing styles placeholder")
+	}
+}
+
 func TestIndexHasStylesAndDialogsWithoutRequests(t *testing.T) {
 	files := fstest.MapFS{
 		"index.html":             {Data: []byte(`<!-- app-styles --><main>Loading...</main><!-- app-dialogs --><script defer src="/static/js/app.js"></script>`)},

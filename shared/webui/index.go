@@ -3,6 +3,7 @@ package webui
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 )
 
@@ -13,6 +14,10 @@ func Index(files fs.FS, stylesheets ...string) ([]byte, error) {
 	page, err := fs.ReadFile(files, "index.html")
 	if err != nil {
 		return nil, err
+	}
+	stylesMarker := []byte("<!-- app-styles -->")
+	if !bytes.Contains(page, stylesMarker) {
+		return nil, errors.New("index.html missing <!-- app-styles --> placeholder")
 	}
 	// Ship styles with the shell so its first paint needs no extra requests.
 	var styles bytes.Buffer
@@ -25,7 +30,7 @@ func Index(files fs.FS, stylesheets ...string) ([]byte, error) {
 		styles.Write(css)
 		styles.WriteString("</style>")
 	}
-	page = bytes.Replace(page, []byte("<!-- app-styles -->"), styles.Bytes(), 1)
+	page = bytes.Replace(page, stylesMarker, styles.Bytes(), 1)
 	names, err := fs.Glob(files, "html/*-dialog.html")
 	if err != nil {
 		return nil, err
