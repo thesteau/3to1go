@@ -1,8 +1,38 @@
 package backup
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+// Same-size edits are intentionally invisible to automatic change detection.
+// Force Backup is the supported way to capture them without a path/size change.
+func TestFingerprintIntentionallyIgnoresSameSizeContentEdits(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "data.txt")
+	job := &JobDefinition{RootPath: root, JobName: "job", IncludeHidden: true}
+	if err := os.WriteFile(path, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := BuildFileList(job, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("world"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	after, err := BuildFileList(job, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != 1 || len(after) != 1 {
+		t.Fatal("expected one discovered file")
+	}
+	if ComputeFingerprint(before) != ComputeFingerprint(after) {
+		t.Fatal("path-and-size fingerprint changed for a same-size edit")
+	}
+}
 
 func TestComputeFingerprint_Deterministic(t *testing.T) {
 	files := []*DiscoveredFile{

@@ -15,8 +15,15 @@ import (
 
 // LoadOrCreate reads a 32-byte key from path, creating one if absent.
 func LoadOrCreate(path string) ([]byte, error) {
-	if data, err := os.ReadFile(path); err == nil && len(data) == 32 {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if len(data) != 32 {
+			return nil, fmt.Errorf("invalid encryption key: expected 32 bytes, got %d", len(data))
+		}
 		return data, nil
+	}
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read encryption key: %w", err)
 	}
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
@@ -25,7 +32,15 @@ func LoadOrCreate(path string) ([]byte, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, key, 0o600); err != nil {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := f.Write(key); err != nil {
+		return nil, err
+	}
+	if err := f.Sync(); err != nil {
 		return nil, err
 	}
 	return key, nil

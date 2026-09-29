@@ -176,7 +176,7 @@ The full flow looks like this:
 
 1. You create a `.upload_dir` file in a folder on Edge.
 2. Edge notices that folder during its scan.
-3. Edge fingerprints the files to see whether anything changed.
+3. Edge fingerprints file paths and sizes to decide whether a new snapshot is needed.
 4. If something changed, Edge creates a `tar.zst` archive.
 5. Edge encrypts that archive locally.
 6. Edge uploads the encrypted archive to Central.
@@ -190,7 +190,7 @@ sequenceDiagram
 
     loop Every scan interval
         Edge->>Edge: Scan for .upload_dir markers
-        Edge->>Edge: Compare content fingerprint
+        Edge->>Edge: Compare path-and-size fingerprint
         alt Content changed
             Edge->>Edge: Create tar.zst archive
             Edge->>Edge: Encrypt archive
@@ -350,9 +350,11 @@ are needed after updating. Configuration and encryption keys remain included.
 
 Central retains the most recent N snapshots per job, where N is controlled by the `retention_keep_last` setting. Time-based retention windows and size-based limits are not supported. The number of recoverable snapshots at any point is always exactly known.
 
-### Content Fingerprinting, Not File Timestamps
+### Path-and-Size Fingerprinting
 
-Edge determines whether a new snapshot is needed by comparing the folder's content fingerprint against the previous upload. File modification times (mtime) are not used as a signal, as they can be altered by restores, synchronization tools, and filesystem operations in ways that do not reflect actual content changes. The Force Backup option is available to bypass fingerprint comparison and upload unconditionally.
+Edge intentionally determines whether a new snapshot is needed from a fingerprint of sorted file paths and sizes. It does not hash file contents or use modification times (mtime). Edits that keep the same file paths and sizes do not trigger an automatic backup. Use Force Backup to capture those edits; if an older staged archive exists, clear it first so Force Backup builds a fresh archive. Content hashing is not a planned change to this design.
+
+New snapshots preserve regular files' permission bits, including executable and private-file permissions, and restore applies those bits where the operating system supports them. Ownership, ACLs, and special permission bits are not preserved. Older snapshots retain their recorded permissions and cannot recover permissions that were never archived.
 
 ## Repo Layout
 
