@@ -4,28 +4,28 @@ package webui
 import (
 	"bytes"
 	"io/fs"
-	"regexp"
 )
-
-var stylesheet = regexp.MustCompile(`<link rel="stylesheet" href="/static/(css/[^"]+)">`)
 
 // Index includes dialog markup in the initial document, avoiding a startup
 // waterfall of fragment requests before authentication and panel requests.
-func Index(files fs.FS) ([]byte, error) {
+// Stylesheets are inlined at the app-styles placeholder in the supplied order.
+func Index(files fs.FS, stylesheets ...string) ([]byte, error) {
 	page, err := fs.ReadFile(files, "index.html")
 	if err != nil {
 		return nil, err
 	}
 	// Ship styles with the shell so its first paint needs no extra requests.
-	for _, match := range stylesheet.FindAllSubmatch(page, -1) {
-		css, err := fs.ReadFile(files, string(match[1]))
+	var styles bytes.Buffer
+	for _, name := range stylesheets {
+		css, err := fs.ReadFile(files, name)
 		if err != nil {
 			return nil, err
 		}
-		style := append([]byte("<style>"), css...)
-		style = append(style, []byte("</style>")...)
-		page = bytes.Replace(page, match[0], style, 1)
+		styles.WriteString("<style>")
+		styles.Write(css)
+		styles.WriteString("</style>")
 	}
+	page = bytes.Replace(page, []byte("<!-- app-styles -->"), styles.Bytes(), 1)
 	names, err := fs.Glob(files, "html/*-dialog.html")
 	if err != nil {
 		return nil, err

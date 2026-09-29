@@ -6,7 +6,19 @@ import (
 	"sync"
 )
 
-var pageShell = sync.OnceValues(func() ([]byte, error) { return webui.Index(static.Files) })
+var pageShell = sync.OnceValues(func() ([]byte, error) {
+	return webui.Index(static.Files,
+		"css/variables.css",
+		"css/base.css",
+		"css/jobs.css",
+		"css/directories.css",
+		"css/dialogs.css",
+		"css/toasts.css",
+		"css/users.css",
+		"css/recovery.css",
+		"css/responsive.css",
+	)
+})
 
 func readStaticFile(name string) ([]byte, error) {
 	if name == "index.html" {
