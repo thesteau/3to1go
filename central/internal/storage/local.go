@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type StorageFile struct {
@@ -33,6 +34,9 @@ func NewLocalBackend(backupRoot string) *LocalBackend {
 }
 
 func (b *LocalBackend) Store(namespace, filename string, stagedPath string) (string, error) {
+	if err := validateStoragePath(namespace, filename); err != nil {
+		return "", err
+	}
 	targetDir := filepath.Join(b.BackupRoot, namespace)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return "", fmt.Errorf("create backup dir: %w", err)
@@ -51,6 +55,9 @@ func (b *LocalBackend) Store(namespace, filename string, stagedPath string) (str
 }
 
 func (b *LocalBackend) List(namespace string) ([]StorageFile, error) {
+	if err := validateStoragePath(namespace, ""); err != nil {
+		return nil, err
+	}
 	dir := filepath.Join(b.BackupRoot, namespace)
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -79,17 +86,40 @@ func (b *LocalBackend) List(namespace string) ([]StorageFile, error) {
 }
 
 func (b *LocalBackend) Open(namespace, filename string) (io.ReadCloser, error) {
+	if err := validateStoragePath(namespace, filename); err != nil {
+		return nil, err
+	}
 	path := filepath.Join(b.BackupRoot, namespace, filename)
 	return os.Open(path)
 }
 
 func (b *LocalBackend) Delete(namespace, filename string) error {
+	if err := validateStoragePath(namespace, filename); err != nil {
+		return err
+	}
 	path := filepath.Join(b.BackupRoot, namespace, filename)
 	err := os.Remove(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	return err
+}
+
+// Validate before Join can clean away traversal components. Reject Windows
+// separators and volume syntax on every platform as well.
+func validateStoragePath(namespace, filename string) error {
+	if namespace == "" || strings.ContainsAny(namespace, `\:`) {
+		return fmt.Errorf("invalid storage namespace")
+	}
+	for _, part := range strings.Split(namespace, "/") {
+		if part == "" || part == "." || part == ".." || !filepath.IsLocal(part) {
+			return fmt.Errorf("invalid storage namespace")
+		}
+	}
+	if filename != "" && (strings.ContainsAny(filename, `/\:`) || filename == "." || filename == ".." || !filepath.IsLocal(filename)) {
+		return fmt.Errorf("invalid snapshot filename")
+	}
+	return nil
 }
 
 func (b *LocalBackend) Healthcheck() bool {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/store"
@@ -123,6 +124,14 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 	body.EdgeID = edgeID
 	body.EdgeInstanceID = instID
 	body.JobName = jobName
+	if _, err := time.Parse("2006-01-02T15:04:05Z", body.Timestamp); err != nil {
+		writeError(w, http.StatusBadRequest, "timestamp must be a UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format")
+		return
+	}
+	if !fingerprintQueryRE.MatchString(body.Fingerprint) {
+		writeError(w, http.StatusBadRequest, "fingerprint must be an 8- or 64-character lowercase hex digest")
+		return
+	}
 
 	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, true); status != 0 {
 		writeError(w, status, detail)

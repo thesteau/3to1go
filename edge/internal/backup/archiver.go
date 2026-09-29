@@ -112,7 +112,7 @@ func addFileToTarContext(ctx context.Context, tw *tar.Writer, file *DiscoveredFi
 		Name:    file.ArchivePath,
 		Size:    size,
 		ModTime: time.Unix(0, file.MtimeNs),
-		Mode:    0o644,
+		Mode:    int64(info.Mode().Perm()),
 		Uid:     0, Gid: 0,
 		Uname:  "",
 		Gname:  "",
@@ -257,7 +257,7 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 		}
 
 		tmp := dest + ".restore.tmp"
-		if err := writeAtomic(tmp, dest, hdr.ModTime, tr); err != nil {
+		if err := writeAtomic(tmp, dest, hdr.ModTime, tr, os.FileMode(hdr.Mode).Perm()); err != nil {
 			os.Remove(tmp)
 			return extractedCount, err
 		}
@@ -266,12 +266,16 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 	return extractedCount, nil
 }
 
-func writeAtomic(tmp, dest string, mtime time.Time, r io.Reader) error {
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+func writeAtomic(tmp, dest string, mtime time.Time, r io.Reader, mode os.FileMode) error {
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(f, r); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Chmod(mode); err != nil {
 		f.Close()
 		return err
 	}

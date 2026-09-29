@@ -131,19 +131,19 @@ type FinalizeResponse struct {
 
 // Service manages resumable uploads.
 type Service struct {
-	settings     *config.Settings
-	backend      ingestBackend
-	index        snapshotIndexer
-	sessions     UploadSessionStore
-	locks        namespaceLocks
-	hooks        hookRunner
-	ntfy         ntfyBroadcaster
-	stagingDir   string
-	uploadRoot   string
-	keyRoot      string
-	sessionLocks sync.Map
+	settings      *config.Settings
+	backend       ingestBackend
+	index         snapshotIndexer
+	sessions      UploadSessionStore
+	locks         namespaceLocks
+	hooks         hookRunner
+	ntfy          ntfyBroadcaster
+	stagingDir    string
+	uploadRoot    string
+	keyRoot       string
+	sessionLocks  sync.Map
 	reservationMu sync.Mutex
-	mu           sync.Mutex
+	mu            sync.Mutex
 }
 
 func New(
@@ -897,7 +897,7 @@ var safeComponentRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func ValidateNamespaceComponent(value, fieldName string) (string, error) {
 	normalized := strings.TrimSpace(value)
-	if normalized == "" || !safeComponentRE.MatchString(normalized) {
+	if normalized == "" || normalized == "." || normalized == ".." || !safeComponentRE.MatchString(normalized) {
 		return "", fmt.Errorf("%s contains invalid characters", fieldName)
 	}
 	return normalized, nil

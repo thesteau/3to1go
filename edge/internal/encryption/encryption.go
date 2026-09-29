@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -15,17 +17,63 @@ import (
 
 // LoadOrCreate reads a 32-byte key from path, creating one if absent.
 func LoadOrCreate(path string) ([]byte, error) {
-	if data, err := os.ReadFile(path); err == nil && len(data) == 32 {
+	return loadOrCreate(path, func(path string) (keyFile, error) {
+		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	})
+}
+
+type keyFile interface {
+	Write([]byte) (int, error)
+	Sync() error
+	Close() error
+}
+
+func loadOrCreate(path string, create func(string) (keyFile, error)) (key []byte, err error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if len(data) != 32 {
+			return nil, fmt.Errorf("invalid encryption key: expected 32 bytes, got %d", len(data))
+		}
 		return data, nil
 	}
-	key := make([]byte, 32)
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read encryption key: %w", err)
+	}
+	key = make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("generate encryption key: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, key, 0o600); err != nil {
+	f, err := create(path)
+	if err != nil {
+		return nil, err
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			err = errors.Join(err, f.Close())
+		}
+		// Only remove a file created by this call, and close it first so
+		// cleanup also works on Windows. Existing invalid keys are untouched.
+		if err != nil {
+			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+				err = errors.Join(err, fmt.Errorf("remove incomplete encryption key: %w", removeErr))
+			}
+		}
+	}()
+	if n, err := f.Write(key); err != nil {
+		return nil, err
+	} else if n != len(key) {
+		return nil, io.ErrShortWrite
+	}
+	if err := f.Sync(); err != nil {
+		return nil, err
+	}
+	err = f.Close()
+	closed = true
+	if err != nil {
 		return nil, err
 	}
 	return key, nil
