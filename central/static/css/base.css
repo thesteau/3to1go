@@ -42,6 +42,30 @@ body {
   flex-shrink: 0;
 }
 
+/* The page skeleton eases in on load instead of appearing all at once. */
+@keyframes shell-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.page-shell > .panel { animation: shell-in 560ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+.page-shell > .panel + .panel { animation-delay: 90ms; }
+
+/* The logo stays hidden until its image loads, then glides in from the left. */
+@keyframes gopher-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-gopher { opacity: 0; }
+.hero-gopher.is-loaded { animation: gopher-in 720ms cubic-bezier(0.4, 0, 0.2, 1) 120ms both; }
+
+@keyframes still-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-shell > .panel,
+  .hero-gopher.is-loaded { animation-name: still-fade-in; }
+}
+
 h1, h2 { margin: 0; }
 
 .eyebrow {
