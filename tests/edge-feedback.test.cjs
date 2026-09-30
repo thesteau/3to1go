@@ -112,3 +112,14 @@ test('restore preview keeps full folder totals when rows are capped', () => {
   assert.match(list.innerHTML, /10 files · 20 B/, 'folders past the cap still show their totals');
   assert.match(list.innerHTML, /10 files in this folder not listed/);
 });
+
+test('restore preview caps rendered folders and summarizes the rest', () => {
+  const list = { innerHTML: '' };
+  const ctx = vm.createContext({ document: { getElementById: id => id === 'recover-preview-list' ? list : null } });
+  load(ctx, 'utils.js');
+  load(ctx, 'recovery.js');
+  const entries = Array.from({ length: 3000 }, (_, i) => ({ path: `dir${String(i).padStart(4, '0')}/f.txt`, size: 1, action: 'replace' }));
+  ctx.renderRecoverPreviewList(entries, { query: '', action: 'all' });
+  assert.equal((list.innerHTML.match(/class="recover-preview-group"/g) || []).length, 150);
+  assert.match(list.innerHTML, /2850 more folders with 2850 files · 2\.8 KB not listed/);
+});

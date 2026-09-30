@@ -18,7 +18,9 @@ function resetRecoverPreview() {
 }
 
 const RECOVER_PREVIEW_ROW_LIMIT = 400;
+const RECOVER_PREVIEW_GROUP_LIMIT = 150;
 const RECOVER_PREVIEW_OPEN_GROUPS = 8;
+const RECOVER_PREVIEW_SEARCH_DELAY_MS = 150;
 
 function renderRecoverPreview(body) {
   const preview = document.getElementById("recover-preview");
@@ -53,9 +55,13 @@ function renderRecoverPreview(body) {
   `;
   const filter = { query: "", action: "all" };
   const search = document.getElementById("recover-preview-search");
+  let searchTimer = null;
   search.addEventListener("input", () => {
-    filter.query = search.value.trim().toLowerCase();
-    renderRecoverPreviewList(entries, filter);
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => {
+      filter.query = search.value.trim().toLowerCase();
+      renderRecoverPreviewList(entries, filter);
+    }, RECOVER_PREVIEW_SEARCH_DELAY_MS);
   });
   preview.querySelectorAll("[data-recover-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -74,7 +80,7 @@ function renderRecoverPreviewList(entries, { query, action }) {
   if (!list) return;
   const matches = entries.filter((entry) => (action === "all" || (entry.action || "add") === action)
     && (!query || String(entry.path || "").toLowerCase().includes(query)));
-  // Group every match so folder totals stay complete; only the rendered rows are capped.
+  // Group every match so folder totals stay complete; rendered rows and folders are both capped.
   const groups = new Map();
   for (const entry of matches) {
     const path = String(entry.path || "");
@@ -85,10 +91,14 @@ function renderRecoverPreviewList(entries, { query, action }) {
   }
   const openGroups = Boolean(query) || groups.size <= RECOVER_PREVIEW_OPEN_GROUPS;
   const sortedGroups = Array.from(groups).sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
+  const shownGroups = sortedGroups.slice(0, RECOVER_PREVIEW_GROUP_LIMIT);
+  const hiddenGroups = sortedGroups.slice(RECOVER_PREVIEW_GROUP_LIMIT);
+  const hiddenFiles = hiddenGroups.flatMap(([, files]) => files);
+  const hiddenSize = hiddenFiles.reduce((sum, file) => sum + Number(file.size || 0), 0);
   let rowBudget = RECOVER_PREVIEW_ROW_LIMIT;
 
   list.innerHTML = matches.length
-    ? sortedGroups.map(([folder, files]) => {
+    ? shownGroups.map(([folder, files]) => {
       const folderSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
       const shownFiles = files.slice(0, Math.max(0, rowBudget));
       rowBudget -= shownFiles.length;
@@ -110,7 +120,9 @@ function renderRecoverPreviewList(entries, { query, action }) {
           }).join("")}
           ${hidden ? `<p class="recover-preview-more hint">${hidden} file${hidden === 1 ? "" : "s"} in this folder not listed. Filter to narrow the list.</p>` : ""}
         </details>`;
-    }).join("")
+    }).join("") + (hiddenGroups.length
+      ? `<p class="recover-preview-more hint">${hiddenGroups.length} more folder${hiddenGroups.length === 1 ? "" : "s"} with ${hiddenFiles.length} file${hiddenFiles.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(hiddenSize))} not listed. Filter to narrow the list.</p>`
+      : "")
     : '<p class="recover-preview-more hint">No files match this filter.</p>';
 }
 
