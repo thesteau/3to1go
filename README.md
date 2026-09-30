@@ -370,7 +370,7 @@ The repository uses three Go modules joined by [`go.work`](go.work): `central`,
 contains only Edge↔Central wire types and constants; the applications remain
 independently deployable.
 
-From the repository root, use `go test ./central/...` or `go test ./edge/...`.
+From the repository root, run `go test ./shared/go/... ./central/... ./edge/...`.
 The app directories also remain valid working directories for the same commands
 because Go discovers the parent workspace. Local app Compose files build from
 the repository root so Docker can include `shared/`; published-image deployment

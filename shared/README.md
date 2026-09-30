@@ -1,27 +1,6 @@
-# Shared Go packages
+# Shared code
 
-Central and Edge depend on this local module through their existing `replace`
-directives and the root `go.work` file.
+- [`go/`](go/): shared Go module and tests used by Central and Edge.
+- [`ts/`](ts/): shared TypeScript scripts and types compiled into each web UI.
 
-- `auth`: account types, password verification, account lifecycle, session
-  middleware, and account HTTP handlers. SQL remains in each application's store.
-- `certificates`: certificate files, trust-store installation, and TLS roots.
-- `hooks`: hook files and command execution, including caller cancellation.
-- `httpx`: JSON responses, validation, rate limiting, request logging, and route
-  parameter adaptation. Applications supply route policies.
-- `ntfy`: template rendering. Notification delivery stays local because timeouts,
-  event headers, filters, and error handling differ.
-- `keylock`: per-key mutex allocation for blocking and nonblocking callers.
-- `configutil`: common configuration coercion and log-level parsing.
-- `protocol`: Edge–Central wire types and constants.
-- `webui`: embedded page assembly, caching, and index serving.
-
-Application entry points, database implementations, backup workflows, and
-platform-specific configuration paths remain in Central and Edge. Shared packages
-must not import either application.
-
-After `npm ci` and `npm run build`, run all Go tests from the repository root:
-
-```sh
-go test -race ./shared/... ./central/... ./edge/...
-```
+Application-specific behavior stays in `central/` and `edge/`.

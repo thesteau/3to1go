@@ -1,5 +1,5 @@
 {
-  // Each UI compiles its ts/ sources to classic (non-module) scripts in js/, which Go embeds.
+  // Each UI compiles shared/ts and its own sources to classic scripts in js/, which Go embeds.
   // Files share one global scope, so they must not use import/export.
   "compilerOptions": {
     "target": "ES2022",

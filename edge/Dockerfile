@@ -6,6 +6,7 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY tsconfig.base.json ./
+COPY shared/ts ./shared/ts
 COPY edge/static/tsconfig.json ./edge/static/
 COPY edge/static/ts ./edge/static/ts
 RUN npx tsc -p edge/static
@@ -15,7 +16,7 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /build
 
 COPY go.work ./
-COPY shared/go.mod shared/go.sum ./shared/
+COPY shared/go/go.mod shared/go/go.sum ./shared/go/
 COPY edge/go.mod edge/go.sum ./edge/
 COPY central/go.mod ./central/go.mod
 # Keep module downloads cached when Go or UI sources change.
@@ -23,7 +24,7 @@ WORKDIR /build/edge
 RUN go mod download
 
 WORKDIR /build
-COPY shared ./shared
+COPY shared/go ./shared/go
 COPY edge ./edge
 COPY --from=web /build/edge/static/js ./edge/static/js
 WORKDIR /build/edge

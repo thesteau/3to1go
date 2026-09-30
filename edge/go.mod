@@ -2,7 +2,7 @@ module github.com/3to1go/edge
 
 go 1.26.0
 
-replace github.com/3to1go/shared => ../shared
+replace github.com/3to1go/shared => ../shared/go
 
 require (
 	github.com/3to1go/shared v0.0.0

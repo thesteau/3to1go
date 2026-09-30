@@ -1,3 +1,4 @@
+const { loadFeature } = require('./helpers/scripts.cts');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -5,7 +6,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 function load(ctx, file) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../edge/static/js', file), 'utf8'), ctx);
+  loadFeature(ctx, 'edge', file.replace(/\.js$/, ''));
 }
 
 function element() {
