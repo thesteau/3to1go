@@ -17,3 +17,7 @@ data/
 certs/
 .auth_token
 relay_auth_token
+node_modules/
+# Compiled from */static/ts by `npm run build`.
+central/static/js/
+edge/static/js/

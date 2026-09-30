@@ -5,6 +5,9 @@ on:
     branches: ["main"]
     paths:
       - "central/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
       - ".github/workflows/central-docker-image.yml"
 
 permissions:

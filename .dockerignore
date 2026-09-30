@@ -1,0 +1,4 @@
+# Images compile the web UI in their own Node stage; never copy local build output.
+node_modules/
+central/static/js/
+edge/static/js/

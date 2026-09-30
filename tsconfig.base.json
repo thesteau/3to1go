@@ -1,0 +1,15 @@
+{
+  // Each UI compiles its ts/ sources to classic (non-module) scripts in js/, which Go embeds.
+  // Files share one global scope, so they must not use import/export.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "removeComments": false,
+    "newLine": "lf",
+    "skipLibCheck": true,
+    "types": []
+  }
+}

@@ -46,6 +46,7 @@ test('Central renders snapshots while storage probes remain pending', async () =
     setActionStatus() {}, setPanelReady() {}, applyTheme() {}, renderHelpHint: () => '', fillSettings() {},
   });
   load(ctx, 'central/static/js/utils.js');
+  load(ctx, 'central/static/js/keys.js');
   load(ctx, 'central/static/js/overview.js');
   ctx.updateOverviewDom = () => { rendered = true; };
   ctx.loadVerifyStatus = () => {};
@@ -116,6 +117,7 @@ test('Central keeps loaded settings editable when a later poll fails', async () 
     setPanelReady: (name, value) => { ready[name] = value; },
   });
   load(ctx, 'central/static/js/utils.js');
+  load(ctx, 'central/static/js/keys.js');
   load(ctx, 'central/static/js/overview.js');
   ctx.updateOverviewDom = () => {};
   ctx.loadVerifyStatus = () => {};
