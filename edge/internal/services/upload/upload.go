@@ -19,7 +19,7 @@ import (
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/encryption"
 	"github.com/3to1go/edge/internal/identity"
-	"github.com/3to1go/edge/internal/services/certificates"
+	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/protocol"
 )
 

@@ -1,4 +1,4 @@
-package api
+package httpx
 
 import (
 	"encoding/json"
@@ -11,26 +11,26 @@ import (
 
 var requestValidator = validator.New()
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
+func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
 }
 
-func writeError(w http.ResponseWriter, status int, detail any) {
-	writeJSON(w, status, map[string]any{"detail": detail})
+func WriteError(w http.ResponseWriter, status int, detail any) {
+	WriteJSON(w, status, map[string]any{"detail": detail})
 }
 
-func readJSON(r *http.Request, v any) error {
+func ReadJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func validateStruct(v any) error {
+func ValidateStruct(v any) error {
 	return requestValidator.Struct(v)
 }
 
-func sessionCookieSecure() bool {
+func SessionCookieSecure() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("SESSION_COOKIE_SECURE"))) {
 	case "1", "true", "yes", "on":
 		return true

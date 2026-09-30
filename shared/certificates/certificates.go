@@ -169,6 +169,7 @@ type ExecError struct {
 }
 
 func (e *ExecError) Error() string { return e.msg }
+
 func (e *ExecError) Unwrap() error { return e.Err }
 
 func (c *CertManager) updateTrustStore() error {

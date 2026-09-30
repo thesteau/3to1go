@@ -2,40 +2,24 @@ package store
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
+	"github.com/3to1go/shared/auth"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
-	DefaultAdminUsername = "admin"
-	DefaultAdminPassword = "admin"
-	BootstrapAdminID     = 1
+	DefaultAdminUsername = auth.DefaultAdminUsername
+	DefaultAdminPassword = auth.DefaultAdminPassword
+	BootstrapAdminID     = auth.BootstrapAdminID
 	SessionCookie        = "three_to_one_go_session"
 	sessionDays          = 7
-	bcryptCost           = 12
-	pbkdf2Iterations     = 260_000
 )
 
-type User struct {
-	ID                 int    `json:"id"`
-	Username           string `json:"username"`
-	PasswordHash       string `json:"-"`
-	IsAdmin            bool   `json:"is_admin"`
-	IsBootstrapAdmin   bool   `json:"is_bootstrap_admin"`
-	MustChangePassword bool   `json:"must_change_password"`
-	CreatedAt          string `json:"created_at"`
-}
+type User = auth.User
 
 type UserStore struct {
 	pool dbPool
@@ -88,18 +72,7 @@ func (s *UserStore) EnsureDefaultAdmin(ctx context.Context, initialPassword stri
 }
 
 func (s *UserStore) Authenticate(ctx context.Context, username, password string) (*User, error) {
-	user, err := s.GetUserByUsername(ctx, username)
-	if err != nil || user == nil {
-		return nil, nil
-	}
-	if !verifyPassword(password, user.PasswordHash) {
-		return nil, nil
-	}
-	user, err = s.withDefaultPasswordChangeRequired(ctx, user)
-	if err != nil {
-		return nil, err
-	}
-	return publicUser(user), nil
+	return auth.Authenticate(s, ctx, username, password)
 }
 
 func (s *UserStore) CreateSession(ctx context.Context, userID int) (string, error) {
@@ -329,14 +302,7 @@ func (s *UserStore) DeleteUser(ctx context.Context, userID int) error {
 }
 
 func (s *UserStore) ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) (*User, error) {
-	user, err := s.GetUserByID(ctx, userID)
-	if err != nil || user == nil {
-		return nil, errors.New("user not found")
-	}
-	if !verifyPassword(currentPassword, user.PasswordHash) {
-		return nil, errors.New("current password is incorrect")
-	}
-	return s.UpdateUser(ctx, userID, nil, &newPassword, nil, new(false))
+	return auth.ChangePassword(s, ctx, userID, currentPassword, newPassword)
 }
 
 func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
@@ -344,15 +310,7 @@ func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
 }
 
 func (s *UserStore) withDefaultPasswordChangeRequired(ctx context.Context, user *User) (*User, error) {
-	if user.MustChangePassword || !verifyPassword(DefaultAdminPassword, user.PasswordHash) {
-		return user, nil
-	}
-	updated, err := s.UpdateUser(ctx, user.ID, nil, nil, nil, new(true))
-	if err != nil {
-		return user, nil
-	}
-	updated.PasswordHash = user.PasswordHash
-	return updated, nil
+	return auth.WithDefaultPasswordChangeRequired(s, ctx, user)
 }
 
 func scanUser(row pgx.Row) (*User, error) {
@@ -364,95 +322,6 @@ func scanUser(row pgx.Row) (*User, error) {
 	}
 	u.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	return u, nil
-}
-
-func publicUser(u *User) *User {
-	return &User{
-		ID:                 u.ID,
-		Username:           u.Username,
-		PasswordHash:       u.PasswordHash,
-		IsAdmin:            u.IsAdmin,
-		IsBootstrapAdmin:   u.ID == BootstrapAdminID,
-		MustChangePassword: u.MustChangePassword,
-		CreatedAt:          u.CreatedAt,
-	}
-}
-
-func normalizeUsername(username string) (string, error) {
-	normalized := strings.ToLower(strings.TrimSpace(username))
-	if len(normalized) < 3 {
-		return "", errors.New("username must be at least 3 characters")
-	}
-	if len(normalized) > 64 {
-		return "", errors.New("username must be at most 64 characters")
-	}
-	for _, ch := range normalized {
-		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '_' && ch != '-' && ch != '.' {
-			return "", errors.New("username can only contain letters, numbers, dots, dashes, and underscores")
-		}
-	}
-	return normalized, nil
-}
-
-func hashPassword(password string) (string, error) {
-	if len(password) < 5 {
-		return "", errors.New("password must be at least 5 characters")
-	}
-	if strings.TrimSpace(password) == "" {
-		return "", errors.New("password must contain at least one non-space character")
-	}
-	digest, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
-	if err != nil {
-		return "", err
-	}
-	return string(digest), nil
-}
-
-func verifyPassword(password, encoded string) bool {
-	if strings.HasPrefix(encoded, "$2a$") || strings.HasPrefix(encoded, "$2b$") || strings.HasPrefix(encoded, "$2y$") {
-		return bcrypt.CompareHashAndPassword([]byte(encoded), []byte(password)) == nil
-	}
-	return verifyPBKDF2Password(password, encoded)
-}
-
-func verifyPBKDF2Password(password, encoded string) bool {
-	parts := strings.SplitN(encoded, "$", 4)
-	if len(parts) != 4 || parts[0] != "pbkdf2_sha256" {
-		return false
-	}
-	iterations, err := parseInt(parts[1])
-	if err != nil {
-		return false
-	}
-	salt, err := hex.DecodeString(parts[2])
-	if err != nil {
-		return false
-	}
-	expected, err := hex.DecodeString(parts[3])
-	if err != nil {
-		return false
-	}
-	digest := pbkdf2.Key([]byte(password), salt, iterations, sha256.Size, sha256.New)
-	return hmac.Equal(digest, expected)
-}
-
-func parseInt(s string) (int, error) {
-	n := 0
-	for _, ch := range s {
-		if ch < '0' || ch > '9' {
-			return 0, errors.New("not an integer")
-		}
-		n = n*10 + int(ch-'0')
-	}
-	return n, nil
-}
-
-func randomToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("read random session token bytes: %w", err)
-	}
-	return hex.EncodeToString(b), nil
 }
 
 //go:fix inline

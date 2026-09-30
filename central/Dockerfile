@@ -15,7 +15,7 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /build
 
 COPY go.work ./
-COPY shared/go.mod ./shared/go.mod
+COPY shared/go.mod shared/go.sum ./shared/
 COPY central/go.mod central/go.sum ./central/
 COPY edge/go.mod ./edge/go.mod
 # Keep module downloads cached when Go or UI sources change.

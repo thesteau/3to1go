@@ -16,12 +16,12 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services/certificates"
-	"github.com/3to1go/central/internal/services/hooks"
 	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/hooks"
 )
 
 // ---------------------------------------------------------------------------
@@ -50,24 +50,33 @@ type mockUserStore struct {
 func (m *mockUserStore) UserForSession(_ context.Context, _ string) (*store.User, error) {
 	return m.sessionUser, m.sessionErr
 }
+
 func (m *mockUserStore) Authenticate(_ context.Context, _, _ string) (*store.User, error) {
 	return m.authenticateUser, m.authenticateErr
 }
+
 func (m *mockUserStore) CreateSession(_ context.Context, _ int) (string, error) {
 	return m.createSessionToken, m.createSessionErr
 }
+
 func (m *mockUserStore) DeleteSession(_ context.Context, _ string) error      { return m.deleteSessionErr }
+
 func (m *mockUserStore) DeleteSessionsForUser(_ context.Context, _ int) error { return nil }
+
 func (m *mockUserStore) ListUsers(_ context.Context) ([]*store.User, error) {
 	return m.listUsers, m.listErr
 }
+
 func (m *mockUserStore) CreateUser(_ context.Context, _, _ string, _ bool) (*store.User, error) {
 	return m.createUserResult, m.createUserErr
 }
+
 func (m *mockUserStore) UpdateUser(_ context.Context, _ int, _, _ *string, _, _ *bool) (*store.User, error) {
 	return m.updateUserResult, m.updateUserErr
 }
+
 func (m *mockUserStore) DeleteUser(_ context.Context, _ int) error { return m.deleteUserErr }
+
 func (m *mockUserStore) ChangePassword(_ context.Context, _ int, _, _ string) (*store.User, error) {
 	return m.changePassResult, m.changePassErr
 }
@@ -86,12 +95,15 @@ type mockCredStore struct {
 func (m *mockCredStore) Verify(_ context.Context, _ string, _ ed25519.PublicKey) (*store.CredentialRecord, error) {
 	return m.verifyResult, m.verifyErr
 }
+
 func (m *mockCredStore) Mint(_ context.Context, _ ed25519.PrivateKey, _ int, _ ...signing.CredentialScope) (string, error) {
 	return m.mintResult, m.mintErr
 }
+
 func (m *mockCredStore) Revoke(_ context.Context, _ string) (int64, error) {
 	return m.revokeN, m.revokeErr
 }
+
 func (m *mockCredStore) CleanupExpired(_ context.Context) (int64, error) {
 	return m.cleanupN, m.cleanupErr
 }
@@ -118,21 +130,27 @@ type mockSnapIndex struct {
 func (m *mockSnapIndex) GetEdgeRegistration(_ context.Context, _, _ string) (*store.EdgeRegistration, error) {
 	return m.getReg, m.getRegErr
 }
+
 func (m *mockSnapIndex) DeleteEdgeRegistration(_ context.Context, _, _ string) error {
 	return m.deleteErr
 }
+
 func (m *mockSnapIndex) DeleteInstanceEntries(_ context.Context, _, _ string) error {
 	return m.deleteErr
 }
+
 func (m *mockSnapIndex) HasNamespaceEntries(_ context.Context, _, _ string) (bool, error) {
 	return m.hasEntries, m.hasErr
 }
+
 func (m *mockSnapIndex) UpsertEdgeRegistration(_ context.Context, _ *store.EdgeRegistration) error {
 	return m.upsertErr
 }
+
 func (m *mockSnapIndex) ListEdgeRegistrations(_ context.Context, _ *string) ([]store.EdgeRegistration, error) {
 	return m.listRegs, m.listRegsErr
 }
+
 func (m *mockSnapIndex) ListNamespaces(_ context.Context) ([]store.NamespaceEntry, error) {
 	return m.listNS, m.listNSErr
 }
@@ -149,14 +167,19 @@ type mockIngest struct {
 func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, _, _ *string, _ bool) (*ingest.SessionResponse, error) {
 	return m.startResp, m.startErr
 }
+
 func (m *mockIngest) AppendChunk(_ context.Context, _ string, _ int64, _ io.Reader) (*ingest.ChunkResponse, error) {
 	return m.chunkResp, m.chunkErr
 }
+
 func (m *mockIngest) FinalizeUpload(_ context.Context, _ string) (*ingest.FinalizeResponse, error) {
 	return m.finResp, m.finErr
 }
+
 func (m *mockIngest) ReconcileNamespace(_ context.Context, _ string) {}
+
 func (m *mockIngest) CleanupLoop(_ context.Context, _ int)           {}
+
 func (m *mockIngest) UpdateSettings(_ *config.Settings)              {}
 
 // ---------------------------------------------------------------------------
@@ -178,7 +201,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
 	backend := storage.NewLocalBackend(settings.BackupRoot)
-	hookMgr := hooks.NewHookManager(t.TempDir(), discardLogger())
+	hookMgr := hooks.NewHookManager("central", t.TempDir(), discardLogger())
 	certMgr := certificates.NewCertManager(t.TempDir())
 	ntfyPub := ntfy.NewNtfyPublisher(discardLogger())
 	if us == nil {

@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services/hooks"
 	"github.com/3to1go/central/internal/services/locks"
 	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/shared/hooks"
 )
 
 func discardLogger() *slog.Logger {
@@ -268,7 +268,7 @@ func newTestService(t *testing.T) *Service {
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
 	lockMgr := locks.NewNamespaceLockManager()
 	logger := discardLogger()
-	hookMgr := hooks.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
+	hookMgr := hooks.NewHookManager("central", filepath.Join(tmpDir, "hooks"), logger)
 	ntfyPub := ntfy.NewNtfyPublisher(logger)
 
 	return &Service{
@@ -655,7 +655,7 @@ func TestNew_CreatesDirectories(t *testing.T) {
 	}
 	lockMgr2 := locks.NewNamespaceLockManager()
 	logger := discardLogger()
-	hookMgr2 := hooks.NewHookManager(filepath.Join(tmpDir, "hooks"), logger)
+	hookMgr2 := hooks.NewHookManager("central", filepath.Join(tmpDir, "hooks"), logger)
 	ntfyPub2 := ntfy.NewNtfyPublisher(logger)
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
 

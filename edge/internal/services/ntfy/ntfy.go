@@ -8,16 +8,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/3to1go/edge/internal/config"
+	notification "github.com/3to1go/shared/ntfy"
 )
 
 const DefaultNtfyMessageTemplate = "Edge uploaded {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} to Central as {{ stored_as }}."
-
-var templatePattern = regexp.MustCompile(`{{\s*([a-zA-Z0-9_]+)\s*}}`)
 
 // NtfyPublisher sends upload notifications to a ntfy server.
 type NtfyPublisher struct {
@@ -74,20 +72,7 @@ func (n *NtfyPublisher) PublishBestEffort(cfg *config.Settings, context map[stri
 
 // RenderNtfyMessage replaces {{ key }} placeholders with values from context.
 func RenderNtfyMessage(template string, context map[string]string) string {
-	normalized := strings.TrimSpace(template)
-	if normalized == "" {
-		normalized = DefaultNtfyMessageTemplate
-	}
-	return templatePattern.ReplaceAllStringFunc(normalized, func(match string) string {
-		sub := templatePattern.FindStringSubmatch(match)
-		if len(sub) < 2 {
-			return match
-		}
-		if v, ok := context[sub[1]]; ok {
-			return v
-		}
-		return ""
-	})
+	return notification.Render(template, DefaultNtfyMessageTemplate, func(key string) string { return context[key] })
 }
 
 func publish(ntfyURL, ntfyTopic, message string) error {

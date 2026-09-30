@@ -14,13 +14,14 @@ import (
 	"github.com/3to1go/central/internal/api"
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services/certificates"
-	"github.com/3to1go/central/internal/services/hooks"
 	"github.com/3to1go/central/internal/services/locks"
 	"github.com/3to1go/central/internal/services/ntfy"
 	"github.com/3to1go/central/internal/services/verify"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/configutil"
+	"github.com/3to1go/shared/hooks"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -93,7 +94,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	// Adjust log level
-	logLevel := parseLogLevel(settings.LogLevel)
+	logLevel := configutil.ParseLogLevel(settings.LogLevel)
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
 	// Storage backend
@@ -107,7 +108,7 @@ func run(logger *slog.Logger) error {
 
 	// Services
 	lockMgr := locks.NewNamespaceLockManager()
-	hookMgr := hooks.NewHookManager(config.HookScriptsDir(), logger)
+	hookMgr := hooks.NewHookManager("central", config.HookScriptsDir(), logger)
 	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
 	ntfyPub := ntfy.NewNtfyPublisher(logger)
 
@@ -160,19 +161,6 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("server error: %w", err)
 	}
 	return nil
-}
-
-func parseLogLevel(level string) slog.Level {
-	switch level {
-	case "DEBUG":
-		return slog.LevelDebug
-	case "WARNING", "WARN":
-		return slog.LevelWarn
-	case "ERROR":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
 }
 
 func initialAdminPassword() string {

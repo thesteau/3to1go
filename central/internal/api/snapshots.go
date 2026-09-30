@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/3to1go/central/internal/ingest"
+	"github.com/3to1go/shared/httpx"
 )
 
 var fingerprintQueryRE = regexp.MustCompile(`^[a-f0-9]{8}([a-f0-9]{56})?$`)
@@ -48,17 +49,17 @@ func (a *App) serveSnapshot(w http.ResponseWriter, r *http.Request, namespace, f
 	file, err := os.OpenInRoot(a.Settings().BackupRoot, snapshotPath(namespace, filename))
 	if err != nil {
 		if os.IsNotExist(err) {
-			writeError(w, http.StatusNotFound, "snapshot not found")
+			httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
 			return
 		}
-		writeError(w, http.StatusBadRequest, "invalid path")
+		httpx.WriteError(w, http.StatusBadRequest, "invalid path")
 		return
 	}
 	defer file.Close()
 
 	info, err := file.Stat()
 	if err != nil || info.IsDir() {
-		writeError(w, http.StatusNotFound, "snapshot not found")
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
 		return
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -89,7 +90,7 @@ func (a *App) handleDownloadSnapshotForInstance(w http.ResponseWriter, r *http.R
 
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	a.serveSnapshot(w, r, namespace, filename, false)
@@ -105,7 +106,7 @@ func (a *App) handleDownloadSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	namespace, err := validatedLegacyNamespace(edgeID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	a.serveSnapshot(w, r, namespace, filename, false)
@@ -122,19 +123,19 @@ func (a *App) handleDeleteSnapshotForInstance(w http.ResponseWriter, r *http.Req
 
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := a.removeSnapshot(namespace, filename); err != nil {
 		if !os.IsNotExist(err) {
-			writeError(w, http.StatusBadRequest, "invalid path")
+			httpx.WriteError(w, http.StatusBadRequest, "invalid path")
 			return
 		}
-		writeError(w, http.StatusNotFound, "snapshot not found")
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
 		return
 	}
 	a.ingest.ReconcileNamespace(r.Context(), namespace)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
 }
 
 func (a *App) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
@@ -147,25 +148,25 @@ func (a *App) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	namespace, err := validatedLegacyNamespace(edgeID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := a.removeSnapshot(namespace, filename); err != nil {
 		if !os.IsNotExist(err) {
-			writeError(w, http.StatusBadRequest, "invalid path")
+			httpx.WriteError(w, http.StatusBadRequest, "invalid path")
 			return
 		}
-		writeError(w, http.StatusNotFound, "snapshot not found")
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
 		return
 	}
 	a.ingest.ReconcileNamespace(r.Context(), namespace)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
 }
 
 func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
 	cred, err := a.authorizeBearer(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	edgeID := r.PathValue("edge_id")
@@ -173,17 +174,17 @@ func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
 	jobName := r.PathValue("job_name")
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, false); status != 0 {
-		writeError(w, status, detail)
+		httpx.WriteError(w, status, detail)
 		return
 	}
 
 	files, err := a.backend.List(namespace)
 	if err != nil || len(files) == 0 {
-		writeError(w, http.StatusNotFound, "no snapshots found")
+		httpx.WriteError(w, http.StatusNotFound, "no snapshots found")
 		return
 	}
 
@@ -200,7 +201,7 @@ func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request) {
 	cred, err := a.authorizeBearer(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	edgeID := r.PathValue("edge_id")
@@ -208,11 +209,11 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	jobName := r.PathValue("job_name")
 	fp := strings.TrimSpace(r.URL.Query().Get("fp"))
 	if fp == "" {
-		writeError(w, http.StatusBadRequest, "fp parameter is required")
+		httpx.WriteError(w, http.StatusBadRequest, "fp parameter is required")
 		return
 	}
 	if !fingerprintQueryRE.MatchString(fp) {
-		writeError(w, http.StatusBadRequest, "fp must be an 8- or 64-character lowercase hex fingerprint")
+		httpx.WriteError(w, http.StatusBadRequest, "fp must be an 8- or 64-character lowercase hex fingerprint")
 		return
 	}
 	fpPrefix := fp
@@ -221,17 +222,17 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	}
 	namespace, err := validatedNamespace(edgeID, instID, jobName)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, false); status != 0 {
-		writeError(w, status, detail)
+		httpx.WriteError(w, status, detail)
 		return
 	}
 
 	files, err := a.backend.List(namespace)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list snapshots")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to list snapshots")
 		return
 	}
 
@@ -247,7 +248,7 @@ func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request
 	}
 
 	if len(matchSlice) == 0 {
-		writeError(w, http.StatusNotFound, "no snapshot found with that fingerprint")
+		httpx.WriteError(w, http.StatusNotFound, "no snapshot found with that fingerprint")
 		return
 	}
 	best := matchSlice[0]

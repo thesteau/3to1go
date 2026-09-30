@@ -13,7 +13,7 @@ func discardSlogLogger() *slog.Logger {
 
 func newTestHookManager(t *testing.T) *HookManager {
 	t.Helper()
-	return NewHookManager(t.TempDir(), discardSlogLogger())
+	return NewHookManager("edge", t.TempDir(), discardSlogLogger())
 }
 
 // ---------------------------------------------------------------------------

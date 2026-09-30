@@ -9,6 +9,7 @@ import (
 
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/httpx"
 	"github.com/3to1go/shared/protocol"
 )
 
@@ -69,18 +70,18 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 
 func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 	if a.Settings().UploadsPaused {
-		writeError(w, http.StatusServiceUnavailable, "uploads are paused")
+		httpx.WriteError(w, http.StatusServiceUnavailable, "uploads are paused")
 		return
 	}
 	cred, err := a.authorizeBearer(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var body ingest.UploadInitRequest
-	if err := readJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	metadata := struct {
@@ -100,50 +101,50 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 		ArchiveSizeBytes: body.ArchiveSizeBytes,
 		IdempotencyKey:   body.IdempotencyKey,
 	}
-	if err := validateStruct(&metadata); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid upload metadata")
+	if err := httpx.ValidateStruct(&metadata); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid upload metadata")
 		return
 	}
 
 	// Validate namespace components
 	edgeID, err := ingest.ValidateNamespaceComponent(body.EdgeID, "edge_id")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	instID, err := ingest.ValidateNamespaceComponent(body.EdgeInstanceID, "edge_instance_id")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	jobName, err := ingest.ValidateNamespaceComponent(body.JobName, "job_name")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	body.EdgeID = edgeID
 	body.EdgeInstanceID = instID
 	body.JobName = jobName
 	if _, err := time.Parse("2006-01-02T15:04:05Z", body.Timestamp); err != nil {
-		writeError(w, http.StatusBadRequest, "timestamp must be a UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format")
+		httpx.WriteError(w, http.StatusBadRequest, "timestamp must be a UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format")
 		return
 	}
 	if !fingerprintQueryRE.MatchString(body.Fingerprint) {
-		writeError(w, http.StatusBadRequest, "fingerprint must be an 8- or 64-character lowercase hex digest")
+		httpx.WriteError(w, http.StatusBadRequest, "fingerprint must be an 8- or 64-character lowercase hex digest")
 		return
 	}
 
 	if status, detail := a.authorizeCredentialForInstance(r, cred, edgeID, instID, true); status != 0 {
-		writeError(w, status, detail)
+		httpx.WriteError(w, status, detail)
 		return
 	}
 
 	if body.ArchiveFormat != protocol.ArchiveFormatTarZst {
-		writeError(w, http.StatusBadRequest, "archive_format must be tar.zst")
+		httpx.WriteError(w, http.StatusBadRequest, "archive_format must be tar.zst")
 		return
 	}
 	if len(body.ArchiveSHA256) != 64 {
-		writeError(w, http.StatusBadRequest, "archive_sha256 must be a 64-character lowercase hex digest")
+		httpx.WriteError(w, http.StatusBadRequest, "archive_sha256 must be a 64-character lowercase hex digest")
 		return
 	}
 
@@ -156,19 +157,19 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 		writeHTTPError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (a *App) handleAppendChunk(w http.ResponseWriter, r *http.Request) {
 	if _, err := a.authorizeBearer(r); err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	uploadID := r.PathValue("upload_id")
 	offsetStr := r.URL.Query().Get("offset")
 	offset, err := strconv.ParseInt(offsetStr, 10, 64)
 	if err != nil || offset < 0 {
-		writeError(w, http.StatusBadRequest, "invalid offset parameter")
+		httpx.WriteError(w, http.StatusBadRequest, "invalid offset parameter")
 		return
 	}
 	resp, err := a.ingest.AppendChunk(r.Context(), uploadID, offset, r.Body)
@@ -176,12 +177,12 @@ func (a *App) handleAppendChunk(w http.ResponseWriter, r *http.Request) {
 		writeHTTPError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (a *App) handleFinalizeUpload(w http.ResponseWriter, r *http.Request) {
 	if _, err := a.authorizeBearer(r); err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	uploadID := r.PathValue("upload_id")
@@ -190,13 +191,13 @@ func (a *App) handleFinalizeUpload(w http.ResponseWriter, r *http.Request) {
 		writeHTTPError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func writeHTTPError(w http.ResponseWriter, err error) {
 	if he, ok := errors.AsType[*ingest.HTTPError](err); ok {
-		writeJSON(w, he.Code, map[string]any{"detail": he.Message})
+		httpx.WriteJSON(w, he.Code, map[string]any{"detail": he.Message})
 		return
 	}
-	writeError(w, http.StatusInternalServerError, err.Error())
+	httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 }

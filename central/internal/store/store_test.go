@@ -32,6 +32,7 @@ func (r *mockRow) Scan(dest ...any) error {
 }
 
 func noRow() pgx.Row         { return &mockRow{} }
+
 func errRow(e error) pgx.Row { return &mockRow{scanFn: func(...any) error { return e }} }
 
 // ---------------------------------------------------------------------------
@@ -48,16 +49,25 @@ func (r *mockRows) Next() bool {
 	r.idx++
 	return r.idx <= len(r.scanFns)
 }
+
 func (r *mockRows) Scan(dest ...any) error                       { return r.scanFns[r.idx-1](dest...) }
+
 func (r *mockRows) Err() error                                   { return r.err }
+
 func (r *mockRows) Close()                                       {}
+
 func (r *mockRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
+
 func (r *mockRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
+
 func (r *mockRows) Values() ([]any, error)                       { return nil, nil }
+
 func (r *mockRows) RawValues() [][]byte                          { return nil }
+
 func (r *mockRows) Conn() *pgx.Conn                              { return nil }
 
 func emptyRows() pgx.Rows      { return &mockRows{} }
+
 func errRows(e error) pgx.Rows { return &mockRows{err: e} }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +110,7 @@ type queuePool struct {
 func (q *queuePool) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
 	return pgconn.CommandTag{}, nil
 }
+
 func (q *queuePool) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
 	if len(q.rowQ) == 0 {
 		return emptyRows(), nil
@@ -108,6 +119,7 @@ func (q *queuePool) Query(ctx context.Context, sql string, args ...any) (pgx.Row
 	q.rowQ = q.rowQ[1:]
 	return r, nil
 }
+
 func (q *queuePool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	if len(q.rows) == 0 {
 		return noRow()
@@ -212,17 +224,6 @@ func TestVerifyPassword_InvalidFormat(t *testing.T) {
 	}
 	if verifyPassword("password", "pbkdf2_sha256$bad$salt$digest") {
 		t.Error("expected false for bad iterations")
-	}
-}
-
-func TestParseInt(t *testing.T) {
-	n, err := parseInt("260000")
-	if err != nil || n != 260000 {
-		t.Errorf("parseInt(%q) = %d, %v", "260000", n, err)
-	}
-	_, err = parseInt("abc")
-	if err == nil {
-		t.Error("expected error for non-integer")
 	}
 }
 
