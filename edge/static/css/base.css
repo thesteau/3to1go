@@ -300,3 +300,12 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .section-spinner { animation: none; }
 }
+
+/* Marks the element an action just changed, then settles back to its normal look. */
+@keyframes action-flash {
+  from {
+    background-color: var(--success-soft);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}
+.action-flash { animation: action-flash 1400ms ease-out; }

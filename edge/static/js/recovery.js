@@ -17,36 +17,98 @@ function resetRecoverPreview() {
   }
 }
 
+const RECOVER_PREVIEW_ROW_LIMIT = 400;
+const RECOVER_PREVIEW_OPEN_GROUPS = 8;
+
 function renderRecoverPreview(body) {
   const preview = document.getElementById("recover-preview");
   if (!preview) return;
   const entries = body.entries || [];
-  const visibleEntries = entries.slice(0, 80);
-  const remaining = Math.max(0, entries.length - visibleEntries.length);
   const replaceCount = Number(body.replace_count || 0);
   const addCount = Number(body.add_count || 0);
+  const totalSize = entries.reduce((sum, entry) => sum + Number(entry.size || 0), 0);
   const snapshotName = body.snapshot_filename || "snapshot";
+  const filterButton = (action, label, count) => `
+    <button type="button" class="secondary" data-recover-filter="${action}" aria-pressed="${action === "all"}">
+      ${escapeHtml(label)} <span class="recover-preview-count">${count}</span>
+    </button>`;
 
   preview.innerHTML = `
     <div class="recover-preview-summary">
-      <strong>${escapeHtml(snapshotName)}</strong>
-      <span>${entries.length} file${entries.length === 1 ? "" : "s"} total</span>
-      <span>${replaceCount} replace</span>
-      <span>${addCount} add</span>
+      <div class="recover-preview-title">
+        <strong title="${escapeHtml(snapshotName)}">${escapeHtml(snapshotName)}</strong>
+        <span class="hint">${entries.length} file${entries.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(totalSize))}</span>
+      </div>
     </div>
-    <p class="hint">Restore will replace only the listed local files marked replace. Local files not listed here stay untouched.</p>
-    <div class="recover-preview-list">
-      ${visibleEntries.map((entry) => `
-        <div class="recover-preview-row">
-          <span class="recover-preview-action ${entry.action === "replace" ? "replace" : "add"}">${escapeHtml(entry.action || "add")}</span>
-          <span class="recover-preview-path">${escapeHtml(entry.path || "")}</span>
-          <span class="hint">${escapeHtml(formatBytes(entry.size || 0))}</span>
-        </div>
-      `).join("")}
-      ${remaining ? `<div class="recover-preview-more hint">${remaining} more file${remaining === 1 ? "" : "s"}</div>` : ""}
+    <p class="hint">Replace overwrites the local copy and Add creates a missing file. Local files not listed stay untouched.</p>
+    <div class="recover-preview-tools">
+      <input id="recover-preview-search" type="search" placeholder="Filter by file or folder" aria-label="Filter restore preview">
+      <div class="recover-preview-filters" role="group" aria-label="Show files">
+        ${filterButton("all", "All", entries.length)}
+        ${filterButton("replace", "Replace", replaceCount)}
+        ${filterButton("add", "Add", addCount)}
+      </div>
     </div>
+    <div id="recover-preview-list" class="recover-preview-list"></div>
   `;
+  const filter = { query: "", action: "all" };
+  const search = document.getElementById("recover-preview-search");
+  search.addEventListener("input", () => {
+    filter.query = search.value.trim().toLowerCase();
+    renderRecoverPreviewList(entries, filter);
+  });
+  preview.querySelectorAll("[data-recover-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      filter.action = button.dataset.recoverFilter;
+      preview.querySelectorAll("[data-recover-filter]").forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+      renderRecoverPreviewList(entries, filter);
+    });
+  });
+  renderRecoverPreviewList(entries, filter);
   preview.hidden = false;
+}
+
+// Files are grouped by folder so a long restore reads as a few locations, not one flat wall of paths.
+function renderRecoverPreviewList(entries, { query, action }) {
+  const list = document.getElementById("recover-preview-list");
+  if (!list) return;
+  const matches = entries.filter((entry) => (action === "all" || (entry.action || "add") === action)
+    && (!query || String(entry.path || "").toLowerCase().includes(query)));
+  const shown = matches.slice(0, RECOVER_PREVIEW_ROW_LIMIT);
+  const groups = new Map();
+  for (const entry of shown) {
+    const path = String(entry.path || "");
+    const slash = path.lastIndexOf("/");
+    const folder = slash === -1 ? "" : path.slice(0, slash + 1);
+    if (!groups.has(folder)) groups.set(folder, []);
+    groups.get(folder).push({ ...entry, name: path.slice(slash + 1) });
+  }
+  const openGroups = Boolean(query) || groups.size <= RECOVER_PREVIEW_OPEN_GROUPS;
+  const remaining = matches.length - shown.length;
+
+  const sortedGroups = Array.from(groups).sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
+
+  list.innerHTML = matches.length
+    ? sortedGroups.map(([folder, files]) => {
+      const folderSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+      return `
+        <details class="recover-preview-group"${openGroups ? " open" : ""}>
+          <summary>
+            <span class="recover-preview-folder" title="${escapeHtml(folder || "Job root")}">${escapeHtml(folder || "Job root")}</span>
+            <span class="hint">${files.length} file${files.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(folderSize))}</span>
+          </summary>
+          ${files.map((file) => {
+            const kind = file.action === "replace" ? "replace" : "add";
+            return `
+            <div class="recover-preview-row">
+              <span class="recover-preview-action ${kind}">${kind === "replace" ? "Replace" : "Add"}</span>
+              <span class="recover-preview-path" title="${escapeHtml(file.path || "")}">${escapeHtml(file.name)}</span>
+              <span class="recover-preview-size">${escapeHtml(formatBytes(file.size || 0))}</span>
+            </div>`;
+          }).join("")}
+        </details>`;
+    }).join("") + (remaining ? `<p class="recover-preview-more hint">${remaining} more file${remaining === 1 ? "" : "s"} not shown. Filter to narrow the list.</p>` : "")
+    : '<p class="recover-preview-more hint">No files match this filter.</p>';
 }
 
 function openRecoverDialog(relativePath, jobName) {

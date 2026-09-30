@@ -1,4 +1,5 @@
-let directoryExpansionState = new Set(["."]);
+// Folders start collapsed; only the ones a user opens stay open across refreshes.
+let directoryExpansionState = new Set();
 let showHiddenDirs = false;
 
 const JOB_EVENT_LINGER_MS = 10000;
@@ -31,7 +32,7 @@ function rememberDirectoryExpansion() {
   const openPaths = Array.from(document.querySelectorAll("#directory-tree details[data-path][open]"))
     .map((element) => element.dataset.path)
     .filter(Boolean);
-  directoryExpansionState = new Set(openPaths.length ? openPaths : ["."]);
+  directoryExpansionState = new Set(openPaths);
 }
 
 function buildDirectoryIndex(directories) {
@@ -157,9 +158,6 @@ function jobActivityDetails(entry) {
 }
 
 function directoryDisplayName(entry) {
-  if (entry.relative_path === ".") {
-    return "Scan Root";
-  }
   return entry.relative_path.split("/").pop() || entry.relative_path;
 }
 
@@ -167,9 +165,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
   const relativePath = entry.relative_path;
   const progressLabel = formatDirectoryProgress(entry);
   const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
-  const pathValue = relativePath === "."
-    ? renderClipValue("", latestData?.scan_root || entry.absolute_path, { className: "clip-code", clipLength: 52 })
-    : renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
+  const pathValue = renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
   const actionMarkup = entry.blocked_by_parent
     ? `<span class="dir-action-note" title="Nested folders under an already-selected parent are backed up through that parent job instead of getting their own .upload_dir settings.">Covered by parent job</span>`
     : `<button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>`;
@@ -190,7 +186,7 @@ function renderDirectoryHeader(entry, childCount, hasSelectedDescendant) {
       </div>
       <div class="dir-actions">
         <button type="button" class="secondary" onclick="return browseFilesFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Browse files</button>
-        ${entry.blocked_by_parent && currentUser?.is_admin ? `<button type="button" class="secondary" onclick="return excludeFileFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'), this)">Exclude folder</button>` : ""}
+        ${entry.blocked_by_parent && !entry.excluded && currentUser?.is_admin ? `<button type="button" class="secondary" onclick="return excludeFileFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'), this)">Exclude folder</button>` : ""}
         ${actionMarkup}
       </div>
     </div>
@@ -223,19 +219,20 @@ function renderDirectoryNode(relativePath, index) {
   const renderedChildren = childPaths.map((childPath) => renderDirectoryNode(childPath, index));
   const hasSelectedDescendant = entry.selected || renderedChildren.some((child) => child.hasSelectedDescendant);
   const header = renderDirectoryHeader(entry, childPaths.length, renderedChildren.some((child) => child.hasSelectedDescendant));
+  const excludedClass = entry.excluded ? " dir-excluded" : "";
 
   if (!childPaths.length) {
     return {
       hasSelectedDescendant,
-      html: `<div class="dir-leaf" data-path="${escapeHtml(relativePath)}">${header}</div>`,
+      html: `<div class="dir-leaf${excludedClass}" data-path="${escapeHtml(relativePath)}">${header}</div>`,
     };
   }
 
-  const shouldOpen = directoryExpansionState.has(relativePath) || hasSelectedDescendant || relativePath === ".";
+  const shouldOpen = directoryExpansionState.has(relativePath);
   return {
     hasSelectedDescendant,
     html: `
-      <details class="dir-branch" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
+      <details class="dir-branch${excludedClass}" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
         <summary class="dir-summary">${header}</summary>
         <div class="dir-children">
           <div class="dir-children-inner">
@@ -269,7 +266,7 @@ function renderSelectedJobs(directories) {
       const lastStateLabel = formatLastState(entry);
       const activity = jobActivityDetails(entry);
       return `
-      <div class="job-card">
+      <div class="job-card" data-path="${escapeHtml(entry.relative_path)}">
         <div class="job-card-body">
           <div class="job-card-info">
             <div class="job-card-header">
@@ -305,10 +302,15 @@ function renderSelectedJobs(directories) {
   setHtmlIfChanged("selected-jobs-count", String(selected.length));
 }
 
+// The scan root itself is implied, so its folders form the top level of the tree.
 function renderDirectoryTree(directories) {
   rememberDirectoryExpansion();
-  const tree = renderDirectoryNode(".", buildDirectoryIndex(directories || []));
-  if (setHtmlIfChanged("directory-tree", tree.html || '<p class="hint">No directories were found under the scan root.</p>')) {
+  const index = buildDirectoryIndex(directories || []);
+  const html = (index.childrenByParent.get(".") || [])
+    .filter((path) => showHiddenDirs || !isHiddenPath(path))
+    .map((path) => renderDirectoryNode(path, index).html)
+    .join("");
+  if (setHtmlIfChanged("directory-tree", html || '<p class="hint">No directories were found under the scan root.</p>')) {
     bindDirectoryTreeEvents();
   }
 }

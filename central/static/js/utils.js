@@ -80,6 +80,38 @@ function pause(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+// Shows an action is in flight on the button that started it; the returned function restores it.
+function setButtonBusy(button, busyLabel) {
+  if (!button) return () => {};
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = busyLabel;
+  return () => {
+    button.disabled = false;
+    button.textContent = label;
+  };
+}
+
+// Briefly highlights the element an action changed so the result is visible where it happened.
+function flashElement(element) {
+  if (!element?.classList) return;
+  element.classList.remove("action-flash");
+  void element.offsetWidth;
+  element.classList.add("action-flash");
+  element.addEventListener("animationend", () => element.classList.remove("action-flash"), { once: true });
+}
+
+// Removed items fade out rather than vanishing, so it is clear which one went away.
+function fadeOutAndRemove(element) {
+  if (!element) return;
+  if (!element.animate) {
+    element.remove();
+    return;
+  }
+  element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-in", fill: "forwards" })
+    .finished.then(() => element.remove(), () => element.remove());
+}
+
 async function readJson(response) {
   return response.json().catch(() => ({}));
 }

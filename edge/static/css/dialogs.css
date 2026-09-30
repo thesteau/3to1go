@@ -185,6 +185,11 @@
   color: var(--danger);
 }
 
+.badge.muted {
+  background: var(--help-bg);
+  color: var(--muted);
+}
+
 .warning-inline {
   margin: 4px 0 8px;
   padding: 8px 12px;

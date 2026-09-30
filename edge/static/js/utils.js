@@ -39,8 +39,11 @@ function statusBadge(entry) {
   if (entry.config_error) {
     return '<span class="badge error">invalid config</span>';
   }
+  if (entry.excluded) {
+    return `<span class="badge muted" title="The parent job's exclusions skip this folder, so it is not backed up.">excluded from ${escapeHtml(entry.blocked_by_parent === "." ? "scan root job" : entry.blocked_by_parent)}</span>`;
+  }
   if (entry.blocked_by_parent) {
-    return `<span class="badge warn" title="Nested folders under an already-selected parent are backed up through that parent job instead of continuing as separate jobs.">managed by ${escapeHtml(entry.blocked_by_parent)}</span>`;
+    return `<span class="badge warn" title="Nested folders under an already-selected parent are backed up through that parent job instead of continuing as separate jobs.">managed by ${escapeHtml(entry.blocked_by_parent === "." ? "scan root job" : entry.blocked_by_parent)}</span>`;
   }
   if (entry.selected) {
     return '<span class="badge">selected</span>';
@@ -79,6 +82,27 @@ function setHtmlIfChanged(id, html) {
   if (!element || element.innerHTML === html) return false;
   element.innerHTML = html;
   return true;
+}
+
+// Shows an action is in flight on the button that started it; the returned function restores it.
+function setButtonBusy(button, busyLabel) {
+  if (!button) return () => {};
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = busyLabel;
+  return () => {
+    button.disabled = false;
+    button.textContent = label;
+  };
+}
+
+// Briefly highlights the element an action changed so the result is visible where it happened.
+function flashElement(element) {
+  if (!element?.classList) return;
+  element.classList.remove("action-flash");
+  void element.offsetWidth;
+  element.classList.add("action-flash");
+  element.addEventListener("animationend", () => element.classList.remove("action-flash"), { once: true });
 }
 
 async function readJson(response) {

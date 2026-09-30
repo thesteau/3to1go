@@ -187,19 +187,56 @@ globalThis.addEventListener?.("unhandledrejection", (event) => {
   setActionStatus(message, "error");
   event.preventDefault();
 });
-// Content that replaces a loading placeholder fades in instead of snapping into place.
-// Routine refreshes of already-loaded content are left alone so polling never flickers.
+// New content fades in instead of snapping into place. Keyed items (directories, jobs, edges,
+// instances) that were already on screen are left alone when re-rendered, so polling never flickers.
 const LOADING_PLACEHOLDER = ".section-loading, .loading-placeholder";
-function fadeInLoadedContent(mutations) {
-  const faded = new Set();
+const FADE_KEY_ATTRS = ["data-path", "data-edge-id", "data-instance-id"];
+const FADE_KEYED = FADE_KEY_ATTRS.map((attr) => `[${attr}]`).join(", ");
+
+function fadeKey(element) {
+  const attr = FADE_KEY_ATTRS.find((name) => element.hasAttribute(name));
+  return `${element.classList[0] || element.tagName}|${attr}=${element.getAttribute(attr)}`;
+}
+
+function keyedElements(node) {
+  const nested = Array.from(node.querySelectorAll(FADE_KEYED));
+  return node.matches(FADE_KEYED) ? [node, ...nested] : nested;
+}
+
+function fadeInNewContent(mutations) {
+  const shownKeys = new Set();
+  const placeholderTargets = new Set();
   for (const { target, removedNodes } of mutations) {
-    if (faded.has(target) || !target.animate) continue;
-    const replacedPlaceholder = Array.from(removedNodes).some((node) => node.nodeType === 1 && node.matches(LOADING_PLACEHOLDER));
-    if (!replacedPlaceholder || target.querySelector(LOADING_PLACEHOLDER)) continue;
-    faded.add(target);
-    target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+    for (const node of removedNodes) {
+      if (node.nodeType !== 1) continue;
+      keyedElements(node).forEach((element) => shownKeys.add(fadeKey(element)));
+      if (node.matches(LOADING_PLACEHOLDER)) placeholderTargets.add(target);
+    }
+  }
+  const faded = [];
+  const fade = (element) => {
+    if (!element.animate || !element.isConnected || faded.some((done) => done.contains(element))) return;
+    faded.push(element);
+    element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+  };
+  // A section replacing its loading placeholder fades as a whole.
+  placeholderTargets.forEach((target) => {
+    if (!target.querySelector(LOADING_PLACEHOLDER)) fade(target);
+  });
+  for (const { addedNodes, removedNodes } of mutations) {
+    const replacedElements = Array.from(removedNodes).some((node) => node.nodeType === 1);
+    for (const node of addedNodes) {
+      if (node.nodeType !== 1 || node.matches(LOADING_PLACEHOLDER) || node.closest(".toast-region")) continue;
+      const keyed = keyedElements(node);
+      if (keyed.length) {
+        keyed.filter((element) => !shownKeys.has(fadeKey(element))).forEach(fade);
+      } else if (!replacedElements) {
+        // Unkeyed markup swapped for other markup is a refresh; only pure additions are new.
+        fade(node);
+      }
+    }
   }
 }
 if (globalThis.MutationObserver && globalThis.document?.body) {
-  new MutationObserver(fadeInLoadedContent).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(fadeInNewContent).observe(document.body, { childList: true, subtree: true });
 }
