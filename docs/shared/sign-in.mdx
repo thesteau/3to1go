@@ -1,0 +1,39 @@
+---
+title: "Sign-in and accounts"
+description: "How the first admin account is created in Central and Edge, and how session cookies work."
+---
+
+Central and Edge each have their **own** web UI and their own accounts. Signing in to one does not sign you in to the other.
+
+## The first admin account
+
+When an app starts with an empty database, it creates an `admin` user. Its password is:
+
+- the value of `INITIAL_ADMIN_PASSWORD` in that app's `.env`, if set, or
+- `admin`, if not.
+
+If you sign in with the default password `admin`, the app requires you to choose a new one before continuing.
+
+<Warning>
+  `INITIAL_ADMIN_PASSWORD` is only read when the first admin is created. Changing it later does **not** change an existing password. To recover a locked Central account, see [Reset the admin password](/central/reset-admin-password).
+</Warning>
+
+In Central, `POSTGRES_PASSWORD` is the database password, not your sign-in password.
+
+## Accounts are for one operator
+
+Sign-in exists so one operator can manage the app and keep everyone else out. It isn't designed as a multi-user permission system.
+
+## Session cookies over HTTPS
+
+If you serve an app over HTTPS (for example behind a reverse proxy), set this in its `.env` so the session cookie is only sent over secure connections:
+
+```sh .env
+SESSION_COOKIE_SECURE=true
+```
+
+Accepted "on" values are `1`, `true`, `yes`, and `on`. Anything else, or leaving it unset, keeps the cookie usable over plain HTTP.
+
+<Note>
+  Edge's settings dialog warns when Edge is served over plain HTTP, because the Edge credential then travels unencrypted. Use HTTPS for the Edge UI and for `CENTRAL_URL` when the network isn't trusted.
+</Note>

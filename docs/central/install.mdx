@@ -1,0 +1,84 @@
+---
+title: "Install Central"
+description: "Run Central and its PostgreSQL database with Docker Compose."
+---
+
+Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs PostgreSQL. The example deployment in the repository runs both.
+
+## Requirements
+
+- Docker with Compose
+- Enough disk for your snapshots (Central keeps full archives; see [retention](/central/snapshots#retention))
+- A port Edges can reach, `6555` by default
+
+## Set up
+
+<Steps>
+  <Step title="Get the example files">
+    ```sh
+    mkdir 3to1go-central && cd 3to1go-central
+    curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
+    curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+    ```
+
+    Or copy [`deploy-example/central/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/central) from GitHub.
+  </Step>
+  <Step title="Edit .env">
+    ```sh .env
+    # Host folder mounted into Central at /backups.
+    BACKUP_DIR=./data/backups
+    POSTGRES_DB=three_to_one_go
+    POSTGRES_USER=three_to_one_go
+    POSTGRES_PASSWORD=change-this-password
+    # Only used when Central creates the first admin user.
+    INITIAL_ADMIN_PASSWORD=admin
+    ```
+
+    Set a real `POSTGRES_PASSWORD`. Point `BACKUP_DIR` at wherever snapshots should live; see [Storage](/concepts/storage-and-3-2-1#where-central-can-store-snapshots).
+  </Step>
+  <Step title="Start it">
+    ```sh
+    docker compose up -d
+    ```
+
+    Central waits for PostgreSQL to be healthy before starting.
+  </Step>
+  <Step title="Sign in">
+    Open `http://<central-host>:6555/` and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
+  </Step>
+  <Step title="Connect your first Edge">
+    Click **Mint Edge Credential** and paste the result into Edge. See [Edge credentials](/central/edge-credentials).
+  </Step>
+</Steps>
+
+## What gets created
+
+The example Compose file keeps everything next to it:
+
+```text
+3to1go-central/
+├── docker-compose.yml
+├── .env
+├── config/          # issuer.key, trusted-certs/
+├── hook-scripts/    # scripts for Custom Scripts
+├── secrets/         # mounted at /run/secrets
+└── data/
+    ├── backups/     # snapshots (unless BACKUP_DIR points elsewhere)
+    ├── staging/     # uploads in progress
+    └── postgres/    # database files
+```
+
+<Warning>
+  Back up `config/` (it holds `issuer.key`) and `data/postgres/`. Losing the database loses snapshot metadata, users, and credential records; losing `issuer.key` invalidates every Edge credential.
+</Warning>
+
+## Update
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+## Build from source
+
+To build the image yourself, use the Compose file in [`central/`](https://github.com/thesteau/3to1go/tree/main/central) instead. It builds from the repository root so the shared code is included.

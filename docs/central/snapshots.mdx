@@ -1,0 +1,67 @@
+---
+title: "Snapshots"
+description: "Browse, download, and delete stored snapshots, and understand retention and integrity checks."
+---
+
+Central's main page, **Stored Snapshots**, lists every Edge, each of its instances, their jobs, and each job's snapshots. The newest snapshot of each job is tagged **latest**.
+
+## How snapshots are stored
+
+Each snapshot is one encrypted `tar.zst` file in Central's backup folder:
+
+```text
+/backups/<edge_id>/<edge_instance_id>/<job_name>/<job>__<timestamp>__<fingerprint>.tar.zst
+```
+
+The fingerprint in the filename identifies the snapshot. You can use it to [restore a specific snapshot](/edge/restore#restore-a-specific-snapshot) from Edge.
+
+## Download a snapshot
+
+Click **Download** on a snapshot. Because snapshots are encrypted by Edge, Central's UI asks for that Edge's **encryption key** the first time:
+
+<Steps>
+  <Step title="Copy the key from Edge">
+    In Edge's UI, find **Encryption Key** and click **Copy**. See [Encryption key](/edge/encryption-key).
+  </Step>
+  <Step title="Paste it into Central">
+    Paste it when Central prompts. Central checks it against the key fingerprint that Edge reported, so a wrong key is caught before decryption starts.
+  </Step>
+  <Step title="Save the file">
+    The snapshot is decrypted in your browser as it downloads, and saved as a regular `tar.zst` archive.
+  </Step>
+</Steps>
+
+The key is kept only in that browser tab's session storage, never sent to Central's server, and is cleared when the tab session ends.
+
+To extract the downloaded archive:
+
+```sh
+tar --zstd -xf photos__2026-09-30T02-00-00Z__abc123.tar.zst
+```
+
+<Tip>
+  To put files back on the original machine, [restore from Edge](/edge/restore) instead. It downloads, decrypts, and extracts for you.
+</Tip>
+
+## Delete a snapshot
+
+Click **Delete** on a snapshot and confirm. This permanently removes the file.
+
+## Retention
+
+After each upload, Central keeps the most recent **Keep Last Snapshots** (default `3`) for that job **and Edge instance**, and deletes older ones. Edge instances never prune each other's snapshots, even if they share an `EDGE_ID`.
+
+Change it in **Edit Central Settings**. See [Design decisions](/concepts/design-decisions#count-based-retention).
+
+## Integrity checks
+
+Central can re-check stored snapshots with SHA-256 to catch files that have been corrupted or changed on disk. Each check covers the **latest snapshot of every job**, not the full history, to stay lightweight.
+
+- **Run Now**: start a check from the integrity bar on the snapshots page.
+- **Scheduled**: set **Snapshot Integrity Check Interval** (hours) in **Edit Central Settings**. `0` turns scheduled checks off.
+
+<Note>
+  Central reads the check interval when it starts. After changing it, restart Central: `docker compose restart central`.
+</Note>
+
+The bar shows the result of the most recent check and when it ran.

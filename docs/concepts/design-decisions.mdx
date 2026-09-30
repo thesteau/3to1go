@@ -1,0 +1,40 @@
+---
+title: "Design decisions"
+description: "Deliberate choices in how 3to1go backs up, detects changes, keeps snapshots, and restores."
+---
+
+These behaviors are intentional. Knowing them up front avoids surprises.
+
+## Full snapshots
+
+Each backup is a complete `tar.zst` archive of the marked folder. There are no incremental backups, block-level deduplication, or delta chains. Every snapshot is self-contained and can be restored on its own.
+
+## Path-and-size fingerprinting
+
+Edge decides whether a new snapshot is needed from a fingerprint of the folder's **sorted file paths and sizes**. It does not hash file contents or look at modification times.
+
+This means an edit that keeps every file's path and size the same does **not** trigger an automatic backup.
+
+<Tip>
+  To capture that kind of edit, use **Force Upload** on the job in Edge. If the job has an older staged archive, use **Clear staged backup** first so Force Upload builds a fresh one.
+</Tip>
+
+## Count-based retention
+
+Central keeps the most recent **N** snapshots per job and Edge instance, where N is Central's **Keep Last Snapshots** setting (default `3`). There are no time-based or size-based limits, so you always know exactly how many snapshots can be recovered.
+
+## Restore replaces files
+
+Restoring a snapshot writes its files back into the job's folder and **overwrites** local copies of the same files. Files that aren't in the snapshot are left untouched. Edge shows a preview of how many files will be replaced and added before anything is written. See [Restore](/edge/restore).
+
+## Permissions
+
+Snapshots preserve regular files' permission bits, including executable and private-file permissions, and restore applies them where the operating system supports it. Ownership, ACLs, and special permission bits are not preserved. Older snapshots can't recover permissions they never recorded.
+
+## Edge skips its own runtime data
+
+On startup Edge marks its spool and state directories with a hidden `.3to1go-runtime` file. Those directories are excluded if Edge ends up backing itself up, even through another mount path. Edge's configuration and encryption key are still included.
+
+## One operator per app
+
+Each app's sign-in is meant for one operator, to keep unauthorized people out. It is not a multi-user or multi-tenant permission system.

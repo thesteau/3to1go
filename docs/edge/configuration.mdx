@@ -1,0 +1,78 @@
+---
+title: "Edge configuration"
+description: "Settings you change in Edge's UI, and the environment variables that override them."
+---
+
+Most Edge settings are changed in **Edit Edge Settings** and saved in Edge's local database. Many can also be set as environment variables in `.env`.
+
+<Warning>
+  An environment variable **overrides** the value saved in the UI every time Edge starts. If a setting keeps reverting, check whether it's also set in `.env`.
+</Warning>
+
+## Connection and identity
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Edge ID | `EDGE_ID` | `edge-01` | Name for this Edge in Central. Must be unique per installation. |
+| Central URL | `CENTRAL_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
+| Advertised Edge URL | none | empty | Optional URL for this Edge's UI that Edge reports to Central. Central can include it in [notifications](/central/notifications). |
+| Edge Credential | none | empty | Credential minted by Central. See [Edge credentials](/central/edge-credentials). |
+
+## Schedule and scanning
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Cron Schedule | none | `0 2 * * 0` | When backup cycles run, as a 5-field cron expression. The default is Sundays at 02:00. |
+| Max Depth | `MAX_DEPTH` | `10` | How many folder levels below the scan root Edge searches for `.upload_dir` markers. |
+| Pause uploads (skip backup cycles) | none | off | Temporarily skip scheduled cycles. |
+| Keep failed-upload archives for retry | `KEEP_LOCAL_PENDING` | on | Keep an archive that failed to upload so the next cycle retries it instead of rebuilding. |
+| none | `SCAN_ROOT` | `/scan` | Folder Edge scans. Leave at `/scan` in Docker. |
+
+The schedule can't run more often than every **5 minutes**.
+
+<Note>
+  The Docker image has no time zone data, so the cron schedule runs in **UTC**. `0 2 * * 0` means 02:00 UTC on Sundays.
+</Note>
+
+A few schedules:
+
+| Cron | Runs |
+|---|---|
+| `0 2 * * 0` | Weekly, Sunday 02:00 |
+| `0 3 * * *` | Daily, 03:00 |
+| `0 */6 * * *` | Every 6 hours |
+
+## Uploads
+
+These rarely need changing. They control how Edge talks to Central over slow or unreliable links.
+
+| UI setting | Environment variable | Default |
+|---|---|---|
+| Upload Chunk Size MB | `UPLOAD_CHUNK_SIZE_MB` | `8` |
+| Min Upload Chunk MB | `MIN_UPLOAD_CHUNK_SIZE_MB` | `1` |
+| Max Upload Chunk MB | `MAX_UPLOAD_CHUNK_SIZE_MB` | `16` |
+| Upload Retry Attempts | `UPLOAD_RETRY_MAX_ATTEMPTS` | `5` |
+| Retry Base Delay Seconds | `UPLOAD_RETRY_BASE_DELAY_SECONDS` | `5` |
+| Retry Max Delay Seconds | `UPLOAD_RETRY_MAX_DELAY_SECONDS` | `300` |
+| Connect Timeout Seconds | `UPLOAD_CONNECT_TIMEOUT_SECONDS` | `10` |
+| Read Timeout Padding Seconds | `UPLOAD_READ_TIMEOUT_PADDING_SECONDS` | `30` |
+| Min Throughput Bytes/Second | `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` (256 KiB/s) |
+| Circuit Breaker Failure Threshold | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` |
+| Circuit Breaker Cooldown Seconds | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` |
+
+After the circuit breaker's failure threshold is reached, Edge stops trying Central for the cooldown period instead of retrying endlessly.
+
+## Other
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Dark Mode | none | on | UI theme. |
+| Log Level | `LOG_LEVEL` | `INFO` | Container log verbosity. |
+| State Directory | `STATE_DIR` | `/data/state` | Per-job state. |
+| Spool Directory | `SPOOL_DIR` | `/data/spool` | Archives waiting to upload. |
+| none | `HTTP_HOST` | `0.0.0.0` in Docker | Address the UI listens on. |
+| none | `HTTP_PORT` | `6556` | UI port. If you change it, update the Compose `ports` mapping too. |
+| none | `INITIAL_ADMIN_PASSWORD` | `admin` | First admin's password. See [Sign-in](/shared/sign-in). |
+| none | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Edge over HTTPS. |
+
+**Trusted Certificates** are also managed in this dialog. See [Trusted certificates](/shared/trusted-certificates).

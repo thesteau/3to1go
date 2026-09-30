@@ -1,0 +1,53 @@
+---
+title: "Encryption key"
+description: "Find, back up, and rotate the key Edge uses to encrypt every snapshot."
+---
+
+Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central never has the key, so it only ever stores encrypted data.
+
+<Warning>
+  If you lose the key, that Edge's snapshots are **permanently unrecoverable**. Nobody, including Central, can decrypt them. Back it up now.
+</Warning>
+
+## Where it is
+
+- In the UI: **Encryption Key** on Edge's main page. It's masked; click **Copy** to copy it.
+- On disk: `config/encryption.key` next to Edge's `docker-compose.yml` (`/config/encryption.key` inside the container).
+
+Edge also shows a **fingerprint** of the key. Central uses the fingerprint to confirm you've pasted the right key before it decrypts a download. It isn't secret and can't be used to decrypt anything.
+
+## Back it up
+
+Store the copied key somewhere that survives losing this machine, such as a password manager. Better still, back up the whole `config` folder, which also holds the instance ID needed to [restore through Edge](/edge/restore#rebuilding-a-lost-machine).
+
+## When you need it
+
+- **Downloading from Central's UI.** Central asks for the key and decrypts the snapshot in your browser. See [Download a snapshot](/central/snapshots#download-a-snapshot).
+- **Restoring from Edge.** Edge uses its current key automatically. See [Restore](/edge/restore).
+
+## Rotate the key
+
+**Rotate** generates a new key for **future** backups. Snapshots already on Central stay encrypted with the old key.
+
+<Warning>
+  After rotating, older snapshots become hard to get back. Edge restores only use the new key. Central's UI checks every pasted key against the **latest** fingerprint Edge reported, and that switches to the new key on Edge's next upload. From then on Central rejects the old key, so its snapshots can't be downloaded from the UI either.
+</Warning>
+
+<Steps>
+  <Step title="Download anything you want to keep">
+    Before rotating, [download](/central/snapshots#download-a-snapshot) any older snapshots you may need from Central's UI while it still accepts the current key.
+  </Step>
+  <Step title="Copy the old key">
+    Click **Copy** and save the current key somewhere safe. The downloaded archives are already decrypted, but keep the key in case you need it later.
+  </Step>
+  <Step title="Rotate">
+    Click **Rotate** and confirm.
+  </Step>
+  <Step title="Save the new key">
+    Copy and store the new key.
+  </Step>
+</Steps>
+
+<Tip>
+  Rotation doesn't remove old snapshots from Central. Retention prunes them as new snapshots arrive, so they'll age out after **Keep Last Snapshots** new backups of each job.
+</Tip>

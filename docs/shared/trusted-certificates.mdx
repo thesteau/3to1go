@@ -1,0 +1,34 @@
+---
+title: "Trusted certificates"
+description: "Let Central and Edge verify internal HTTPS services signed by your own CA."
+---
+
+If Central, Edge, or your ntfy server use HTTPS certificates from a private CA (for example `https://ntfy.home`), add that CA so the apps trust it. This works the same way in both apps, and each app keeps its own list.
+
+## Upload from the UI
+
+<Steps>
+  <Step title="Open settings">
+    Open **Edit Central Settings** in Central, or **Edit Edge Settings** in Edge.
+  </Step>
+  <Step title="Add the certificate">
+    Under **Trusted Certificates**, upload your CA or root certificate as a PEM `.crt` file.
+  </Step>
+</Steps>
+
+The app saves it under `/config/trusted-certs`, installs it into the container's trust store immediately, and reinstalls it every time the container starts.
+
+## Add files directly
+
+For automated deployments, drop `.crt` files into the app's persisted config folder before starting it:
+
+```text
+3to1go-central/config/trusted-certs/home-ca.crt
+3to1go-edge/config/trusted-certs/home-ca.crt
+```
+
+This keeps your certificates out of the image while letting the apps verify private HTTPS endpoints.
+
+<Note>
+  Only CA or root certificates are needed, not each server's certificate. Files must end in `.crt`.
+</Note>

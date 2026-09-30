@@ -1,0 +1,103 @@
+---
+title: "Backup jobs"
+description: "Mark folders for backup with .upload_dir, set exclusions, and manage each job."
+---
+
+A **job** is a folder Edge backs up. Any folder under the scan root that contains a file named `.upload_dir` becomes a job. You can create the marker yourself, or let Edge's UI write it for you.
+
+## Create a job from the UI
+
+<Steps>
+  <Step title="Find the folder">
+    In **Directories Under Scan Root**, browse to the folder you want.
+  </Step>
+  <Step title="Open the Job Editor">
+    Click **Edit** on the folder's row to open the **Job Editor**. **Browse files** on the row lets you look inside first.
+  </Step>
+  <Step title="Set options and save">
+    Fill in the fields below and click **Save Job**. Edge writes the folder's `.upload_dir` for you.
+  </Step>
+</Steps>
+
+| Field | Default | Description |
+|---|---|---|
+| Job Name | Folder name | Name used on Central. Letters, digits, `.`, `_`, and `-` only. |
+| Exclude Patterns | none | One pattern per line. See [Exclusions](#exclusions). |
+| Include hidden files | on | Back up files and folders whose names start with `.`. |
+| Follow symlinks | off | Back up the targets of symbolic links instead of skipping them. |
+
+**Stop Backing Up** removes the marker. Existing snapshots on Central are kept.
+
+## Create a job with a file
+
+Create `.upload_dir` in the folder. An empty file uses the folder name as the job name:
+
+```sh
+touch /home/alice/photos/.upload_dir
+```
+
+Or write YAML to set options:
+
+```yaml .upload_dir
+job_name: photos
+include_hidden: true
+follow_symlinks: false
+exclude:
+  - "*.tmp"
+  - cache/
+  - /exports/old/
+```
+
+If the YAML is invalid or `job_name` has disallowed characters, Edge skips the job and shows the error on it.
+
+<Warning>
+  Job names must be **unique** across the whole Edge. Two folders both named `photos` need different `job_name` values, such as `main-photos` and `projects-photos`.
+</Warning>
+
+Once Edge finds a marker, it doesn't look for more markers inside that folder: a nested folder is already covered by its parent job.
+
+## Exclusions
+
+Patterns are matched against paths relative to the job folder, using `/` as the separator.
+
+| Pattern | Excludes |
+|---|---|
+| `*.tmp` | Any file or folder whose name matches, at any depth |
+| `cache/` | Every folder named `cache`, at any depth, and everything inside it |
+| `logs/*.log` | Paths matching the glob from the job root, such as `logs/app.log` |
+| `/exports/old/` | Exactly `exports/old` under the job folder, and everything inside it |
+| `/photos/image[1].jpg` | Exactly that file. Patterns starting with `/` are literal, so `[1]` is not treated as a glob. |
+
+### Exclude from the file browser
+
+On a job, click **Files & exclusions** to browse its files with their sizes.
+
+- **Exclude** on a file, or **Exclude folder** on a folder, adds a literal `/…` pattern to the job's `.upload_dir` immediately.
+- **Calculate folder size** totals a folder on demand. Totals are source sizes before compression, include excluded files, and skip symlinks and Edge's own runtime data.
+- To include something again, remove its pattern in the Job Editor.
+
+<Note>
+  Exclusions apply to the **next** archive. If the job already has a staged archive, click **Clear staged backup** so it's rebuilt with the new exclusions.
+</Note>
+
+## Job actions
+
+| Button | What it does |
+|---|---|
+| **Files & exclusions** | Browse the job's files and manage exclusions. |
+| **Force Upload** | Back up now, even if nothing changed. Central may report it as a duplicate. |
+| **Restore** | Restore a snapshot from Central into this folder. See [Restore](/edge/restore). |
+| **Edit** | Open the Job Editor. |
+| **Clear staged backup** | Shown when an archive is waiting to upload. Deletes it and resets retry state. Your files, backup history, and Central snapshots are kept. |
+
+**Cancel operation** at the top of the page stops the backup cycle or forced upload in progress, including compression and upload retries. Incomplete archives are discarded; a fully built archive stays staged for retry. Cancel before clearing a staged backup.
+
+## When a job is backed up
+
+On each scheduled cycle, Edge compares the job's file paths and sizes with its last backup. It only builds and uploads a new snapshot when they differ.
+
+To run a cycle for all jobs without waiting for the schedule, click **Run Backup Cycle Now**. It follows the same rule, so unchanged jobs are skipped.
+
+<Tip>
+  An edit that keeps a file's size the same isn't detected automatically. Use **Force Upload** to capture it. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
+</Tip>

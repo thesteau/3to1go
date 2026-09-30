@@ -1,0 +1,66 @@
+---
+title: "Introduction"
+description: "3to1go is a self-hosted backup ecosystem made of two apps: Edge and Central."
+---
+
+<img src="/images/3to1go.png" alt="Go gophers racing — 3, 2, 1, Go!" width="420" />
+
+3to1go is a simple, self-hosted backup system. It is one ecosystem made of **two separate apps** that you deploy independently:
+
+<CardGroup cols={2}>
+  <Card title="Edge" icon="laptop" href="/edge/overview">
+    Runs on each machine that has files you care about. Finds the folders you marked, packs and **encrypts** them, and uploads them to Central on a schedule.
+  </Card>
+  <Card title="Central" icon="server" href="/central/overview">
+    The always-on receiver. Stores encrypted snapshots on disk, keeps the most recent ones per job, and lets you browse and download them in a web UI.
+  </Card>
+</CardGroup>
+
+Run one Central, and one Edge on every machine you want to back up. Each app has its own container, web UI, sign-in, and settings.
+
+## The short version
+
+<Steps>
+  <Step title="Pick a machine to run Central">
+    A home server, NAS, or VPS that stays on.
+  </Step>
+  <Step title="Run Edge on each machine you want to back up">
+    Give each Edge a unique `EDGE_ID` and a credential minted by Central.
+  </Step>
+  <Step title="Mark folders with a .upload_dir file">
+    Any folder containing `.upload_dir` becomes a backup job.
+  </Step>
+  <Step title="Edge packs and encrypts those folders">
+    Snapshots are encrypted on Edge before they leave the machine.
+  </Step>
+  <Step title="Central stores the snapshots">
+    Browse, download, and verify them from Central's web UI, or restore them from Edge.
+  </Step>
+</Steps>
+
+## Why the name?
+
+The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage) (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown (3, 2, 1, Go!), and the "Go" is the [Go](https://go.dev/) language both apps are written in.
+
+## Why use 3to1go
+
+- **Simple Central/Edge model.** Central receives and organizes backups. Each Edge owns scanning, encryption, scheduling, and upload retries.
+- **Encrypted snapshots by default.** Edge encrypts archives before upload, so Central never needs access to your plaintext files.
+- **Instance-aware storage.** Central tracks both `edge_id` and `edge_instance_id`, so related machines can be grouped without mixing their snapshots or pruning each other.
+- **Operator-friendly credentials.** Central mints Edge credentials from its UI, and can revoke one without deleting any snapshots.
+- **No giant config file.** You mark folders with a small file instead of writing a central backup manifest.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run Central and Edge with Docker and take your first backup.
+  </Card>
+  <Card title="How it works" icon="diagram-project" href="/concepts/how-it-works">
+    Follow a folder from marker to stored snapshot.
+  </Card>
+</CardGroup>
+
+<Note>
+  3to1go is open source under the MIT License. Source, issues, and example deployments are on [GitHub](https://github.com/thesteau/3to1go).
+</Note>
