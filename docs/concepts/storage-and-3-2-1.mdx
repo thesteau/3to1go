@@ -1,0 +1,41 @@
+---
+title: "Storage and the 3-2-1 rule"
+description: "Which copies 3to1go covers, and where Central can keep your snapshots."
+---
+
+The [3-2-1 rule](https://en.wikipedia.org/wiki/Backup#Storage) says to keep **3** copies of your data, on **2** different media, with **1** offsite. 3to1go covers the first two copies. The third is up to you, and it may already be covered depending on where Central runs.
+
+| Copy | What | Covered by |
+|------|------|------------|
+| 1: live data | The original files on your machine | Edge |
+| 2: second copy, different media | Encrypted snapshots on a separate machine | **3to1go: Edge → Central** |
+| 3: offsite | A copy that survives a local disaster | Your choice (see below) |
+
+## Getting the offsite copy
+
+Central is always your own infrastructure, so it only counts as offsite if it runs somewhere genuinely separate.
+
+<CardGroup cols={2}>
+  <Card title="Central is already offsite" icon="globe">
+    Run Central on a VPS, at a family member's place, or on any host physically separate from your Edge machines. Edge → Central already gives you the offsite copy.
+  </Card>
+  <Card title="Central is local" icon="house">
+    Run Central on a home NAS or server for fast access, then sync Central's backup folder somewhere else for the offsite copy.
+  </Card>
+</CardGroup>
+
+Because Central only holds encrypted archives, you can run it on hardware you don't fully control, and push its data to any storage without exposing your files.
+
+## Where Central can store snapshots
+
+Central writes plain files into its backup folder (`/backups` inside the container, set by `BACKUP_DIR` in Compose). It doesn't care what is behind that folder, so you can point it at any mounted filesystem:
+
+- **Local disk.** The default. Fast and simple.
+- **Mounted NAS.** Works out of the box. Central handles moves across filesystems when the backup folder is on a different device from its temp directory.
+- **Removable hard drive.** Mount it and point `BACKUP_DIR` at it.
+- **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The desktop client replicates it to the cloud, and the provider only ever sees encrypted archives.
+- **S3, Backblaze B2, or other object storage.** Mount the bucket as a local filesystem first (for example with `rclone mount`) and point `BACKUP_DIR` at the mount. Or keep snapshots on local disk and run `rclone sync` or `aws s3 sync` on a schedule.
+
+<Note>
+  Central is not a sync engine. It just writes files, so any tool that can replicate a directory can handle the rest.
+</Note>

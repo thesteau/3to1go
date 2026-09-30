@@ -1,0 +1,87 @@
+---
+title: "Quickstart"
+description: "Run Central and Edge with Docker and take your first backup."
+---
+
+This guide uses the published Docker images and the example Compose files from the repository. You need [Docker](https://docs.docker.com/get-docker/) with Compose on each machine.
+
+<Tip>
+  You can run both apps on the same machine to try things out. In real use, Central usually runs on a separate, always-on host.
+</Tip>
+
+## 1. Start Central
+
+On the machine that will store backups:
+
+```sh
+mkdir 3to1go-central && cd 3to1go-central
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
+curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+```
+
+Edit `.env` and set a real `POSTGRES_PASSWORD` (and optionally `INITIAL_ADMIN_PASSWORD`), then start it:
+
+```sh
+docker compose up -d
+```
+
+Open **http://localhost:6555/** and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
+
+## 2. Mint an Edge credential
+
+In Central's UI, mint a new Edge credential and copy it. You'll paste it into Edge in the next step. See [Edge credentials](/central/edge-credentials).
+
+## 3. Start Edge
+
+On the machine that has the files:
+
+```sh
+mkdir 3to1go-edge && cd 3to1go-edge
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
+curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+```
+
+Edit `.env`:
+
+```sh .env
+EDGE_ID=laptop-alice                          # unique per Edge installation
+CENTRAL_URL=http://central.example.lan:6555   # must be reachable from the Edge container
+SCAN_DIR=/home/alice                          # folder on this machine that Edge can see
+```
+
+If Central runs on the same Docker Desktop host, `CENTRAL_URL` is usually `http://host.docker.internal:6555`.
+
+```sh
+docker compose up -d
+```
+
+Open **http://localhost:6556/**, sign in, and paste the credential from step 2 into Edge's settings.
+
+## 4. Mark a folder for backup
+
+Create a file named `.upload_dir` in the folder you want backed up. An empty file works; Edge uses the folder name as the job name:
+
+```sh
+touch /home/alice/photos/.upload_dir
+```
+
+Or click **Edit** on the folder in Edge's folder browser and save it as a job, which writes the marker for you. See [Backup jobs](/edge/backup-jobs).
+
+## 5. Run the first backup
+
+Edge backs up on its schedule (weekly by default). To back up now, click **Run Backup Cycle Now** in Edge's UI. When it finishes, the snapshot appears in Central's UI.
+
+<Warning>
+  Back up Edge's `encryption.key` right away. Without it, that Edge's snapshots cannot be decrypted. See [Encryption key](/edge/encryption-key).
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Back up several folders or drives" icon="hard-drive" href="/edge/multiple-folders">
+    Mount more than one folder into Edge.
+  </Card>
+  <Card title="Restore files" icon="clock-rotate-left" href="/edge/restore">
+    Bring a snapshot back onto the Edge machine.
+  </Card>
+</CardGroup>

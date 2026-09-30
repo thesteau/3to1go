@@ -1,0 +1,75 @@
+---
+title: "Central hooks"
+description: "Run your own commands before and after Central stores an upload."
+---
+
+Hooks let Central run a shell command at two points while storing an upload:
+
+- **Pre command**: after an upload has arrived and passed its checksum, before Central stores it. Central waits for it to finish.
+- **Post command**: after Central has stored it (or failed to).
+
+Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
+
+## Set up
+
+<Steps>
+  <Step title="Open Custom Scripts">
+    In Central, click **Custom Scripts**.
+  </Step>
+  <Step title="Upload a script (optional)">
+    Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable, and Windows line endings are converted.
+  </Step>
+  <Step title="Set the commands">
+    Enter a **Pre Command** and/or **Post Command**. Either:
+    - the name of an uploaded script, such as `after-upload.sh`, or
+    - any shell command, such as `curl -fsS https://hc-ping.com/your-id`.
+  </Step>
+</Steps>
+
+Commands run with `sh -c` inside the Central container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Output and non-zero exit codes are written to Central's logs; a failing hook doesn't stop the upload.
+
+## Environment variables
+
+Every hook gets these variables:
+
+| Variable | Value |
+|---|---|
+| `THREETOONEGO_APP` | `central` |
+| `THREETOONEGO_HOOK_PHASE` | `pre` or `post` |
+| `THREETOONEGO_HOOK_SCRIPTS_DIR` | The hook scripts folder |
+| `THREETOONEGO_EDGE_ID` | Sending Edge's ID |
+| `THREETOONEGO_EDGE_INSTANCE_ID` | Sending Edge's instance ID |
+| `THREETOONEGO_JOB_NAME` | Backup job name |
+| `THREETOONEGO_UPLOAD_ID` | Upload session ID |
+| `THREETOONEGO_NAMESPACE` | Storage path, `edge_id/instance_id/job_name` |
+| `THREETOONEGO_FILENAME` | Uploaded filename |
+| `THREETOONEGO_FINGERPRINT` | Snapshot fingerprint |
+| `THREETOONEGO_TIMESTAMP` | Snapshot timestamp |
+| `THREETOONEGO_ARCHIVE_SHA256` | SHA-256 of the encrypted archive |
+| `THREETOONEGO_ARCHIVE_SIZE_BYTES` | Archive size |
+| `THREETOONEGO_SOURCE_ADDRESS` | IP the upload came from |
+| `THREETOONEGO_ADVERTISED_URL` | URL the Edge advertises, if set |
+| `THREETOONEGO_STAGED_PATH` | Where the upload is staged before storing |
+
+The **post** command also gets:
+
+| Variable | Value |
+|---|---|
+| `THREETOONEGO_STATUS` | `ok` or `error` |
+| `THREETOONEGO_STORED_AS` | Final stored filename |
+| `THREETOONEGO_PRUNED` | Number of old snapshots removed by retention |
+| `THREETOONEGO_DUPLICATE` | `true` if Central already had this snapshot |
+
+## Example: log each stored snapshot
+
+```sh after-upload.sh
+#!/bin/sh
+[ "$THREETOONEGO_STATUS" = "ok" ] || exit 0
+echo "stored $THREETOONEGO_NAMESPACE/$THREETOONEGO_STORED_AS"
+```
+
+Set **Post Command** to `after-upload.sh`.
+
+<Note>
+  The Central image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included; run those on the host or in another container that reads the same backup folder.
+</Note>

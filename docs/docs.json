@@ -1,0 +1,100 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "3to1go",
+  "description": "Self-hosted, encrypted backups: Edge backs up your machines, Central stores the snapshots.",
+  "colors": {
+    "primary": "#c73346",
+    "light": "#e05263",
+    "dark": "#c73346"
+  },
+  "logo": {
+    "light": "/images/3to1go.png",
+    "dark": "/images/3to1go.png"
+  },
+  "favicon": "/images/favicon.png",
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "https://buymeacoffee.com/thesteau"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/thesteau/3to1go"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "icon": "house",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["index", "quickstart"]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/how-it-works",
+              "concepts/storage-and-3-2-1",
+              "concepts/design-decisions"
+            ]
+          },
+          {
+            "group": "Both apps",
+            "pages": ["shared/sign-in", "shared/trusted-certificates"]
+          }
+        ]
+      },
+      {
+        "tab": "Central",
+        "icon": "server",
+        "groups": [
+          {
+            "group": "Central",
+            "pages": ["central/overview", "central/install", "central/configuration"]
+          },
+          {
+            "group": "Using Central",
+            "pages": [
+              "central/edge-credentials",
+              "central/snapshots",
+              "central/notifications",
+              "central/hooks",
+              "central/reset-admin-password"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Edge",
+        "icon": "laptop",
+        "groups": [
+          {
+            "group": "Edge",
+            "pages": ["edge/overview", "edge/install", "edge/configuration"]
+          },
+          {
+            "group": "Using Edge",
+            "pages": [
+              "edge/backup-jobs",
+              "edge/multiple-folders",
+              "edge/restore",
+              "edge/encryption-key",
+              "edge/notifications",
+              "edge/hooks"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/thesteau/3to1go"
+    }
+  }
+}
