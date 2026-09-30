@@ -366,9 +366,17 @@ New snapshots preserve regular files' permission bits, including executable and 
 ### Developing Both Apps Together
 
 The repository uses three Go modules joined by [`go.work`](go.work): `central`,
-`edge`, and the small [`shared/`](shared/) protocol module. The shared module
-contains only Edge↔Central wire types and constants; the applications remain
-independently deployable.
+`edge`, and [`shared/go`](shared/go/). Code both apps use lives under
+[`shared/`](shared/):
+
+- [`shared/go`](shared/go/) - the Edge↔Central wire protocol, plus common
+  authentication, HTTP helpers, trusted certificates, hooks, ntfy templates,
+  locks, config helpers, and web UI serving.
+- [`shared/ts`](shared/ts/) - browser scripts and types compiled into both web
+  UIs, such as sign-in, users, hooks, certificates, notifications, and dialogs.
+
+Behavior specific to one app stays in `central/` or `edge/`, and the
+applications remain independently deployable.
 
 From the repository root, run `go test ./shared/go/... ./central/... ./edge/...`.
 The app directories also remain valid working directories for the same commands
