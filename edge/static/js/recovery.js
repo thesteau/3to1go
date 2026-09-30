@@ -59,6 +59,8 @@ function renderRecoverPreview(body) {
   search.addEventListener("input", () => {
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => {
+      // A newer preview replaces this search box; a stale filter must not overwrite its list.
+      if (!search.isConnected) return;
       filter.query = search.value.trim().toLowerCase();
       renderRecoverPreviewList(entries, filter);
     }, RECOVER_PREVIEW_SEARCH_DELAY_MS);
