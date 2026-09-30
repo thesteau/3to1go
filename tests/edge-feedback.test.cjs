@@ -123,3 +123,35 @@ test('restore preview caps rendered folders and summarizes the rest', () => {
   assert.equal((list.innerHTML.match(/class="recover-preview-group"/g) || []).length, 150);
   assert.match(list.innerHTML, /2850 more folders with 2850 files · 2\.8 KB not listed/);
 });
+
+test('a pending search from an old restore preview does not overwrite a newer one', () => {
+  const timers = [];
+  let search = null;
+  let list = null;
+  // Each preview render replaces the search box and list, as innerHTML does in the browser.
+  const preview = {
+    hidden: true, querySelectorAll: () => [],
+    set innerHTML(_) {
+      if (search) search.isConnected = false;
+      const listeners = {};
+      search = { value: '', isConnected: true, addEventListener: (type, fn) => { listeners[type] = fn; }, fire: type => listeners[type]() };
+      list = { innerHTML: '' };
+    },
+  };
+  const ctx = vm.createContext({
+    window: { setTimeout: fn => timers.push(fn), clearTimeout() {} },
+    document: { getElementById: id => ({ 'recover-preview': preview, 'recover-preview-search': search, 'recover-preview-list': list })[id] || null },
+  });
+  load(ctx, 'utils.js');
+  load(ctx, 'recovery.js');
+  ctx.renderRecoverPreview({ snapshot_filename: 'A', entries: [{ path: 'a-only.txt', size: 1, action: 'replace' }] });
+  const staleSearch = search;
+  staleSearch.value = 'a-only';
+  staleSearch.fire('input');
+  ctx.renderRecoverPreview({ snapshot_filename: 'B', entries: [{ path: 'b-only.txt', size: 1, action: 'add' }] });
+  const newerList = list.innerHTML;
+  timers.forEach(fn => fn());
+  assert.equal(list.innerHTML, newerList);
+  assert.match(list.innerHTML, /b-only\.txt/);
+  assert.doesNotMatch(list.innerHTML, /a-only\.txt/);
+});
