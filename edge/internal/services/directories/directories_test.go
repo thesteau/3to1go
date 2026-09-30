@@ -173,6 +173,33 @@ func TestListDirectories_ChildBlockedByParentWithMarker(t *testing.T) {
 	}
 }
 
+func TestListDirectories_ReportsFoldersExcludedByParentJob(t *testing.T) {
+	root := t.TempDir()
+	parentDir := filepath.Join(root, "parent")
+	os.MkdirAll(filepath.Join(parentDir, "skip", "deeper"), fs.ModePerm)
+	os.MkdirAll(filepath.Join(parentDir, "keep"), fs.ModePerm)
+	writeMarker(t, parentDir, map[string]any{"job_name": "parent"})
+
+	svc, _ := newDirService(t, root)
+	if err := svc.ExcludePath("parent/skip"); err != nil {
+		t.Fatalf("ExcludePath: %v", err)
+	}
+	entries, err := svc.ListDirectories()
+	if err != nil {
+		t.Fatalf("ListDirectories: %v", err)
+	}
+	excluded := map[string]bool{}
+	for _, entry := range entries {
+		excluded[entry.RelativePath] = entry.Excluded
+	}
+	want := map[string]bool{"parent": false, "parent/keep": false, "parent/skip": true, "parent/skip/deeper": true}
+	for path, expected := range want {
+		if excluded[path] != expected {
+			t.Errorf("%s excluded = %v, want %v", path, excluded[path], expected)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // SaveJob
 // ---------------------------------------------------------------------------

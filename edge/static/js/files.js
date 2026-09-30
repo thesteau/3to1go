@@ -1,5 +1,7 @@
 let fileBrowserPath = ".";
 let fileBrowserRequest = 0;
+// Rows of the folder on screen, so an exclusion can update its row in place.
+let fileBrowserRows = new Map();
 
 async function cancelOperation(btn) {
   btn.disabled = true;
@@ -39,6 +41,7 @@ async function browseFiles(path) {
   size.onclick = () => calculateFolderSize(path, size);
   const list = document.getElementById("files-list");
   list.replaceChildren();
+  fileBrowserRows = new Map();
   setStatus("files-status", "Loading files…", "info");
   try {
     const response = await fetch(`/api/directories/browse?relative_path=${encodeURIComponent(path)}`);
@@ -78,11 +81,12 @@ async function browseFiles(path) {
       } else {
         sizeCell.textContent = "—";
       }
-      cell(entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"));
+      const reason = cell(entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"));
       const actions = cell();
       if (entry.job_path && !entry.excluded && currentUser?.is_admin) {
         button(actions, "Exclude", (btn) => excludeFilePath(entry.relative_path, btn));
       }
+      fileBrowserRows.set(entry.relative_path, { row, reason, actions });
       list.appendChild(row);
     }
     setStatus("files-status", body.entries.length ? `${body.entries.length} items` : "This folder is empty.", "info");
@@ -108,8 +112,13 @@ async function calculateFolderSize(path, btn) {
   }
 }
 
+function directoryTreeItem(path) {
+  return Array.from(document.querySelectorAll?.("#directory-tree [data-path]") || [])
+    .find((element) => element.dataset.path === path);
+}
+
 async function excludeFilePath(path, btn) {
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Excluding…");
   try {
     const response = await fetch("/api/directories/exclude", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -117,13 +126,20 @@ async function excludeFilePath(path, btn) {
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.detail || "Exclusion failed.");
+    setActionStatus(`Excluded ${path}. The next backup of its parent job skips it.`, "success");
+    const fileRow = fileBrowserRows.get(path);
+    if (fileRow) {
+      fileRow.reason.textContent = "Excluded by job settings";
+      fileRow.actions.replaceChildren();
+      flashElement(fileRow.row);
+    }
     await loadData({ silent: true, refreshDirectoryTree: true });
-    if (document.getElementById("files-dialog").open) await browseFiles(fileBrowserPath);
-    setActionStatus(`Excluded ${path} from its parent backup job.`, "success");
+    // The tree re-renders on the next frame; highlight the fresh element, not the replaced one.
+    globalThis.requestAnimationFrame?.(() => flashElement(directoryTreeItem(path)));
   } catch (error) {
     setActionStatus(error.message, "error");
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }
 
@@ -145,7 +161,7 @@ async function clearStagedBackup(path, btn) {
     message: `Discard the local staged backup for ${path} and reset its retry state? Source files and backups stored in Central are kept. The next backup can build a fresh archive.`,
     confirmLabel: "Clear staged backup", danger: true,
   })) return;
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Clearing…");
   try {
     const response = await fetch("/api/directories/clear-staged", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -153,11 +169,13 @@ async function clearStagedBackup(path, btn) {
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.detail || "Could not clear staged backup.");
+    setActionStatus(`Cleared the staged backup for ${path}. The next backup builds a fresh archive.`, "success");
     await loadData({ silent: true, refreshDirectoryTree: true });
-    setActionStatus(`Cleared staged backup for ${path}.`, "success");
+    flashElement(Array.from(document.querySelectorAll?.("#selected-jobs .job-card") || [])
+      .find((card) => card.dataset.path === path));
   } catch (error) {
     setActionStatus(error.message, "error");
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }

@@ -38,6 +38,7 @@ type DirectoryEntry struct {
 	AbsolutePath    string         `json:"absolute_path"`
 	Selected        bool           `json:"selected"`
 	BlockedByParent any            `json:"blocked_by_parent"`
+	Excluded        bool           `json:"excluded"`
 	Config          any            `json:"config"`
 	ConfigError     any            `json:"config_error"`
 	State           state.JobState `json:"state"`
@@ -52,8 +53,9 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 
 	var entries []DirectoryEntry
 
-	var walk func(dir string, depth int, blockedBy any)
-	walk = func(dir string, depth int, blockedBy any) {
+	// owner is the nearest selected ancestor's job, used to report parent-job exclusions.
+	var walk func(dir string, depth int, blockedBy any, owner *backup.JobDefinition)
+	walk = func(dir string, depth int, blockedBy any, owner *backup.JobDefinition) {
 		if depth > d.settings.MaxDepth {
 			return
 		}
@@ -72,14 +74,23 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 			selected = true
 		}
 
+		excluded := false
+		if owner != nil {
+			if jobRel, err := filepath.Rel(owner.RootPath, dir); err == nil {
+				excluded = backup.ExcludedByJob(owner, filepath.ToSlash(jobRel))
+			}
+		}
+
 		var cfg any
 		var cfgErr any
+		childOwner := owner
 		if selected {
 			payload, err := backup.ReadUploadDirPayload(markerPath)
 			if err == nil {
 				job, err := backup.BuildJobDefinition(dir, payload)
 				if err == nil {
 					cfg = backup.JobDefinitionToPayload(job)
+					childOwner = job
 				} else {
 					cfgErr = err.Error()
 				}
@@ -94,6 +105,7 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 			AbsolutePath:    dir,
 			Selected:        selected,
 			BlockedByParent: blockedBy,
+			Excluded:        excluded,
 			Config:          cfg,
 			ConfigError:     cfgErr,
 			State:           s,
@@ -110,11 +122,11 @@ func (d *DirectoryService) ListDirectories() ([]DirectoryEntry, error) {
 			childBlocked = relPath
 		}
 		for _, child := range children {
-			walk(child, depth+1, childBlocked)
+			walk(child, depth+1, childBlocked, childOwner)
 		}
 	}
 
-	walk(scanRoot, 0, nil)
+	walk(scanRoot, 0, nil, nil)
 	return entries, nil
 }
 

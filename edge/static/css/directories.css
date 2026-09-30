@@ -77,6 +77,12 @@
   font-size: 0.8rem;
 }
 
+.dir-excluded > .dir-row .dir-name,
+.dir-excluded > .dir-summary .dir-name {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
 .dir-state {
   font-size: 0.88rem;
 }

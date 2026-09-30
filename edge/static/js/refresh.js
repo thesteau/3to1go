@@ -1,5 +1,6 @@
 let latestData = null;
 let isLoadingData = false;
+let _loadDataInFlight = null;
 let _edgeRefreshTimer = null;
 let _edgeAutoRefreshStarted = false;
 let _edgeRefreshBurstRemaining = 0;
@@ -46,13 +47,18 @@ function requestEdgeActiveRefreshBurst(count = EDGE_ACTIVE_REFRESH_BURST_COUNT) 
   scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS, { force: true });
 }
 
-async function loadData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
+async function loadData(options = {}) {
   if (isLoadingData) {
-    scheduleEdgeRefresh(EDGE_ACTIVE_REFRESH_MS);
-    return;
+    // An action refreshing after a change needs data fetched after that change, not the poll in flight.
+    await _loadDataInFlight;
+    return loadData(options);
   }
   isLoadingData = true;
+  _loadDataInFlight = fetchEdgeData(options);
+  return _loadDataInFlight;
+}
 
+async function fetchEdgeData({ silent = false, includeKey = true, refreshDirectoryTree = !silent } = {}) {
   if (!latestData?.directories) {
     const spinner = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
     setHtmlIfChanged("selected-jobs", spinner);

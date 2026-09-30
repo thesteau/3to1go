@@ -20,6 +20,7 @@ async function loadStorageOverview() {
 }
 
 let _overviewLoading = false;
+let _overviewInFlight = null;
 let _knownSnapshotKeys = null;
 const CENTRAL_REFRESH_MS = 15000;
 
@@ -46,7 +47,7 @@ function formatDate(d) {
 }
 
 async function manualRefresh() {
-  if (await loadOverview({ force: true, notifyNewSnapshots: true })) {
+  if (await loadOverview({ notifyNewSnapshots: true })) {
     setActionStatus("Refreshed.", "success");
   }
 }
@@ -55,7 +56,7 @@ async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) 
   const basePath = edgeInstanceId
     ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
     : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Downloading…");
   try {
     const res = await fetch(basePath);
     if (!res.ok) {
@@ -92,7 +93,7 @@ async function downloadSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) 
       );
     }
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }
 
@@ -104,7 +105,7 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
     danger: true,
   })) return;
 
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Deleting…");
   try {
     const url = edgeInstanceId
       ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
@@ -119,10 +120,10 @@ async function deleteSnapshot(edgeId, edgeInstanceId, jobName, filename, btn) {
       setActionStatus("Delete failed.", "error");
       return;
     }
-    btn.closest(".snapshot-row")?.remove();
     setActionStatus(`Deleted snapshot ${filename}.`, "success");
+    fadeOutAndRemove(btn.closest(".snapshot-row"));
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }
 
@@ -234,7 +235,7 @@ async function revokeInstanceCredential(edgeId, edgeInstanceId, btn) {
   })) {
     return;
   }
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Revoking…");
   try {
     const response = await fetch(`/api/credentials/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`, {
       method: "DELETE",
@@ -250,7 +251,7 @@ async function revokeInstanceCredential(edgeId, edgeInstanceId, btn) {
   } catch (error) {
     setActionStatus(error.message || "Revoke failed.", "error");
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }
 
@@ -264,7 +265,7 @@ async function deleteInstance(edgeId, edgeInstanceId, btn) {
   })) {
     return;
   }
-  btn.disabled = true;
+  const restore = setButtonBusy(btn, "Deleting…");
   const baseUrl = `/api/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`;
   try {
     const res = await fetch(baseUrl, { method: "DELETE" });
@@ -300,7 +301,7 @@ async function deleteInstance(edgeId, edgeInstanceId, btn) {
   } catch (error) {
     setActionStatus(error.message || "Delete failed.", "error");
   } finally {
-    btn.disabled = false;
+    restore();
   }
 }
 
@@ -412,11 +413,18 @@ function updateOverviewDom(container, html) {
   }
 }
 
-async function loadOverview({ silent = false, force = false, notifyNewSnapshots = false } = {}) {
+async function loadOverview(options = {}) {
   if (_overviewLoading) {
-    return false;
+    if (!options.force) return false;
+    // A refresh after a change needs data fetched after that change, not the poll in flight.
+    await _overviewInFlight;
+    return loadOverview(options);
   }
+  _overviewInFlight = fetchOverview(options);
+  return _overviewInFlight;
+}
 
+async function fetchOverview({ silent = false, notifyNewSnapshots = false } = {}) {
   _overviewLoading = true;
   loadStorageOverview();
   if (!silent && !document.getElementById("namespaces").children.length) {
