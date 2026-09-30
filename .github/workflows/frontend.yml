@@ -17,6 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Reject committed JavaScript
+        shell: bash
+        run: |
+          files=$(git ls-files -- '*.js' '*.mjs' '*.cjs' '*.jsx' '*.js.map' '*.mjs.map' '*.cjs.map')
+          if [ -n "$files" ]; then
+            echo "JavaScript must be generated, not committed:"
+            printf '%s\n' "$files"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -29,4 +39,4 @@ jobs:
         run: npm run build
 
       - name: Run UI tests
-        run: node --test tests/*.cjs
+        run: node --test tests/*.cts

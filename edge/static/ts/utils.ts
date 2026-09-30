@@ -19,6 +19,11 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
+// Encode a string for JavaScript inside an HTML event attribute.
+function inlineString(value: string): string {
+  return escapeHtml(JSON.stringify(value));
+}
+
 function formatMessage(value: unknown, fallback = ""): string {
   if (value === undefined || value === null || value === "") {
     return fallback;

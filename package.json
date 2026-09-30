@@ -6,7 +6,7 @@
     "build": "tsc -p central/static && tsc -p edge/static",
     "watch": "tsc -p central/static --watch --preserveWatchOutput",
     "watch:edge": "tsc -p edge/static --watch --preserveWatchOutput",
-    "test": "npm run build && node --test tests/*.cjs"
+    "test": "npm run build && node --test tests/*.cts"
   },
   "devDependencies": {
     "typescript": "7.0.2"

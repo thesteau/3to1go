@@ -11,8 +11,8 @@ const key = Buffer.from(Array.from({ length: 32 }, (_, i) => i));
 const keyB64 = key.toString('base64url');
 const plaintext = Buffer.from(Array.from({ length: (1 << 16) + 1000 }, (_, i) => (i * 31 + 7) & 0xff));
 
-function cryptoContext() {
-  const ctx = vm.createContext({ crypto: globalThis.crypto, atob, Blob });
+function cryptoContext(crypto = globalThis.crypto) {
+  const ctx = vm.createContext({ crypto, atob, Blob });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../central/static/js/crypto.js'), 'utf8'), ctx);
   return ctx;
 }
@@ -24,6 +24,23 @@ test('Central decrypts snapshots Edge encrypts with minio/sio DARE 2.0', async (
   assert.equal(ctx.isEncrypted(arrayBuffer(fixture)), true);
   const blob = await ctx.decryptBuffer(arrayBuffer(fixture), keyB64);
   assert.deepEqual(Buffer.from(await blob.arrayBuffer()), plaintext);
+});
+
+test('Central bounds decryption work instead of queuing the entire archive', async () => {
+  let active = 0;
+  let peak = 0;
+  const subtle = globalThis.crypto.subtle;
+  const ctx = cryptoContext({ subtle: {
+    importKey: (...args) => subtle.importKey(...args),
+    async decrypt(...args) {
+      peak = Math.max(peak, ++active);
+      try { return await subtle.decrypt(...args); }
+      finally { active--; }
+    },
+  } });
+  const blob = await ctx.decryptBuffer(arrayBuffer(fixture), keyB64);
+  assert.deepEqual(Buffer.from(await blob.arrayBuffer()), plaintext);
+  assert.equal(peak, 1);
 });
 
 test('Central rejects tampered, truncated or extended DARE snapshots', async () => {

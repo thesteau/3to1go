@@ -49,7 +49,7 @@ async function fingerprintKey(keyB64: string): Promise<string> {
 // final flag set only on the last one), and a stream without a final package is rejected as truncated.
 async function decryptDare(buffer: ArrayBuffer, key: CryptoKey): Promise<Blob> {
   const bytes = new Uint8Array(buffer);
-  const packages: { nonce: Uint8Array<ArrayBuffer>; header: Uint8Array<ArrayBuffer>; ciphertext: Uint8Array<ArrayBuffer> }[] = [];
+  const plaintext: ArrayBuffer[] = [];
   let firstNonce: Uint8Array<ArrayBuffer> | null = null;
   let offset = 0;
   for (let sequence = 0; ; sequence += 1) {
@@ -71,14 +71,16 @@ async function decryptDare(buffer: ArrayBuffer, key: CryptoKey): Promise<Blob> {
     const nonce = headerNonce.slice();
     const view = new DataView(nonce.buffer);
     view.setUint32(8, (view.getUint32(8, true) ^ sequence) >>> 0, true);
-    packages.push({ nonce, header: header.slice(0, 4), ciphertext: bytes.subarray(offset + DARE_HEADER_LEN, end) });
+    // Keep only one WebCrypto operation in flight, even for multi-gigabyte archives.
+    plaintext.push(await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: header.subarray(0, 4) },
+      key, bytes.subarray(offset + DARE_HEADER_LEN, end),
+    ));
     offset = end;
     if (final) break;
   }
   if (offset !== bytes.length) throw new Error("Encrypted snapshot has data after its final package.");
 
-  const plaintext = await Promise.all(packages.map(({ nonce, header, ciphertext }) =>
-    crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: header }, key, ciphertext)));
   return new Blob(plaintext);
 }
 

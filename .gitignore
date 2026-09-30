@@ -18,6 +18,14 @@ certs/
 .auth_token
 relay_auth_token
 node_modules/
+# JavaScript is build output only; source and tests belong in TypeScript.
+*.js
+*.mjs
+*.cjs
+*.jsx
+*.js.map
+*.mjs.map
+*.cjs.map
 # Compiled from */static/ts by `npm run build`.
 central/static/js/
 edge/static/js/

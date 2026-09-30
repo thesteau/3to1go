@@ -47,6 +47,7 @@ test('Central renders snapshots while storage probes remain pending', async () =
   });
   load(ctx, 'central/static/js/utils.js');
   load(ctx, 'central/static/js/keys.js');
+  load(ctx, 'central/static/js/verification.js');
   load(ctx, 'central/static/js/overview.js');
   ctx.updateOverviewDom = () => { rendered = true; };
   ctx.loadVerifyStatus = () => {};
@@ -68,7 +69,9 @@ for (const app of ['edge', 'central']) {
       fetch: async () => { fetches++; throw new Error('Unexpected request'); },
     });
     load(ctx, `${app}/static/js/ui.js`);
-    load(ctx, `${app}/static/js/admin.js`);
+    for (const file of ["admin", "notifications", "certificates", "hooks"]) {
+      load(ctx, `${app}/static/js/${file}.js`);
+    }
     ctx.setActionStatus = () => {};
     await ctx.saveSettings();
     assert.equal(fetches, 0);
@@ -118,6 +121,7 @@ test('Central keeps loaded settings editable when a later poll fails', async () 
   });
   load(ctx, 'central/static/js/utils.js');
   load(ctx, 'central/static/js/keys.js');
+  load(ctx, 'central/static/js/verification.js');
   load(ctx, 'central/static/js/overview.js');
   ctx.updateOverviewDom = () => {};
   ctx.loadVerifyStatus = () => {};

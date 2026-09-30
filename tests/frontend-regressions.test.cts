@@ -60,6 +60,7 @@ function overviewContext(fetch) {
   });
   load(context, 'central/static/js/utils.js');
   load(context, 'central/static/js/keys.js');
+  load(context, 'central/static/js/verification.js');
   load(context, 'central/static/js/overview.js');
   context.updateOverviewDom = () => {};
   return { context, messages };
