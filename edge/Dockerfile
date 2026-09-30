@@ -1,10 +1,11 @@
 # Compiles the TypeScript UI to the static/js directory the Go binary embeds.
-FROM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 
 WORKDIR /build
 
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
+COPY tsconfig.base.json ./
 COPY edge/static/tsconfig.json ./edge/static/
 COPY edge/static/ts ./edge/static/ts
 RUN npx tsc -p edge/static
@@ -17,12 +18,14 @@ COPY go.work ./
 COPY shared/go.mod ./shared/go.mod
 COPY edge/go.mod edge/go.sum ./edge/
 COPY central/go.mod ./central/go.mod
+# Keep module downloads cached when Go or UI sources change.
+WORKDIR /build/edge
+RUN go mod download
+
+WORKDIR /build
 COPY shared ./shared
 COPY edge ./edge
 COPY --from=web /build/edge/static/js ./edge/static/js
-WORKDIR /build/edge
-RUN --mount=type=cache,target=/root/.cache/go-build go mod download
-
 WORKDIR /build/edge
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /3to1go-edge ./cmd/server

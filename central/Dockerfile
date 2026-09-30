@@ -1,10 +1,11 @@
 # Compiles the TypeScript UI to the static/js directory the Go binary embeds.
-FROM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 
 WORKDIR /build
 
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
+COPY tsconfig.base.json ./
 COPY central/static/tsconfig.json ./central/static/
 COPY central/static/ts ./central/static/ts
 RUN npx tsc -p central/static
@@ -17,12 +18,14 @@ COPY go.work ./
 COPY shared/go.mod ./shared/go.mod
 COPY central/go.mod central/go.sum ./central/
 COPY edge/go.mod ./edge/go.mod
+# Keep module downloads cached when Go or UI sources change.
+WORKDIR /build/central
+RUN go mod download
+
+WORKDIR /build
 COPY shared ./shared
 COPY central ./central
 COPY --from=web /build/central/static/js ./central/static/js
-WORKDIR /build/central
-RUN --mount=type=cache,target=/root/.cache/go-build go mod download
-
 WORKDIR /build/central
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /3to1go-central ./cmd/server
