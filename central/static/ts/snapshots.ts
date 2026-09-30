@@ -20,36 +20,51 @@ function formatDate(d: Date | null): string {
   });
 }
 
+// Returns the snapshot response, or null after reporting why it could not be fetched.
+async function fetchSnapshot(path: string): Promise<Response | null> {
+  const res = await fetch(path);
+  if (res.ok) return res;
+  if (res.status === 404) {
+    await loadOverview({ silent: true, force: true });
+    setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
+    return null;
+  }
+  setActionStatus("Download failed.", "error");
+  return null;
+}
+
 async function downloadSnapshot(edgeId: string, edgeInstanceId: string | null, jobName: string, filename: string, btn: HTMLButtonElement): Promise<void> {
   const basePath = edgeInstanceId
     ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
     : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
   const restore = setButtonBusy(btn, "Downloading…");
   try {
-    const res = await fetch(basePath);
-    if (!res.ok) {
-      if (res.status === 404) {
-        await loadOverview({ silent: true, force: true });
-        setActionStatus(`That snapshot was already gone, so Central refreshed the snapshot list.`, "info");
-        return;
+    let res = await fetchSnapshot(basePath);
+    if (!res) return;
+    // The snapshot streams through decryption, so a large archive is never held whole in the tab.
+    let reader = snapshotReaderFromResponse(res);
+    let key: string | null = null;
+    if (snapshotEncryption(await reader.peek(SNAPSHOT_HEAD_LEN))) {
+      key = getEncKey(edgeId, edgeInstanceId);
+      if (!key) {
+        // Getting the key may mean waiting on the operator; don't hold the response open against
+        // the server's write timeout meanwhile. Fetch the snapshot again once the key is known.
+        reader.cancel();
+        key = await resolveEncKey(edgeId, edgeInstanceId);
+        if (!key) return;
+        res = await fetchSnapshot(basePath);
+        if (!res) return;
+        reader = snapshotReaderFromResponse(res);
       }
-      setActionStatus("Download failed.", "error");
-      return;
     }
-    const buffer = await res.arrayBuffer();
-
-    if (!isEncrypted(buffer)) {
-      triggerBlobDownload(buffer, filename);
-      return;
-    }
-
-    const key = await resolveEncKey(edgeId, edgeInstanceId);
-    if (!key) return;
 
     try {
-      const decrypted = await decryptBuffer(buffer, key);
-      triggerBlobDownload(decrypted, filename);
-    } catch {
+      triggerBlobDownload(await readSnapshot(reader, key), filename);
+    } catch (error) {
+      if (error instanceof SnapshotReadError) {
+        setActionStatus("The download was interrupted. Check the connection and retry.", "error");
+        return;
+      }
       clearStoredEncKey(edgeId, edgeInstanceId);
       await refreshKeyPanel(edgeId, edgeInstanceId);
       const expectedFingerprint = getExpectedKeyFingerprint(edgeId, edgeInstanceId);

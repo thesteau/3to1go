@@ -43,6 +43,87 @@ test('Central bounds decryption work instead of queuing the entire archive', asy
   assert.equal(peak, 1);
 });
 
+// Encrypts `data` the way minio/sio DARE 2.0 does, to build streams larger than the Go fixture.
+function dareEncrypt(data) {
+  const random = nodeCrypto.randomBytes(12);
+  random[0] &= 0x7f;
+  const packages = [];
+  for (let offset = 0, sequence = 0; offset < data.length; offset += 1 << 16, sequence += 1) {
+    const payload = data.subarray(offset, offset + (1 << 16));
+    const header = Buffer.alloc(16);
+    header[0] = 0x20;
+    header.writeUInt16LE(payload.length - 1, 2);
+    random.copy(header, 4);
+    if (offset + payload.length >= data.length) header[4] |= 0x80;
+    const nonce = Buffer.from(header.subarray(4));
+    nonce.writeUInt32LE((nonce.readUInt32LE(8) ^ sequence) >>> 0, 8);
+    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', key, nonce).setAAD(header.subarray(0, 4));
+    packages.push(header, cipher.update(payload), cipher.final(), cipher.getAuthTag());
+  }
+  return Buffer.concat(packages);
+}
+
+test('Central decrypts a DARE snapshot as it streams instead of buffering the whole response', async () => {
+  const data = nodeCrypto.randomBytes(3 * (1 << 16) + 123);
+  const encrypted = dareEncrypt(data);
+  const chunkSize = 16 * 1024;
+  let reads = 0;
+  let readsAtFirstDecrypt = null;
+  const subtle = globalThis.crypto.subtle;
+  const ctx = cryptoContext({ subtle: {
+    importKey: (...args) => subtle.importKey(...args),
+    decrypt(...args) {
+      readsAtFirstDecrypt ??= reads;
+      return subtle.decrypt(...args);
+    },
+  } });
+  const reader = vm.runInContext('(next) => new SnapshotReader(next)', ctx)(async () => {
+    const chunk = encrypted.subarray(reads * chunkSize, (reads + 1) * chunkSize);
+    if (!chunk.length) return null;
+    reads += 1;
+    return new Uint8Array(chunk);
+  });
+  const blob = await ctx.readSnapshot(reader, keyB64);
+  assert.deepEqual(Buffer.from(await blob.arrayBuffer()), data);
+  const totalReads = Math.ceil(encrypted.length / chunkSize);
+  assert.ok(readsAtFirstDecrypt <= Math.ceil((16 + (1 << 16) + 16) / chunkSize), `first package decrypted after ${readsAtFirstDecrypt} reads`);
+  assert.ok(readsAtFirstDecrypt < totalReads);
+});
+
+function downloadContext({ savedKey }) {
+  const storage = new Map(savedKey ? [['3to1go_enc_edge-a::inst-1', keyB64]] : []);
+  const requests = [];
+  const downloads = [];
+  const prompts = [];
+  const ctx = vm.createContext({
+    crypto: globalThis.crypto, atob, Blob,
+    fetch: async (url) => { requests.push(url); return new Response(fixture); },
+    sessionStorage: {
+      getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k),
+      key: (i) => Array.from(storage.keys())[i] ?? null, get length() { return storage.size; },
+    },
+    document: { querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ click() {} }) },
+    URL: { createObjectURL: (blob) => { downloads.push(blob); return 'blob:snapshot'; }, revokeObjectURL() {} },
+    appDialog: async (options) => { prompts.push(options.title); return keyB64; },
+    setActionStatus() {}, loadOverview: async () => true,
+  });
+  for (const file of ['utils', 'crypto', 'keys', 'snapshots']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, `../central/static/js/${file}.js`), 'utf8'), ctx);
+  }
+  return { ctx, requests, downloads, prompts };
+}
+
+test('Central downloads with a saved key in one request, and re-fetches after prompting for a key', async () => {
+  for (const savedKey of [true, false]) {
+    const { ctx, requests, downloads, prompts } = downloadContext({ savedKey });
+    await ctx.downloadSnapshot('edge-a', 'inst-1', 'photos', 'photos.tar.zst', null);
+    assert.equal(requests.length, savedKey ? 1 : 2);
+    assert.deepEqual(prompts, savedKey ? [] : ['Encryption Key Required']);
+    assert.equal(downloads.length, 1);
+    assert.deepEqual(Buffer.from(await downloads[0].arrayBuffer()), plaintext);
+  }
+});
+
 test('Central rejects tampered, truncated or extended DARE snapshots', async () => {
   const ctx = cryptoContext();
   const tampered = Buffer.from(fixture);
