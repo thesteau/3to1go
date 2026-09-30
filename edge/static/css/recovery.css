@@ -166,3 +166,8 @@
   margin: 0;
   padding: 6px 8px;
 }
+
+.recover-preview-group > .recover-preview-more {
+  padding-left: 26px;
+  border-top: 1px solid var(--line-soft);
+}

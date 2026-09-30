@@ -95,3 +95,20 @@ test('a refresh requested during a poll waits and fetches fresh data', async () 
   pendingDirectories.shift()({ ok: true, json: async () => ({ directories: [] }) });
   await afterAction;
 });
+
+test('restore preview keeps full folder totals when rows are capped', () => {
+  const list = { innerHTML: '' };
+  const ctx = vm.createContext({ document: { getElementById: id => id === 'recover-preview-list' ? list : null } });
+  load(ctx, 'utils.js');
+  load(ctx, 'recovery.js');
+  const entries = [
+    ...Array.from({ length: 450 }, (_, i) => ({ path: `a/${i}.txt`, size: 1, action: 'replace' })),
+    ...Array.from({ length: 10 }, (_, i) => ({ path: `b/${i}.txt`, size: 2, action: 'add' })),
+  ];
+  ctx.renderRecoverPreviewList(entries, { query: '', action: 'all' });
+  assert.equal((list.innerHTML.match(/class="recover-preview-row"/g) || []).length, 400);
+  assert.match(list.innerHTML, /450 files · 450 B/);
+  assert.match(list.innerHTML, /50 files in this folder not listed/);
+  assert.match(list.innerHTML, /10 files · 20 B/, 'folders past the cap still show their totals');
+  assert.match(list.innerHTML, /10 files in this folder not listed/);
+});

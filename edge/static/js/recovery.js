@@ -74,9 +74,9 @@ function renderRecoverPreviewList(entries, { query, action }) {
   if (!list) return;
   const matches = entries.filter((entry) => (action === "all" || (entry.action || "add") === action)
     && (!query || String(entry.path || "").toLowerCase().includes(query)));
-  const shown = matches.slice(0, RECOVER_PREVIEW_ROW_LIMIT);
+  // Group every match so folder totals stay complete; only the rendered rows are capped.
   const groups = new Map();
-  for (const entry of shown) {
+  for (const entry of matches) {
     const path = String(entry.path || "");
     const slash = path.lastIndexOf("/");
     const folder = slash === -1 ? "" : path.slice(0, slash + 1);
@@ -84,20 +84,22 @@ function renderRecoverPreviewList(entries, { query, action }) {
     groups.get(folder).push({ ...entry, name: path.slice(slash + 1) });
   }
   const openGroups = Boolean(query) || groups.size <= RECOVER_PREVIEW_OPEN_GROUPS;
-  const remaining = matches.length - shown.length;
-
   const sortedGroups = Array.from(groups).sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
+  let rowBudget = RECOVER_PREVIEW_ROW_LIMIT;
 
   list.innerHTML = matches.length
     ? sortedGroups.map(([folder, files]) => {
       const folderSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+      const shownFiles = files.slice(0, Math.max(0, rowBudget));
+      rowBudget -= shownFiles.length;
+      const hidden = files.length - shownFiles.length;
       return `
-        <details class="recover-preview-group"${openGroups ? " open" : ""}>
+        <details class="recover-preview-group"${openGroups && shownFiles.length ? " open" : ""}>
           <summary>
             <span class="recover-preview-folder" title="${escapeHtml(folder || "Job root")}">${escapeHtml(folder || "Job root")}</span>
             <span class="hint">${files.length} file${files.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(folderSize))}</span>
           </summary>
-          ${files.map((file) => {
+          ${shownFiles.map((file) => {
             const kind = file.action === "replace" ? "replace" : "add";
             return `
             <div class="recover-preview-row">
@@ -106,8 +108,9 @@ function renderRecoverPreviewList(entries, { query, action }) {
               <span class="recover-preview-size">${escapeHtml(formatBytes(file.size || 0))}</span>
             </div>`;
           }).join("")}
+          ${hidden ? `<p class="recover-preview-more hint">${hidden} file${hidden === 1 ? "" : "s"} in this folder not listed. Filter to narrow the list.</p>` : ""}
         </details>`;
-    }).join("") + (remaining ? `<p class="recover-preview-more hint">${remaining} more file${remaining === 1 ? "" : "s"} not shown. Filter to narrow the list.</p>` : "")
+    }).join("")
     : '<p class="recover-preview-more hint">No files match this filter.</p>';
 }
 

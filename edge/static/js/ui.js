@@ -200,6 +200,10 @@ const LOADING_PLACEHOLDER = ".section-loading, .loading-placeholder";
 const FADE_KEY_ATTRS = ["data-path", "data-edge-id", "data-instance-id"];
 const FADE_KEYED = FADE_KEY_ATTRS.map((attr) => `[${attr}]`).join(", ");
 
+function prefersReducedMotion() {
+  return Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
 function fadeKey(element) {
   const attr = FADE_KEY_ATTRS.find((name) => element.hasAttribute(name));
   return `${element.classList[0] || element.tagName}|${attr}=${element.getAttribute(attr)}`;
@@ -211,6 +215,7 @@ function keyedElements(node) {
 }
 
 function fadeInNewContent(mutations) {
+  if (prefersReducedMotion()) return;
   const shownKeys = new Set();
   const placeholderTargets = new Set();
   for (const { target, removedNodes } of mutations) {

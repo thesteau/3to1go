@@ -104,7 +104,7 @@ function flashElement(element) {
 // Removed items fade out rather than vanishing, so it is clear which one went away.
 function fadeOutAndRemove(element) {
   if (!element) return;
-  if (!element.animate) {
+  if (!element.animate || globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     element.remove();
     return;
   }
