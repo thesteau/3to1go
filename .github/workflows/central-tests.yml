@@ -26,6 +26,19 @@ jobs:
           go-version-file: central/go.mod
           cache-dependency-path: central/go.sum
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install web UI build tools
+        working-directory: .
+        run: npm ci
+
+      # The server embeds static/js, which go generate compiles from static/ts.
+      - name: Generate web UI
+        run: go generate ./...
+
       - name: Download modules
         run: go mod download
 

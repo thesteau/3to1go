@@ -1,0 +1,14 @@
+{
+  "name": "3to1go-web",
+  "private": true,
+  "description": "TypeScript sources for the Central and Edge web UIs. Compiled to */static/js (not committed), which the Go servers embed.",
+  "scripts": {
+    "build": "tsc -p central/static && tsc -p edge/static",
+    "watch": "tsc -p central/static --watch --preserveWatchOutput",
+    "watch:edge": "tsc -p edge/static --watch --preserveWatchOutput",
+    "test": "npm run build && node --test tests/*.cts"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

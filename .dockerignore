@@ -1,0 +1,31 @@
+# Images compile the web UI in their own Node stage; never copy local build output.
+node_modules/
+central/static/js/
+edge/static/js/
+
+# Only source assets belong in the build context.
+.git/
+tests/
+**/*_test.go
+**/testdata/
+**/.env
+**/.env.*
+!**/.env.example
+central/config/
+central/data/
+central/hook-scripts/
+central/secrets/
+edge/config/
+edge/data/
+edge/hook-scripts/
+edge/secrets/
+edge/scan/
+edge/state/
+edge/spool/
+data/
+certs/
+coverage.out
+*.coverprofile
+*.prof
+*.test
+*.log
