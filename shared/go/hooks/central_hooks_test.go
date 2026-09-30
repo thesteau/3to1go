@@ -16,7 +16,7 @@ func discardLogger() *slog.Logger {
 func newHookManager(t *testing.T) (*HookManager, string) {
 	t.Helper()
 	dir := t.TempDir()
-	hm := NewHookManager(dir, discardLogger())
+	hm := NewHookManager("central", dir, discardLogger())
 	return hm, dir
 }
 

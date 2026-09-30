@@ -19,14 +19,14 @@ import (
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/encryption"
 	"github.com/3to1go/edge/internal/identity"
-	"github.com/3to1go/edge/internal/services/certificates"
 	"github.com/3to1go/edge/internal/services/directories"
-	"github.com/3to1go/edge/internal/services/hooks"
 	"github.com/3to1go/edge/internal/services/locks"
 	"github.com/3to1go/edge/internal/services/ntfy"
 	"github.com/3to1go/edge/internal/services/recovery"
 	"github.com/3to1go/edge/internal/services/state"
 	"github.com/3to1go/edge/internal/services/upload"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/hooks"
 )
 
 // EdgeRunner owns all runtime services and drives backup cycles.
@@ -79,7 +79,7 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 
 	uploadClient := upload.NewUploadClient(settings, encKey, certMgr)
 	lockMgr := locks.NewJobLockManager()
-	hookMgr := hooks.NewHookManager(config.HookScriptsDir(), logger)
+	hookMgr := hooks.NewHookManager("edge", config.HookScriptsDir(), logger)
 	ntfyPub := ntfy.NewNtfyPublisher(logger)
 	dirSvc := directories.NewDirectoryService(settings, logger, stateStore)
 	recoverySvc := recovery.NewRecoveryService(settings, logger, stateStore, uploadClient, encKey)

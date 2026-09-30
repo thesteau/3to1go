@@ -5,12 +5,13 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/services/directories"
 	"github.com/3to1go/edge/internal/store"
 	"github.com/3to1go/edge/static"
+	"github.com/3to1go/shared/auth"
+	"github.com/3to1go/shared/httpx"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -123,8 +124,8 @@ func (a *App) Handler() http.Handler {
 	// Users
 	r.Get("/api/users", a.handleListUsers)
 	r.Post("/api/users", a.handleCreateUser)
-	r.Put("/api/users/{user_id}", withPathValues(a.handleUpdateUser, "user_id"))
-	r.Delete("/api/users/{user_id}", withPathValues(a.handleDeleteUser, "user_id"))
+	r.Put("/api/users/{user_id}", httpx.WithPathValues(a.handleUpdateUser, "user_id"))
+	r.Delete("/api/users/{user_id}", httpx.WithPathValues(a.handleDeleteUser, "user_id"))
 
 	// System status + scheduler
 	r.Get("/api/status", a.handleStatus)
@@ -159,98 +160,28 @@ func (a *App) Handler() http.Handler {
 	// Certificates
 	r.Get("/api/certificates", a.handleGetCertificates)
 	r.Post("/api/certificates/files", a.handleUploadCertificate)
-	r.Delete("/api/certificates/files/{filename}", withPathValues(a.handleDeleteCertificate, "filename"))
+	r.Delete("/api/certificates/files/{filename}", httpx.WithPathValues(a.handleDeleteCertificate, "filename"))
 
 	// Hooks
 	r.Get("/api/hooks", a.handleGetHooks)
 	r.Post("/api/hooks", a.handleSaveHooks)
 	r.Post("/api/hooks/files", a.handleUploadHookFile)
-	r.Get("/api/hooks/files/{filename}", withPathValues(a.handleViewHookFile, "filename"))
-	r.Delete("/api/hooks/files/{filename}", withPathValues(a.handleDeleteHookFile, "filename"))
+	r.Get("/api/hooks/files/{filename}", httpx.WithPathValues(a.handleViewHookFile, "filename"))
+	r.Delete("/api/hooks/files/{filename}", httpx.WithPathValues(a.handleDeleteHookFile, "filename"))
 
 	// Encryption key
 	r.Get("/api/encryption-key", a.handleGetEncryptionKey)
 	r.Post("/api/encryption-key/rotate", a.handleRotateEncryptionKey)
 
-	return a.requestLogger(newRateLimiter().middleware(a.sessionMiddleware(r)))
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (s *statusRecorder) WriteHeader(code int) {
-	s.status = code
-	s.ResponseWriter.WriteHeader(code)
+	return a.requestLogger(httpx.NewRateLimiter(specsForPath).Middleware(a.sessionMiddleware(r)))
 }
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasPrefix(path, "/static/") || path == "/health" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		level := slog.LevelDebug
-		if r.Method != http.MethodGet {
-			level = slog.LevelInfo
-		}
-		a.logger.Log(r.Context(), level, "request",
-			"method", r.Method,
-			"path", path,
-			"status", rec.status,
-			"ms", time.Since(start).Milliseconds(),
-		)
-	})
-}
-
-func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		for _, name := range names {
-			r.SetPathValue(name, chi.URLParam(r, name))
-		}
-		next(w, r)
-	}
+	return httpx.RequestLogger(a.logger, func(path string) bool { return strings.HasPrefix(path, "/static/") || path == "/health" }, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		cookie, _ := r.Cookie(store.SessionCookie)
-		var token string
-		if cookie != nil {
-			token = cookie.Value
-		}
-		user, _ := a.userStore.UserForSession(r.Context(), token)
-		ctx := context.WithValue(r.Context(), contextKeyUser, user)
-		r = r.WithContext(ctx)
-
-		if isPublicPath(path) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if strings.HasPrefix(path, "/api/") {
-			if user == nil {
-				writeError(w, http.StatusUnauthorized, "login required")
-				return
-			}
-			if user.MustChangePassword &&
-				path != "/api/session/change-password" &&
-				path != "/api/session/me" &&
-				path != "/api/session/logout" {
-				writeError(w, http.StatusForbidden, "password change required")
-				return
-			}
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return a.accountHandler().Middleware(next, isPublicPath)
 }
 
 func isPublicPath(path string) bool {
@@ -263,36 +194,16 @@ func isPublicPath(path string) bool {
 		strings.HasPrefix(path, "/health")
 }
 
-type contextKey string
+type contextKey = auth.ContextKey
 
-const contextKeyUser contextKey = "user"
+const contextKeyUser = auth.ContextKeyUser
 
-func currentUser(r *http.Request) *store.User {
-	u, _ := r.Context().Value(contextKeyUser).(*store.User)
-	return u
-}
+func currentUser(r *http.Request) *store.User { return auth.CurrentUser(r) }
 
-func requireUser(w http.ResponseWriter, r *http.Request) *store.User {
-	u := currentUser(r)
-	if u == nil {
-		writeError(w, http.StatusUnauthorized, "login required")
-		return nil
-	}
-	return u
-}
+func requireUser(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireUser(w, r) }
 
-func requireAdmin(w http.ResponseWriter, r *http.Request) *store.User {
-	u := requireUser(w, r)
-	if u == nil {
-		return nil
-	}
-	if !u.IsAdmin {
-		writeError(w, http.StatusForbidden, "admin required")
-		return nil
-	}
-	return u
-}
+func requireAdmin(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireAdmin(w, r) }
 
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

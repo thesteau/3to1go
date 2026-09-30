@@ -7,16 +7,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/3to1go/central/internal/config"
+	notification "github.com/3to1go/shared/ntfy"
 )
 
 const DefaultNtfyMessageTemplate = "Central received {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} from {{ advertised_url }} as {{ stored_as }}."
-
-var templatePattern = regexp.MustCompile(`{{\s*([a-zA-Z0-9_]+)\s*}}`)
 
 type NtfyPublisher struct {
 	logger *slog.Logger
@@ -81,14 +79,7 @@ func (n *NtfyPublisher) PublishBestEffort(s *config.Settings, ctx map[string]any
 }
 
 func RenderMessage(template string, ctx map[string]any) string {
-	norm := strings.TrimSpace(template)
-	if norm == "" {
-		norm = DefaultNtfyMessageTemplate
-	}
-	return templatePattern.ReplaceAllStringFunc(norm, func(match string) string {
-		key := strings.TrimSpace(match[2 : len(match)-2])
-		return ctxString(ctx, key)
-	})
+	return notification.Render(template, DefaultNtfyMessageTemplate, func(key string) string { return ctxString(ctx, key) })
 }
 
 func (n *NtfyPublisher) matches(s *config.Settings, ctx map[string]any) bool {

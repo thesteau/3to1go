@@ -1,24 +1,7 @@
 package locks
 
-import "sync"
+import "github.com/3to1go/shared/keylock"
 
-// NamespaceLockManager provides per-namespace mutexes.
-type NamespaceLockManager struct {
-	mu    sync.Mutex
-	locks map[string]*sync.Mutex
-}
+type NamespaceLockManager = keylock.Manager
 
-func NewNamespaceLockManager() *NamespaceLockManager {
-	return &NamespaceLockManager{locks: make(map[string]*sync.Mutex)}
-}
-
-func (m *NamespaceLockManager) Lock(namespace string) *sync.Mutex {
-	m.mu.Lock()
-	l := m.locks[namespace]
-	if l == nil {
-		l = &sync.Mutex{}
-		m.locks[namespace] = l
-	}
-	m.mu.Unlock()
-	return l
-}
+func NewNamespaceLockManager() *NamespaceLockManager { return keylock.New() }

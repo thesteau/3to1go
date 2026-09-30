@@ -9,6 +9,7 @@ import (
 	"github.com/3to1go/central/internal/ingest"
 	"github.com/3to1go/central/internal/services/overview"
 	"github.com/3to1go/central/internal/storage"
+	"github.com/3to1go/shared/httpx"
 )
 
 func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
@@ -27,10 +28,10 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 		data, err = overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to build overview")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
 		return
 	}
-	writeJSON(w, http.StatusOK, data)
+	httpx.WriteJSON(w, http.StatusOK, data)
 }
 
 func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -38,18 +39,18 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body config.SettingsPayload
-	if err := readJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	newSettings, err := config.BuildSettings(&body)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	normalized := config.SettingsToPayload(newSettings)
 	if err := a.settingsStore.Save(r.Context(), &normalized); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
 	a.ApplySettings(newSettings)
@@ -57,10 +58,10 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	data, err := overview.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to build overview")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"settings": data["settings"],
 	})
@@ -83,15 +84,15 @@ func (a *App) setUploadsPaused(w http.ResponseWriter, r *http.Request, paused bo
 	payload.UploadsPaused = paused
 	newSettings, err := config.BuildSettings(&payload)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to build settings")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build settings")
 		return
 	}
 	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
 	a.ApplySettings(newSettings)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
 }
 
 func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
@@ -100,12 +101,12 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	edgeID, err := ingest.ValidateNamespaceComponent(r.PathValue("edge_id"), "edge_id")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	instID, err := ingest.ValidateNamespaceComponent(r.PathValue("edge_instance_id"), "edge_instance_id")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	cleanupMissing := r.URL.Query().Get("cleanup_missing") == "true"
@@ -117,16 +118,16 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !info.IsDir() {
 		reg, err := a.snapIndex.GetEdgeRegistration(r.Context(), edgeID, instID)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to inspect instance registration")
+			httpx.WriteError(w, http.StatusInternalServerError, "failed to inspect instance registration")
 			return
 		}
 		hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), edgeID, instID)
 		if reg == nil && !hasEntries {
-			writeError(w, http.StatusNotFound, "instance not found")
+			httpx.WriteError(w, http.StatusNotFound, "instance not found")
 			return
 		}
 		if !cleanupMissing {
-			writeError(w, http.StatusConflict, map[string]any{
+			httpx.WriteError(w, http.StatusConflict, map[string]any{
 				"message":           "instance files not found",
 				"cleanup_available": true,
 			})
@@ -134,17 +135,17 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 		}
 		if reg != nil {
 			if err := a.snapIndex.DeleteEdgeRegistration(r.Context(), edgeID, instID); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to clean instance registration")
+				httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance registration")
 				return
 			}
 		}
 		if hasEntries {
 			if err := a.snapIndex.DeleteInstanceEntries(r.Context(), edgeID, instID); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to clean instance index entries")
+				httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance index entries")
 				return
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]string{
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{
 			"status":           "cleaned",
 			"edge_id":          edgeID,
 			"edge_instance_id": instID,
@@ -162,7 +163,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := os.RemoveAll(instanceDir); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to delete instance files")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance files")
 		return
 	}
 
@@ -172,7 +173,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 
 	// Check if anything remains
 	if _, err := os.Stat(instanceDir); err == nil {
-		writeError(w, http.StatusConflict, map[string]any{
+		httpx.WriteError(w, http.StatusConflict, map[string]any{
 			"message":           "instance still has backup files or index entries",
 			"cleanup_available": false,
 		})
@@ -180,17 +181,17 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), edgeID, instID)
 	if hasEntries {
-		writeError(w, http.StatusConflict, map[string]any{
+		httpx.WriteError(w, http.StatusConflict, map[string]any{
 			"message":           "instance still has backup files or index entries",
 			"cleanup_available": false,
 		})
 		return
 	}
 	if err := a.snapIndex.DeleteEdgeRegistration(r.Context(), edgeID, instID); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to delete instance registration")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance registration")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{
 		"status":           "deleted",
 		"edge_id":          edgeID,
 		"edge_instance_id": instID,
@@ -200,7 +201,7 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	s := a.Settings()
 	if !a.backend.Healthcheck() {
-		writeError(w, http.StatusServiceUnavailable, "storage backend unavailable")
+		httpx.WriteError(w, http.StatusServiceUnavailable, "storage backend unavailable")
 		return
 	}
 
@@ -209,7 +210,7 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	backupUsed := storage.DirSize(s.BackupRoot)
 	_, _, backupFree, _ := storage.DiskUsage(s.BackupRoot)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status":                       "ok",
 		"staging_dir":                  s.StagingDir,
 		"staging_used_bytes":           stagingUsed,
@@ -225,9 +226,9 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleHealthReady(w http.ResponseWriter, r *http.Request) {
 	s := a.Settings()
 	if !a.backend.Healthcheck() {
-		writeError(w, http.StatusServiceUnavailable, "storage backend unavailable")
+		httpx.WriteError(w, http.StatusServiceUnavailable, "storage backend unavailable")
 		return
 	}
 	os.MkdirAll(s.StagingDir, 0o755)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

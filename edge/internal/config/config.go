@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/3to1go/shared/configutil"
 )
 
 const AppDirName = "3to1goEdge"
@@ -59,9 +60,7 @@ func (s *Settings) MaxUploadChunkSizeBytes() int64 {
 	return int64(s.MaxUploadChunkSizeMB) * 1024 * 1024
 }
 
-func usesContainerLayout() bool {
-	return strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")) == "/config"
-}
+func usesContainerLayout() bool { return configutil.UsesContainerLayout() }
 
 func DefaultConfigDir() string {
 	if usesContainerLayout() {
@@ -398,36 +397,11 @@ func coerceInt(value, def, min int) int {
 	return value
 }
 
-func coerceText(value, def string) string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return def
-	}
-	return v
-}
+func coerceText(value, def string) string { return configutil.CoerceText(value, def) }
 
-func coerceURL(value, def string) (string, error) {
-	v := strings.TrimRight(strings.TrimSpace(value), "/")
-	if v == "" {
-		v = def
-	}
-	if v == "" {
-		return "", nil
-	}
-	u, err := url.Parse(v)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("url must be a full http or https URL")
-	}
-	return v, nil
-}
+func coerceURL(value, def string) (string, error) { return configutil.CoerceURL(value, def) }
 
-func coerceTheme(value string) string {
-	v := strings.ToLower(strings.TrimSpace(value))
-	if v == "light" {
-		return "light"
-	}
-	return "dark"
-}
+func coerceTheme(value string) string { return configutil.CoerceTheme(value) }
 
 func coerceBoolPtr(value *bool, def bool) bool {
 	if value == nil {

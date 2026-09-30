@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io/fs"
+	"sync"
 )
 
 // Index includes dialog markup in the initial document, avoiding a startup
@@ -44,4 +45,15 @@ func Index(files fs.FS, stylesheets ...string) ([]byte, error) {
 		dialogs.Write(fragment)
 	}
 	return bytes.Replace(page, []byte("<!-- app-dialogs -->"), dialogs.Bytes(), 1), nil
+}
+
+// Reader caches the assembled index and reads other assets from files.
+func Reader(files fs.FS, stylesheets ...string) func(string) ([]byte, error) {
+	page := sync.OnceValues(func() ([]byte, error) { return Index(files, stylesheets...) })
+	return func(name string) ([]byte, error) {
+		if name == "index.html" {
+			return page()
+		}
+		return fs.ReadFile(files, name)
+	}
 }

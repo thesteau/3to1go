@@ -24,7 +24,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: edge/go.mod
-          cache-dependency-path: edge/go.sum
+          cache-dependency-path: |
+            edge/go.sum
+            shared/go/go.sum
 
       - uses: actions/setup-node@v4
         with:
@@ -43,4 +45,4 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        run: go test -race ./...
+        run: go test -race ./... ../shared/go/...

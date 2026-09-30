@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/3to1go/central/internal/signing"
+	"github.com/3to1go/shared/configutil"
 )
 
 const AppDirName = "3to1goCentral"
@@ -51,9 +52,7 @@ func (s *Settings) UploadChunkSizeBytes() int64 {
 	return int64(s.UploadChunkSizeMB) * 1024 * 1024
 }
 
-func usesContainerLayout() bool {
-	return strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")) == "/config"
-}
+func usesContainerLayout() bool { return configutil.UsesContainerLayout() }
 
 func DefaultConfigDir() string {
 	if usesContainerLayout() {
@@ -99,33 +98,11 @@ func coerceInt(value string, def, min int) int {
 	return n
 }
 
-func coerceText(value, def string) string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return def
-	}
-	return v
-}
+func coerceText(value, def string) string { return configutil.CoerceText(value, def) }
 
-func coerceURL(value string) (string, error) {
-	v := strings.TrimRight(strings.TrimSpace(value), "/")
-	if v == "" {
-		return "", nil
-	}
-	u, err := url.Parse(v)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("url must be a full http or https URL")
-	}
-	return v, nil
-}
+func coerceURL(value string) (string, error) { return configutil.CoerceURL(value, "") }
 
-func coerceTheme(value string) string {
-	v := strings.ToLower(strings.TrimSpace(value))
-	if v == "light" {
-		return "light"
-	}
-	return "dark"
-}
+func coerceTheme(value string) string { return configutil.CoerceTheme(value) }
 
 // SettingsPayload is the serializable subset stored in the database.
 type SettingsPayload struct {

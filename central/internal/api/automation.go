@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"github.com/3to1go/central/internal/config"
-	"github.com/3to1go/central/internal/services/certificates"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/httpx"
 )
 
 // --- Certificates ---
@@ -15,7 +16,7 @@ func (a *App) handleGetCertificates(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, a.certs.Snapshot())
+	httpx.WriteJSON(w, http.StatusOK, a.certs.Snapshot())
 }
 
 func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
@@ -25,25 +26,25 @@ func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(10 << 20)
 	file, header, err := r.FormFile("certificate_file")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "certificate_file is required")
+		httpx.WriteError(w, http.StatusBadRequest, "certificate_file is required")
 		return
 	}
 	defer file.Close()
 	content, err := io.ReadAll(file)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read file")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to read file")
 		return
 	}
 	saved, err := a.certs.SaveUploadedFile(header.Filename, content)
 	if err != nil {
 		if isRuntimeError(err) {
-			writeError(w, http.StatusBadGateway, err.Error())
+			httpx.WriteError(w, http.StatusBadGateway, err.Error())
 		} else {
-			writeError(w, http.StatusBadRequest, err.Error())
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
 }
 
 func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +53,10 @@ func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := r.PathValue("filename")
 	if err := a.certs.DeleteFile(filename); err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // --- Ntfy ---
@@ -64,7 +65,7 @@ func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, a.ntfy.Snapshot(a.Settings()))
+	httpx.WriteJSON(w, http.StatusOK, a.ntfy.Snapshot(a.Settings()))
 }
 
 func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
@@ -79,8 +80,8 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 		NtfyMatchEdgeInstID string `json:"ntfy_match_edge_instance_id"`
 		NtfyMatchSource     string `json:"ntfy_match_source"`
 	}
-	if err := readJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -94,16 +95,16 @@ func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
 	payload.NtfyMatchSource = body.NtfyMatchSource
 
 	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
 	newSettings, err := config.BuildSettings(&payload)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	a.ApplySettings(newSettings)
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"ntfy": map[string]string{
 			"ntfy_url":                    body.NtfyURL,
@@ -121,15 +122,15 @@ func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body map[string]any
-	if err := readJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if err := a.ntfy.PublishTest(body); err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+		httpx.WriteError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // --- Hooks ---
@@ -139,7 +140,7 @@ func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := a.Settings()
-	writeJSON(w, http.StatusOK, a.hooks.Snapshot(s.HookPreCommand, s.HookPostCommand))
+	httpx.WriteJSON(w, http.StatusOK, a.hooks.Snapshot(s.HookPreCommand, s.HookPostCommand))
 }
 
 func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
@@ -150,8 +151,8 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 		PreCommand  string `json:"pre_command"`
 		PostCommand string `json:"post_command"`
 	}
-	if err := readJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -161,16 +162,16 @@ func (a *App) handleSaveHooks(w http.ResponseWriter, r *http.Request) {
 	payload.HookPostCommand = body.PostCommand
 
 	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save settings")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
 	newSettings, err := config.BuildSettings(&payload)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	a.ApplySettings(newSettings)
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"hooks":  map[string]string{"pre_command": body.PreCommand, "post_command": body.PostCommand},
 	})
@@ -183,21 +184,21 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(10 << 20)
 	file, header, err := r.FormFile("hook_file")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "hook_file is required")
+		httpx.WriteError(w, http.StatusBadRequest, "hook_file is required")
 		return
 	}
 	defer file.Close()
 	content, err := io.ReadAll(file)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read file")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to read file")
 		return
 	}
 	saved, err := a.hooks.SaveUploadedFile(header.Filename, content)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "file": saved})
 }
 
 func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
@@ -208,13 +209,13 @@ func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
 	name, content, err := a.hooks.ReadTextFile(filename)
 	if err != nil {
 		if isNotFoundError(err) {
-			writeError(w, http.StatusNotFound, err.Error())
+			httpx.WriteError(w, http.StatusNotFound, err.Error())
 		} else {
-			writeError(w, http.StatusBadRequest, err.Error())
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"filename": name, "content": content})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"filename": name, "content": content})
 }
 
 func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
@@ -223,10 +224,10 @@ func (a *App) handleDeleteHookFile(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := r.PathValue("filename")
 	if err := a.hooks.DeleteFile(filename); err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func isRuntimeError(err error) bool {

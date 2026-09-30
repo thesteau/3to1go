@@ -10,11 +10,25 @@ function loadPageScripts(app) {
   const ctx = vm.createContext({ window: { fetch() {} } });
   // App startup needs a live DOM; load its dependencies in the real page order.
   for (const [, file] of html.matchAll(/<script defer src="\/static\/js\/([^"]+)"/g)) {
-    if (file === 'app.js') continue;
-    vm.runInContext(fs.readFileSync(path.join(base, 'js', file), 'utf8'), ctx, { filename: file });
+    const source = fs.readFileSync(path.join(base, 'js', file), 'utf8');
+    if (file.endsWith('/app.js')) continue;
+    vm.runInContext(source, ctx, { filename: file });
   }
   return { ctx, base, html };
 }
+
+test('shared helpers preserve each application\'s formatting and certificate styling', () => {
+  const central = loadPageScripts('central').ctx;
+  const edge = loadPageScripts('edge').ctx;
+  assert.equal(central.formatBytes(0), '—');
+  assert.equal(edge.formatBytes(0), '0 B');
+  assert.match(central.renderCertificateFiles([{ name: 'trusted.crt' }]), /class="btn btn-del"/);
+  assert.match(edge.renderCertificateFiles([{ name: 'trusted.crt' }]), /class="danger"/);
+  for (const ctx of [central, edge]) {
+    assert.equal(ctx.escapeHtml('<operator>'), '&lt;operator&gt;');
+    assert.equal(typeof ctx.createUser, 'function');
+  }
+});
 
 // Browsers decode HTML entities before compiling event attributes.
 function handlers(html) {

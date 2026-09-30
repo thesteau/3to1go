@@ -12,13 +12,15 @@ import (
 
 	"github.com/3to1go/central/internal/config"
 	"github.com/3to1go/central/internal/ingest"
-	"github.com/3to1go/central/internal/services/certificates"
-	"github.com/3to1go/central/internal/services/hooks"
 	"github.com/3to1go/central/internal/services/verify"
 	"github.com/3to1go/central/internal/signing"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
 	"github.com/3to1go/central/static"
+	"github.com/3to1go/shared/auth"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/shared/httpx"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -216,8 +218,8 @@ func (a *App) Handler() http.Handler {
 	// Users (auth required)
 	r.Get("/api/users", a.handleListUsers)
 	r.Post("/api/users", a.handleCreateUser)
-	r.Put("/api/users/{user_id}", withPathValues(a.handleUpdateUser, "user_id"))
-	r.Delete("/api/users/{user_id}", withPathValues(a.handleDeleteUser, "user_id"))
+	r.Put("/api/users/{user_id}", httpx.WithPathValues(a.handleUpdateUser, "user_id"))
+	r.Delete("/api/users/{user_id}", httpx.WithPathValues(a.handleDeleteUser, "user_id"))
 	// Overview + settings
 	r.Get("/api/overview", a.handleOverview)
 	r.Post("/api/settings", a.handleSaveSettings)
@@ -225,16 +227,16 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/admin/uploads/resume", a.handleResumeUploads)
 
 	// Instances
-	r.Delete("/api/instances/{edge_id}/{edge_instance_id}", withPathValues(a.handleDeleteInstance, "edge_id", "edge_instance_id"))
+	r.Delete("/api/instances/{edge_id}/{edge_instance_id}", httpx.WithPathValues(a.handleDeleteInstance, "edge_id", "edge_instance_id"))
 
 	// Credentials
 	r.Post("/api/credentials/mint", a.handleMintCredential)
-	r.Delete("/api/credentials/instances/{edge_id}/{edge_instance_id}", withPathValues(a.handleRevokeCredential, "edge_id", "edge_instance_id"))
+	r.Delete("/api/credentials/instances/{edge_id}/{edge_instance_id}", httpx.WithPathValues(a.handleRevokeCredential, "edge_id", "edge_instance_id"))
 
 	// Certificates
 	r.Get("/api/certificates", a.handleGetCertificates)
 	r.Post("/api/certificates/files", a.handleUploadCertificate)
-	r.Delete("/api/certificates/files/{filename}", withPathValues(a.handleDeleteCertificate, "filename"))
+	r.Delete("/api/certificates/files/{filename}", httpx.WithPathValues(a.handleDeleteCertificate, "filename"))
 
 	// Verify
 	r.Get("/api/admin/verify", a.handleGetVerifyStatus)
@@ -249,101 +251,35 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/hooks", a.handleGetHooks)
 	r.Post("/api/hooks", a.handleSaveHooks)
 	r.Post("/api/hooks/files", a.handleUploadHookFile)
-	r.Get("/api/hooks/files/{filename}", withPathValues(a.handleViewHookFile, "filename"))
-	r.Delete("/api/hooks/files/{filename}", withPathValues(a.handleDeleteHookFile, "filename"))
+	r.Get("/api/hooks/files/{filename}", httpx.WithPathValues(a.handleViewHookFile, "filename"))
+	r.Delete("/api/hooks/files/{filename}", httpx.WithPathValues(a.handleDeleteHookFile, "filename"))
 
 	// Snapshots (auth required for UI downloads)
-	r.Get("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", withPathValues(a.handleDownloadSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
-	r.Delete("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", withPathValues(a.handleDeleteSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
-	r.Get("/api/snapshots/{edge_id}/{job_name}/{filename}", withPathValues(a.handleDownloadSnapshot, "edge_id", "job_name", "filename"))
-	r.Delete("/api/snapshots/{edge_id}/{job_name}/{filename}", withPathValues(a.handleDeleteSnapshot, "edge_id", "job_name", "filename"))
+	r.Get("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDownloadSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
+	r.Delete("/api/snapshots/{edge_id}/{edge_instance_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDeleteSnapshotForInstance, "edge_id", "edge_instance_id", "job_name", "filename"))
+	r.Get("/api/snapshots/{edge_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDownloadSnapshot, "edge_id", "job_name", "filename"))
+	r.Delete("/api/snapshots/{edge_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDeleteSnapshot, "edge_id", "job_name", "filename"))
 
 	// Backup uploads (Bearer JWT auth, no session)
 	r.Post("/backup/uploads/initiate", a.handleInitiateUpload)
-	r.Put("/backup/uploads/{upload_id}/chunk", withPathValues(a.handleAppendChunk, "upload_id"))
-	r.Post("/backup/uploads/{upload_id}/finalize", withPathValues(a.handleFinalizeUpload, "upload_id"))
+	r.Put("/backup/uploads/{upload_id}/chunk", httpx.WithPathValues(a.handleAppendChunk, "upload_id"))
+	r.Post("/backup/uploads/{upload_id}/finalize", httpx.WithPathValues(a.handleFinalizeUpload, "upload_id"))
 
 	// Recovery (Bearer JWT auth)
-	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", withPathValues(a.handleDownloadLatest, "edge_id", "edge_instance_id", "job_name"))
-	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", withPathValues(a.handleDownloadByFingerprint, "edge_id", "edge_instance_id", "job_name"))
+	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/latest", httpx.WithPathValues(a.handleDownloadLatest, "edge_id", "edge_instance_id", "job_name"))
+	r.Get("/backup/recovery/{edge_id}/{edge_instance_id}/{job_name}/by-fingerprint", httpx.WithPathValues(a.handleDownloadByFingerprint, "edge_id", "edge_instance_id", "job_name"))
 
-	return a.requestLogger(newRateLimiter().middleware(a.sessionMiddleware(r)))
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (s *statusRecorder) WriteHeader(code int) {
-	s.status = code
-	s.ResponseWriter.WriteHeader(code)
+	return a.requestLogger(httpx.NewRateLimiter(specsForPath).Middleware(a.sessionMiddleware(r)))
 }
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		level := slog.LevelDebug
-		if r.Method != http.MethodGet {
-			level = slog.LevelInfo
-		}
-		a.logger.Log(r.Context(), level, "request",
-			"method", r.Method,
-			"path", path,
-			"status", rec.status,
-			"ms", time.Since(start).Milliseconds(),
-		)
-	})
-}
-
-func withPathValues(next http.HandlerFunc, names ...string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		for _, name := range names {
-			r.SetPathValue(name, chi.URLParam(r, name))
-		}
-		next(w, r)
-	}
+	return httpx.RequestLogger(a.logger, func(path string) bool {
+		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready"
+	}, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		cookie, _ := r.Cookie(store.SessionCookie)
-		var token string
-		if cookie != nil {
-			token = cookie.Value
-		}
-		user, _ := a.userStore.UserForSession(r.Context(), token)
-
-		ctx := context.WithValue(r.Context(), contextKeyUser, user)
-		r = r.WithContext(ctx)
-
-		if isPublicPath(path) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if strings.HasPrefix(path, "/api/") {
-			if user == nil {
-				writeError(w, http.StatusUnauthorized, "login required")
-				return
-			}
-			if user.MustChangePassword {
-				writeError(w, http.StatusForbidden, "password change required")
-				return
-			}
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return a.accountHandler().Middleware(next, isPublicPath)
 }
 
 func isPublicPath(path string) bool {
@@ -358,32 +294,12 @@ func isPublicPath(path string) bool {
 		strings.HasPrefix(path, "/backup/recovery/")
 }
 
-type contextKey string
+type contextKey = auth.ContextKey
 
-const contextKeyUser contextKey = "user"
+const contextKeyUser = auth.ContextKeyUser
 
-func currentUser(r *http.Request) *store.User {
-	u, _ := r.Context().Value(contextKeyUser).(*store.User)
-	return u
-}
+func currentUser(r *http.Request) *store.User { return auth.CurrentUser(r) }
 
-func requireUser(w http.ResponseWriter, r *http.Request) *store.User {
-	u := currentUser(r)
-	if u == nil {
-		writeError(w, http.StatusUnauthorized, "login required")
-		return nil
-	}
-	return u
-}
+func requireUser(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireUser(w, r) }
 
-func requireAdmin(w http.ResponseWriter, r *http.Request) *store.User {
-	u := requireUser(w, r)
-	if u == nil {
-		return nil
-	}
-	if !u.IsAdmin {
-		writeError(w, http.StatusForbidden, "admin required")
-		return nil
-	}
-	return u
-}
+func requireAdmin(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireAdmin(w, r) }

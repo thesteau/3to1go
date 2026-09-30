@@ -1,8 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "ts",
+    "rootDir": "../..",
     "outDir": "js"
   },
-  "include": ["ts"]
+  "include": [
+    "ts",
+    "../../shared/ts"
+  ]
 }

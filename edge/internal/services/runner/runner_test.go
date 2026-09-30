@@ -14,11 +14,11 @@ import (
 
 	"github.com/3to1go/edge/internal/backup"
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services/hooks"
 	"github.com/3to1go/edge/internal/services/locks"
 	"github.com/3to1go/edge/internal/services/ntfy"
 	"github.com/3to1go/edge/internal/services/state"
 	"github.com/3to1go/edge/internal/services/upload"
+	"github.com/3to1go/shared/hooks"
 	_ "modernc.org/sqlite"
 )
 
@@ -45,7 +45,7 @@ func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadCl
 		StateStore:    stateStore,
 		UploadClient:  client,
 		LockManager:   locks.NewJobLockManager(),
-		HookManager:   hooks.NewHookManager(t.TempDir(), logger),
+		HookManager:   hooks.NewHookManager("edge", t.TempDir(), logger),
 		NtfyPublisher: ntfy.NewNtfyPublisher(logger),
 	}
 }

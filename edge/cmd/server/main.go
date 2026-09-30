@@ -14,11 +14,12 @@ import (
 
 	"github.com/3to1go/edge/internal/api"
 	"github.com/3to1go/edge/internal/config"
-	"github.com/3to1go/edge/internal/services/certificates"
 	"github.com/3to1go/edge/internal/services/runner"
 	"github.com/3to1go/edge/internal/services/scheduler"
 	"github.com/3to1go/edge/internal/services/state"
 	"github.com/3to1go/edge/internal/store"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/configutil"
 )
 
 func main() {
@@ -78,7 +79,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	// Adjust log level now that settings are known.
-	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLogLevel(settings.LogLevel)}))
+	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: configutil.ParseLogLevel(settings.LogLevel)}))
 
 	// Migrate job state from the legacy JSON file (no-op if already done or not present).
 	if err := stateStore.MigrateFromFile(filepath.Join(settings.StateDir, "edge-state.json")); err != nil {
@@ -134,19 +135,6 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("server error: %w", err)
 	}
 	return nil
-}
-
-func parseLogLevel(level string) slog.Level {
-	switch level {
-	case "DEBUG":
-		return slog.LevelDebug
-	case "WARNING", "WARN":
-		return slog.LevelWarn
-	case "ERROR":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
 }
 
 func initialAdminPassword() string {

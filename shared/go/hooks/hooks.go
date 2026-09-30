@@ -19,21 +19,35 @@ const (
 
 var allowedHookSuffixes = map[string]bool{".sh": true, ".txt": true}
 
+// HookManager manages hook scripts and runs pre/post commands for an application.
 type HookManager struct {
 	ScriptsDir string
 	logger     *slog.Logger
+	app        string
+	waitDelay  time.Duration
 }
 
-func NewHookManager(scriptsDir string, logger *slog.Logger) *HookManager {
-	os.MkdirAll(scriptsDir, 0o755)
-	return &HookManager{ScriptsDir: scriptsDir, logger: logger}
-}
-
+// HookFileInfo describes a single hook script file.
 type HookFileInfo struct {
 	Name       string `json:"name"`
 	SizeBytes  int64  `json:"size_bytes"`
 	ModifiedAt string `json:"modified_at"`
 	Viewable   bool   `json:"viewable"`
+}
+
+func NewHookManager(app, scriptsDir string, logger *slog.Logger) *HookManager {
+	os.MkdirAll(scriptsDir, 0o755)
+	var waitDelay time.Duration
+	// Preserve Edge's bound on waiting for subprocess output pipes.
+	if app == "edge" {
+		waitDelay = time.Second
+	}
+	return &HookManager{ScriptsDir: scriptsDir, logger: logger, app: app, waitDelay: waitDelay}
+}
+
+// SetLogger replaces the logger (used when settings are reloaded at runtime).
+func (h *HookManager) SetLogger(logger *slog.Logger) {
+	h.logger = logger
 }
 
 func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]any {
@@ -72,7 +86,6 @@ func (h *HookManager) SaveUploadedFile(filename string, content []byte) (HookFil
 	if !allowedHookSuffixes[ext] {
 		return HookFileInfo{}, fmt.Errorf("only .sh scripts or .txt helper files are allowed")
 	}
-	text := string(content)
 	if !utf8.Valid(content) {
 		return HookFileInfo{}, fmt.Errorf("only UTF-8 text files are allowed")
 	}
@@ -82,6 +95,7 @@ func (h *HookManager) SaveUploadedFile(filename string, content []byte) (HookFil
 		return HookFileInfo{}, fmt.Errorf("only the first 3 files are supported here")
 	}
 
+	text := string(content)
 	if ext == ".sh" {
 		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 	}
@@ -91,8 +105,7 @@ func (h *HookManager) SaveUploadedFile(filename string, content []byte) (HookFil
 		return HookFileInfo{}, err
 	}
 	if ext == ".sh" {
-		info, _ := os.Stat(target)
-		if info != nil {
+		if info, err := os.Stat(target); err == nil {
 			os.Chmod(target, info.Mode()|0o700)
 		}
 	}
@@ -129,7 +142,12 @@ func (h *HookManager) DeleteFile(filename string) error {
 	return err
 }
 
+// RunCommand executes command in the hook scripts directory with THREETOONEGO_* env vars.
 func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) {
+	h.RunCommandContext(context.Background(), command, phase, hookCtx)
+}
+
+func (h *HookManager) RunCommandContext(parent context.Context, command, phase string, hookCtx map[string]any) {
 	normalized := strings.TrimSpace(command)
 	if normalized == "" {
 		return
@@ -137,7 +155,7 @@ func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) 
 
 	shellCmd := h.resolveCommand(normalized)
 	env := os.Environ()
-	env = append3to1goEnv(env, "APP", "central")
+	env = append3to1goEnv(env, "APP", h.app)
 	env = append3to1goEnv(env, "HOOK_PHASE", phase)
 	env = append3to1goEnv(env, "HOOK_SCRIPTS_DIR", h.ScriptsDir)
 	for k, v := range hookCtx {
@@ -148,10 +166,11 @@ func (h *HookManager) RunCommand(command, phase string, hookCtx map[string]any) 
 		env = append3to1goEnv(env, strings.ToUpper(k), val)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), hookTimeoutSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(parent, hookTimeoutSeconds*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", shellCmd)
+	cmd.WaitDelay = h.waitDelay
 	cmd.Dir = h.ScriptsDir
 	cmd.Env = env
 

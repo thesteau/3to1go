@@ -1,3 +1,4 @@
+const { loadFeature } = require('./helpers/scripts.cts');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,7 +14,7 @@ const plaintext = Buffer.from(Array.from({ length: (1 << 16) + 1000 }, (_, i) =>
 
 function cryptoContext(crypto = globalThis.crypto) {
   const ctx = vm.createContext({ crypto, atob, Blob });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../central/static/js/crypto.js'), 'utf8'), ctx);
+  loadFeature(ctx, 'central', 'crypto');
   return ctx;
 }
 
@@ -108,7 +109,7 @@ function downloadContext({ savedKey }) {
     setActionStatus() {}, loadOverview: async () => true,
   });
   for (const file of ['utils', 'crypto', 'keys', 'snapshots']) {
-    vm.runInContext(fs.readFileSync(path.join(__dirname, `../central/static/js/${file}.js`), 'utf8'), ctx);
+    loadFeature(ctx, 'central', file);
   }
   return { ctx, requests, downloads, prompts };
 }

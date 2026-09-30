@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/3to1go/shared/httpx"
 )
 
 func (a *App) handleGetVerifyStatus(w http.ResponseWriter, r *http.Request) {
@@ -9,15 +11,15 @@ func (a *App) handleGetVerifyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.verify == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "never_run"})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "never_run"})
 		return
 	}
 	result := a.verify.Latest()
 	if result == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "never_run"})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "never_run"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status":           "ok",
 		"checked_at":       result.CheckedAt,
 		"total_checked":    result.TotalChecked,
@@ -32,11 +34,11 @@ func (a *App) handleRunVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.verify == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "never_run", "total_checked": 0, "failure_count": 0})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "never_run", "total_checked": 0, "failure_count": 0})
 		return
 	}
 	result := a.verify.RunOnce(r.Context())
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status":           "ok",
 		"checked_at":       result.CheckedAt,
 		"total_checked":    result.TotalChecked,

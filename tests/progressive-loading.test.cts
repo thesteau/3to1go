@@ -1,3 +1,4 @@
+const { loadFeature } = require('./helpers/scripts.cts');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -5,7 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 function load(ctx, file) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), ctx);
+  const [app, feature] = file.match(/^(central|edge)\/static\/js\/(.+)\.js$/).slice(1);
+  loadFeature(ctx, app, feature);
 }
 
 test('Edge renders status and key before a slow directory scan completes', async () => {
