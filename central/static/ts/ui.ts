@@ -236,7 +236,8 @@ function fadeInNewContent(mutations: MutationRecord[]): void {
   const fade = (element: Element) => {
     if (!element.animate || !element.isConnected || faded.some((done) => done.contains(element))) return;
     faded.push(element);
-    element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+    // A soft start and long tail reads as easing in; plain ease-out jumps most of the way at once.
+    element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 480, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
   };
   // A section replacing its loading placeholder fades as a whole.
   placeholderTargets.forEach((target) => {

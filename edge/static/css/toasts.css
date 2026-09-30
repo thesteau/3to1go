@@ -24,7 +24,7 @@
   box-shadow: var(--shadow);
   color: var(--ink);
   opacity: 0;
-  transition: opacity 260ms ease-out;
+  transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toast.visible {
