@@ -85,7 +85,7 @@ credential="$(printf '%s' "$minted" | python3 -c 'import json,sys; print(json.lo
 
 docker run -d --name "$edge" --network "$network" -p 16556:6556 \
   -e CENTRAL_URL="http://$central:6555" -e EDGE_ID=e2e-edge \
-  -e EDGE_CREDENTIAL="$credential" -e SCAN_ROOT=/scan \
+  -e SCAN_ROOT=/scan \
   -e HTTP_HOST=0.0.0.0 -e HTTP_PORT=6556 \
   -e SESSION_COOKIE_SECURE=false \
   -v "$root/edge-config:/config" -v "$root/edge-state:/data/state" \
