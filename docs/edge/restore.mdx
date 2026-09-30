@@ -45,7 +45,7 @@ A job can only restore its **own** snapshots. You can't restore one job's snapsh
 - Edge must have the **same encryption key** that encrypted the snapshot. If it doesn't, the restore fails with "unable to decrypt snapshot with this Edge key".
 
 <Note>
-  After you [rotate the key](/edge/encryption-key#rotate-the-key), Edge can no longer restore snapshots made with the old key. Download those from Central's UI with the old key instead. See [Download a snapshot](/central/snapshots#download-a-snapshot).
+  After you [rotate the key](/edge/encryption-key#rotate-the-key), Edge can no longer restore snapshots made with the old key, and Central's UI stops accepting the old key after Edge's next upload. Download any older snapshots you need **before** rotating.
 </Note>
 
 ## Rebuilding a lost machine

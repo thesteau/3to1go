@@ -3,26 +3,30 @@ title: "Storage and the 3-2-1 rule"
 description: "Which copies 3to1go covers, and where Central can keep your snapshots."
 ---
 
-The [3-2-1 rule](https://en.wikipedia.org/wiki/Backup#Storage) says to keep **3** copies of your data, on **2** different media, with **1** offsite. 3to1go covers the first two copies. The third is up to you, and it may already be covered depending on where Central runs.
+The [3-2-1 rule](https://en.wikipedia.org/wiki/Backup#Storage) says to keep **3** copies of your data, on **2** different media, with **1** of them offsite. 3to1go gives you **two** copies: your live files and Central's snapshots. The third copy is always up to you.
 
 | Copy | What | Covered by |
 |------|------|------------|
 | 1: live data | The original files on your machine | Edge |
 | 2: second copy, different media | Encrypted snapshots on a separate machine | **3to1go: Edge → Central** |
-| 3: offsite | A copy that survives a local disaster | Your choice (see below) |
+| 3: third copy | An independent copy of Central's snapshots | Your choice (see below) |
 
-## Getting the offsite copy
+## Getting the third copy
 
-Central is always your own infrastructure, so it only counts as offsite if it runs somewhere genuinely separate.
+Copy Central's backup folder somewhere independent of Central. Where Central runs decides which copy is your offsite one:
 
 <CardGroup cols={2}>
-  <Card title="Central is already offsite" icon="globe">
-    Run Central on a VPS, at a family member's place, or on any host physically separate from your Edge machines. Edge → Central already gives you the offsite copy.
-  </Card>
   <Card title="Central is local" icon="house">
-    Run Central on a home NAS or server for fast access, then sync Central's backup folder somewhere else for the offsite copy.
+    Central runs on a home NAS or server for fast access. Sync its backup folder to offsite storage. That synced copy is both your **third** copy and your **offsite** one.
+  </Card>
+  <Card title="Central is offsite" icon="globe">
+    Central runs on a VPS, at a family member's place, or on another host physically separate from your Edge machines. Its snapshots are your **offsite** copy, but you still have only two copies. Add a third, such as a sync of Central's backup folder to another disk or provider.
   </Card>
 </CardGroup>
+
+<Warning>
+  Running Central offsite does **not** give you three copies on its own. If Central's disk fails at the same time as a machine, there's nothing else to restore from.
+</Warning>
 
 Because Central only holds encrypted archives, you can run it on hardware you don't fully control, and push its data to any storage without exposing your files.
 
