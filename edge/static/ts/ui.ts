@@ -9,6 +9,8 @@ interface AppDialogOptions {
 }
 
 const TOAST_DURATION_MS = 8000;
+// Matches the .toast opacity transition in toasts.css, so a toast finishes fading before removal.
+const TOAST_FADE_MS = 420;
 let _appDialogResolve: ((confirmed: boolean) => void) | null = null;
 
 function normalizeTheme(theme: string | undefined): "light" | "dark" {
@@ -46,7 +48,7 @@ function showToast(message: unknown, kind: StatusKind = "info", { duration = TOA
 
   window.setTimeout(() => {
     toast.classList.remove("visible");
-    window.setTimeout(() => toast.remove(), 180);
+    window.setTimeout(() => toast.remove(), TOAST_FADE_MS);
   }, duration);
 }
 
