@@ -36,6 +36,9 @@ Store the copied key somewhere that survives losing this machine, such as a pass
 </Warning>
 
 <Steps>
+  <Step title="Pause backup cycles">
+    Wait for any backup or restore operation to finish. In **Edit Edge Settings**, enable **Pause uploads (skip backup cycles)** and save. Confirm the setting is saved before continuing; if another cycle started and the save was rejected, wait for it to finish and try again. Keep cycles paused until the new-key backups below are complete.
+  </Step>
   <Step title="Download anything you want to keep">
     Before rotating, [download](/central/snapshots#download-a-snapshot) any older snapshots you may need from Central's UI while it still accepts the current key.
   </Step>
@@ -43,13 +46,18 @@ Store the copied key somewhere that survives losing this machine, such as a pass
     Click **Copy** and save the current key somewhere safe. The downloaded archives are already decrypted, but keep the key in case you need it later.
   </Step>
   <Step title="Rotate">
-    Wait for any backup or restore operation to finish. Clear any staged backups, then click **Rotate** and confirm.
+    With cycles paused, clear any staged backups, then click **Rotate** and confirm.
   </Step>
   <Step title="Save the new key">
     Copy and store the new key.
   </Step>
   <Step title="Create backups with the new key">
-    Use **Force Upload** on each job to build and upload a fresh archive, including jobs whose paths and sizes have not changed.
+    Refresh Edge and check each job for staged backups again. Before its first **Force Upload** after rotation, use **Clear staged backup** if one is present: Force Upload reuses staged archives, which may still use the old key.
+
+    Use **Force Upload** on each job, including jobs whose paths and sizes have not changed, and wait for each upload to finish. Force Upload works while backup cycles are paused. Confirm each job uploads successfully with the new key before continuing.
+  </Step>
+  <Step title="Resume backup cycles">
+    If you paused cycles for this rotation, turn off **Pause uploads (skip backup cycles)** in **Edit Edge Settings** and save. Leave it enabled if you intended to keep cycles paused.
   </Step>
 </Steps>
 
