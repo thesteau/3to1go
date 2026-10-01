@@ -2,8 +2,9 @@ name: Frontend
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "prod"]
   pull_request:
+    branches-ignore: [release-state]
   workflow_dispatch:
 
 permissions:
@@ -37,6 +38,9 @@ jobs:
 
       - name: Type-check and compile TypeScript
         run: npm run build
+
+      - name: Type-check release automation
+        run: npx tsc --noEmit --target es2022 --module commonjs --types node --skipLibCheck scripts/release-state.cts
 
       - name: Run UI tests
         run: node --test tests/*.cts

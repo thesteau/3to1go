@@ -2,8 +2,9 @@ name: Edge Tests
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "prod"]
   pull_request:
+    branches-ignore: [release-state]
   workflow_dispatch:
 
 permissions:
