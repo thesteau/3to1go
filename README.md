@@ -20,6 +20,8 @@ If you want the shortest mental model:
 4. Edge packs and encrypts those folders.
 5. Central stores the snapshots and lets you browse them in a web UI.
 
+Read the [documentation](https://3to1go.docs.thesteau.com/) for setup guides, configuration, and backup and restore workflows.
+
 ## Why Use 3to1go
 
 - **Simple Central/Edge model** - Central receives and organizes backups, while each Edge owns scanning, encryption, scheduling, and upload retries.
