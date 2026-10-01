@@ -42,9 +42,32 @@ Review the version, notes, and selected production SHA, then merge the metadata 
 
 `release-please-config.json` describes the bridge's supported configuration: the `go` strategy at repository root, unprefixed `vX.Y.Z` tags, and `initial-version: 1.0.0`. The library is pinned to `17.11.2` in `package.json` and the lockfile. The bridge validates these settings and does not support arbitrary Release Please plugins or extra-file updates. It does not version the private frontend tooling package or modify Go dependencies. Library upgrades must pass the release bridge tests because the bridge uses its programmatic strategy/PR/release APIs.
 
-Use Conventional Commits in changes merged to main: `fix:` produces a patch release, `feat:` a minor release, and `feat!:` or a `BREAKING CHANGE:` footer a major release. With squash merges into main, use the appropriate PR title as the squash commit message. Docs/chore-only changes normally do not create a release PR; they are included when a releasable change is promoted. The metadata PR updates as more changes reach prod, including its selected SHA. Review its current head before merging. Stale approvals must be dismissed when automation updates it.
+PR titles decide the version; see [PR titles and versions](#pr-titles-and-versions). The metadata PR updates as more changes reach prod, including its selected SHA. Review its current head before merging. Stale approvals must be dismissed when automation updates it.
 
 No back-merges or version-file synchronization are required. Neither main nor prod receives per-release version/changelog commits. Release state stays on its own branch, and Git tags point to application commits on prod. Do not merge the metadata branch into a code branch or add application files to it; validation rejects extra files, directories, and symlinks.
+
+## PR titles and versions
+
+Release Please reads only commit messages on prod. PRs into main are squash-merged, so **the PR title becomes the commit message** that decides the next version. The **PR title** workflow (`Validate Conventional Commit PR title`) rejects PRs into main whose title is not a Conventional Commit, and its run notice states the release effect.
+
+Title format: `<type>[(scope)][!]: <summary>`. Use a lowercase type, an optional lowercase scope such as `edge`, `central`, or `docs`, and a space after the colon.
+
+| Title | Example | Effect once promoted to prod |
+|---|---|---|
+| `feat:` | `feat(edge): add restore preview` | **Minor** — `1.2.3` → `1.3.0` |
+| `fix:` | `fix(central): keep retention count after restart` | **Patch** — `1.2.3` → `1.2.4` |
+| `perf:` | `perf: stream archives during upload` | **Patch** |
+| `revert:` | `revert: restore previous scan order` | **Patch** |
+| Any type with `!` | `feat(central)!: remove legacy upload API` | **Major** — `1.2.3` → `2.0.0` |
+| `docs:`, `chore:`, `refactor:`, `test:`, `build:`, `ci:`, `style:`, `deps:` | `docs: explain Kubernetes paths` | **No release on its own**; ships with the next releasing change |
+
+A release takes the largest bump among all commits promoted since the previous release. For example, three `fix:` PRs and one `feat:` PR together produce one minor release. Mark breaking changes with `!` in the title. A `BREAKING CHANGE:` footer also counts, but only if it ends up in the squash commit body, so the title is the reliable place. Use `!` for changes that need operator action on upgrade, such as removed configuration, incompatible Edge ↔ Central protocol changes, or migrations that cannot be rolled back.
+
+**The first stable release is always `v1.0.0`**, whatever the types or breaking markers in its history: `initial-version` sets it, and the bridge rejects any other first version. It still needs at least one releasing commit (`feat`, `fix`, `perf`, `revert`, or any `!`) on prod before Release Please proposes it.
+
+<Warning>
+  Configure GitHub so the title actually becomes the commit. In **Settings → General → Pull Requests**, set squash merging's default commit message to **Pull request title** (or **Pull request title and description**). Otherwise, a single-commit PR is squashed using that commit's own message. Do not squash the main → prod promotion PR: its `chore:` title would replace every promoted commit and nothing would release. Use **Create a merge commit** for promotion.
+</Warning>
 
 ## One-time GitHub setup and v1.0.0
 
@@ -71,8 +94,9 @@ For **main**, create an active branch ruleset targeting `refs/heads/main`: requi
 - `Run edge unit tests`
 - `Type-check, compile and run UI tests`
 - `Edge to Central backup and recovery`
+- `Validate Conventional Commit PR title`
 
-For **prod**, create the same active branch ruleset targeting `refs/heads/prod`, with the same four checks plus `Validate production PR source`. Require branches to be up to date before merging and at least one independent approval. The source check permits only same-repository `main` promotion. Do not require linear history on prod: promotion must preserve merge commits. Enable **Allow merge commits** in Settings → General → Pull Requests, and disable automatic head-branch deletion because `main` is a long-lived promotion head. If enforcing merge methods through rulesets, allow merge commits for prod.
+For **prod**, create the same active branch ruleset targeting `refs/heads/prod`, with the first four checks above (not the title check, which runs only on PRs into main) plus `Validate production PR source`. Require branches to be up to date before merging and at least one independent approval. The source check permits only same-repository `main` promotion. Do not require linear history on prod: promotion must preserve merge commits. Enable **Allow merge commits** in Settings → General → Pull Requests, and disable automatic head-branch deletion because `main` is a long-lived promotion head. If enforcing merge methods through rulesets, allow merge commits for prod.
 
 For **release-state**, create an active branch ruleset targeting `refs/heads/release-state`: require a PR, at least one independent approval, dismiss stale approvals, require conversation resolution, block force pushes, restrict deletion, and require the **Validate release metadata** commit status from GitHub Actions. The validation workflow explicitly publishes this status on the metadata PR head SHA; its automatic workflow check runs against the base commit and is named **Run release metadata validation**. Select **Validate release metadata** as the required status. Require branches to be up to date before merging. Do not require application build/test checks on this branch: it has no application code. Its dedicated check validates the entire metadata tree, version/manifest agreement, previous release boundary, production ancestry, and Release Please's calculated version/notes. It accepts only the same-repository automation branch. All automation code executes from trusted prod, never from the metadata PR.
 
