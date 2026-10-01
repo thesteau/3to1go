@@ -91,6 +91,25 @@ test('metadata dispatch resolves only open same-repository automation PRs into r
   }
 });
 
+test('PR titles must be Conventional Commits and report their release effect', async () => {
+  const run = new AsyncFunction('core', 'process', scripts('pr-title')[0]);
+  for (const [title, expected] of [
+    ['feat: add restore preview', 'notice:"feat" title: minor release once promoted to prod.'],
+    ['fix(edge): retry uploads', 'notice:"fix" title: patch release once promoted to prod.'],
+    ['perf: faster scans', 'notice:"perf" title: patch release once promoted to prod.'],
+    ['feat(central)!: drop legacy API', 'notice:"feat!" title: major release once promoted to prod.'],
+    ['chore!: remove old config keys', 'notice:"chore!" title: major release once promoted to prod.'],
+    ['docs: explain retention', 'notice:"docs" title: no release on its own once promoted to prod.'],
+    ['Add fading', 'failed'], ['feat:missing space', 'failed'], ['Feat: capitalised', 'failed'],
+    ['feature: unknown type', 'failed'], ['fix(Edge): uppercase scope', 'failed'], ['fix: ', 'failed']
+  ]) {
+    const calls: string[] = [];
+    await run({notice: (text: string) => calls.push('notice:' + text), setFailed: () => calls.push('failed')},
+      {env: {PR_TITLE: title}});
+    assert.deepEqual(calls, [expected], title);
+  }
+});
+
 test('metadata status reports pending and validation outcomes on the resolved PR head', async () => {
   const workflowScripts = scripts('release-state-check');
   for (const [index, result, expected] of [[1, 'success', 'pending'], [2, 'success', 'success'],
