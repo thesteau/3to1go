@@ -18,6 +18,12 @@ description: "3to1go is a self-hosted backup ecosystem made of two apps: Edge an
 
 Run one Central, and one Edge on every machine you want to back up. Each app has its own container, web UI, sign-in, and settings.
 
+<Frame caption="Three example machines sending backups to one Central. You can add more Edges.">
+  <img src="/images/backup-layout.svg" alt="Three Edges with separate IP addresses on port 6556 upload to Central on port 6555, with an optional external sync to cloud storage for a third copy." />
+</Frame>
+
+Each Edge keeps the original files on its machine; Central stores the second copy. An external sync tool can copy Central's encrypted snapshots to cloud storage for a **third copy**. You configure that extra copy separately. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
+
 ## The short version
 
 <Steps>
