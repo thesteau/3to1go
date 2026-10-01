@@ -3,7 +3,7 @@ title: "Encryption key"
 description: "Find, back up, and rotate the key Edge uses to encrypt every snapshot."
 ---
 
-Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central never has the key, so it only ever stores encrypted data.
+Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central's server never receives the key; its browser UI uses a key you paste locally to decrypt downloads.
 
 <Warning>
   If you lose the key, that Edge's snapshots are **permanently unrecoverable**. Nobody, including Central, can decrypt them. Back it up now.
@@ -13,6 +13,8 @@ Each Edge creates its own encryption key on first start and uses it to encrypt e
 
 - In the UI: **Encryption Key** on Edge's main page. It's masked; click **Copy** to copy it.
 - On disk: `config/encryption.key` next to Edge's `docker-compose.yml` (`/config/encryption.key` inside the container).
+
+The file contains 32 raw key bytes. The UI's **Copy** button provides their base64url text representation for pasting into Central. Preserve the file as-is when restoring Edge's config; do not replace it with the copied text.
 
 Edge also shows a **fingerprint** of the key. Central uses the fingerprint to confirm you've pasted the right key before it decrypts a download. It isn't secret and can't be used to decrypt anything.
 
@@ -27,7 +29,7 @@ Store the copied key somewhere that survives losing this machine, such as a pass
 
 ## Rotate the key
 
-**Rotate** generates a new key for **future** backups. Snapshots already on Central stay encrypted with the old key.
+**Rotate** generates a new key for archives built afterward. Snapshots already on Central stay encrypted with the old key. Rotation does not rebuild staged archives or force unchanged jobs to upload.
 
 <Warning>
   After rotating, older snapshots become hard to get back. Edge restores only use the new key. Central's UI checks every pasted key against the **latest** fingerprint Edge reported, and that switches to the new key on Edge's next upload. From then on Central rejects the old key, so its snapshots can't be downloaded from the UI either.
@@ -41,10 +43,13 @@ Store the copied key somewhere that survives losing this machine, such as a pass
     Click **Copy** and save the current key somewhere safe. The downloaded archives are already decrypted, but keep the key in case you need it later.
   </Step>
   <Step title="Rotate">
-    Click **Rotate** and confirm.
+    Wait for any backup or restore operation to finish. Clear any staged backups, then click **Rotate** and confirm.
   </Step>
   <Step title="Save the new key">
     Copy and store the new key.
+  </Step>
+  <Step title="Create backups with the new key">
+    Use **Force Upload** on each job to build and upload a fresh archive, including jobs whose paths and sizes have not changed.
   </Step>
 </Steps>
 

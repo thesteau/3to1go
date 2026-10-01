@@ -75,6 +75,6 @@ Central stores snapshots under both, so two installations never write into the s
 
 Each Edge generates its own `encryption.key` on first run and encrypts every archive before upload. Central stores the encrypted blobs as-is.
 
-When you download a snapshot from Central's UI, the browser asks for that Edge's key and decrypts the file locally. Central compares the key's fingerprint with the one Edge reported, so it can tell you if you pasted the wrong key before trying to decrypt.
+When you download a snapshot from Central's UI, the browser asks for that Edge's key and decrypts the file locally. The browser compares the key's fingerprint with the one Edge reported, so it can tell you if you pasted the wrong key before trying to decrypt. The key is never sent to Central's server.
 
 See [Encryption key](/edge/encryption-key) for how to find, back up, and rotate the key.

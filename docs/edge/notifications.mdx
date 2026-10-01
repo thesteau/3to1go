@@ -5,6 +5,8 @@ description: "Get an ntfy message when Edge successfully uploads a job to Centra
 
 Edge can post a message to an [ntfy](https://ntfy.sh) topic after a job uploads **successfully**. Publishing is optional and best-effort: a failed notification never blocks an upload.
 
+This runs for scheduled cycles and **Run Backup Cycle Now**. Individual **Force Upload** actions currently bypass Edge's notification step; Central can still notify when it stores that upload.
+
 <Note>
   Central has its own, separate notification settings that fire when Central receives an upload. See [Central notifications](/central/notifications). Configure whichever side you prefer, or both.
 </Note>

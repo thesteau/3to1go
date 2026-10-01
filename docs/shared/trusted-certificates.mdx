@@ -3,7 +3,9 @@ title: "Trusted certificates"
 description: "Let Central and Edge verify internal HTTPS services signed by your own CA."
 ---
 
-If Central, Edge, or your ntfy server use HTTPS certificates from a private CA (for example `https://ntfy.home`), add that CA so the apps trust it. This works the same way in both apps, and each app keeps its own list.
+If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Edge needs to trust Central's CA, and each app needs to trust its ntfy server's CA. Each app keeps its own list.
+
+This configures outbound trust. It does not enable HTTPS on either web UI or make your browser trust a private CA; configure HTTPS at your reverse proxy and browser separately.
 
 ## Upload from the UI
 
@@ -12,7 +14,7 @@ If Central, Edge, or your ntfy server use HTTPS certificates from a private CA (
     Open **Edit Central Settings** in Central, or **Edit Edge Settings** in Edge.
   </Step>
   <Step title="Add the certificate">
-    Under **Trusted Certificates**, upload your CA or root certificate as a PEM `.crt` file.
+    Under **Trusted Certificates**, upload your CA or root certificate as a PEM `.crt` file. Each app supports up to ten uploaded certificate files.
   </Step>
 </Steps>
 

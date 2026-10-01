@@ -69,7 +69,7 @@ The example Compose file keeps everything next to it:
 ```
 
 <Warning>
-  Back up `config/` (it holds `issuer.key`) and `data/postgres/`. Losing the database loses snapshot metadata, users, and credential records; losing `issuer.key` invalidates every Edge credential.
+  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records; losing `issuer.key` invalidates every Edge credential.
 </Warning>
 
 ## Update

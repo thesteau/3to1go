@@ -28,6 +28,10 @@ A **job** is a folder Edge backs up. Any folder under the scan root that contain
 
 **Stop Backing Up** removes the marker. Existing snapshots on Central are kept.
 
+<Frame caption="The Job Editor writes the folder's .upload_dir settings.">
+  <img src="/images/workflows/job-editor.png" alt="Edge Job Editor with directory, job name, exclusion patterns, hidden files, and symlink settings" />
+</Frame>
+
 ## Create a job with a file
 
 Create `.upload_dir` in the folder. An empty file uses the folder name as the job name:
@@ -55,6 +59,8 @@ If the YAML is invalid or `job_name` has disallowed characters, Edge skips the j
 </Warning>
 
 Once Edge finds a marker, it doesn't look for more markers inside that folder: a nested folder is already covered by its parent job.
+
+Archives contain regular files. Empty directories and special files are not archived, and the job root's `.upload_dir` is excluded. A job with no included files is skipped. With **Follow symlinks** enabled, Edge stores the target's files rather than preserving the links themselves.
 
 ## Exclusions
 
@@ -85,7 +91,7 @@ On a job, click **Files & exclusions** to browse its files with their sizes.
 | Button | What it does |
 |---|---|
 | **Files & exclusions** | Browse the job's files and manage exclusions. |
-| **Force Upload** | Back up now, even if nothing changed. Central may report it as a duplicate. |
+| **Force Upload** | Upload this job even if its fingerprint is unchanged. Reuses a staged archive if one exists; clear it first to build a fresh backup. Central may report an identical encrypted archive as a duplicate. |
 | **Restore** | Restore a snapshot from Central into this folder. See [Restore](/edge/restore). |
 | **Edit** | Open the Job Editor. |
 | **Clear staged backup** | Shown when an archive is waiting to upload. Deletes it and resets retry state. Your files, backup history, and Central snapshots are kept. |
@@ -95,6 +101,8 @@ On a job, click **Files & exclusions** to browse its files with their sizes.
 ## When a job is backed up
 
 On each scheduled cycle, Edge compares the job's file paths and sizes with its last backup. It only builds and uploads a new snapshot when they differ.
+
+If a failed upload has a staged archive ready for retry, Edge retries that archive first. New edits and exclusions are picked up when a fresh archive is built.
 
 To run a cycle for all jobs without waiting for the schedule, click **Run Backup Cycle Now**. It follows the same rule, so unchanged jobs are skipped.
 
