@@ -23,4 +23,4 @@ jobs:
         run: docker build -t 3to1go-edge-validation -f edge/Dockerfile .
 
       - name: Run end-to-end test
-        run: bash integration/e2e.sh
+        run: bash tests/integration/e2e.sh
