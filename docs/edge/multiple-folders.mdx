@@ -85,3 +85,5 @@ Adding a volume only makes a folder **visible**. It isn't backed up until you cr
 - **Mounts need write access** for Edge to save markers and restore files.
 - **Max Depth counts the extra level.** The `/scan/<name>` folders add one level, so raise **Max Depth** in settings if your markers are deep.
 - **Moving an existing folder under a new mount?** Keep its job name so it continues its history on Central. Edge's local state is keyed by path, so the next scan may upload it again.
+
+These steps also apply to the development Compose file in `edge/`. Adding mounts does not require a Central storage migration: snapshots remain organized by `edge_id/edge_instance_id/job_name`.

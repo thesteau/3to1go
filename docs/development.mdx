@@ -1,0 +1,67 @@
+---
+title: "Developing both apps"
+description: "Repository layout, frontend generation, tests, and local Docker builds."
+---
+
+Central and Edge are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `central/` | Central's receiver API, storage logic, and web UI |
+| `edge/` | Edge's scanning, encryption, upload, restore, and web UI |
+| `shared/go/` | Wire protocol, authentication, HTTP helpers, certificates, hooks, ntfy templates, locks, configuration helpers, and web UI serving |
+| `shared/ts/` | Browser scripts and types compiled into both UIs |
+| `tests/` | TypeScript frontend tests |
+| `deploy-example/central/`, `deploy-example/edge/` | Compose deployments using published images |
+| `docs/` | Mintlify documentation |
+
+The root `go.work` joins three Go modules: `central`, `edge`, and `shared/go`. Behavior specific to one app stays in that app's directory. Go also discovers the parent workspace when commands run inside an app directory.
+
+## Build and test locally
+
+Use the Go version declared in the repository's `go.work` and module files, and **Node.js 24** for the frontend build and tests. Run these commands from the repository root:
+
+```sh
+npm ci
+npm run build
+go test ./shared/go/... ./central/... ./edge/...
+```
+
+Build an individual server from its app directory after generating the frontend:
+
+```sh
+cd central
+go build ./cmd/server
+```
+
+Use `edge` in place of `central` to build Edge. To run the frontend tests from the repository root:
+
+```sh
+npm test
+```
+
+`npm test` rebuilds both UIs and runs `tests/*.cts` directly with Node. The CI Go test jobs also enable the race detector.
+
+## Frontend sources and generated files
+
+Edit TypeScript in `central/static/ts`, `edge/static/ts`, or `shared/ts`. Each app compiles shared scripts with its own sources. These are classic scripts sharing one global scope per app; inline HTML handlers call their functions, so do not add `import` or `export`.
+
+The generated `central/static/js` and `edge/static/js` directories are embedded by Go. Generate them before `go build` or `go test`. After `npm ci`, either run `npm run build` at the root or `go generate ./...` from the relevant app directory.
+
+Generated JavaScript is gitignored and dockerignored. Do not edit or commit it, JavaScript source maps, or other `.js`, `.mjs`, `.cjs`, or `.jsx` files. Frontend tests belong in TypeScript (`tests/*.cts`); CI rejects tracked JavaScript.
+
+For continuous compilation, use `npm run watch` for Central or `npm run watch:edge` for Edge. Rebuild and restart the Go server to serve updated embedded assets.
+
+## Build with Docker Compose
+
+Use `central/docker-compose.yml` and `edge/docker-compose.yml` for builds from this checkout. Each uses the repository root as its Docker build context so shared code is included. The Dockerfiles compile the frontend in a Node stage before building Go.
+
+Copy the app's `.env.example` to `.env` and configure it as described in [Central installation](/central/install) or [Edge installation](/edge/install). Then, from that app's directory:
+
+```sh
+docker compose up -d --build
+```
+
+Use `deploy-example/` for published-image deployments instead. The same [multiple-folder mount instructions](/edge/multiple-folders) apply to either Edge Compose file.

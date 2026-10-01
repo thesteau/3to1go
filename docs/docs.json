@@ -46,6 +46,10 @@
           {
             "group": "Both apps",
             "pages": ["shared/sign-in", "shared/trusted-certificates"]
+          },
+          {
+            "group": "Contributing",
+            "pages": ["development"]
           }
         ]
       },
