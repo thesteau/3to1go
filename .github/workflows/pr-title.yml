@@ -23,12 +23,13 @@ jobs:
             const releasing = {feat: 'minor', fix: 'patch', perf: 'patch', revert: 'patch'};
             const quiet = ['docs', 'chore', 'refactor', 'test', 'build', 'ci', 'style', 'deps'];
             const match = /^([a-z]+)(\([a-z0-9._/-]+\))?(!)?: \S/.exec(title);
-            if (!match || !(match[1] in releasing || quiet.includes(match[1]))) {
+            const bump = match && Object.hasOwn(releasing, match[1]) ? releasing[match[1]] : null;
+            if (!match || !(bump || quiet.includes(match[1]))) {
               core.setFailed(`PR title "${title}" is not a Conventional Commit title. Use "<type>[(scope)][!]: <summary>" ` +
                 `where type is one of: ${[...Object.keys(releasing), ...quiet].join(', ')}. ` +
                 'See docs/releases.mdx#pr-titles-and-versions.');
               return;
             }
             const effect = match[3] ? 'major release' :
-              match[1] in releasing ? `${releasing[match[1]]} release` : 'no release on its own';
+              bump ? `${bump} release` : 'no release on its own';
             core.notice(`"${match[1]}${match[3] ?? ''}" title: ${effect} once promoted to prod.`);

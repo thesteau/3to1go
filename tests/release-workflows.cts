@@ -101,7 +101,7 @@ test('PR titles must be Conventional Commits and report their release effect', a
     ['chore!: remove old config keys', 'notice:"chore!" title: major release once promoted to prod.'],
     ['docs: explain retention', 'notice:"docs" title: no release on its own once promoted to prod.'],
     ['Add fading', 'failed'], ['feat:missing space', 'failed'], ['Feat: capitalised', 'failed'],
-    ['feature: unknown type', 'failed'], ['fix(Edge): uppercase scope', 'failed'], ['fix: ', 'failed']
+    ['feature: unknown type', 'failed'], ['constructor: inherited key', 'failed'], ['fix(Edge): uppercase scope', 'failed'], ['fix: ', 'failed']
   ]) {
     const calls: string[] = [];
     await run({notice: (text: string) => calls.push('notice:' + text), setFailed: () => calls.push('failed')},
