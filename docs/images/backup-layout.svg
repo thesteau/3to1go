@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="410" viewBox="0 0 960 410" role="img" aria-labelledby="title description">
+  <title id="title">Several Edges back up to one Central</title>
+  <desc id="description">Edge 1 at 192.168.1.21:6556, Edge 2 at 192.168.1.22:6556, and Edge 3 at 192.168.1.23:6556 each encrypt backups locally before uploading to Central at 192.168.1.10:6555. An external sync tool can copy Central's encrypted snapshots to cloud storage for copy 3.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="410" rx="18" fill="#faf8f5"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#242a35" text-anchor="middle">
+    <text x="133" y="35" font-size="15" font-weight="700">1 · Original files</text>
+    <text x="476" y="35" font-size="15" font-weight="700">2 · Encrypted backups</text>
+    <text x="812" y="35" font-size="15" font-weight="700">3 · Independent copy</text>
+    <g fill="#fff" stroke="#cdd3dc" stroke-width="1.5">
+      <rect x="24" y="65" width="218" height="80" rx="12"/>
+      <rect x="24" y="175" width="218" height="80" rx="12"/>
+      <rect x="24" y="285" width="218" height="80" rx="12"/>
+    </g>
+    <g font-size="19" font-weight="700">
+      <text x="133" y="89">Edge 1 · Laptop</text>
+      <text x="133" y="199">Edge 2 · Desktop</text>
+      <text x="133" y="309">Edge 3 · Server</text>
+    </g>
+    <g font-size="15">
+      <text x="133" y="111">192.168.1.21:6556</text>
+      <text x="133" y="221">192.168.1.22:6556</text>
+      <text x="133" y="331">192.168.1.23:6556</text>
+    </g>
+    <g font-size="13" fill="#6a3440">
+      <text x="133" y="132">Encrypts before upload</text>
+      <text x="133" y="242">Encrypts before upload</text>
+      <text x="133" y="352">Encrypts before upload</text>
+    </g>
+    <g fill="none" stroke="#a52b3d" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M242 105 H290 Q305 105 305 120 V185 H366"/>
+      <path d="M242 215 H366"/>
+      <path d="M242 325 H290 Q305 325 305 310 V245 H366"/>
+    </g>
+    <text x="305" y="78" font-size="13" fill="#6a3440">Upload</text>
+    <rect x="370" y="155" width="212" height="120" rx="14" fill="#fff0f2" stroke="#a52b3d" stroke-width="2"/>
+    <text x="476" y="191" font-size="24" font-weight="700">Central</text>
+    <text x="476" y="221" font-size="16">192.168.1.10:6555</text>
+    <text x="476" y="250" font-size="14">Stores all Edge snapshots</text>
+    <path d="M584 215 H708" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
+    <text x="646" y="180" font-size="13">External sync</text>
+    <text x="646" y="250" font-size="13">Optional</text>
+    <path d="M748 270 C701 270 701 209 732 197 C722 153 778 129 806 158 C834 124 889 146 885 190 C939 188 949 270 897 270 Z" fill="#edf3fb" stroke="#7890af" stroke-width="1.5"/>
+    <text x="818" y="219" font-size="21" font-weight="700">Cloud storage</text>
+    <text x="818" y="247" font-size="14">Encrypted snapshots</text>
+    <text x="480" y="393" font-size="13" fill="#586273">Example LAN addresses · Each app has its own web UI · Add more Edges as needed</text>
+  </g>
+</svg>

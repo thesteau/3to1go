@@ -5,6 +5,14 @@ description: "Follow a folder from its .upload_dir marker to a stored, encrypted
 
 Edge and Central are separate apps with separate jobs. Edge does all the work that needs your plaintext files. Central only ever receives encrypted archives.
 
+<Frame caption="Each Edge uploads independently to the same Central. The cloud copy is handled by an external tool.">
+  <img src="/images/backup-layout.svg" alt="Edge 1 at 192.168.1.21:6556, Edge 2 at 192.168.1.22:6556, and Edge 3 at 192.168.1.23:6556 send backups to Central at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
+</Frame>
+
+The addresses above are examples: each machine has its own IP, so its Edge UI can use the same port, **6556**. All three Edges set their **Central URL** to the same receiver, shown here as `http://192.168.1.10:6555`. Use your own reachable address, with HTTPS when configured.
+
+The numbers count copies of each machine's data: **1** is its original files, **2** is Central's snapshots, and **3** is an independent copy made by an external sync tool. Central does not upload to cloud storage itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1) for how location and storage choices affect those copies.
+
 | | Edge | Central |
 |---|---|---|
 | Runs on | Each machine with files to back up | One always-on host |
