@@ -1,0 +1,65 @@
+name: Release metadata
+
+on:
+  pull_request_target:
+    branches: [release-state]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  metadata:
+    name: Run release metadata validation
+    runs-on: ubuntu-latest
+    steps:
+      # pull_request_target's automatic check belongs to the base commit.
+      # Publish the required status explicitly on the metadata PR head instead.
+      - name: Mark metadata validation pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: context.payload.pull_request.head.sha,
+              context: 'Validate release metadata',
+              state: 'pending',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+      - name: Require automation branch in this repository
+        env:
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          [[ "$SAME_REPO" == true && "$HEAD_BRANCH" == release-please--branches--release-state ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: prod
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Validate metadata without executing PR code
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_OPERATION: check
+          RELEASE_STATE_REF: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/release-state.cts
+      - name: Report metadata validation result on PR head
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          VALIDATION_RESULT: ${{ job.status }}
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: context.payload.pull_request.head.sha,
+              context: 'Validate release metadata',
+              state: process.env.VALIDATION_RESULT === 'success' ? 'success' : 'failure',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
