@@ -81,7 +81,7 @@ curl -fsS -b "$cookie_central" -H 'Content-Type: application/json' \
   http://127.0.0.1:16555/api/session/change-password >/dev/null
 minted="$(curl -fsS -b "$cookie_central" -H 'Content-Type: application/json' \
   -d '{"shared":false}' http://127.0.0.1:16555/api/credentials/mint)"
-credential="$(printf '%s' "$minted" | python3 -c 'import json,sys; print(json.load(sys.stdin)["credential"])')"
+credential="$(printf '%s' "$minted" | jq -er '.credential')"
 
 docker run -d --name "$edge" --network "$network" -p 16556:6556 \
   -e CENTRAL_URL="http://$central:6555" -e EDGE_ID=e2e-edge \
@@ -101,13 +101,13 @@ curl -fsS -b "$cookie_edge" -H 'Content-Type: application/json' \
   -d '{"current_password":"admin","new_password":"e2e-admin","confirm_new_password":"e2e-admin"}' \
   http://127.0.0.1:16556/api/session/change-password >/dev/null
 settings_payload="$(curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/settings | \
-  python3 -c 'import json,sys; p=json.load(sys.stdin)["settings"]; p["edge_credential"]="'"$credential"'"; print(json.dumps(p))')"
+  jq -ec --arg credential "$credential" '.settings | objects | .edge_credential = $credential')"
 curl -fsS -b "$cookie_edge" -H 'Content-Type: application/json' \
   -X POST -d "$settings_payload" http://127.0.0.1:16556/api/settings >/dev/null
 curl -fsS -b "$cookie_edge" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
 
 instance="$(curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/status | \
-  python3 -c 'import json,sys; print(json.load(sys.stdin)["edge_instance_id"])')"
+  jq -er '.edge_instance_id')"
 
 for _ in $(seq 1 90); do
   if curl -fsS -H "Authorization: Bearer $credential" \

@@ -1,11 +1,4 @@
 .env
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.data/
 */.env
 */config/
 */hook-scripts/
@@ -15,8 +8,6 @@ __pycache__/
 */secrets/
 data/
 certs/
-.auth_token
-relay_auth_token
 node_modules/
 # JavaScript is build output only; source and tests belong in TypeScript.
 *.js
