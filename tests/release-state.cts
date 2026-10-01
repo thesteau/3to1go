@@ -139,12 +139,17 @@ test('real Release Please handles repeated promotions without release metadata o
     approved = proposed;
     git('checkout', 'main');
     writeFileSync(join(folder, 'app.txt'), 'documentation while approval is pending');
-    git('add', 'app.txt'); git('commit', '-m', 'docs: expand usage');
+    git('add', 'app.txt'); git('commit', '-m', 'fix: expand usage');
     git('checkout', 'prod'); git('merge', '--no-ff', 'main', '-m', 'chore: promote main to prod');
     git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'prod'));
     assert.notEqual(approved.prodSha, git('rev-parse', 'prod'));
     context.mock.timers.enable({apis: ['Date'], now: Date.now() + 86400000});
+    const createPullRequest = client.createPullRequest;
+    client.createPullRequest = async () => {throw new Error('Next proposal PR creation failed');};
+    // Publishing must complete independently of a failure in the next plan.
     await bridge.publish(client, api, {}, 'state');
+    await assert.rejects(bridge.plan(client, api, {}), /Next proposal PR creation failed/);
+    client.createPullRequest = createPullRequest;
     assert.equal(tags['v1.0.0'], approved.prodSha); // The recorded SHA, not the later prod head.
     await bridge.publish(client, api, {}, 'state'); // Retry does not move the tag or release.
     assert.equal(Object.keys(releases).length, 1);
