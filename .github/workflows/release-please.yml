@@ -1,0 +1,49 @@
+name: Stable release
+
+on:
+  push:
+    branches: [prod]
+  pull_request_target:
+    branches: [release-state]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan a release, or retry publishing approved release-state
+        type: choice
+        options: [plan, publish]
+        default: plan
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-state
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && (github.ref_name == 'main' || github.ref_name == 'prod')) ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.head.ref == 'release-please--branches--release-state')
+    runs-on: ubuntu-latest
+    steps:
+      # Never execute code from the metadata branch or a PR head.
+      - uses: actions/checkout@v4
+        with:
+          ref: prod
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Plan or publish the recorded production commit
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_OPERATION: ${{ github.event_name == 'pull_request_target' && 'publish' || inputs.operation || 'plan' }}
+          RELEASE_STATE_REF: ${{ github.event.pull_request.merge_commit_sha || 'release-state' }}
+        run: node scripts/release-state.cts

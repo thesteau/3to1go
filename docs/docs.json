@@ -49,7 +49,7 @@
           },
           {
             "group": "Contributing",
-            "pages": ["development"]
+            "pages": ["development", "releases", "release-state-recovery"]
           }
         ]
       },
