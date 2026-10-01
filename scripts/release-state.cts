@@ -205,8 +205,6 @@ async function publish(github: any, api: any, repo: any, ref: string): Promise<v
     });
     console.log(`Published ${state.tag} at approved production commit ${state.prodSha}.`);
   }
-  // A prod push could have arrived while the metadata PR was awaiting approval.
-  await plan(github, api, repo);
 }
 
 async function main(): Promise<void> {

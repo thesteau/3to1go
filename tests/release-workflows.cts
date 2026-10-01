@@ -27,14 +27,45 @@ test('release automation dispatches metadata validation and images using trusted
       }},
       actions: {createWorkflowDispatch: async (args: any) => calls.push(args)}
     }};
-    await new AsyncFunction('github', 'context', 'process', 'Buffer', scripts('release-please')[0])(
-      github, {repo}, {env: {RELEASE_OPERATION: operation, RELEASE_STATE_REF: 'approved-merge-sha'}}, Buffer
-    );
+    const releaseScripts = scripts('release-please');
+    if (operation === 'publish') {
+      await new AsyncFunction('github', 'context', 'process', 'Buffer', releaseScripts[0])(
+        github, {repo}, {env: {RELEASE_STATE_REF: 'approved-merge-sha'}}, Buffer
+      );
+    }
+    await new AsyncFunction('github', 'context', releaseScripts[1])(github, {repo});
     assert.deepEqual(calls, [
       ...(operation === 'publish' ? [{...repo, workflow_id: 'stable-docker-images.yml', ref: 'prod', inputs: {tag: 'v1.2.3'}}] : []),
       {...repo, workflow_id: 'release-state-check.yml', ref: 'prod', inputs: {pr: '42'}}
     ]);
   }
+});
+
+test('a failed next proposal cannot prevent dispatch of already-published release images', async () => {
+  const source = readFileSync(resolve(__dirname, '..', '.github/workflows/release-please.yml'), 'utf8');
+  const steps = source.split(/^      - /m).slice(1);
+  const calls: string[] = [];
+  const github = {rest: {
+    repos: {getContent: async () => ({data: {content: Buffer.from('{"tag":"v1.2.3"}').toString('base64')}})},
+    actions: {createWorkflowDispatch: async (args: any) => calls.push(args.inputs.tag)}
+  }};
+  // Execute the publication-related steps in workflow order. The next proposal
+  // fails, as it would if GitHub rejected its PR creation after publication.
+  await assert.rejects(async () => {
+    for (const step of steps) {
+      if (step.startsWith('name: Plan or publish the recorded production commit')) calls.push('published');
+      if (step.startsWith('name: Start stable image publishing')) {
+        await new AsyncFunction('github', 'context', 'process', 'Buffer', scripts('release-please')[0])(
+          github, {repo}, {env: {RELEASE_STATE_REF: 'approved-merge-sha'}}, Buffer
+        );
+      }
+      if (step.startsWith('name: Plan next release after publication')) {
+        calls.push('planning');
+        throw new Error('Next proposal PR creation failed');
+      }
+    }
+  }, /Next proposal PR creation failed/);
+  assert.deepEqual(calls, ['published', 'v1.2.3', 'planning']);
 });
 
 test('metadata dispatch resolves only open same-repository automation PRs into release-state', async () => {
