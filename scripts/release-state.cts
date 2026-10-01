@@ -211,8 +211,8 @@ async function publish(github: any, api: any, repo: any, ref: string): Promise<v
 
 async function main(): Promise<void> {
   const [owner, repoName] = (process.env.GITHUB_REPOSITORY ?? '').split('/');
-  invariant(owner && repoName && process.env.RELEASE_PLEASE_TOKEN, 'Repository and release token are required');
-  const github = await GitHub.create({owner, repo: repoName, defaultBranch: 'prod', token: process.env.RELEASE_PLEASE_TOKEN});
+  invariant(owner && repoName && process.env.GH_TOKEN, 'Repository and workflow token are required');
+  const github = await GitHub.create({owner, repo: repoName, defaultBranch: 'prod', token: process.env.GH_TOKEN});
   const api = github.getGitHubApi().octokit;
   const repo = {owner, repo: repoName};
   git('fetch', 'origin', 'prod');

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: promote-main-to-prod
@@ -17,10 +18,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      # A separate token is necessary so bot-created PRs trigger required CI.
       - uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           script: |
             const {owner, repo} = context.repo;
             await github.rest.repos.getBranch({owner, repo, branch: 'prod'});
