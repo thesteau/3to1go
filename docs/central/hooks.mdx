@@ -6,7 +6,7 @@ description: "Run your own commands before and after Central stores an upload."
 Hooks let Central run a shell command at two points while storing an upload:
 
 - **Pre command**: after an upload has arrived and passed its checksum, before Central stores it. Central waits for it to finish.
-- **Post command**: after Central has stored it (or failed to).
+- **Post command**: after storage succeeds, or when storing a new archive fails. Earlier failures, such as a checksum mismatch, do not run the post command. Retrying a completed upload does not rerun hooks.
 
 Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
 

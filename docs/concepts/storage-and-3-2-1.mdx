@@ -32,14 +32,16 @@ Because Central only holds encrypted archives, you can run it on hardware you do
 
 ## Where Central can store snapshots
 
-Central writes plain files into its backup folder (`/backups` inside the container, set by `BACKUP_DIR` in Compose). It doesn't care what is behind that folder, so you can point it at any mounted filesystem:
+Central writes encrypted archive files into its backup folder (`/backups` inside the container, set by `BACKUP_DIR` in Compose). Storage is accessed through ordinary filesystem operations:
 
 - **Local disk.** The default. Fast and simple.
-- **Mounted NAS.** Works out of the box. Central handles moves across filesystems when the backup folder is on a different device from its temp directory.
+- **Mounted NAS.** Mount it on the Docker host and give Central write access. Central handles moves across filesystems when the backup folder is on a different device from its staging directory.
 - **Removable hard drive.** Mount it and point `BACKUP_DIR` at it.
 - **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The desktop client replicates it to the cloud, and the provider only ever sees encrypted archives.
-- **S3, Backblaze B2, or other object storage.** Mount the bucket as a local filesystem first (for example with `rclone mount`) and point `BACKUP_DIR` at the mount. Or keep snapshots on local disk and run `rclone sync` or `aws s3 sync` on a schedule.
+- **Object storage.** Central has no native object-storage backend. Use an external tool to copy the local backup folder to your provider. If using a filesystem mount over object storage, verify that it supports Central's file writes, listing, renames, and deletion before relying on it.
 
 <Note>
   Central is not a sync engine. It just writes files, so any tool that can replicate a directory can handle the rest.
 </Note>
+
+Keep Edge's encryption keys independently of these copies. To recover the Central service as well as the archives, also preserve its signing key and PostgreSQL database as described in [Install Central](/central/install#what-gets-created). A mirror can propagate retention deletions, so its history depends on the replication tool and destination's retention settings.

@@ -3,7 +3,7 @@ title: "Central notifications"
 description: "Get an ntfy message whenever Central receives a snapshot."
 ---
 
-Central can post a message to an [ntfy](https://ntfy.sh) topic each time it finishes processing an upload. That includes an upload it failed to store, so a message isn't proof of success. Publishing is optional and best-effort: a failed notification never blocks Central.
+Central can post a message to an [ntfy](https://ntfy.sh) topic after the storage step of upload finalization. That includes some storage failures, so a message isn't proof of success. Earlier failures, such as a rejected request or checksum mismatch, do not send a notification. Publishing is optional and best-effort: a failed notification never blocks Central.
 
 <Note>
   Edge has its own, separate notification settings that fire when an upload **succeeds from Edge's side**. See [Edge notifications](/edge/notifications). You can use either or both.

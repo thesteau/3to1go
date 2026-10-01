@@ -3,7 +3,7 @@ title: "Encryption key"
 description: "Find, back up, and rotate the key Edge uses to encrypt every snapshot."
 ---
 
-Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central never has the key, so it only ever stores encrypted data.
+Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central's server never receives the key; its browser UI uses a key you paste locally to decrypt downloads.
 
 <Warning>
   If you lose the key, that Edge's snapshots are **permanently unrecoverable**. Nobody, including Central, can decrypt them. Back it up now.
@@ -13,6 +13,8 @@ Each Edge creates its own encryption key on first start and uses it to encrypt e
 
 - In the UI: **Encryption Key** on Edge's main page. It's masked; click **Copy** to copy it.
 - On disk: `config/encryption.key` next to Edge's `docker-compose.yml` (`/config/encryption.key` inside the container).
+
+The file contains 32 raw key bytes. The UI's **Copy** button provides their base64url text representation for pasting into Central. Preserve the file as-is when restoring Edge's config; do not replace it with the copied text.
 
 Edge also shows a **fingerprint** of the key. Central uses the fingerprint to confirm you've pasted the right key before it decrypts a download. It isn't secret and can't be used to decrypt anything.
 
@@ -27,13 +29,16 @@ Store the copied key somewhere that survives losing this machine, such as a pass
 
 ## Rotate the key
 
-**Rotate** generates a new key for **future** backups. Snapshots already on Central stay encrypted with the old key.
+**Rotate** generates a new key for archives built afterward. Snapshots already on Central stay encrypted with the old key. Rotation does not rebuild staged archives or force unchanged jobs to upload.
 
 <Warning>
   After rotating, older snapshots become hard to get back. Edge restores only use the new key. Central's UI checks every pasted key against the **latest** fingerprint Edge reported, and that switches to the new key on Edge's next upload. From then on Central rejects the old key, so its snapshots can't be downloaded from the UI either.
 </Warning>
 
 <Steps>
+  <Step title="Pause backup cycles">
+    Wait for any backup or restore operation to finish. In **Edit Edge Settings**, enable **Pause uploads (skip backup cycles)** and save. Confirm the setting is saved before continuing; if another cycle started and the save was rejected, wait for it to finish and try again. Keep cycles paused until the new-key backups below are complete.
+  </Step>
   <Step title="Download anything you want to keep">
     Before rotating, [download](/central/snapshots#download-a-snapshot) any older snapshots you may need from Central's UI while it still accepts the current key.
   </Step>
@@ -41,10 +46,18 @@ Store the copied key somewhere that survives losing this machine, such as a pass
     Click **Copy** and save the current key somewhere safe. The downloaded archives are already decrypted, but keep the key in case you need it later.
   </Step>
   <Step title="Rotate">
-    Click **Rotate** and confirm.
+    With cycles paused, clear any staged backups, then click **Rotate** and confirm.
   </Step>
   <Step title="Save the new key">
     Copy and store the new key.
+  </Step>
+  <Step title="Create backups with the new key">
+    Refresh Edge and check each job for staged backups again. Before its first **Force Upload** after rotation, use **Clear staged backup** if one is present: Force Upload reuses staged archives, which may still use the old key.
+
+    Use **Force Upload** on each job, including jobs whose paths and sizes have not changed, and wait for each upload to finish. Force Upload works while backup cycles are paused. Confirm each job uploads successfully with the new key before continuing.
+  </Step>
+  <Step title="Resume backup cycles">
+    If you paused cycles for this rotation, turn off **Pause uploads (skip backup cycles)** in **Edit Edge Settings** and save. Leave it enabled if you intended to keep cycles paused.
   </Step>
 </Steps>
 

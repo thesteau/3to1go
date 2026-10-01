@@ -8,7 +8,7 @@ Central is the 3to1go app that **receives and keeps** backups. It runs on one al
 ## What Central does
 
 - **Receives uploads** from Edges in chunks, and verifies each one before storing it.
-- **Stores snapshots** as plain files under `edge_id/edge_instance_id/job_name` in its backup folder.
+- **Stores snapshots** as encrypted archive files under `edge_id/edge_instance_id/job_name` in its backup folder.
 - **Applies retention**, keeping the most recent snapshots per job and instance.
 - **Mints and revokes Edge credentials**, so only Edges you've authorized can upload.
 - **Checks integrity** on a schedule, if enabled.

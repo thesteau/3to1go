@@ -9,7 +9,7 @@ Edge is the 3to1go app that **makes** backups. Run one Edge on every machine who
 
 - **Finds backup jobs** by scanning for folders that contain a `.upload_dir` marker.
 - **Detects changes** with a path-and-size fingerprint, so unchanged folders aren't uploaded again.
-- **Builds and encrypts archives** as `tar.zst` files, using a key that never leaves the machine.
+- **Builds and encrypts archives** as `tar.zst` files. The key stays on Edge unless you copy it for safekeeping or browser-based downloads; it is never sent to Central's server.
 - **Uploads to Central** in chunks, resuming and retrying when the connection drops.
 - **Runs on a schedule** you set with a cron expression, weekly by default.
 - **Restores snapshots** from Central back into the original folder.
@@ -35,6 +35,10 @@ Open `http://<edge-host>:6556/`. The main page shows:
 
 - **Selected Jobs**: each backup job, its last state, the size of its last backup, and buttons to browse files, force an upload, restore, or edit it.
 - **Directories Under Scan Root**: a folder browser for choosing what to back up. Turn on **Show hidden** to see hidden folders.
+
+<Frame caption="A selected job after a successful backup.">
+  <img src="/images/workflows/edge-job.png" alt="A successful documents backup job with Files and exclusions, Force Upload, Restore, and Edit buttons" />
+</Frame>
 
 <CardGroup cols={2}>
   <Card title="Install Edge" icon="download" href="/edge/install" />

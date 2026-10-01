@@ -6,7 +6,9 @@ description: "Run your own commands before and after Edge processes each backup 
 Hooks let Edge run a shell command around each job in a backup cycle:
 
 - **Pre command**: before Edge scans and archives the job. Edge waits for it to finish. Useful for dumping a database into the folder first.
-- **Post command**: after the job is done, whether it uploaded, was unchanged, or failed.
+- **Post command**: after the job is done, whether it uploaded, was unchanged, or failed. Cancellation skips the post command.
+
+Hooks run during scheduled cycles and **Run Backup Cycle Now**. The individual **Force Upload** action currently bypasses both hooks.
 
 ## Set up
 
@@ -27,6 +29,8 @@ Hooks let Edge run a shell command around each job in a backup cycle:
 Commands run with `sh -c` inside the Edge container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout, and is stopped if you **Cancel operation**. Output and non-zero exit codes go to Edge's logs; a failing hook doesn't stop the backup.
 
 The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs.
+
+Edge prepares different jobs concurrently, so their hooks can overlap. Keep per-job output separate when your scripts write files.
 
 ## Environment variables
 

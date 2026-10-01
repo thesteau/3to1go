@@ -5,6 +5,10 @@ description: "Browse, download, and delete stored snapshots, and understand rete
 
 Central's main page, **Stored Snapshots**, lists every Edge, each of its instances, their jobs, and each job's snapshots. The newest snapshot of each job is tagged **latest**.
 
+<Frame caption="An expanded Edge instance with a stored snapshot in a local demo deployment.">
+  <img src="/images/workflows/central-snapshots.png" alt="Central snapshot list showing an Edge instance, decryption key controls, and Download and Delete buttons" />
+</Frame>
+
 ## How snapshots are stored
 
 Each snapshot is one encrypted `tar.zst` file in Central's backup folder:
@@ -13,11 +17,13 @@ Each snapshot is one encrypted `tar.zst` file in Central's backup folder:
 /backups/<edge_id>/<edge_instance_id>/<job_name>/<job>__<timestamp>__<fingerprint>.tar.zst
 ```
 
-The fingerprint in the filename identifies the snapshot. You can use it to [restore a specific snapshot](/edge/restore#restore-a-specific-snapshot) from Edge.
+The fingerprint in the filename is the first eight characters of Edge's path-and-size fingerprint. You can use it to [restore a matching snapshot](/edge/restore#restore-a-specific-snapshot) from Edge, but multiple snapshots can share it.
 
 ## Download a snapshot
 
 Click **Download** on a snapshot. Because snapshots are encrypted by Edge, Central's UI asks for that Edge's **encryption key** the first time:
+
+Browser decryption uses Web Crypto. Open Central over HTTPS, or through `localhost` for local use; a plain HTTP LAN address does not provide the secure browser context needed for decryption.
 
 <Steps>
   <Step title="Copy the key from Edge">
@@ -31,12 +37,12 @@ Click **Download** on a snapshot. Because snapshots are encrypted by Edge, Centr
   </Step>
 </Steps>
 
-The key is kept only in that browser tab's session storage, never sent to Central's server, and is cleared when the tab session ends.
+The key is kept in that browser tab's memory and session storage, never sent to Central's server. **Clear** removes a saved key; signing out or returning to the sign-in dialog clears all saved keys in that tab, as does ending the tab session.
 
 To extract the downloaded archive:
 
 ```sh
-tar --zstd -xf photos__2026-09-30T02-00-00Z__abc123.tar.zst
+tar --zstd -xf photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 ```
 
 <Tip>
@@ -51,6 +57,8 @@ Click **Delete** on a snapshot and confirm. This permanently removes the file.
 
 After each upload, Central keeps the most recent **Keep Last Snapshots** (default `3`) for that job **and Edge instance**, and deletes older ones. Edge instances never prune each other's snapshots, even if they share an `EDGE_ID`.
 
+Ordering uses the stored files' modification times. Preserve those times when copying archives back into Central's backup folder.
+
 Change it in **Edit Central Settings**. See [Design decisions](/concepts/design-decisions#count-based-retention).
 
 ## Integrity checks
@@ -64,4 +72,4 @@ Central can re-check stored snapshots with SHA-256 to catch files that have been
   Central reads the check interval when it starts. After changing it, restart Central: `docker compose restart central`.
 </Note>
 
-The bar shows the result of the most recent check and when it ran.
+The bar shows the result of the most recent check and when it ran. Results are held in memory and reset when Central restarts. Snapshots without a recorded archive checksum are skipped. A successful check verifies the stored encrypted bytes, not whether you still have the correct decryption key.

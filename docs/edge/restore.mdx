@@ -22,9 +22,13 @@ Edge can download a snapshot from Central, decrypt it with its own key, and extr
     Click **Preview Restore**. Edge shows how many files the snapshot has, and how many would replace existing files or be added.
   </Step>
   <Step title="Confirm">
-    Confirm to write the files into the job's folder.
+    Click **Restore These Files** to write the files into the job's folder. Search and the **All**, **Replace**, and **Add** filters only change the preview display; they do not select a subset to restore.
   </Step>
 </Steps>
+
+<Frame caption="Restore preview showing one missing file to add and one local file to replace.">
+  <img src="/images/workflows/restore-preview.png" alt="Edge restore preview with Add and Replace file actions and a Restore These Files button" />
+</Frame>
 
 ## Restore a specific snapshot
 
@@ -36,6 +40,8 @@ photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 ```
 
 Enter it in **Snapshot fingerprint**, then preview and confirm as above.
+
+Use the eight lowercase hexadecimal characters shown in **FP** (a full 64-character fingerprint is also accepted). Central matches the first eight characters and returns the matching file with the newest modification time. Forced backups can share a fingerprint, so it is not a unique snapshot ID. To retrieve an exact older file among such matches, use that file's **Download** button in Central.
 
 A job can only restore its **own** snapshots. You can't restore one job's snapshot into another job's folder.
 

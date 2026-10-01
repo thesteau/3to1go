@@ -6,14 +6,14 @@ description: "Settings you change in Edge's UI, and the environment variables th
 Most Edge settings are changed in **Edit Edge Settings** and saved in Edge's local database. Many can also be set as environment variables in `.env`.
 
 <Warning>
-  An environment variable **overrides** the value saved in the UI every time Edge starts. If a setting keeps reverting, check whether it's also set in `.env`.
+  A supported environment variable **overrides** the UI value when Edge starts and whenever settings are saved. To change that value through the UI, remove the override from `.env` and recreate the container with `docker compose up -d`.
 </Warning>
 
 ## Connection and identity
 
 | UI setting | Environment variable | Default | Description |
 |---|---|---|---|
-| Edge ID | `EDGE_ID` | `edge-01` | Name for this Edge in Central. Must be unique per installation. |
+| Edge ID | `EDGE_ID` | `edge-01` | Name used to group installations in Central. A unique name per machine is easiest to recognize; instance IDs keep installations separate. |
 | Central URL | `CENTRAL_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
 | Advertised Edge URL | none | empty | Optional URL for this Edge's UI that Edge reports to Central. Central can include it in [notifications](/central/notifications). |
 | Edge Credential | none | empty | Credential minted by Central. See [Edge credentials](/central/edge-credentials). |
@@ -24,14 +24,16 @@ Most Edge settings are changed in **Edit Edge Settings** and saved in Edge's loc
 |---|---|---|---|
 | Cron Schedule | none | `0 2 * * 0` | When backup cycles run, as a 5-field cron expression. The default is Sundays at 02:00. |
 | Max Depth | `MAX_DEPTH` | `10` | How many folder levels below the scan root Edge searches for `.upload_dir` markers. |
-| Pause uploads (skip backup cycles) | none | off | Temporarily skip scheduled cycles. |
+| Pause uploads (skip backup cycles) | none | off | Skip scheduled cycles and Run Backup Cycle Now. Individual Force Upload actions still run. |
 | Keep failed-upload archives for retry | `KEEP_LOCAL_PENDING` | on | Keep an archive that failed to upload so the next cycle retries it instead of rebuilding. |
 | none | `SCAN_ROOT` | `/scan` | Folder Edge scans. Leave at `/scan` in Docker. |
 
 The schedule can't run more often than every **5 minutes**.
 
+Scheduled cycles also wait at least five minutes after startup and after the previous cycle finishes. **Run Backup Cycle Now** bypasses these waits. It queues a cycle; it does not start a second cycle while one is running.
+
 <Note>
-  The Docker image has no time zone data, so the cron schedule runs in **UTC**. `0 2 * * 0` means 02:00 UTC on Sundays.
+  The scheduler uses the server's local time zone. The supplied Docker image runs in **UTC** by default, so `0 2 * * 0` means 02:00 UTC on Sundays in that deployment.
 </Note>
 
 A few schedules:
@@ -72,7 +74,7 @@ After the circuit breaker's failure threshold is reached, Edge stops trying Cent
 | Spool Directory | `SPOOL_DIR` | `/data/spool` | Archives waiting to upload. |
 | none | `HTTP_HOST` | `0.0.0.0` in Docker | Address the UI listens on. |
 | none | `HTTP_PORT` | `6556` | UI port. If you change it, update the Compose `ports` mapping too. |
-| none | `INITIAL_ADMIN_PASSWORD` | `admin` | First admin's password. See [Sign-in](/shared/sign-in). |
+| none | `INITIAL_ADMIN_PASSWORD` | `admin` | First admin's password, used only when no user accounts exist. A password change is required on first sign-in, even with a custom value. See [Sign-in](/shared/sign-in). |
 | none | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Edge over HTTPS. |
 
 **Trusted Certificates** are also managed in this dialog. See [Trusted certificates](/shared/trusted-certificates).

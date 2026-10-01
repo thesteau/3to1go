@@ -5,7 +5,7 @@ description: "Environment variables for deployment, and settings you change from
 
 Central is configured in two places:
 
-- **Environment variables** in `.env` for deployment details: database, ports, and folders. Changes need a container restart.
+- **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers; `docker compose restart` alone does not reload `.env`.
 - **Edit Central Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
 
 ## Environment variables
@@ -18,7 +18,7 @@ Central is configured in two places:
 | `POSTGRES_DB` | `three_to_one_go` | Database name, shared by Central and the Postgres container. |
 | `POSTGRES_USER` | none | Database user. **Required** unless `INDEX_DATABASE_URL` is set. |
 | `POSTGRES_PASSWORD` | none | Database password. **Required** unless `INDEX_DATABASE_URL` is set. |
-| `INITIAL_ADMIN_PASSWORD` | `admin` | Password for the first `admin` user. Only used when the database is empty. |
+| `INITIAL_ADMIN_PASSWORD` | `admin` | Password for the first `admin` user. Only used when no user accounts exist. A password change is required on first sign-in, even with a custom value. |
 
 ### Using an external PostgreSQL
 
@@ -38,6 +38,8 @@ or set the parts individually:
 | `INDEX_DATABASE_USER` | `POSTGRES_USER` |
 | `INDEX_DATABASE_PASSWORD` | `POSTGRES_PASSWORD` |
 
+When using an external database, also remove the bundled `postgres` service and Central's `depends_on: postgres` entry from the Compose file if you no longer want to run that database container.
+
 ### Server and paths
 
 | Variable | Default | Description |
@@ -56,16 +58,18 @@ Open **Edit Central Settings**.
 | Setting | Default | Description |
 |---|---|---|
 | Dark Mode | on | UI theme. |
-| Pause incoming uploads | off | Temporarily stop accepting uploads from Edges. |
+| Pause incoming uploads | off | Reject new upload sessions. Uploads already in progress can continue. |
 | Keep Last Snapshots | `3` | How many snapshots to keep per job and Edge instance. Older ones are pruned after each upload. |
 | Log Level | `INFO` | Container log verbosity. |
 | Max Upload Size MB | `2048` | Largest archive Central will accept. |
 | Upload Chunk Size MB | `8` | Chunk size Central asks Edges to use. |
-| Upload Session TTL Hours | `24` | How long an unfinished upload can be resumed before it's discarded. |
+| Upload Session TTL Hours | `24` | Upload session lifetime, refreshed as upload activity continues. Expired sessions are removed by cleanup. |
 | Cleanup Interval Seconds | `300` | How often expired upload sessions are cleaned up. Minimum `10`. |
 | Snapshot Integrity Check Interval | `0` (off) | Hours between automatic integrity checks. See [Integrity checks](/central/snapshots#integrity-checks). |
 
 **Trusted Certificates** are also managed here. See [Trusted certificates](/shared/trusted-certificates).
+
+Restart Central after changing **Log Level** or **Snapshot Integrity Check Interval** so the running logger or verification schedule uses the new value.
 
 <Note>
   Raise **Max Upload Size MB** if a job's archive is larger than 2 GB. Otherwise Central rejects its upload.
