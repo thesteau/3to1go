@@ -87,7 +87,7 @@ spec:
         - name: hook-scripts
           hostPath: { path: /home/alice/3to1go-edge/hook-scripts, type: DirectoryOrCreate }
         - name: scan
-          hostPath: { path: /home/alice, type: Directory }
+          hostPath: { path: /home/alice, type: DirectoryOrCreate }
         - name: state
           hostPath: { path: /home/alice/3to1go-edge/state, type: DirectoryOrCreate }
         - name: spool
@@ -172,7 +172,7 @@ spec:
         - name: hook-scripts
           hostPath: { path: "${HOME_DIR}/backup-edge/hook-scripts", type: DirectoryOrCreate }
         - name: scan
-          hostPath: { path: "${HOME_DIR}", type: Directory }
+          hostPath: { path: "${HOME_DIR}", type: DirectoryOrCreate }
         - name: state
           hostPath: { path: "${HOME_DIR}/backup-edge/state", type: DirectoryOrCreate }
         - name: spool
