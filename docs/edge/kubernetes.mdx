@@ -1,0 +1,213 @@
+---
+title: "Run Edge on Kubernetes"
+description: "Run Edge as a pod on the node that holds the files you want to back up."
+---
+
+Edge can run on Kubernetes as well as Docker Compose. Only Edge is covered here; run Central with [Docker Compose](/central/install).
+
+This is an example, not a packaged chart. The image, ports, and folders are the same as in the [Compose install](/edge/install), so adapt the manifest to your cluster. The scheduling, networking, and secret handling are up to you.
+
+![Flux on the control plane deploys one Edge pod per node; each pod encrypts that node's folders and uploads to Central outside the cluster.](/images/kubernetes-layout.svg)
+
+## How it maps to Compose
+
+Edge backs up files on a specific machine, so the pod has to run on the node that holds them and mount host folders directly.
+
+| Compose | Kubernetes |
+|---|---|
+| One Edge per machine | One Edge pod per node, pinned with `nodeSelector` |
+| `./config`, `./hook-scripts`, `./state`, `./spool` volumes | `hostPath` volumes on that node |
+| `${SCAN_DIR}:/scan` | A `hostPath` volume mounted at `/scan` |
+| `.env` values | Container `env` |
+| `ports: "6556:6556"` | `hostPort: 6556`, or a Service |
+
+## Example manifest
+
+This runs one Edge on the node named `node-1` and backs up `/home/alice`. Replace the hostname, paths, `EDGE_ID`, and `CENTRAL_URL`.
+
+```yaml edge.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 3to1go-edge-node-1
+  namespace: backup
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate        # never run two pods against the same folders
+  selector:
+    matchLabels:
+      app: 3to1go-edge-node-1
+  template:
+    metadata:
+      labels:
+        app: 3to1go-edge-node-1
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: node-1
+      containers:
+        - name: edge
+          image: ghcr.io/thesteau/3to1go-edge:latest
+          env:
+            - name: EDGE_ID
+              value: node-1                         # unique per Edge
+            - name: CENTRAL_URL
+              value: http://central.example.lan:6555  # reachable from the pod
+            - name: SCAN_DIR
+              value: /home/alice                    # label shown in Edge's UI
+          ports:
+            - name: web
+              containerPort: 6556
+              hostPort: 6556
+          startupProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - { name: config, mountPath: /config }
+            - { name: hook-scripts, mountPath: /hook-scripts }
+            - { name: scan, mountPath: /scan }
+            - { name: state, mountPath: /data/state }
+            - { name: spool, mountPath: /data/spool }
+      volumes:
+        - name: config
+          hostPath: { path: /home/alice/3to1go-edge/config, type: DirectoryOrCreate }
+        - name: hook-scripts
+          hostPath: { path: /home/alice/3to1go-edge/hook-scripts, type: DirectoryOrCreate }
+        - name: scan
+          hostPath: { path: /home/alice, type: Directory }
+        - name: state
+          hostPath: { path: /home/alice/3to1go-edge/state, type: DirectoryOrCreate }
+        - name: spool
+          hostPath: { path: /home/alice/3to1go-edge/spool, type: DirectoryOrCreate }
+```
+
+```sh
+kubectl create namespace backup
+kubectl apply -f edge.yaml
+```
+
+Then open `http://node-1:6556/` and continue from **Sign in and add the credential** in the [Compose install](/edge/install#set-up).
+
+## Things to keep in mind
+
+- **Keep `/config` on persistent storage.** It holds the settings database, `encryption.key`, and `installation.id`. Losing it means a new encryption key and a new instance on Central; losing the key means losing access to existing snapshots. Back up the key as described in [Encryption key](/edge/encryption-key).
+- **Run one pod per set of folders.** Edge's state is local to the pod. Use `replicas: 1` with the `Recreate` strategy, and don't share `/config`, `/data/state`, or `/data/spool` between Edges.
+- **Edge always scans `/scan`.** Inside the container, `SCAN_DIR` only sets the host path Edge shows in its UI. To back up several folders or drives, mount each at `/scan/<name>` as in [Multiple folders and drives](/edge/multiple-folders).
+- **Mounts need write access.** Edge writes `.upload_dir` markers and restores files into `/scan`. The image runs as root, so files it creates on the host are root-owned.
+- **Reaching the UI.** `hostPort` matches the Compose setup. If you put Edge behind a Service or Ingress instead, keep it private or use HTTPS; see [Sign-in](/shared/sign-in).
+- **Credentials.** Paste the Edge credential in Edge's UI, as with Compose. It is stored in `/config`, so no Kubernetes Secret is needed. To set a first admin password, add `INITIAL_ADMIN_PASSWORD` from a Secret with `valueFrom.secretKeyRef`.
+- **Moving from Compose.** Point the `hostPath` volumes at the existing Compose folders and keep the same `EDGE_ID`. Stop the Compose container first (`docker compose down`, without `-v`). Edge keeps its key, settings, and instance ID.
+- **Updating.** Change the image tag or digest and re-apply, or let a tool such as Renovate or Flux do it. With `Recreate`, the old pod stops before the new one starts.
+
+## Several machines
+
+Repeat the Deployment once per node with its own name, `nodeSelector`, `EDGE_ID`, and paths, or generate them from one template.
+
+### Sample: one template per device with Flux
+
+This keeps a single Edge template in Git and builds one copy per device. Flux fills in the `${...}` values from each device's entry.
+
+```yaml device-template/backup-edge.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: backup-edge-${DEVICE_ID}
+  namespace: backup
+  labels:
+    app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0         # stop the old pod before starting the new one
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/hostname: ${NODE_HOSTNAME}
+      containers:
+        - name: backup-edge
+          image: ghcr.io/thesteau/3to1go-edge:latest
+          env:
+            - name: EDGE_ID
+              value: ${EDGE_ID}
+            - name: CENTRAL_URL
+              value: http://<central-host>:6555
+            - name: SCAN_DIR
+              value: ${HOME_DIR}
+          ports:
+            - name: web
+              containerPort: 6556
+              hostPort: 6556
+          volumeMounts:
+            - { name: config, mountPath: /config }
+            - { name: hook-scripts, mountPath: /hook-scripts }
+            - { name: scan, mountPath: /scan }
+            - { name: state, mountPath: /data/state }
+            - { name: spool, mountPath: /data/spool }
+      volumes:
+        - name: config
+          hostPath: { path: "${HOME_DIR}/backup-edge/config", type: DirectoryOrCreate }
+        - name: hook-scripts
+          hostPath: { path: "${HOME_DIR}/backup-edge/hook-scripts", type: DirectoryOrCreate }
+        - name: scan
+          hostPath: { path: "${HOME_DIR}", type: Directory }
+        - name: state
+          hostPath: { path: "${HOME_DIR}/backup-edge/state", type: DirectoryOrCreate }
+        - name: spool
+          hostPath: { path: "${HOME_DIR}/backup-edge/spool", type: DirectoryOrCreate }
+```
+
+```yaml device-template/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - backup-edge.yaml
+```
+
+Add one Flux `Kustomization` per device:
+
+```yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: device-<id>
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./device-template
+  prune: true
+  deletionPolicy: Orphan   # removing the entry leaves the running Edge alone
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  postBuild:
+    substitute:
+      DEVICE_ID: <id>
+      EDGE_ID: <edge-id>
+      NODE_HOSTNAME: <node-name>
+      HOME_DIR: /home/<user>
+```
+
+The `nodeSelector` pins each copy to its device, so the pod only exists once that node joins the cluster. If the device previously ran Edge with Compose in `<home>/backup-edge`, these `hostPath` folders pick up its existing config, key, and state.

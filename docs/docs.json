@@ -79,7 +79,7 @@
         "groups": [
           {
             "group": "Edge",
-            "pages": ["edge/overview", "edge/install", "edge/configuration"]
+            "pages": ["edge/overview", "edge/install", "edge/kubernetes", "edge/configuration"]
           },
           {
             "group": "Using Edge",
