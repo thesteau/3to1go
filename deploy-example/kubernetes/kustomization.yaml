@@ -1,0 +1,13 @@
+# First create .env here (gitignored) with your own first admin password:
+#   INITIAL_ADMIN_PASSWORD=<your-password>
+# Apply with: kubectl apply -k deploy-example/kubernetes
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: 3to1go
+resources:
+  - namespace.yaml
+  - backup-edge.yaml
+secretGenerator:
+  - name: backup-edge
+    envs:
+      - .env

@@ -28,7 +28,7 @@ services:
       #    Select the folders to back up; adding a volume alone does not select it.
       #    Leave /scan itself unselected. Give every backup job a unique name.
       # Commented entries are examples only; they are not active mounts.
-      # Full walkthrough: root README.md, "Multiple Folders Or Drives With Docker".
+      # Full walkthrough: https://3to1go.docs.thesteau.com/edge/multiple-folders
       - ./state:/data/state
       - ./spool:/data/spool
     restart: unless-stopped

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" role="img" aria-labelledby="title description">
+  <title id="title">Edge pods on Kubernetes back up to one Central</title>
+  <desc id="description">In a Kubernetes cluster, Flux on the control plane deploys one Edge pod to each node. Each pod mounts that node's folders, encrypts backups locally, and uploads them to Central, which runs outside the cluster with Docker Compose.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
+    </marker>
+    <marker id="arrow-deploy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7890af"/>
+    </marker>
+  </defs>
+  <rect width="760" height="430" rx="18" fill="#faf8f5"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#242a35" text-anchor="middle">
+    <text x="259" y="35" font-size="15" font-weight="700">1 · Original files on each node</text>
+    <text x="638" y="35" font-size="15" font-weight="700">2 · Encrypted backups</text>
+
+    <rect x="24" y="55" width="470" height="330" rx="14" fill="#f1f4f8" stroke="#7890af" stroke-width="1.5" stroke-dasharray="8 6"/>
+    <text x="44" y="372" font-size="13" fill="#586273" text-anchor="start">Kubernetes cluster</text>
+
+    <rect x="44" y="155" width="170" height="140" rx="12" fill="#edf3fb" stroke="#7890af" stroke-width="1.5"/>
+    <text x="129" y="190" font-size="18" font-weight="700">Control plane</text>
+    <text x="129" y="214" font-size="15">Flux</text>
+    <text x="129" y="245" font-size="13" fill="#586273">Pulls the template</text>
+    <text x="129" y="263" font-size="13" fill="#586273">from Git</text>
+
+    <g fill="none" stroke="#7890af" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-deploy)">
+      <path d="M214 190 L270 120"/>
+      <path d="M214 225 H270"/>
+      <path d="M214 260 L270 330"/>
+    </g>
+    <text x="242" y="215" font-size="12" fill="#586273">Deploys</text>
+
+    <g fill="#fff" stroke="#cdd3dc" stroke-width="1.5">
+      <rect x="274" y="75" width="200" height="80" rx="12"/>
+      <rect x="274" y="185" width="200" height="80" rx="12"/>
+      <rect x="274" y="295" width="200" height="80" rx="12"/>
+    </g>
+    <g font-size="18" font-weight="700">
+      <text x="374" y="99">Node 1 · Edge pod</text>
+      <text x="374" y="209">Node 2 · Edge pod</text>
+      <text x="374" y="319">Node 3 · Edge pod</text>
+    </g>
+    <g font-size="14">
+      <text x="374" y="121">Host folders → /scan</text>
+      <text x="374" y="231">Host folders → /scan</text>
+      <text x="374" y="341">Host folders → /scan</text>
+    </g>
+    <g font-size="13" fill="#6a3440">
+      <text x="374" y="142">Encrypts before upload</text>
+      <text x="374" y="252">Encrypts before upload</text>
+      <text x="374" y="362">Encrypts before upload</text>
+    </g>
+
+    <g fill="none" stroke="#a52b3d" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M474 115 H505 Q520 115 520 130 V195 H544"/>
+      <path d="M474 225 H544"/>
+      <path d="M474 335 H505 Q520 335 520 320 V255 H544"/>
+    </g>
+    <text x="520" y="100" font-size="13" fill="#6a3440">Upload</text>
+
+    <rect x="548" y="165" width="180" height="120" rx="14" fill="#fff0f2" stroke="#a52b3d" stroke-width="2"/>
+    <text x="638" y="201" font-size="24" font-weight="700">Central</text>
+    <text x="638" y="229" font-size="14">Outside the cluster</text>
+    <text x="638" y="256" font-size="13">Stores all Edge snapshots</text>
+
+
+    <text x="380" y="413" font-size="13" fill="#586273">One Edge pod per node · Each pod has its own web UI on port 6556 · Central on port 6555</text>
+  </g>
+</svg>
