@@ -82,16 +82,24 @@ Edge backs up on its schedule (weekly by default). To back up now, click **Run B
 | Tag | What it is |
 |---|---|
 | `vX.Y.Z` | A stable release. Use this in production. |
-| `latest` | The newest build from `main`. May be unstable. |
+| `latest` | The most recent build of that app from `main`. May be unstable. |
 | 7-character commit SHA | A specific `main` build. |
 
-Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Central and Edge, and download the Compose file and `.env` template from that release's tag instead of `main`:
+Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Central and Edge. In steps 1 and 3, download the files from that release's tag instead of `main`, so the configuration matches the image:
 
-```sh
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/v1.0.0/deploy-example/central/docker-compose.yml
+```sh Central
+VERSION=v1.0.0
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/docker-compose.yml
+curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/.env.example -o .env
 ```
 
-Then set the image tag in each `docker-compose.yml`:
+```sh Edge
+VERSION=v1.0.0
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/docker-compose.yml
+curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/.env.example -o .env
+```
+
+Then set the same tag as the image in each `docker-compose.yml`:
 
 ```yaml
 image: ghcr.io/thesteau/3to1go-central:v1.0.0
@@ -101,7 +109,7 @@ image: ghcr.io/thesteau/3to1go-central:v1.0.0
 image: ghcr.io/thesteau/3to1go-edge:v1.0.0
 ```
 
-For the [Kubernetes example](/edge/kubernetes), set the Edge image the same way. To upgrade, change the tag to a newer release and run `docker compose up -d`.
+For the [Kubernetes example](/edge/kubernetes), set the Edge image the same way. To upgrade, read the release notes, change the tag to the newer release, and run `docker compose up -d`. If the notes mention configuration changes, compare your `.env` with that release's `.env.example`.
 
 ## Next steps
 

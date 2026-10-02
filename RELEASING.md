@@ -72,4 +72,7 @@ If the branch is deleted:
    ```
 4. Reapply the ruleset, then re-enable the workflow. Run `publish` if that release was never published. Otherwise run `plan`.
 
-If the commit is gone, rebuild the three files by hand from the latest published GitHub Release. Use its tag, its commit SHA, and the previous release's tag and SHA. Commit them on an orphan branch and push them the same way.
+If the commit is gone, rebuild the three files by hand on an orphan branch and push them the same way. First, check whether the most recently merged release PR has a published GitHub Release:
+
+- **Not published:** that approval is still outstanding. Rebuild from the PR's **Files changed** tab, which shows the approved `release.json` and manifest, then run `publish` in step 4. If you rebuild from the latest published release instead, the approval is silently dropped.
+- **Published:** rebuild from that GitHub Release. Use its tag, its commit SHA, its notes, and the previous release's tag and SHA. Then run `plan`.
