@@ -1,1 +1,8 @@
-null
+{
+  "version": "1.0.0",
+  "tag": "v1.0.0",
+  "prodSha": "2f49d32f0654e2dc48efc12aca502f1504c7c39b",
+  "previousTag": null,
+  "previousSha": null,
+  "notes": "## 1.0.0 (2026-10-02)\n\n\n### Features\n\n* enforce Conventional Commit PR titles ([#48](https://github.com/thesteau/3to1go/issues/48)) ([3a309f1](https://github.com/thesteau/3to1go/commit/3a309f13299fa65b011fb08ab1e913427ec7033a))"
+}
