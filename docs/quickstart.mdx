@@ -5,7 +5,7 @@ description: "Run Central and Edge with Docker and take your first backup."
 
 This guide uses the published Docker images and the example Compose files from the repository. You need [Docker](https://docs.docker.com/get-docker/) with Compose on each machine.
 
-The examples use `latest`, the unstable `main` channel. For production, select a published stable version and pin both app images as described in [Deployment and releases](/releases).
+The examples use the `latest` images. For production, pin a stable version; see [Choose an image version](#choose-an-image-version).
 
 <Tip>
   You can run both apps on the same machine to try things out. In real use, Central usually runs on a separate, always-on host.
@@ -76,6 +76,32 @@ Edge backs up on its schedule (weekly by default). To back up now, click **Run B
 <Warning>
   Back up Edge's `encryption.key` right away. Without it, that Edge's snapshots cannot be decrypted. See [Encryption key](/edge/encryption-key).
 </Warning>
+
+## Choose an image version
+
+| Tag | What it is |
+|---|---|
+| `vX.Y.Z` | A stable release. Use this in production. |
+| `latest` | The newest build from `main`. May be unstable. |
+| 7-character commit SHA | A specific `main` build. |
+
+Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Central and Edge, and download the Compose file and `.env` template from that release's tag instead of `main`:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/v1.0.0/deploy-example/central/docker-compose.yml
+```
+
+Then set the image tag in each `docker-compose.yml`:
+
+```yaml
+image: ghcr.io/thesteau/3to1go-central:v1.0.0
+```
+
+```yaml
+image: ghcr.io/thesteau/3to1go-edge:v1.0.0
+```
+
+For the [Kubernetes example](/edge/kubernetes), set the Edge image the same way. To upgrade, change the tag to a newer release and run `docker compose up -d`.
 
 ## Next steps
 
