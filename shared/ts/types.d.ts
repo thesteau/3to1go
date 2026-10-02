@@ -23,8 +23,15 @@ interface UserResponse extends ApiBody {
   user: CurrentUser;
 }
 
+interface BuildInfo {
+  version?: string;
+  commit?: string;
+  summary?: string;
+}
+
 interface UsersResponse extends ApiBody {
   users?: CurrentUser[];
+  build?: BuildInfo;
 }
 
 interface StoredFile {

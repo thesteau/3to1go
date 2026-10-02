@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/3to1go/shared/buildinfo"
 	"github.com/3to1go/shared/httpx"
 )
 
@@ -110,7 +111,8 @@ func (a *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to list users")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"users": users})
+	// The Admin dialog shows which build is running.
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"users": users, "build": buildinfo.Fields()})
 }
 
 func (a *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {

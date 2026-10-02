@@ -46,6 +46,11 @@
   border-top: 1px solid var(--border);
 }
 
+.build-info {
+  margin: 0 auto 0 0;
+  align-self: center;
+}
+
 .icon-link {
   display: flex;
   align-items: center;
