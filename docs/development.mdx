@@ -41,7 +41,7 @@ Use `edge` in place of `central` to build Edge.
 
 ## Run the tests
 
-CI runs three suites on every PR, and you can run them all locally from the repository root. Go unit tests mock database calls and use in-memory store mocks for service tests. They don't open SQLite databases or connect to PostgreSQL. The Docker end-to-end test starts its own real database.
+CI runs the Go and frontend tests on every PR, and the end-to-end test after each push to `main` or `prod`, since it builds both Docker images. You can run all three locally from the repository root. Go unit tests mock database calls and use in-memory store mocks for service tests. They don't open SQLite databases or connect to PostgreSQL. The Docker end-to-end test starts its own real database.
 
 | Suite | Needs |
 |---|---|
