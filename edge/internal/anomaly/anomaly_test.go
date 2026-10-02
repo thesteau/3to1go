@@ -89,6 +89,26 @@ func TestTruncatedFilesInASmallJobAreFlagged(t *testing.T) {
 	}
 }
 
+func TestJobsOfEmptyFilesStayQuietOnceApproved(t *testing.T) {
+	// Placeholder files that are empty by design, backed up and approved before.
+	empty := func(n int) []*backup.DiscoveredFile {
+		files := folder(n, 0, ".keep")
+		for _, f := range files {
+			f.Size = 0
+		}
+		return files
+	}
+	// The job once held data, then its files were emptied and each empty
+	// backup was approved.
+	history := []Observation{observe(folder(12, 0, ".keep"), 0.40)}
+	for week := 0; week < 6; week++ {
+		history = append(history, observe(empty(12), 0))
+	}
+	if r := Evaluate(history, observe(empty(13), 0)); r.Unusual() {
+		t.Errorf("flagged another empty backup: %s", r.Summary())
+	}
+}
+
 func TestEmptiedFolderIsFlagged(t *testing.T) {
 	r := Evaluate(normalHistory(), observe(folder(30, 0, ".docx"), 0.40))
 	if got := signals(r); !slices.Equal(got, []string{"file_count", "size"}) {

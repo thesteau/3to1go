@@ -84,9 +84,14 @@ func LogShift(history []float64, current float64) Shift {
 	}
 	med := Median(logs)
 	typical := math.Exp(med)
-	// Zero has no logarithm, but after a history of real sizes it is the
-	// largest possible drop, such as every file truncated to nothing.
+	// Zero has no logarithm, but when a job usually holds data it is the
+	// largest possible drop, such as every file truncated to nothing. If at
+	// least half the accepted history is zero too, the median is zero, so an
+	// empty backup is the job's normal and isn't flagged.
 	if current <= 0 {
+		if zeros := len(history) - len(logs); zeros*2 >= len(history) {
+			return Shift{}
+		}
 		return Shift{Typical: typical, Ratio: 0, Z: math.Inf(-1)}
 	}
 	// 1.4826 scales the MAD to match a standard deviation for normal data.

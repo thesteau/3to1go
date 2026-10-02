@@ -57,6 +57,22 @@ func TestLogShiftTreatsZeroAsACompleteDrop(t *testing.T) {
 	if shift := LogShift([]float64{0, 0, 0}, 0); shift.Unusual(2) {
 		t.Errorf("zero after only zeros = %+v, want nothing to compare", shift)
 	}
+	// One positive size among mostly zeros is still a complete drop when the job
+	// usually holds data, but not when most accepted backups were empty.
+	if shift := LogShift([]float64{1000, 1000, 1000, 0, 0}, 0); !shift.Unusual(2) {
+		t.Errorf("zero after mostly real sizes = %+v, want a complete drop", shift)
+	}
+}
+
+func TestLogShiftAcceptsZeroWhenEmptyIsUsual(t *testing.T) {
+	history := make([]float64, 20)
+	history[19] = 1000 // 19 approved empty backups and one with data
+	if shift := LogShift(history, 0); shift.Unusual(2) {
+		t.Errorf("zero after mostly zeros = %+v, want normal", shift)
+	}
+	if shift := LogShift([]float64{0, 1000}, 0); shift.Unusual(2) {
+		t.Errorf("zero after half zeros = %+v, want normal", shift)
+	}
 }
 
 func TestLogShiftWithoutUsableHistory(t *testing.T) {
