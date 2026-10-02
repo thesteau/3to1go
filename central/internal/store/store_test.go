@@ -14,6 +14,7 @@ import (
 	"github.com/3to1go/central/internal/signing"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ---------------------------------------------------------------------------
@@ -65,6 +66,9 @@ func (r *mockRows) Values() ([]any, error) { return nil, nil }
 func (r *mockRows) RawValues() [][]byte { return nil }
 
 func (r *mockRows) Conn() *pgx.Conn { return nil }
+
+// TypeMap may return nil when rows carry no decoded values, as these don't.
+func (r *mockRows) TypeMap() *pgtype.Map { return nil }
 
 func emptyRows() pgx.Rows { return &mockRows{} }
 
