@@ -1,4 +1,4 @@
-name: PR title
+name: "PR: Conventional Commit title"
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Squash merges use the PR title as the commit Release Please reads on prod.
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         with:

@@ -1,4 +1,4 @@
-name: Stable Docker Images
+name: "Image: Stable release"
 
 on:
   release:
@@ -40,7 +40,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release.json"
           jq -e '.draft == false and .prerelease == false' "$RUNNER_TEMP/release.json"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -52,10 +52,10 @@ jobs:
           target=$(jq -r '.target_commitish' "$RUNNER_TEMP/release.json")
           [[ "$target" == prod || "$target" == "$(git rev-parse HEAD)" ]]
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         if: matrix.app == 'edge'
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -83,7 +83,7 @@ jobs:
             *) echo "Registry check failed: HTTP $status" >&2; exit 1 ;;
           esac
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         if: steps.image.outputs.exists == 'false'
         with:
           context: .
