@@ -1,4 +1,4 @@
-name: Stable release
+name: "Release: Plan and publish"
 
 on:
   push:
@@ -34,11 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Never execute code from the metadata branch or a PR head.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: prod
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -53,7 +53,7 @@ jobs:
       # Explicit dispatches do trigger them, using the trusted prod workflows.
       - name: Start stable image publishing
         if: github.event_name == 'pull_request_target' || inputs.operation == 'publish'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           RELEASE_STATE_REF: ${{ github.event.pull_request.merge_commit_sha || 'release-state' }}
         with:
@@ -75,7 +75,7 @@ jobs:
           RELEASE_OPERATION: plan
         run: node scripts/release-state.cts
       - name: Start metadata validation
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const repo = context.repo;

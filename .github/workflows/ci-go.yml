@@ -1,0 +1,83 @@
+name: "CI: Go tests"
+
+on:
+  push:
+    branches: ["main", "prod"]
+  pull_request:
+    branches-ignore: [release-state]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same PR makes an in-progress run obsolete; branch pushes always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    # Job names are required status checks; keep "Run <app> unit tests".
+    name: Run ${{ matrix.app }} unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: central
+            title: Central
+          - app: edge
+            title: Edge
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ matrix.app }}/go.mod
+          cache-dependency-path: |
+            ${{ matrix.app }}/go.sum
+            shared/go/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install web UI build tools
+        working-directory: .
+        run: npm ci
+
+      # The server embeds static/js, which go generate compiles from static/ts.
+      - name: Generate web UI
+        run: go generate ./...
+
+      # -json output feeds the HTML report, which also prints failures to this log.
+      - name: Run tests
+        env:
+          APP: ${{ matrix.app }}
+          TITLE: ${{ matrix.title }} Go tests
+        run: |
+          mkdir -p ../reports
+          status=0
+          go test -race -json -coverprofile="../reports/$APP-coverage.out" ./... ../shared/go/... > "../reports/$APP-go-tests.json" || status=$?
+          node ../scripts/test-report.cts go "$TITLE" "../reports/$APP-go-tests.json" "../reports/$APP-go-tests.html"
+          if [ -s "../reports/$APP-coverage.out" ]; then
+            go tool cover -html="../reports/$APP-coverage.out" -o "../reports/$APP-coverage.html"
+          fi
+          exit "$status"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.app }}-test-report
+          path: |
+            reports/*.html
+            reports/*.json
+          if-no-files-found: ignore
+          retention-days: 14
