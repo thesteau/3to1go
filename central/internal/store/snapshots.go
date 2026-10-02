@@ -241,7 +241,8 @@ func (s *SnapshotIndex) RecentArchiveSizes(ctx context.Context, namespace string
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, `n		SELECT size_bytes FROM (
+	rows, err := s.pool.Query(ctx, `
+		SELECT size_bytes FROM (
 			SELECT id, size_bytes FROM archive_size_history
 			WHERE edge_id = $1 AND edge_instance_id = $2 AND job_name = $3
 			ORDER BY id DESC LIMIT $4
@@ -269,11 +270,13 @@ func (s *SnapshotIndex) RecordArchiveSize(ctx context.Context, namespace string,
 	if err != nil {
 		return err
 	}
-	if _, err := s.pool.Exec(ctx, `n		INSERT INTO archive_size_history (edge_id, edge_instance_id, job_name, size_bytes)
+	if _, err := s.pool.Exec(ctx, `
+		INSERT INTO archive_size_history (edge_id, edge_instance_id, job_name, size_bytes)
 		VALUES ($1, $2, $3, $4)`, edgeID, instID, jobName, size); err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `n		DELETE FROM archive_size_history
+	_, err = s.pool.Exec(ctx, `
+		DELETE FROM archive_size_history
 		WHERE edge_id = $1 AND edge_instance_id = $2 AND job_name = $3
 		AND id NOT IN (
 			SELECT id FROM archive_size_history

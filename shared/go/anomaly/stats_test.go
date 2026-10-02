@@ -49,6 +49,16 @@ func TestLogShiftIgnoresAnEarlierOutlier(t *testing.T) {
 	}
 }
 
+func TestLogShiftTreatsZeroAsACompleteDrop(t *testing.T) {
+	shift := LogShift([]float64{1000, 1040, 980, 1010, 995}, 0)
+	if !shift.Unusual(2) || shift.Ratio != 0 || shift.Typical < 990 {
+		t.Errorf("zero after real sizes = %+v, want an unusual complete drop", shift)
+	}
+	if shift := LogShift([]float64{0, 0, 0}, 0); shift.Unusual(2) {
+		t.Errorf("zero after only zeros = %+v, want nothing to compare", shift)
+	}
+}
+
 func TestLogShiftWithoutUsableHistory(t *testing.T) {
 	if shift := LogShift(nil, 10); shift.Unusual(2) || shift.Typical != 0 {
 		t.Errorf("empty history shift = %+v", shift)

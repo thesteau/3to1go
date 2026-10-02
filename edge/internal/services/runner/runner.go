@@ -552,6 +552,11 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 		return false, err
 	}
 
+	// Review the archive before the state first points at it, so a restart can
+	// never find an unchecked archive marked ready to upload.
+	review := r.reviewStagedArchive(job, settings, files, size, forceSend)
+	holdArchive := review != nil && review.hold
+
 	s.PendingArchive = archivePath
 	s.PendingArchiveSize = &size
 	s.PendingArchiveSHA256 = sha256sum
@@ -573,15 +578,30 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	s.ActivePhasePercent = 50
 	s.ManualInterventionRequired = false
 	s.LastStatus = "archive_created"
+	if holdArchive {
+		s.LastStatus = heldForReviewStatus
+		s.ManualInterventionRequired = true
+		s.LastErrorCategory = unusualBackupCategory
+		s.LastErrorDetail = review.summary
+		s.ActivePhase = ""
+		s.ActivePhasePercent = 0
+		s.LastUploadUpdatedAt = utcNow()
+	}
 	r.StateStore.Set(job.RootPath, *s)
 
 	if prevPending != "" && prevPending != archivePath {
 		os.Remove(prevPending)
 	}
-	if r.holdUnusualBackup(job, s, settings, files, size, forceSend) {
-		return false, nil
+	// Alert only once the outcome is saved, so a restart can't lose a hold.
+	if review != nil {
+		r.logger.Warn("unusual_backup", "job_name", job.JobName, "held", review.hold, "detail", review.summary)
+		r.NtfyPublisher.PublishUnusualBackup(settings, map[string]string{
+			"edge_id":  settings.EdgeID,
+			"job_name": job.JobName,
+			"detail":   review.summary,
+		}, review.hold)
 	}
-	return true, nil
+	return !holdArchive, nil
 }
 
 const (
@@ -589,50 +609,36 @@ const (
 	unusualBackupCategory = "unusual_backup"
 )
 
-// holdUnusualBackup records the staged archive's measurements and compares
-// them with the job's history. It alerts on an unusual backup and, in hold
-// mode, keeps the archive staged until the operator uploads or clears it.
-// It returns true when the archive is held.
-func (r *EdgeRunner) holdUnusualBackup(job *backup.JobDefinition, s *state.JobState, settings *config.Settings, files []*backup.DiscoveredFile, archiveBytes int64, forceSend bool) bool {
+// unusualReview describes a staged archive that looks unlike its job's history.
+type unusualReview struct {
+	summary string
+	hold    bool // true to keep the archive staged until the operator decides
+}
+
+// reviewStagedArchive records the staged archive's measurements and compares
+// them with the job's history. It returns nil when the archive looks normal,
+// checks are off, or the operator forced the upload.
+func (r *EdgeRunner) reviewStagedArchive(job *backup.JobDefinition, settings *config.Settings, files []*backup.DiscoveredFile, archiveBytes int64, forceSend bool) *unusualReview {
 	obs := anomaly.Observe(files, archiveBytes, time.Now())
 	if err := r.Anomalies.SetPending(job.RootPath, obs); err != nil {
 		r.logger.Warn("anomaly_record_failed", "job_name", job.JobName, "error", err)
-		return false
+		return nil
 	}
 	// Force Upload is an explicit request to send this backup. Its measurements
 	// still join the history once it uploads.
 	if forceSend || settings.AnomalyMode == anomaly.ModeOff {
-		return false
+		return nil
 	}
 	history, err := r.Anomalies.History(job.RootPath)
 	if err != nil {
 		r.logger.Warn("anomaly_history_failed", "job_name", job.JobName, "error", err)
-		return false
+		return nil
 	}
 	result := anomaly.Evaluate(history, obs)
 	if !result.Unusual() {
-		return false
+		return nil
 	}
-	hold := settings.AnomalyMode == anomaly.ModeHold
-	summary := result.Summary()
-	r.logger.Warn("unusual_backup", "job_name", job.JobName, "held", hold, "detail", summary)
-	r.NtfyPublisher.PublishUnusualBackup(settings, map[string]string{
-		"edge_id":  settings.EdgeID,
-		"job_name": job.JobName,
-		"detail":   summary,
-	}, hold)
-	if !hold {
-		return false
-	}
-	s.LastStatus = heldForReviewStatus
-	s.ManualInterventionRequired = true
-	s.LastErrorCategory = unusualBackupCategory
-	s.LastErrorDetail = summary
-	s.ActivePhase = ""
-	s.ActivePhasePercent = 0
-	s.LastUploadUpdatedAt = utcNow()
-	r.StateStore.Set(job.RootPath, *s)
-	return true
+	return &unusualReview{summary: result.Summary(), hold: settings.AnomalyMode == anomaly.ModeHold}
 }
 
 func (r *EdgeRunner) createPendingArchive(job *backup.JobDefinition, files []*backup.DiscoveredFile, fingerprint string, settings *config.Settings, s *state.JobState) (string, string, error) {

@@ -308,6 +308,29 @@ func TestSnapshotIndex_EnsureSchema_ExecError(t *testing.T) {
 	}
 }
 
+// startsWithSQL reports whether a statement begins with keyword once leading
+// whitespace is removed. Checking only Contains would miss stray characters
+// before the keyword, which PostgreSQL rejects.
+func startsWithSQL(sql, keyword string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sql), keyword)
+}
+
+func TestSnapshotIndex_EnsureSchema_StatementsAreWellFormed(t *testing.T) {
+	var statements []string
+	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+		statements = append(statements, sql)
+		return pgconn.CommandTag{}, nil
+	}})
+	if err := idx.EnsureSchema(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range statements {
+		if !startsWithSQL(stmt, "CREATE ") && !startsWithSQL(stmt, "ALTER ") {
+			t.Errorf("schema statement starts unexpectedly: %.60q", strings.TrimSpace(stmt))
+		}
+	}
+}
+
 func TestSnapshotIndex_EnsureSchema_AddsArchiveSizeHistory(t *testing.T) {
 	var statements []string
 	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
@@ -340,7 +363,7 @@ func TestRecentArchiveSizes_ReturnsOldestFirstWithinLimit(t *testing.T) {
 	if err != nil || len(sizes) != 2 || sizes[0] != 100 || sizes[1] != 200 {
 		t.Fatalf("sizes = %v, err %v", sizes, err)
 	}
-	if !strings.Contains(gotSQL, "ORDER BY id DESC LIMIT $4") || !strings.Contains(gotSQL, ") recent ORDER BY id") {
+	if !startsWithSQL(gotSQL, "SELECT size_bytes FROM (") || !strings.Contains(gotSQL, "ORDER BY id DESC LIMIT $4") || !strings.Contains(gotSQL, ") recent ORDER BY id") {
 		t.Errorf("query = %s", gotSQL)
 	}
 	if len(gotArgs) != 4 || gotArgs[0] != "edge" || gotArgs[1] != "inst" || gotArgs[2] != "job" || gotArgs[3] != 20 {
@@ -364,7 +387,7 @@ func TestRecordArchiveSize_InsertsThenTrims(t *testing.T) {
 	if err := idx.RecordArchiveSize(context.Background(), "edge/inst/job", 1234, 20); err != nil {
 		t.Fatal(err)
 	}
-	if len(statements) != 2 || !strings.Contains(statements[0], "INSERT INTO archive_size_history") || !strings.Contains(statements[1], "DELETE FROM archive_size_history") {
+	if len(statements) != 2 || !startsWithSQL(statements[0], "INSERT INTO archive_size_history") || !startsWithSQL(statements[1], "DELETE FROM archive_size_history") {
 		t.Fatalf("statements = %v", statements)
 	}
 	if len(trimArgs) != 4 || trimArgs[3] != 20 {
@@ -572,7 +595,7 @@ func TestDeleteArchiveSizes_RemovesWholeInstance(t *testing.T) {
 	if err := idx.DeleteArchiveSizes(context.Background(), "edge1", "inst1"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(gotSQL, "DELETE FROM archive_size_history WHERE edge_id = $1 AND edge_instance_id = $2") || strings.Contains(gotSQL, "job_name") {
+	if !startsWithSQL(gotSQL, "DELETE FROM archive_size_history WHERE edge_id = $1 AND edge_instance_id = $2") || strings.Contains(gotSQL, "job_name") {
 		t.Errorf("query = %s", gotSQL)
 	}
 	if len(gotArgs) != 2 || gotArgs[0] != "edge1" || gotArgs[1] != "inst1" {

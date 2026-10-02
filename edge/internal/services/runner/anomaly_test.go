@@ -14,6 +14,7 @@ import (
 
 	"github.com/3to1go/edge/internal/anomaly"
 	"github.com/3to1go/edge/internal/backup"
+	"github.com/3to1go/edge/internal/services/state"
 )
 
 var timeZero = time.Unix(0, 0)
@@ -81,10 +82,19 @@ func TestUnusualBackupIsHeldUntilForceUpload(t *testing.T) {
 		os.WriteFile(name+".locked", noise, 0o644)
 		os.Remove(name)
 	}
+	recorder := &recordingStateStore{jobStateStore: runner.StateStore}
+	runner.StateStore = recorder
 	cycle()
 	held := runner.StateStore.Get(jobRoot)
 	if held.LastStatus != heldForReviewStatus || !held.ManualInterventionRequired || held.PendingArchive == "" {
 		t.Fatalf("not held: %+v", held)
+	}
+	// A restart can only see saved state, so no save may mark the new archive
+	// ready to upload before it was reviewed and held.
+	for _, saved := range recorder.saved {
+		if saved.PendingArchive == held.PendingArchive && !saved.ManualInterventionRequired {
+			t.Fatalf("archive saved as ready to upload before its hold: status %q", saved.LastStatus)
+		}
 	}
 	for _, want := range []string{"barely compresses", ".locked", "mass renaming"} {
 		if !strings.Contains(held.LastErrorDetail, want) {
@@ -95,11 +105,15 @@ func TestUnusualBackupIsHeldUntilForceUpload(t *testing.T) {
 		t.Fatalf("held archive was uploaded: %d uploads", uploads)
 	}
 
-	// The next cycle leaves it held, with its reasons, and doesn't upload.
+	// After a restart, a fresh runner on the same saved state leaves it held,
+	// with its reasons, and doesn't upload.
+	restarted := testRunner(t, settings, client)
+	restarted.StateStore, restarted.Anomalies = runner.StateStore, runner.Anomalies
+	runner = restarted
 	cycle()
 	again := runner.StateStore.Get(jobRoot)
 	if again.LastStatus != heldForReviewStatus || again.LastErrorDetail != held.LastErrorDetail || uploads != 6 {
-		t.Fatalf("second cycle: status %s, uploads %d, detail %q", again.LastStatus, uploads, again.LastErrorDetail)
+		t.Fatalf("after restart: status %s, uploads %d, detail %q", again.LastStatus, uploads, again.LastErrorDetail)
 	}
 
 	// Force Upload sends the held archive and makes it part of the history.
@@ -129,16 +143,29 @@ func TestAlertModeUploadsUnusualBackups(t *testing.T) {
 		runner.Anomalies.Accept(jobRoot)
 	}
 	files := []*backup.DiscoveredFile{{ArchivePath: "a.txt", Size: 1}}
-	s := runner.StateStore.Get(jobRoot)
-	if runner.holdUnusualBackup(job, &s, settings, files, 1, false) {
-		t.Fatal("alert mode held the backup")
+	if review := runner.reviewStagedArchive(job, settings, files, 1, false); review == nil || review.hold {
+		t.Fatalf("alert mode review = %+v, want an alert without a hold", review)
 	}
 	settings.AnomalyMode = anomaly.ModeHold
-	if !runner.holdUnusualBackup(job, &s, settings, files, 1, false) {
-		t.Fatal("hold mode let a 99.9% drop through")
+	if review := runner.reviewStagedArchive(job, settings, files, 1, false); review == nil || !review.hold {
+		t.Fatalf("hold mode review = %+v, want a hold for a 99.9%% drop", review)
+	}
+	if review := runner.reviewStagedArchive(job, settings, files, 1, true); review != nil {
+		t.Fatalf("Force Upload was reviewed: %+v", review)
 	}
 	settings.AnomalyMode = anomaly.ModeOff
-	if runner.holdUnusualBackup(job, &s, settings, files, 1, false) {
-		t.Fatal("off mode held the backup")
+	if review := runner.reviewStagedArchive(job, settings, files, 1, false); review != nil {
+		t.Fatalf("off mode review = %+v", review)
 	}
+}
+
+// recordingStateStore keeps a copy of every saved state.
+type recordingStateStore struct {
+	jobStateStore
+	saved []state.JobState
+}
+
+func (r *recordingStateStore) Set(key string, s state.JobState) error {
+	r.saved = append(r.saved, s)
+	return r.jobStateStore.Set(key, s)
 }

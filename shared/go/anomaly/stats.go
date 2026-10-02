@@ -79,12 +79,17 @@ func LogShift(history []float64, current float64) Shift {
 			logs = append(logs, math.Log(v))
 		}
 	}
-	if len(logs) == 0 || current <= 0 {
+	if len(logs) == 0 {
 		return Shift{}
 	}
 	med := Median(logs)
+	typical := math.Exp(med)
+	// Zero has no logarithm, but after a history of real sizes it is the
+	// largest possible drop, such as every file truncated to nothing.
+	if current <= 0 {
+		return Shift{Typical: typical, Ratio: 0, Z: math.Inf(-1)}
+	}
 	// 1.4826 scales the MAD to match a standard deviation for normal data.
 	spread := math.Max(1.4826*MAD(logs), minLogSpread)
-	typical := math.Exp(med)
 	return Shift{Typical: typical, Ratio: current / typical, Z: (math.Log(current) - med) / spread}
 }

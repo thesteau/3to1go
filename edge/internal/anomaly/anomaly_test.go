@@ -70,6 +70,25 @@ func TestOrdinaryChangesAreNotFlagged(t *testing.T) {
 	}
 }
 
+func TestTruncatedFilesInASmallJobAreFlagged(t *testing.T) {
+	// Twelve files, too few for the churn and file-type checks, all wiped to 0 bytes.
+	var history []Observation
+	for week := 0; week < 6; week++ {
+		history = append(history, observe(folder(12, week, ".txt"), 0.40))
+	}
+	wiped := folder(12, 0, ".txt")
+	for _, f := range wiped {
+		f.Size = 0
+	}
+	r := Evaluate(history, observe(wiped, 0))
+	if got := signals(r); !slices.Equal(got, []string{"size"}) {
+		t.Fatalf("signals = %v (%s)", got, r.Summary())
+	}
+	if !strings.Contains(r.Summary(), "The folder holds 0 B, but usually holds about") {
+		t.Errorf("summary = %q", r.Summary())
+	}
+}
+
 func TestEmptiedFolderIsFlagged(t *testing.T) {
 	r := Evaluate(normalHistory(), observe(folder(30, 0, ".docx"), 0.40))
 	if got := signals(r); !slices.Equal(got, []string{"file_count", "size"}) {
