@@ -10,10 +10,8 @@ on:
 permissions:
   contents: read
 
-# Every push to main or prod runs to completion.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+# No concurrency group: GitHub keeps only one pending run per group, so queued
+# pushes would be skipped. Every push gets its own run, each on its own runner.
 
 jobs:
   e2e:

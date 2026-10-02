@@ -37,10 +37,10 @@ Display names start with the workflow's purpose, and file names use the matching
 |---|---|---|
 | `CI:` / `ci-` | Checks on every PR and branch push. End-to-end only runs on pushes to `main` and `prod`. | Go tests, Frontend, End-to-end |
 | `PR:` / `pr-` | PR policy | Conventional Commit title, Production source |
-| `Image:` / `image-` | Docker image publishing | Central latest, Edge latest, Stable release |
+| `Image:` / `image-` | Docker image publishing. The `latest` images publish after End-to-end passes on a `main` push. | Central latest, Edge latest, Stable release |
 | `Release:` / `release-` | Release pipeline | Promote main to prod, Plan and publish, Validate metadata |
 
-`stable-docker-images.yml` keeps its old file name because `release-please.yml` starts it by name on `prod`. Renaming it means changing both files, and both changes must reach `prod` together. Required checks match **job** names, so renaming a workflow is safe, but renaming a required job needs a ruleset update.
+`stable-docker-images.yml` keeps its old file name because `release-please.yml` starts it by name on `prod`. Renaming it means changing both files, and both changes must reach `prod` together. Required checks match **job** names, so renaming a workflow is usually safe, but renaming a required job needs a ruleset update. The exception is "CI: End-to-end": both `latest` image workflows wait for it by that display name, so renaming it would stop `latest` images from publishing.
 
 ## Repository settings
 
@@ -68,7 +68,7 @@ Display names start with the workflow's purpose, and file names use the matching
 | Target | Rules |
 |---|---|
 | `main` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Squash**. Checks: `Run central unit tests`, `Run edge unit tests`, `Type-check, compile and run UI tests`, `Validate Conventional Commit PR title`. Don't require `Edge to Central backup and recovery`: it only runs after a push to `main` or `prod`, so a PR would wait for it forever |
-| `prod` | Same as `main`, without the title check, plus `Validate production PR source`. Merge method: **Merge**. Don't require up-to-date branches or linear history. `prod` is never merged back into `main`, so every later promotion PR would be out of date |
+| `prod` | Same as `main`, without the title check, plus `Validate production PR source` and `Edge to Central backup and recovery`. The promotion PR's head is `main`'s latest commit, which already ran the end-to-end test on push, so requiring it adds no runs and blocks promoting a commit that failed it. Merge method: **Merge**. Don't require up-to-date branches or linear history. `prod` is never merged back into `main`, so every later promotion PR would be out of date |
 | `release-state` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Merge**. Require up-to-date branches, so a PR built on older metadata can't be approved. Check: `Validate release metadata` (the commit status, not `Run release metadata validation`) |
 | Tags `v*` | Restrict creation, update, and deletion, but let the release workflow create tags. Enable immutable releases if available |
 

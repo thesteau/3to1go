@@ -17,7 +17,7 @@ flowchart LR
 
 | Branch | Role |
 |---|---|
-| `main` | Integration branch. A merge that changes an app publishes that app's `latest` image. |
+| `main` | Integration branch. A merge that changes an app publishes that app's `latest` image once the end-to-end test passes. |
 | `prod` | Stable code. Releases are tagged on commits here. |
 | `release-state` | Release metadata only: version, changelog, and the prod commit to tag. Never merged into a code branch. |
 
