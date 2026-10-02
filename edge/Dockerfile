@@ -1,5 +1,5 @@
 # Compiles the TypeScript UI to the static/js directory the Go binary embeds.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:26-alpine AS web
 
 WORKDIR /build
 
@@ -11,7 +11,7 @@ COPY edge/static/tsconfig.json ./edge/static/
 COPY edge/static/ts ./edge/static/ts
 RUN npx tsc -p edge/static
 
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /build
 
@@ -31,7 +31,7 @@ WORKDIR /build/edge
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /3to1go-edge ./cmd/server
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates curl
 
