@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/thesteau/3to1go/compare/v1.0.1...v1.1.0) (2026-10-02)
+
+
+### Features
+
+* add anonmaly detection feature, update docs, and basic bug fixes ([#59](https://github.com/thesteau/3to1go/issues/59)) ([8e49a6a](https://github.com/thesteau/3to1go/commit/8e49a6a1251bd8694261bdff11a47f3a1139e826))
+
 ## [1.0.1](https://github.com/thesteau/3to1go/compare/v1.0.0...v1.0.1) (2026-10-02)
 
 
