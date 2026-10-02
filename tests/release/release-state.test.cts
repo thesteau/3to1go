@@ -150,6 +150,57 @@ test('a promotion releases main\'s commit unless prod changed the files', () => 
   }
 });
 
+test('a prod-only feature released earlier is not counted again after a release tags main', () => {
+  const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
+  const oldCwd = process.cwd();
+  const git = (...args: string[]) => execFileSync('git', ['-C', folder, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  const promote = () => { git('checkout', 'prod'); git('merge', '--no-ff', 'main', '-m', 'chore: promote main to prod'); };
+  try {
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release validation');
+    git('config', 'user.email', 'validation@example.invalid');
+    writeFileSync(join(folder, 'app.txt'), 'first');
+    git('add', '.'); git('commit', '-m', 'feat: initial application');
+    git('branch', 'prod');
+    process.chdir(folder);
+
+    // v1.0.0 ships a feature that only exists on prod.
+    git('checkout', 'prod');
+    writeFileSync(join(folder, 'prod.txt'), 'prod only');
+    git('add', 'prod.txt'); git('commit', '-m', 'feat: prod-only feature');
+    git('tag', 'v1.0.0');
+    // prod drops it again, so the next promotion matches main and v1.0.1 tags main's commit.
+    git('rm', '-q', 'prod.txt'); git('commit', '-m', 'chore: drop prod-only file');
+    git('checkout', 'main'); git('commit', '--allow-empty', '-m', 'fix: on main');
+    promote();
+    const second = bridge.releaseCommit(git('rev-parse', 'prod'));
+    assert.equal(second, git('rev-parse', 'main'));
+    git('tag', '-a', 'v1.0.1', '-m', 'v1.0.1', second);
+    // The next release keeps prod's tip, whose history still has the feature.
+    git('checkout', 'prod');
+    writeFileSync(join(folder, 'prod.txt'), 'prod fix');
+    git('add', 'prod.txt'); git('commit', '-m', 'fix: prod-only fix');
+    git('checkout', 'main'); git('commit', '--allow-empty', '-m', 'fix: another');
+    promote();
+    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'prod'));
+    const tip = bridge.releaseCommit(git('rev-parse', 'prod'));
+    assert.equal(tip, git('rev-parse', 'prod'));
+
+    const released = bridge.releasedCommits('1.0.1');
+    assert.deepEqual(released.sort(), [git('rev-parse', 'v1.0.0'), second].sort(), 'annotated tags resolve to commits');
+    assert.deepEqual(bridge.releasedCommits('1.0.0'), [git('rev-parse', 'v1.0.0')], 'later tags are not excluded');
+    const onlyPrevious = bridge.commitsBetween(tip, second).map((c: any) => c.message);
+    assert.ok(onlyPrevious.includes('feat: prod-only feature'), 'the previous release alone would miss it');
+    const messages = bridge.commitsBetween(tip, second, released).map((c: any) => c.message);
+    assert.ok(!messages.includes('feat: prod-only feature'), 'the feature v1.0.0 shipped is not counted again');
+    assert.ok(messages.includes('fix: prod-only fix') && messages.includes('fix: another'));
+  } finally {
+    process.chdir(oldCwd);
+    assert.equal(dirname(resolve(folder)), resolve(tmpdir()));
+    rmSync(folder, {recursive: true, force: true});
+  }
+});
+
 test('real Release Please handles repeated promotions without release metadata on code branches', async (context: any) => {
   const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
   const oldCwd = process.cwd();
