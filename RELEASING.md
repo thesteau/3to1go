@@ -90,7 +90,9 @@ Never move or reuse a version tag.
 
 ## When prod is reset
 
-`prod` is restored from time to time, which can drop the commit the last release was tagged on. Planning doesn't need that commit in `prod`'s history. The tag keeps it, and the next release counts only the commits on `prod` that the last release didn't include. The workflow log notes when the last release's commit isn't in `prod`'s history.
+`prod` is restored from time to time. A promotion's merge commit only exists on `prod`, so a release tags the `main` commit the promotion brought in instead. It has the same files and stays in `prod`'s history when `prod` is reset to `main`. If `prod` has changes of its own, the merge commit is tagged.
+
+If a reset still drops the last release's commit, planning doesn't need it in `prod`'s history. The tag keeps it, and the next release counts only the commits on `prod` that the last release didn't include. The workflow log notes when the last release's commit isn't in `prod`'s history.
 
 A reset that keeps commit IDs, such as resetting `prod` to `main`, counts nothing twice. Commits re-created with new IDs, by a rebase or squash, count again. Check the release PR's version and notes before approving it.
 

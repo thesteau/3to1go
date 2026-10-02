@@ -90,6 +90,18 @@ function commitsBetween(prodSha: string, previousSha: string | null): any[] {
   return commits;
 }
 
+// Chooses which commit on prod to release. A promotion merge commit exists only
+// on prod and disappears when prod is reset to main. When the merge's files match
+// the main commit it brought in, release that main commit instead: same code,
+// still on prod as the merge's second parent, and it survives a reset.
+function releaseCommit(prodTip: string): string {
+  const [, ...parents] = git('rev-list', '--parents', '-n', '1', prodTip).split(' ');
+  if (parents.length === 2 && git('rev-parse', `${prodTip}^{tree}`) === git('rev-parse', `${parents[1]}^{tree}`)) {
+    return parents[1];
+  }
+  return prodTip;
+}
+
 async function buildCandidate(github: any, prodSha: string, previous: ReleaseState | null): Promise<any> {
   const config = JSON.parse(readFileSync('release-please-config.json', 'utf8'));
   invariant(config['release-type'] === 'go' && config['initial-version'] === '1.0.0' &&
@@ -189,7 +201,7 @@ async function plan(github: any, api: any, repo: any): Promise<void> {
   const previous = await readState(api, repo, STATE_BRANCH);
   invariant(!previous || await published(api, repo, previous),
     'Approved release is not published yet. Retry publish before planning another release.');
-  const prodSha = git('rev-parse', 'origin/prod');
+  const prodSha = releaseCommit(git('rev-parse', 'origin/prod'));
   const candidate = await buildCandidate(github, prodSha, previous);
   if (!candidate) { console.log('No releasable production changes.'); return; }
   const state: ReleaseState = {
@@ -248,5 +260,5 @@ async function main(): Promise<void> {
   } else throw new Error('Unknown release operation');
 }
 
-module.exports = {validateState, validateTree, commitsBetween, buildCandidate, readState, bootstrap, published, plan, publish};
+module.exports = {validateState, validateTree, commitsBetween, releaseCommit, buildCandidate, readState, bootstrap, published, plan, publish};
 if (require.main === module) main().catch((error: Error) => { console.error(error.message); process.exitCode = 1; });

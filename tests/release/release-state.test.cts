@@ -116,6 +116,40 @@ test('planning after prod is reset counts only what the last release did not shi
   }
 });
 
+test('a promotion releases main\'s commit unless prod changed the files', () => {
+  const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
+  const oldCwd = process.cwd();
+  const git = (...args: string[]) => execFileSync('git', ['-C', folder, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  try {
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release validation');
+    git('config', 'user.email', 'validation@example.invalid');
+    writeFileSync(join(folder, 'app.txt'), 'first');
+    git('add', '.'); git('commit', '-m', 'feat: initial application');
+    git('branch', 'prod');
+    process.chdir(folder);
+
+    // A plain commit on prod is released as is.
+    assert.equal(bridge.releaseCommit(git('rev-parse', 'prod')), git('rev-parse', 'prod'));
+
+    // A promotion merge with main's files releases main's commit.
+    git('commit', '--allow-empty', '-m', 'fix: on main');
+    git('checkout', 'prod'); git('merge', '--no-ff', 'main', '-m', 'chore: promote main to prod');
+    assert.equal(bridge.releaseCommit(git('rev-parse', 'prod')), git('rev-parse', 'main'));
+
+    // A merge whose files differ from main's keeps the merge commit.
+    writeFileSync(join(folder, 'prod.txt'), 'prod only');
+    git('add', 'prod.txt'); git('commit', '-m', 'chore: prod-only file');
+    git('checkout', 'main'); git('commit', '--allow-empty', '-m', 'fix: another');
+    git('checkout', 'prod'); git('merge', '--no-ff', 'main', '-m', 'chore: promote main to prod');
+    assert.equal(bridge.releaseCommit(git('rev-parse', 'prod')), git('rev-parse', 'prod'));
+  } finally {
+    process.chdir(oldCwd);
+    assert.equal(dirname(resolve(folder)), resolve(tmpdir()));
+    rmSync(folder, {recursive: true, force: true});
+  }
+});
+
 test('real Release Please handles repeated promotions without release metadata on code branches', async (context: any) => {
   const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
   const oldCwd = process.cwd();
@@ -203,7 +237,7 @@ test('real Release Please handles repeated promotions without release metadata o
       git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'prod'));
       await bridge.plan(client, api, {});
       assert.equal(proposed.version, version);
-      assert.equal(proposed.prodSha, git('rev-parse', 'prod'));
+      assert.equal(proposed.prodSha, git('rev-parse', 'prod^2'), 'releases the promoted main commit');
       approved = proposed;
       await bridge.publish(client, api, {}, 'state');
     }
