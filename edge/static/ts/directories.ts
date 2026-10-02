@@ -3,9 +3,10 @@ let directoryExpansionState = new Set<string>();
 let showHiddenDirs = false;
 // The tree loads one level at a time: "." holds the top level, other keys an opened folder.
 const directoryChildren = new Map<string, DirectoryNode[]>();
-const directoryChildrenLoading = new Set<string>();
 // Each reload bumps this so responses requested before it cannot overwrite fresher data.
 let directoryTreeGeneration = 0;
+// The generation of each folder's pending request; an older one never blocks a newer one.
+const directoryChildrenLoading = new Map<string, number>();
 
 const JOB_EVENT_LINGER_MS = 10000;
 
@@ -67,6 +68,8 @@ async function reloadDirectoryTree(): Promise<void> {
     if (nodes) {
       directoryChildren.set(path, nodes);
     } else {
+      // Drop the stale children too, so reopening the folder fetches it again.
+      directoryChildren.delete(path);
       directoryExpansionState.delete(path);
     }
   }
@@ -74,12 +77,12 @@ async function reloadDirectoryTree(): Promise<void> {
 }
 
 async function loadDirectoryChildren(relativePath: string): Promise<void> {
-  if (directoryChildrenLoading.has(relativePath)) return;
-  directoryChildrenLoading.add(relativePath);
   const generation = directoryTreeGeneration;
+  if (directoryChildrenLoading.get(relativePath) === generation) return;
+  directoryChildrenLoading.set(relativePath, generation);
   try {
     const nodes = await fetchDirectoryChildren(relativePath);
-    // A reload started meanwhile re-fetches this open folder with fresher data.
+    // A reload started meanwhile, or a newer request for this folder, supplies fresher data.
     if (generation !== directoryTreeGeneration) return;
     directoryChildren.set(relativePath, nodes);
   } catch (error) {
@@ -90,7 +93,7 @@ async function loadDirectoryChildren(relativePath: string): Promise<void> {
     if (element) element.open = false;
     setActionStatus((error as Error).message, "error");
   } finally {
-    directoryChildrenLoading.delete(relativePath);
+    if (directoryChildrenLoading.get(relativePath) === generation) directoryChildrenLoading.delete(relativePath);
   }
   renderDirectoryTree();
 }

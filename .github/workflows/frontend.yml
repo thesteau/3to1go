@@ -39,8 +39,22 @@ jobs:
       - name: Type-check and compile TypeScript
         run: npm run build
 
-      - name: Type-check release automation
-        run: npx tsc --noEmit --target es2022 --module commonjs --types node --skipLibCheck scripts/release-state.cts
+      - name: Type-check repository scripts
+        run: npx tsc --noEmit --target es2022 --module commonjs --types node --skipLibCheck scripts/release-state.cts scripts/test-report.cts
 
+      # Also writes reports/frontend-tests.html and this job's summary.
       - name: Run UI tests
-        run: node --test tests/*.cts
+        run: >-
+          node --test
+          --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout
+          "tests/**/*.test.cts"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-report
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14

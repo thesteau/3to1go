@@ -4,7 +4,7 @@ const {execFileSync} = require('node:child_process');
 const {mkdtempSync, writeFileSync, rmSync} = require('node:fs');
 const {tmpdir} = require('node:os');
 const {join, resolve, dirname, basename} = require('node:path');
-const bridge = require('../scripts/release-state.cts');
+const bridge = require('../../scripts/release-state.cts');
 
 const initial = {
   version: '1.0.0', tag: 'v1.0.0', prodSha: 'a'.repeat(40),

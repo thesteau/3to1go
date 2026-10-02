@@ -17,6 +17,11 @@ cleanup() {
         echo "--- $container startup diagnostics ---" >&2
         docker inspect --format '{{json .State}}' "$container" >&2 || true
         docker logs --tail 200 "$container" >&2 || true
+        # CI uploads these full logs as an artifact.
+        if [ -n "${E2E_LOG_DIR:-}" ]; then
+          mkdir -p "$E2E_LOG_DIR"
+          docker logs "$container" > "$E2E_LOG_DIR/${container%-$$}.log" 2>&1 || true
+        fi
       fi
     done
   fi
