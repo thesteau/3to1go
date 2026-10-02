@@ -257,6 +257,30 @@ func TestListChildren_StopsAtMaxDepthAndRejectsEscapes(t *testing.T) {
 	}
 }
 
+func TestListChildren_RejectsSymlinkLeavingScanRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	os.Mkdir(filepath.Join(outside, "secret"), fs.ModePerm)
+	os.Mkdir(filepath.Join(root, "inside"), fs.ModePerm)
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(root, "inside"), filepath.Join(root, "alias")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	svc, _ := newDirService(t, root)
+	if nodes, err := svc.ListChildren("escape"); err == nil {
+		t.Errorf("expected symlink outside the scan root to be rejected, got %+v", nodes)
+	}
+	if _, err := svc.ListChildren("alias"); err != nil {
+		t.Errorf("symlink within the scan root: %v", err)
+	}
+	if _, err := svc.ListChildren("inside/missing"); err == nil {
+		t.Error("expected a missing folder to be rejected")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // SaveJob
 // ---------------------------------------------------------------------------

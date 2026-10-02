@@ -127,14 +127,14 @@ func (d *DirectoryService) invalidateJobs() {
 }
 
 // ListChildren returns the folders directly below relativePath, within max_depth.
+// Symlinks are resolved first so a link inside the root cannot list folders outside it.
 func (d *DirectoryService) ListChildren(relativePath string) ([]DirectoryNode, error) {
-	dir, err := d.resolveDirectory(relativePath)
+	scanRoot, dir, err := d.resolveBrowsePath(relativePath)
 	if err != nil {
 		return nil, err
 	}
-	scanRoot, err := filepath.Abs(d.settings.ScanRoot)
-	if err != nil {
-		return nil, err
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return nil, fmt.Errorf("directory not found")
 	}
 	depth := 0
 	if rel, err := filepath.Rel(scanRoot, dir); err == nil && rel != "." {

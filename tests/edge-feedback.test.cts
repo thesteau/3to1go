@@ -112,6 +112,65 @@ test('opening a folder fetches its children once and keeps it open across reload
   assert.equal(ctx.findEntry('music/new').blocked_by_parent, 'music');
 });
 
+test('a folder response requested before a tree reload cannot overwrite it', async () => {
+  const pending = [];
+  const tree = { innerHTML: '' };
+  const details = [];
+  let parentIsJob = true;
+  const ctx = vm.createContext({
+    document: { getElementById: id => id === 'directory-tree' ? tree : null, querySelectorAll: () => details },
+    currentUser: { is_admin: true }, latestData: null, setActionStatus() {},
+    fetch: async url => {
+      const relativePath = decodeURIComponent(url.split('relative_path=')[1]);
+      const body = relativePath === '.'
+        ? { directories: [{ relative_path: 'music', selected: parentIsJob, child_count: 1 }] }
+        : { directories: [{ relative_path: 'music/old', blocked_by_parent: parentIsJob ? 'music' : null }] };
+      const response = { ok: true, json: async () => body };
+      // Hold the first folder request open; answer everything else at once.
+      if (relativePath === 'music' && pending.length === 0) return new Promise(resolve => pending.push(() => resolve(response)));
+      return response;
+    },
+  });
+  load(ctx, 'utils.js');
+  load(ctx, 'directories.js');
+  await ctx.reloadDirectoryTree();
+  const listeners = {};
+  details.push({ dataset: { path: 'music' }, open: true, addEventListener: (name, fn) => { listeners[name] = fn; } });
+  ctx.bindDirectoryTreeEvents();
+  listeners.toggle();
+  await new Promise(setImmediate);
+
+  parentIsJob = false;
+  await ctx.reloadDirectoryTree();
+  assert.equal(ctx.findEntry('music/old').blocked_by_parent, null);
+  pending.shift()();
+  await new Promise(setImmediate);
+  assert.equal(ctx.findEntry('music/old').blocked_by_parent, null, 'the stale response is discarded');
+  assert.doesNotMatch(tree.innerHTML, /Covered by parent job/);
+});
+
+test('a folder opened during a tree reload keeps its children', async () => {
+  let finishTopLevel;
+  const { ctx, tree, details } = lazyTreeContext({
+    '.': [{ relative_path: 'music', child_count: 1 }],
+    music: [{ relative_path: 'music/new' }],
+  });
+  await ctx.reloadDirectoryTree();
+  const originalFetch = ctx.fetch;
+  ctx.fetch = async url => url.endsWith('relative_path=.')
+    ? new Promise(resolve => { finishTopLevel = () => resolve(originalFetch(url)); })
+    : originalFetch(url);
+  const reload = ctx.reloadDirectoryTree();
+  const listeners = {};
+  details.push({ dataset: { path: 'music' }, open: true, addEventListener: (name, fn) => { listeners[name] = fn; } });
+  ctx.bindDirectoryTreeEvents();
+  listeners.toggle();
+  await new Promise(setImmediate);
+  finishTopLevel();
+  await reload;
+  assert.match(tree.innerHTML, /data-path="music\/new"/);
+});
+
 test('unopened folders show that they contain a selected job', async () => {
   const { ctx, tree } = lazyTreeContext(
     { '.': [{ relative_path: 'media', child_count: 3, hidden_child_count: 1 }] },

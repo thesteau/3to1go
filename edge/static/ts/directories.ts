@@ -4,6 +4,8 @@ let showHiddenDirs = false;
 // The tree loads one level at a time: "." holds the top level, other keys an opened folder.
 const directoryChildren = new Map<string, DirectoryNode[]>();
 const directoryChildrenLoading = new Set<string>();
+// Each reload bumps this so responses requested before it cannot overwrite fresher data.
+let directoryTreeGeneration = 0;
 
 const JOB_EVENT_LINGER_MS = 10000;
 
@@ -46,6 +48,7 @@ function directoryTreeLoaded(): boolean {
 
 // Re-fetches the top level and every open folder; folders that vanished close.
 async function reloadDirectoryTree(): Promise<void> {
+  const generation = ++directoryTreeGeneration;
   const paths = [".", ...directoryExpansionState];
   const results = await Promise.all(paths.map(async (path) => {
     try {
@@ -55,7 +58,11 @@ async function reloadDirectoryTree(): Promise<void> {
       return [path, null] as const;
     }
   }));
-  directoryChildren.clear();
+  if (generation !== directoryTreeGeneration) return;
+  // Folders opened while this reload ran were fetched after it began; keep them.
+  for (const path of [...directoryChildren.keys()]) {
+    if (!paths.includes(path) && !directoryExpansionState.has(path)) directoryChildren.delete(path);
+  }
   for (const [path, nodes] of results) {
     if (nodes) {
       directoryChildren.set(path, nodes);
@@ -69,9 +76,14 @@ async function reloadDirectoryTree(): Promise<void> {
 async function loadDirectoryChildren(relativePath: string): Promise<void> {
   if (directoryChildrenLoading.has(relativePath)) return;
   directoryChildrenLoading.add(relativePath);
+  const generation = directoryTreeGeneration;
   try {
-    directoryChildren.set(relativePath, await fetchDirectoryChildren(relativePath));
+    const nodes = await fetchDirectoryChildren(relativePath);
+    // A reload started meanwhile re-fetches this open folder with fresher data.
+    if (generation !== directoryTreeGeneration) return;
+    directoryChildren.set(relativePath, nodes);
   } catch (error) {
+    if (generation !== directoryTreeGeneration) return;
     directoryExpansionState.delete(relativePath);
     const element = Array.from(document.querySelectorAll<HTMLDetailsElement>("#directory-tree details[data-path]"))
       .find((item) => item.dataset.path === relativePath);
