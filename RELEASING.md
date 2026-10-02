@@ -35,7 +35,7 @@ Display names start with the workflow's purpose, and file names use the matching
 
 | Prefix | Purpose | Workflows |
 |---|---|---|
-| `CI:` / `ci-` | Checks on every PR and branch push | Go tests, Frontend, End-to-end |
+| `CI:` / `ci-` | Checks on every PR and branch push. End-to-end only runs on pushes to `main` and `prod`. | Go tests, Frontend, End-to-end |
 | `PR:` / `pr-` | PR policy | Conventional Commit title, Production source |
 | `Image:` / `image-` | Docker image publishing | Central latest, Edge latest, Stable release |
 | `Release:` / `release-` | Release pipeline | Promote main to prod, Plan and publish, Validate metadata |
@@ -67,7 +67,7 @@ Display names start with the workflow's purpose, and file names use the matching
 
 | Target | Rules |
 |---|---|
-| `main` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Squash**. Checks: `Run central unit tests`, `Run edge unit tests`, `Type-check, compile and run UI tests`, `Edge to Central backup and recovery`, `Validate Conventional Commit PR title` |
+| `main` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Squash**. Checks: `Run central unit tests`, `Run edge unit tests`, `Type-check, compile and run UI tests`, `Validate Conventional Commit PR title`. Don't require `Edge to Central backup and recovery`: it only runs after a push to `main` or `prod`, so a PR would wait for it forever |
 | `prod` | Same as `main`, without the title check, plus `Validate production PR source`. Merge method: **Merge**. Don't require up-to-date branches or linear history. `prod` is never merged back into `main`, so every later promotion PR would be out of date |
 | `release-state` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Merge**. Require up-to-date branches, so a PR built on older metadata can't be approved. Check: `Validate release metadata` (the commit status, not `Run release metadata validation`) |
 | Tags `v*` | Restrict creation, update, and deletion, but let the release workflow create tags. Enable immutable releases if available |

@@ -1,23 +1,23 @@
 name: "CI: End-to-end"
 
+# Builds both images and runs them against real databases, so it only runs on
+# the integration and release branches, not on every PR.
 on:
   push:
     branches: ["main", "prod"]
-  pull_request:
-    branches-ignore: [release-state]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer push to the same PR makes an in-progress run obsolete; branch pushes always finish.
+# Every push to main or prod runs to completion.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   e2e:
-    # Required status check; keep this name.
+    # Not a required PR check, because PRs don't run it.
     name: Edge to Central backup and recovery
     runs-on: ubuntu-latest
     steps:
