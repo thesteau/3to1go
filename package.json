@@ -9,7 +9,7 @@
     "test": "npm run build && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""
   },
   "devDependencies": {
-    "@types/node": "24.19.0",
+    "@types/node": "26.6.3",
     "release-please": "17.11.2",
     "typescript": "7.0.2"
   }
