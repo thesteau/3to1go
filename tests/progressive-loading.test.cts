@@ -10,8 +10,10 @@ function load(ctx, file) {
   loadFeature(ctx, app, feature);
 }
 
-test('Edge renders status and key before a slow directory scan completes', async () => {
+test('Edge renders status and key before slow job and folder loads complete', async () => {
   let finishDirectories;
+  let finishTree;
+  let treeLoaded = false;
   const rendered = [];
   const ready = {};
   const ctx = vm.createContext({
@@ -24,16 +26,39 @@ test('Edge renders status and key before a slow directory scan completes', async
     fillMetaFromDir: () => rendered.push('status'),
     fillMetaEncKey: () => rendered.push('key'),
     renderSelectedJobs: () => rendered.push('jobs'),
-    renderDirectoryTree: () => rendered.push('tree'), requestAnimationFrame: fn => fn(),
+    renderDirectoryTree() {},
+    directoryTreeLoaded: () => treeLoaded,
+    reloadDirectoryTree: () => new Promise(resolve => { finishTree = resolve; }).then(() => { treeLoaded = true; rendered.push('tree'); }),
   });
   load(ctx, 'edge/static/js/refresh.js');
   const pending = ctx.loadData();
   await new Promise(setImmediate);
   assert.deepEqual(rendered, ['status', 'key']);
   assert.equal(ready.settings, true);
+  finishTree();
+  await new Promise(setImmediate);
+  assert.deepEqual(rendered, ['status', 'key', 'tree'], 'the folder tree does not wait for job discovery');
   finishDirectories({ ok: true, json: async () => ({ directories: [] }) });
   await pending;
-  assert.deepEqual(rendered, ['status', 'key', 'jobs', 'tree']);
+  assert.deepEqual(rendered, ['status', 'key', 'tree', 'jobs']);
+});
+
+test('Edge polls skip the folder tree once it has loaded', async () => {
+  const requests = [];
+  let reloads = 0;
+  const ctx = vm.createContext({
+    window: {}, document: { getElementById: () => null },
+    fetch: async url => { requests.push(url); return { ok: true, json: async () => ({ directories: [] }) }; },
+    setHtmlIfChanged() {}, applyTheme() {}, setActionStatus() {}, setPanelReady() {}, fillMetaFromDir() {},
+    renderSelectedJobs() {}, renderDirectoryTree() {}, directoryTreeLoaded: () => true,
+    reloadDirectoryTree: async () => { reloads++; },
+  });
+  load(ctx, 'edge/static/js/refresh.js');
+  await ctx.loadData({ silent: true, includeKey: false });
+  assert.equal(reloads, 0);
+  assert.deepEqual(requests, ['/api/status', '/api/directories']);
+  await ctx.loadData({ silent: true, includeKey: false, refreshDirectoryTree: true });
+  assert.equal(reloads, 1);
 });
 
 test('Central renders snapshots while storage probes remain pending', async () => {
@@ -97,7 +122,7 @@ test('Edge keeps loaded settings editable when a later poll fails', async () => 
       return { ok: true, json: async () => url === '/api/status' ? { settings: { theme: 'dark' } } : url === '/api/directories' ? { directories: [] } : { key_base64: 'k', fingerprint: 'f' } };
     },
     setHtmlIfChanged() {}, applyTheme() {}, setActionStatus() {}, fillMetaFromDir() {}, fillMetaEncKey() {},
-    renderSelectedJobs() {}, renderDirectoryTree() {}, requestAnimationFrame: fn => fn(),
+    renderSelectedJobs() {}, renderDirectoryTree() {}, directoryTreeLoaded: () => true, reloadDirectoryTree: async () => {},
     setPanelReady: (name, value) => { ready[name] = value; },
   });
   load(ctx, 'edge/static/js/refresh.js');

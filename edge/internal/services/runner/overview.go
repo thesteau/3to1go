@@ -15,10 +15,10 @@ type circuitSnapshotter interface {
 	Snapshot() map[string]any
 }
 
-// dirLister lists configured backup directories.
+// dirLister lists configured backup jobs.
 // *directories.DirectoryService satisfies it.
 type dirLister interface {
-	ListDirectories() ([]directories.DirectoryEntry, error)
+	ListJobs() ([]directories.DirectoryEntry, error)
 }
 
 // BuildStatusResponse returns the full status payload for the /api/status endpoint.
@@ -51,9 +51,9 @@ func scanDir(fallback string) string {
 	return fallback
 }
 
-// BuildDirectoryResponse returns the directory list payload for /api/directories.
+// BuildDirectoryResponse returns the job list payload for /api/directories.
 func BuildDirectoryResponse(settings *config.Settings, dirService dirLister) map[string]any {
-	dirs, err := dirService.ListDirectories()
+	dirs, err := dirService.ListJobs()
 	if err != nil {
 		dirs = nil
 	}

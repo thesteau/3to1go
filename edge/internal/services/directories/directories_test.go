@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -82,98 +83,136 @@ func writeMarker(t *testing.T, dir string, payload map[string]any) {
 }
 
 // ---------------------------------------------------------------------------
-// ListDirectories
+// ListJobs
 // ---------------------------------------------------------------------------
 
-func TestListDirectories_EmptyScanRoot(t *testing.T) {
-	root := t.TempDir()
-	svc, _ := newDirService(t, root)
-	entries, err := svc.ListDirectories()
+func jobPaths(t *testing.T, svc *DirectoryService) []string {
+	t.Helper()
+	entries, err := svc.ListJobs()
 	if err != nil {
-		t.Fatalf("ListDirectories: %v", err)
+		t.Fatalf("ListJobs: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("expected 1 entry (root itself), got %d", len(entries))
+	paths := []string{}
+	for _, entry := range entries {
+		if !entry.Selected {
+			t.Errorf("%s listed without a marker", entry.RelativePath)
+		}
+		paths = append(paths, entry.RelativePath)
 	}
-	if entries[0].Selected {
-		t.Error("root should not be selected (no marker)")
+	return paths
+}
+
+func TestListJobs_FindsMarkersWithinDepthWithoutEnteringJobs(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"photos/nested", "docs/work/q1", "deep/a/b/c/d/e", "plain"} {
+		os.MkdirAll(filepath.Join(root, dir), fs.ModePerm)
+	}
+	writeMarker(t, filepath.Join(root, "photos"), map[string]any{"job_name": "photos"})
+	writeMarker(t, filepath.Join(root, "photos", "nested"), map[string]any{"job_name": "nested"})
+	writeMarker(t, filepath.Join(root, "docs", "work"), map[string]any{"job_name": "work"})
+	writeMarker(t, filepath.Join(root, "deep", "a", "b", "c", "d", "e"), map[string]any{"job_name": "too_deep"})
+
+	svc, _ := newDirService(t, root)
+	got := jobPaths(t, svc)
+	want := []string{"docs/work", "photos"}
+	if !slices.Equal(got, want) {
+		t.Errorf("jobs = %v, want %v", got, want)
 	}
 }
 
-func TestListDirectories_WithSubdirectory(t *testing.T) {
+func TestListJobs_ReportsInvalidConfig(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "broken")
+	os.Mkdir(dir, fs.ModePerm)
+	os.WriteFile(filepath.Join(dir, backup.UploadDirFilename), []byte("job_name: [unclosed"), 0o644)
+
+	svc, _ := newDirService(t, root)
+	entries, err := svc.ListJobs()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("ListJobs = %v, %v", entries, err)
+	}
+	if entries[0].ConfigError == nil {
+		t.Error("invalid marker should report a config error")
+	}
+}
+
+func TestListJobs_ReusesDiscoveryUntilJobsChange(t *testing.T) {
 	root := t.TempDir()
 	os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm)
 	os.Mkdir(filepath.Join(root, "docs"), fs.ModePerm)
-
-	svc, _ := newDirService(t, root)
-	entries, err := svc.ListDirectories()
-	if err != nil {
-		t.Fatalf("ListDirectories: %v", err)
+	svc, ms := newDirService(t, root)
+	if got := jobPaths(t, svc); len(got) != 0 {
+		t.Fatalf("jobs = %v, want none", got)
 	}
-	if len(entries) != 3 {
-		t.Errorf("expected 3 entries (root + 2 subdirs), got %d", len(entries))
+
+	// A marker written outside the UI waits for the discovery cache to expire.
+	writeMarker(t, filepath.Join(root, "docs"), map[string]any{"job_name": "docs"})
+	if got := jobPaths(t, svc); len(got) != 0 {
+		t.Errorf("jobs = %v, want cached empty list", got)
+	}
+
+	if _, err := svc.SaveJob("photos", map[string]any{"job_name": "photos"}); err != nil {
+		t.Fatalf("SaveJob: %v", err)
+	}
+	ms.Set(filepath.Join(root, "photos"), state.JobState{LastStatus: "uploading"})
+	entries, _ := svc.ListJobs()
+	if len(entries) != 2 || entries[1].RelativePath != "photos" || entries[1].State.LastStatus != "uploading" {
+		t.Errorf("after save: %+v", entries)
+	}
+
+	if err := svc.DeleteJob("photos"); err != nil {
+		t.Fatalf("DeleteJob: %v", err)
+	}
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs"}) {
+		t.Errorf("after delete: %v", got)
 	}
 }
 
-func TestListDirectories_WithMarkerFile(t *testing.T) {
+// ---------------------------------------------------------------------------
+// ListChildren
+// ---------------------------------------------------------------------------
+
+func childrenByPath(t *testing.T, svc *DirectoryService, relativePath string) map[string]DirectoryNode {
+	t.Helper()
+	nodes, err := svc.ListChildren(relativePath)
+	if err != nil {
+		t.Fatalf("ListChildren(%q): %v", relativePath, err)
+	}
+	result := map[string]DirectoryNode{}
+	for _, node := range nodes {
+		result[node.RelativePath] = node
+	}
+	return result
+}
+
+func TestListChildren_ListsOneLevelWithCounts(t *testing.T) {
 	root := t.TempDir()
-	photoDir := filepath.Join(root, "photos")
-	os.Mkdir(photoDir, fs.ModePerm)
-	writeMarker(t, photoDir, map[string]any{"job_name": "photos"})
+	for _, dir := range []string{"photos/2024", "photos/.thumbs", "docs"} {
+		os.MkdirAll(filepath.Join(root, dir), fs.ModePerm)
+	}
+	writeMarker(t, filepath.Join(root, "photos"), map[string]any{"job_name": "photos"})
 
 	svc, _ := newDirService(t, root)
-	entries, err := svc.ListDirectories()
+	nodes, err := svc.ListChildren(".")
 	if err != nil {
-		t.Fatalf("ListDirectories: %v", err)
+		t.Fatalf("ListChildren: %v", err)
 	}
-
-	var photosEntry *DirectoryEntry
-	for i := range entries {
-		if entries[i].RelativePath == "photos" {
-			photosEntry = &entries[i]
-			break
-		}
+	if len(nodes) != 2 || nodes[0].RelativePath != "docs" || nodes[1].RelativePath != "photos" {
+		t.Fatalf("nodes = %+v", nodes)
 	}
-	if photosEntry == nil {
-		t.Fatal("expected 'photos' entry in results")
+	photos := nodes[1]
+	if !photos.Selected || photos.Config == nil || photos.BlockedByParent != nil {
+		t.Errorf("photos = %+v", photos)
 	}
-	if !photosEntry.Selected {
-		t.Error("photos directory should be selected (has marker)")
+	if photos.ChildCount != 2 || photos.HiddenChildCount != 1 {
+		t.Errorf("photos counts = %d/%d, want 2/1", photos.ChildCount, photos.HiddenChildCount)
 	}
-	if photosEntry.Config == nil {
-		t.Error("photos directory should have Config set")
+	if nodes[0].ChildCount != 0 {
+		t.Errorf("docs child count = %d, want 0", nodes[0].ChildCount)
 	}
 }
 
-func TestListDirectories_ChildBlockedByParentWithMarker(t *testing.T) {
-	root := t.TempDir()
-	parentDir := filepath.Join(root, "parent")
-	childDir := filepath.Join(parentDir, "child")
-	os.MkdirAll(childDir, fs.ModePerm)
-	writeMarker(t, parentDir, map[string]any{"job_name": "parent"})
-
-	svc, _ := newDirService(t, root)
-	entries, err := svc.ListDirectories()
-	if err != nil {
-		t.Fatalf("ListDirectories: %v", err)
-	}
-
-	var childEntry *DirectoryEntry
-	for i := range entries {
-		if entries[i].RelativePath == "parent/child" {
-			childEntry = &entries[i]
-			break
-		}
-	}
-	if childEntry == nil {
-		t.Fatal("expected parent/child entry")
-	}
-	if childEntry.BlockedByParent == nil {
-		t.Error("child should be blocked by parent")
-	}
-}
-
-func TestListDirectories_ReportsFoldersExcludedByParentJob(t *testing.T) {
+func TestListChildren_ReportsParentJobBlocksAndExclusions(t *testing.T) {
 	root := t.TempDir()
 	parentDir := filepath.Join(root, "parent")
 	os.MkdirAll(filepath.Join(parentDir, "skip", "deeper"), fs.ModePerm)
@@ -184,19 +223,37 @@ func TestListDirectories_ReportsFoldersExcludedByParentJob(t *testing.T) {
 	if err := svc.ExcludePath("parent/skip"); err != nil {
 		t.Fatalf("ExcludePath: %v", err)
 	}
-	entries, err := svc.ListDirectories()
-	if err != nil {
-		t.Fatalf("ListDirectories: %v", err)
+	children := childrenByPath(t, svc, "parent")
+	if children["parent/keep"].Excluded || !children["parent/skip"].Excluded {
+		t.Errorf("exclusions = keep:%v skip:%v", children["parent/keep"].Excluded, children["parent/skip"].Excluded)
 	}
-	excluded := map[string]bool{}
-	for _, entry := range entries {
-		excluded[entry.RelativePath] = entry.Excluded
+	if children["parent/keep"].BlockedByParent != "parent" {
+		t.Errorf("blocked_by_parent = %v, want parent", children["parent/keep"].BlockedByParent)
 	}
-	want := map[string]bool{"parent": false, "parent/keep": false, "parent/skip": true, "parent/skip/deeper": true}
-	for path, expected := range want {
-		if excluded[path] != expected {
-			t.Errorf("%s excluded = %v, want %v", path, excluded[path], expected)
-		}
+	deeper := childrenByPath(t, svc, "parent/skip")["parent/skip/deeper"]
+	if !deeper.Excluded || deeper.BlockedByParent != "parent" {
+		t.Errorf("deeper = %+v", deeper)
+	}
+}
+
+func TestListChildren_StopsAtMaxDepthAndRejectsEscapes(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "a", "b", "c", "d", "e", "f"), fs.ModePerm)
+	svc, _ := newDirService(t, root) // MaxDepth 5
+
+	d := childrenByPath(t, svc, "a/b/c")["a/b/c/d"]
+	if d.ChildCount != 1 {
+		t.Errorf("depth-4 child count = %d, want 1", d.ChildCount)
+	}
+	e := childrenByPath(t, svc, "a/b/c/d")["a/b/c/d/e"]
+	if e.ChildCount != 0 {
+		t.Errorf("max-depth folder child count = %d, want 0", e.ChildCount)
+	}
+	if got := childrenByPath(t, svc, "a/b/c/d/e"); len(got) != 0 {
+		t.Errorf("children beyond max depth = %v", got)
+	}
+	if _, err := svc.ListChildren("../escape"); err == nil {
+		t.Error("expected traversal to be rejected")
 	}
 }
 

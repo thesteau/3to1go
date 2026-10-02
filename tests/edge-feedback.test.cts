@@ -47,26 +47,79 @@ test('excluding a file shows progress, then updates its row without reloading th
   assert.deepEqual(messages.map(([, kind]) => kind), ['success']);
 });
 
-test('directory tree hides the scan root and starts every folder collapsed', () => {
+function lazyTreeContext(children, latestData = null) {
   const tree = { innerHTML: '' };
+  const details = [];
+  const requests = [];
   const ctx = vm.createContext({
-    document: { getElementById: id => id === 'directory-tree' ? tree : null, querySelectorAll: () => [] },
-    currentUser: { is_admin: true }, latestData: null,
+    document: {
+      getElementById: id => id === 'directory-tree' ? tree : null,
+      querySelectorAll: () => details,
+    },
+    currentUser: { is_admin: true }, latestData, setActionStatus() {},
+    fetch: async url => {
+      const relativePath = decodeURIComponent(url.split('relative_path=')[1]);
+      requests.push(relativePath);
+      return { ok: true, json: async () => ({ directories: children[relativePath] || [] }) };
+    },
   });
   load(ctx, 'utils.js');
   load(ctx, 'directories.js');
-  ctx.renderDirectoryTree([
-    { relative_path: '.', selected: false },
-    { relative_path: 'music', selected: true },
-    { relative_path: 'music/old', blocked_by_parent: 'music', excluded: true },
-    { relative_path: 'music/new', blocked_by_parent: 'music' },
-  ]);
+  return { ctx, tree, details, requests };
+}
+
+test('directory tree loads only the top level and starts every folder collapsed', async () => {
+  const { ctx, tree, requests } = lazyTreeContext({
+    '.': [
+      { relative_path: 'music', selected: true, child_count: 2 },
+      { relative_path: 'docs', child_count: 0 },
+    ],
+  });
+  await ctx.reloadDirectoryTree();
+  assert.deepEqual(requests, ['.']);
   assert.doesNotMatch(tree.innerHTML, /Scan Root|data-path="\."/);
   assert.match(tree.innerHTML, /<details class="dir-branch" data-path="music">/);
+  assert.match(tree.innerHTML, /2 nested/);
+  assert.match(tree.innerHTML, /class="dir-leaf" data-path="docs"/);
+});
+
+test('opening a folder fetches its children once and keeps it open across reloads', async () => {
+  const { ctx, tree, details, requests } = lazyTreeContext({
+    '.': [{ relative_path: 'music', selected: true, child_count: 2 }],
+    music: [
+      { relative_path: 'music/old', blocked_by_parent: 'music', excluded: true },
+      { relative_path: 'music/new', blocked_by_parent: 'music' },
+    ],
+  });
+  await ctx.reloadDirectoryTree();
+  const listeners = {};
+  details.push({ dataset: { path: 'music' }, open: true, addEventListener: (name, fn) => { listeners[name] = fn; } });
+  ctx.bindDirectoryTreeEvents();
+  listeners.toggle();
+  await new Promise(setImmediate);
+  assert.deepEqual(requests, ['.', 'music']);
+  assert.match(tree.innerHTML, /<details class="dir-branch" data-path="music" open>/);
   assert.match(tree.innerHTML, /class="dir-leaf dir-excluded" data-path="music\/old"/);
   assert.match(tree.innerHTML, /excluded from music/);
   const excludeButtons = tree.innerHTML.match(/Exclude folder/g) || [];
   assert.equal(excludeButtons.length, 1, 'only the folder that is not yet excluded offers Exclude');
+
+  listeners.toggle();
+  await new Promise(setImmediate);
+  assert.deepEqual(requests, ['.', 'music'], 'reopening uses the loaded children');
+  await ctx.reloadDirectoryTree();
+  assert.deepEqual(requests, ['.', 'music', '.', 'music'], 'a reload refreshes open folders only');
+  assert.equal(ctx.findEntry('music/new').blocked_by_parent, 'music');
+});
+
+test('unopened folders show that they contain a selected job', async () => {
+  const { ctx, tree } = lazyTreeContext(
+    { '.': [{ relative_path: 'media', child_count: 3, hidden_child_count: 1 }] },
+    { directories: [{ relative_path: 'media/photos', selected: true }] },
+  );
+  await ctx.reloadDirectoryTree();
+  assert.match(tree.innerHTML, /contains selected job/);
+  assert.match(tree.innerHTML, /2 nested/, 'hidden folders are not counted until shown');
 });
 
 test('a refresh requested during a poll waits and fetches fresh data', async () => {
@@ -82,7 +135,7 @@ test('a refresh requested during a poll waits and fetches fresh data', async () 
       return { ok: true, json: async () => ({ settings: { theme: 'dark' } }) };
     },
     setHtmlIfChanged() {}, applyTheme() {}, setActionStatus() {}, setPanelReady() {}, fillMetaFromDir() {}, fillMetaEncKey() {},
-    renderSelectedJobs() {}, renderDirectoryTree() {}, requestAnimationFrame: fn => fn(),
+    renderSelectedJobs() {}, renderDirectoryTree() {}, directoryTreeLoaded: () => true, reloadDirectoryTree: async () => {},
   });
   load(ctx, 'refresh.js');
   const poll = ctx.loadData({ silent: true, includeKey: false });
