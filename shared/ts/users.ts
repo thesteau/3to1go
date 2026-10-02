@@ -19,9 +19,18 @@ async function loadUsers(): Promise<void> {
       return;
     }
     renderUsers(body.users || []);
+    renderBuildInfo(body.build);
   } catch {
     setStatus("users-status", "Could not load users. Close and reopen to retry.", "error");
   }
+}
+
+// Stable builds show their release tag, main builds their commit.
+function renderBuildInfo(build: BuildInfo | undefined): void {
+  const element = document.getElementById("build-info");
+  if (!element || !build?.summary) return;
+  element.textContent = `Version ${build.summary}`;
+  element.title = build.commit ? `Commit ${build.commit}` : "";
 }
 
 function renderUsers(users: CurrentUser[]): void {

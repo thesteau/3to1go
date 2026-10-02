@@ -51,6 +51,7 @@ jobs:
           git merge-base --is-ancestor HEAD origin/prod
           target=$(jq -r '.target_commitish' "$RUNNER_TEMP/release.json")
           [[ "$target" == prod || "$target" == "$(git rev-parse HEAD)" ]]
+          echo "REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: docker/setup-qemu-action@v4
         if: matrix.app == 'edge'
@@ -91,5 +92,8 @@ jobs:
           platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ env.RELEASE_TAG }}
+          build-args: |
+            VERSION=${{ env.RELEASE_TAG }}
+            REVISION=${{ env.REVISION }}
           cache-from: type=gha,scope=stable-${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=stable-${{ matrix.app }}
