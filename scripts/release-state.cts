@@ -69,25 +69,54 @@ function isAncestor(ancestor: string, descendant: string): boolean {
   }
 }
 
-// Lists the commits on prodSha that the previous release didn't include. prod is
+// Commits tagged by releases up to and including `version`. A release may tag a
+// main commit that leaves out prod-only commits an earlier release shipped, so
+// excluding only the previous release's commit could count those again.
+function releasedCommits(version: string): string[] {
+  const upTo = version.split('.').map(Number);
+  const shas = [];
+  for (const line of git('for-each-ref', '--format=%(refname:strip=2) %(objectname) %(*objectname)', 'refs/tags/v*').split('\n')) {
+    const [tag, object, peeled] = line.split(' ');
+    if (!tag || !SEMVER.test(tag.slice(1))) continue;
+    const parts = tag.slice(1).split('.').map(Number);
+    const difference = parts.map((value, index) => value - upTo[index]).find(value => value !== 0);
+    if (difference === undefined || difference < 0) shas.push(peeled || object);
+  }
+  return shas;
+}
+
+// Lists the commits on prodSha that earlier releases didn't include. prod is
 // reset from time to time, so the previous release's commit may no longer be in
-// its history; its tag keeps the commit, and `previous..prod` still lists only
-// what it didn't ship. Commits re-created with new IDs (rebased or squashed)
+// its history; its tag keeps the commit, and `prod --not <released>` still lists
+// only what wasn't shipped. Commits re-created with new IDs (rebased or squashed)
 // would count again, which shows up in the release PR before approval.
-function commitsBetween(prodSha: string, previousSha: string | null): any[] {
+function commitsBetween(prodSha: string, previousSha: string | null, released: string[] = []): any[] {
   invariant(SHA.test(prodSha) && (!previousSha || SHA.test(previousSha)), 'Invalid history boundary');
+  invariant(released.every(sha => SHA.test(sha)), 'Invalid released commit');
   invariant(isAncestor(prodSha, 'origin/prod'), `Commit ${prodSha} is not on prod`);
   if (previousSha && !isAncestor(previousSha, prodSha)) {
     console.warn(`The previous release's commit ${previousSha} isn't in prod's history, likely after a reset. ` +
       'Counting the commits it didn\'t include.');
   }
-  const range = previousSha ? `${previousSha}..${prodSha}` : prodSha;
-  const fields = git('log', '--format=%H%x00%B%x00', range).split('\0');
+  const excluded = [...new Set([...(previousSha ? [previousSha] : []), ...released])];
+  const fields = git('log', '--format=%H%x00%B%x00', prodSha, ...(excluded.length ? ['--not', ...excluded] : [])).split('\0');
   const commits = [];
   for (let index = 0; index + 1 < fields.length; index += 2) {
     commits.push({sha: fields[index].trim(), message: fields[index + 1].trim()});
   }
   return commits;
+}
+
+// Chooses which commit on prod to release. A promotion merge commit exists only
+// on prod and disappears when prod is reset to main. When the merge's files match
+// the main commit it brought in, release that main commit instead: same code,
+// still on prod as the merge's second parent, and it survives a reset.
+function releaseCommit(prodTip: string): string {
+  const [, ...parents] = git('rev-list', '--parents', '-n', '1', prodTip).split(' ');
+  if (parents.length === 2 && git('rev-parse', `${prodTip}^{tree}`) === git('rev-parse', `${parents[1]}^{tree}`)) {
+    return parents[1];
+  }
+  return prodTip;
 }
 
 async function buildCandidate(github: any, prodSha: string, previous: ReleaseState | null): Promise<any> {
@@ -104,7 +133,8 @@ async function buildCandidate(github: any, prodSha: string, previous: ReleaseSta
     tag: new TagName(Version.parse(previous.version)), sha: previous.prodSha, notes: previous.notes
   } : undefined;
   return strategy.buildReleasePullRequest(
-    parseConventionalCommits(commitsBetween(prodSha, previous?.prodSha ?? null)), latest
+    parseConventionalCommits(commitsBetween(prodSha, previous?.prodSha ?? null,
+      previous ? releasedCommits(previous.version) : [])), latest
   );
 }
 
@@ -189,7 +219,7 @@ async function plan(github: any, api: any, repo: any): Promise<void> {
   const previous = await readState(api, repo, STATE_BRANCH);
   invariant(!previous || await published(api, repo, previous),
     'Approved release is not published yet. Retry publish before planning another release.');
-  const prodSha = git('rev-parse', 'origin/prod');
+  const prodSha = releaseCommit(git('rev-parse', 'origin/prod'));
   const candidate = await buildCandidate(github, prodSha, previous);
   if (!candidate) { console.log('No releasable production changes.'); return; }
   const state: ReleaseState = {
@@ -248,5 +278,5 @@ async function main(): Promise<void> {
   } else throw new Error('Unknown release operation');
 }
 
-module.exports = {validateState, validateTree, commitsBetween, buildCandidate, readState, bootstrap, published, plan, publish};
+module.exports = {validateState, validateTree, releasedCommits, commitsBetween, releaseCommit, buildCandidate, readState, bootstrap, published, plan, publish};
 if (require.main === module) main().catch((error: Error) => { console.error(error.message); process.exitCode = 1; });
