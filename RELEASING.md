@@ -88,6 +88,22 @@ Leave `release-please--branches--release-state` unprotected, because Release Ple
 
 Never move or reuse a version tag.
 
+## Recovering prod history
+
+Each release tags a commit on `prod`, and planning the next release needs that commit to still be in `prod`'s history. Never force-push or rewrite `prod`. If it happens anyway, planning fails with "The previous release's commit … is no longer in prod's history".
+
+Releases keep their tags, so add the last released commit back as an ancestor of `prod` without changing any files:
+
+```sh
+git fetch origin prod --tags
+git switch -c restore-release-history origin/prod
+git merge -s ours --no-ff <last release tag> -m "chore: restore <tag> release history in prod"
+git diff origin/prod HEAD --stat   # must print nothing
+git push origin HEAD:prod          # needs a ruleset bypass on prod
+```
+
+The push to `prod` runs **Release: Plan and publish** again. `prod` is never merged back into `main`, so `main` and later promotions are unaffected.
+
 ## Recovering `release-state`
 
 The branch is an orphan containing exactly three files:

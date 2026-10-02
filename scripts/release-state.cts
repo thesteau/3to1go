@@ -57,10 +57,24 @@ function git(...args: string[]): string {
   }).trim();
 }
 
+// git exits 1 when the commit isn't an ancestor; other failures, such as an
+// unknown commit, are real errors.
+function isAncestor(ancestor: string, descendant: string): boolean {
+  try {
+    git('merge-base', '--is-ancestor', ancestor, descendant);
+    return true;
+  } catch (error: any) {
+    if (error.status === 1) return false;
+    throw error;
+  }
+}
+
 function commitsBetween(prodSha: string, previousSha: string | null): any[] {
   invariant(SHA.test(prodSha) && (!previousSha || SHA.test(previousSha)), 'Invalid history boundary');
-  git('merge-base', '--is-ancestor', prodSha, 'origin/prod');
-  if (previousSha) git('merge-base', '--is-ancestor', previousSha, prodSha);
+  invariant(isAncestor(prodSha, 'origin/prod'), `Commit ${prodSha} is not on prod`);
+  invariant(!previousSha || isAncestor(previousSha, prodSha),
+    `The previous release's commit ${previousSha} is no longer in prod's history, so the changes since it ` +
+    `can't be worked out. prod's history was probably rewritten. See "Recovering prod history" in RELEASING.md.`);
   const range = previousSha ? `${previousSha}..${prodSha}` : prodSha;
   const fields = git('log', '--format=%H%x00%B%x00', range).split('\0');
   const commits = [];
