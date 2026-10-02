@@ -6,7 +6,7 @@ const (
 
 	UploadInitiatePath = "/backup/uploads/initiate"
 
-	StatusOffsetMismatch  = "offset_mismatch"
+	StatusOffsetMismatch   = "offset_mismatch"
 	StatusChecksumMismatch = "checksum_mismatch"
 )
 

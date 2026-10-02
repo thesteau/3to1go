@@ -3,13 +3,13 @@ title: "Edge overview"
 description: "The app that runs on each machine, finds marked folders, encrypts them, and uploads them to Central."
 ---
 
-Edge is the 3to1go app that **makes** backups. Run one Edge on every machine whose files you want to protect. Each Edge works on its own and only needs to reach Central to upload.
+Edge **makes** backups. Run one on every machine whose files you want to protect. Each Edge works on its own and only needs to reach Central to upload and restore.
 
 ## What Edge does
 
 - **Finds backup jobs** by scanning for folders that contain a `.upload_dir` marker.
 - **Detects changes** with a path-and-size fingerprint, so unchanged folders aren't uploaded again.
-- **Builds and encrypts archives** as `tar.zst` files. The key stays on Edge unless you copy it for safekeeping or browser-based downloads; it is never sent to Central's server.
+- **Builds and encrypts archives** as `tar.zst` files. The key stays on Edge unless you copy it for safekeeping or browser downloads. It is never sent to Central's server.
 - **Uploads to Central** in chunks, resuming and retrying when the connection drops.
 - **Runs on a schedule** you set with a cron expression, weekly by default.
 - **Restores snapshots** from Central back into the original folder.

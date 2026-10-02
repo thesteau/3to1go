@@ -54,11 +54,25 @@ exclude:
 
 If the YAML is invalid or `job_name` has disallowed characters, Edge skips the job and shows the error on it.
 
+Edge looks for new markers at most every 30 seconds, so one you create by hand can take that long to appear under **Selected Jobs**. Deleted markers, and jobs saved or removed in the UI, show up right away.
+
 <Warning>
   Job names must be **unique** across the whole Edge. Two folders both named `photos` need different `job_name` values, such as `main-photos` and `projects-photos`.
 </Warning>
 
-Once Edge finds a marker, it doesn't look for more markers inside that folder: a nested folder is already covered by its parent job.
+Once Edge finds a marker, it doesn't look for more inside that folder. Nested folders are covered by the parent job.
+
+```mermaid
+flowchart TD
+    S["/scan"] --> PH["photos/ 📌 job: photos"]
+    PH --> Y["2024/ (covered by photos)"]
+    PH --> R["raw/ 📌 ignored, inside photos"]
+    S --> D["documents/ (no marker)"]
+    D --> W["work/ 📌 job: work"]
+    D --> T["taxes/ (not backed up)"]
+```
+
+📌 = folder with a `.upload_dir` marker.
 
 Archives contain regular files. Empty directories and special files are not archived, and the job root's `.upload_dir` is excluded. A job with no included files is skipped. With **Follow symlinks** enabled, Edge stores the target's files rather than preserving the links themselves.
 
@@ -91,12 +105,12 @@ On a job, click **Files & exclusions** to browse its files with their sizes.
 | Button | What it does |
 |---|---|
 | **Files & exclusions** | Browse the job's files and manage exclusions. |
-| **Force Upload** | Upload this job even if its fingerprint is unchanged. Reuses a staged archive if one exists; clear it first to build a fresh backup. Central may report an identical encrypted archive as a duplicate. |
+| **Force Upload** | Upload this job even if its fingerprint is unchanged. Reuses a staged archive if one exists, so clear it first to build a fresh backup. Central may report an identical encrypted archive as a duplicate. |
 | **Restore** | Restore a snapshot from Central into this folder. See [Restore](/edge/restore). |
 | **Edit** | Open the Job Editor. |
 | **Clear staged backup** | Shown when an archive is waiting to upload. Deletes it and resets retry state. Your files, backup history, and Central snapshots are kept. |
 
-**Cancel operation** at the top of the page stops the backup cycle or forced upload in progress, including compression and upload retries. Incomplete archives are discarded; a fully built archive stays staged for retry. Cancel before clearing a staged backup.
+**Cancel operation** at the top of the page stops the backup cycle or forced upload in progress, including compression and upload retries. Incomplete archives are discarded, and a fully built archive stays staged for retry. Cancel before clearing a staged backup.
 
 ## When a job is backed up
 

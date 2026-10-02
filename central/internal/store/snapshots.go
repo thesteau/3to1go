@@ -17,6 +17,8 @@ type SnapshotEntry struct {
 	Timestamp   string  `json:"timestamp"`
 	SizeBytes   int64   `json:"size_bytes"`
 	Mtime       float64 `json:"mtime"`
+	// Unusual explains why this archive's size differed sharply from the job's history.
+	Unusual string `json:"unusual,omitempty"`
 }
 
 type SnapshotJob struct {
@@ -29,6 +31,7 @@ type SnapshotMini struct {
 	Name      string  `json:"name"`
 	SizeBytes int64   `json:"size_bytes"`
 	Mtime     float64 `json:"mtime"`
+	Unusual   string  `json:"unusual,omitempty"`
 }
 
 type NamespaceEntry struct {
@@ -82,6 +85,17 @@ func (s *SnapshotIndex) EnsureSchema(ctx context.Context) error {
 		)`,
 		`ALTER TABLE edge_registration ADD COLUMN IF NOT EXISTS credential_hash TEXT`,
 		`ALTER TABLE edge_registration ADD COLUMN IF NOT EXISTS last_upload_tls BOOLEAN`,
+		`ALTER TABLE snapshot_index ADD COLUMN IF NOT EXISTS unusual TEXT NOT NULL DEFAULT ''`,
+		`CREATE TABLE IF NOT EXISTS archive_size_history (
+			id BIGSERIAL PRIMARY KEY,
+			edge_id TEXT NOT NULL,
+			edge_instance_id TEXT NOT NULL,
+			job_name TEXT NOT NULL,
+			size_bytes BIGINT NOT NULL,
+			recorded_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_archive_size_history_namespace
+			ON archive_size_history (edge_id, edge_instance_id, job_name, id DESC)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_index_namespace_pk
 			ON snapshot_index (edge_id, edge_instance_id, job_name, stored_as)`,
 		`CREATE INDEX IF NOT EXISTS idx_snapshot_index_namespace_sha
@@ -130,8 +144,8 @@ func (s *SnapshotIndex) UpsertSnapshot(ctx context.Context, namespace string, e 
 	}
 	_, err = s.pool.Exec(ctx, `
 		INSERT INTO snapshot_index
-			(edge_id, edge_instance_id, job_name, stored_as, archive_sha256, fingerprint, snapshot_timestamp, size_bytes, mtime)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(edge_id, edge_instance_id, job_name, stored_as, archive_sha256, fingerprint, snapshot_timestamp, size_bytes, mtime, unusual)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (edge_id, edge_instance_id, job_name, stored_as)
 		DO UPDATE SET
 			archive_sha256 = EXCLUDED.archive_sha256,
@@ -139,8 +153,9 @@ func (s *SnapshotIndex) UpsertSnapshot(ctx context.Context, namespace string, e 
 			snapshot_timestamp = EXCLUDED.snapshot_timestamp,
 			size_bytes = EXCLUDED.size_bytes,
 			mtime = EXCLUDED.mtime,
+			unusual = EXCLUDED.unusual,
 			updated_at = CURRENT_TIMESTAMP`,
-		edgeID, instID, jobName, e.StoredAs, e.ArchiveSHA, e.Fingerprint, e.Timestamp, e.SizeBytes, e.Mtime)
+		edgeID, instID, jobName, e.StoredAs, e.ArchiveSHA, e.Fingerprint, e.Timestamp, e.SizeBytes, e.Mtime, e.Unusual)
 	return err
 }
 
@@ -176,7 +191,7 @@ func (s *SnapshotIndex) ReconcileNamespace(ctx context.Context, namespace string
 
 func (s *SnapshotIndex) ListNamespaces(ctx context.Context) ([]NamespaceEntry, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT edge_id, edge_instance_id, job_name, stored_as, size_bytes, mtime
+		SELECT edge_id, edge_instance_id, job_name, stored_as, size_bytes, mtime, unusual
 		FROM snapshot_index
 		ORDER BY lower(edge_id), lower(edge_instance_id), lower(job_name), mtime DESC, stored_as DESC`)
 	if err != nil {
@@ -193,7 +208,8 @@ func (s *SnapshotIndex) ListNamespaces(ctx context.Context) ([]NamespaceEntry, e
 		var edgeID, instID, jobName, storedAs string
 		var sizeBytes int64
 		var mtime float64
-		if err := rows.Scan(&edgeID, &instID, &jobName, &storedAs, &sizeBytes, &mtime); err != nil {
+		var unusual string
+		if err := rows.Scan(&edgeID, &instID, &jobName, &storedAs, &sizeBytes, &mtime, &unusual); err != nil {
 			return nil, err
 		}
 		key := instanceKey{edgeID, instID}
@@ -212,9 +228,59 @@ func (s *SnapshotIndex) ListNamespaces(ctx context.Context) ([]NamespaceEntry, e
 			jm[jobName] = job
 		}
 		job.SnapshotCount++
-		job.Snapshots = append(job.Snapshots, SnapshotMini{Name: storedAs, SizeBytes: sizeBytes, Mtime: mtime})
+		job.Snapshots = append(job.Snapshots, SnapshotMini{Name: storedAs, SizeBytes: sizeBytes, Mtime: mtime, Unusual: unusual})
 	}
 	return instances, rows.Err()
+}
+
+// RecentArchiveSizes returns up to limit of a job's most recent archive sizes,
+// oldest first. Retention keeps only a few snapshots, so this separate history
+// is what tells Central how big the job's archives usually are.
+func (s *SnapshotIndex) RecentArchiveSizes(ctx context.Context, namespace string, limit int) ([]int64, error) {
+	edgeID, instID, jobName, err := splitNamespace(namespace)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `n		SELECT size_bytes FROM (
+			SELECT id, size_bytes FROM archive_size_history
+			WHERE edge_id = $1 AND edge_instance_id = $2 AND job_name = $3
+			ORDER BY id DESC LIMIT $4
+		) recent ORDER BY id`,
+		edgeID, instID, jobName, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var sizes []int64
+	for rows.Next() {
+		var size int64
+		if err := rows.Scan(&size); err != nil {
+			return nil, err
+		}
+		sizes = append(sizes, size)
+	}
+	return sizes, rows.Err()
+}
+
+// RecordArchiveSize adds an archive size to the job's history and keeps only
+// the most recent keep entries.
+func (s *SnapshotIndex) RecordArchiveSize(ctx context.Context, namespace string, size int64, keep int) error {
+	edgeID, instID, jobName, err := splitNamespace(namespace)
+	if err != nil {
+		return err
+	}
+	if _, err := s.pool.Exec(ctx, `n		INSERT INTO archive_size_history (edge_id, edge_instance_id, job_name, size_bytes)
+		VALUES ($1, $2, $3, $4)`, edgeID, instID, jobName, size); err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `n		DELETE FROM archive_size_history
+		WHERE edge_id = $1 AND edge_instance_id = $2 AND job_name = $3
+		AND id NOT IN (
+			SELECT id FROM archive_size_history
+			WHERE edge_id = $1 AND edge_instance_id = $2 AND job_name = $3
+			ORDER BY id DESC LIMIT $4
+		)`, edgeID, instID, jobName, keep)
+	return err
 }
 
 func (s *SnapshotIndex) GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*EdgeRegistration, error) {
@@ -264,6 +330,15 @@ func (s *SnapshotIndex) DeleteEdgeRegistration(ctx context.Context, edgeID, inst
 func (s *SnapshotIndex) DeleteInstanceEntries(ctx context.Context, edgeID, instID string) error {
 	_, err := s.pool.Exec(ctx,
 		`DELETE FROM snapshot_index WHERE edge_id = $1 AND edge_instance_id = $2`,
+		edgeID, instID)
+	return err
+}
+
+// DeleteArchiveSizes forgets an Edge instance's archive size history, for
+// every job, when the instance is deleted.
+func (s *SnapshotIndex) DeleteArchiveSizes(ctx context.Context, edgeID, instID string) error {
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM archive_size_history WHERE edge_id = $1 AND edge_instance_id = $2`,
 		edgeID, instID)
 	return err
 }

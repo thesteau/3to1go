@@ -119,13 +119,45 @@ for _ in $(seq 1 90); do
     -o "$root/recovered.snapshot" \
     "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"; then
     test -s "$root/recovered.snapshot"
-    echo "Edge -> Central -> recovery end-to-end test passed"
-    exit 0
+    break
   fi
   sleep 2
 done
 
-echo "Timed out waiting for the Edge snapshot" >&2
-docker logs "$edge" >&2
-docker logs "$central" >&2
-exit 1
+if [ ! -s "$root/recovered.snapshot" ]; then
+  echo "Timed out waiting for the Edge snapshot" >&2
+  docker logs "$edge" >&2
+  docker logs "$central" >&2
+  exit 1
+fi
+
+# Rehearse Central recovery with a logical dump while its filesystem is frozen.
+# All destructive database operations below target this test's disposable DB.
+docker stop "$edge" "$central" >/dev/null
+docker exec "$postgres" sh -ec \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/central-recovery.dump'
+docker cp "$postgres:/tmp/central-recovery.dump" "$root/database.dump"
+docker run --rm -v "$root:/recovery" alpine:3.21 sh -ec \
+  'cd /recovery; tar -cpf deployment.tar central-config staging; tar -cpf snapshots.tar -C backups .'
+
+docker exec "$postgres" sh -ec \
+  'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB"; createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker exec "$postgres" sh -ec \
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/central-recovery.dump'
+
+# Move the old files aside so the server actually starts from restored copies.
+docker run --rm -v "$root:/recovery" alpine:3.21 sh -ec \
+  'cd /recovery; mv central-config central-config-original; mv staging staging-original; mv backups backups-original; mkdir backups; tar -xpf deployment.tar; tar -xpf snapshots.tar -C backups'
+docker start "$central" >/dev/null
+wait_for_service "$central" curl -fsS --connect-timeout 2 --max-time 3 \
+  http://127.0.0.1:16555/health/ready
+
+# A restored account and the original Edge token must work without replacement.
+curl -fsS -c "$cookie_central" -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"e2e-admin"}' \
+  http://127.0.0.1:16555/api/session/login >/dev/null
+curl -fsS -H "Authorization: Bearer $credential" \
+  -o "$root/recovered-after-restore.snapshot" \
+  "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"
+cmp "$root/recovered.snapshot" "$root/recovered-after-restore.snapshot"
+echo "Edge -> Central -> recovery and Central disaster-recovery test passed"

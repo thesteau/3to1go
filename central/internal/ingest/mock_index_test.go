@@ -20,6 +20,29 @@ type mockIndex struct {
 	getEdgeRegistrationErr    error
 
 	upsertEdgeRegistrationErr error
+
+	// archiveSizes is the per-namespace size history, oldest first.
+	archiveSizes map[string][]int64
+}
+
+func (m *mockIndex) RecentArchiveSizes(_ context.Context, namespace string, limit int) ([]int64, error) {
+	sizes := m.archiveSizes[namespace]
+	if len(sizes) > limit {
+		sizes = sizes[len(sizes)-limit:]
+	}
+	return sizes, nil
+}
+
+func (m *mockIndex) RecordArchiveSize(_ context.Context, namespace string, size int64, keep int) error {
+	if m.archiveSizes == nil {
+		m.archiveSizes = map[string][]int64{}
+	}
+	sizes := append(m.archiveSizes[namespace], size)
+	if len(sizes) > keep {
+		sizes = sizes[len(sizes)-keep:]
+	}
+	m.archiveSizes[namespace] = sizes
+	return nil
 }
 
 func (m *mockIndex) FindDuplicate(_ context.Context, _, _ string) (*store.SnapshotEntry, error) {

@@ -13,6 +13,23 @@ Each entry has the form:
 
 For example, `"D:/Projects:/scan/projects"` makes `D:\Projects` appear as `/scan/projects` in Edge. Use forward slashes in Compose, including for Windows paths.
 
+```mermaid
+flowchart LR
+    subgraph Computer["Your computer"]
+        A["C:\Users\Alice"]
+        B["D:\Projects"]
+        C["E:\Photos"]
+    end
+    subgraph Edge["Edge container, under /scan"]
+        M["/scan/main"]
+        P["/scan/projects"]
+        PH["/scan/photos"]
+    end
+    A -->|volume| M
+    B -->|volume| P
+    C -->|volume| PH
+```
+
 ## Set it up
 
 <Steps>
@@ -38,7 +55,7 @@ For example, `"D:/Projects:/scan/projects"` makes `D:\Projects` appear as `/scan
           - ./spool:/data/spool
     ```
 
-    Keep the other volume entries unchanged. The example Compose file includes these lines as comments; remove the `#` to activate them.
+    Keep the other volume entries unchanged. The example Compose file includes these lines as comments. Remove the `#` to activate them.
 
     On Linux, use paths such as `"/home/alice:/scan/main"` and `"/mnt/data/projects:/scan/projects"`.
   </Step>
@@ -84,6 +101,6 @@ Adding a volume only makes a folder **visible**. It isn't backed up until you cr
 - **Job names must be unique across all mounted folders.** The `main` and `projects` labels don't separate same-named jobs on Central, so use names like `main-photos` and `projects-photos`.
 - **Mounts need write access** for Edge to save markers and restore files.
 - **Max Depth counts the extra level.** The `/scan/<name>` folders add one level, so raise **Max Depth** in settings if your markers are deep.
-- **Moving an existing folder under a new mount?** Keep its job name so it continues its history on Central. Edge's local state is keyed by path, so the next scan may upload it again.
+- **Moving an existing folder under a new mount?** Keep its job name so its history on Central continues. Edge tracks local state by path, so the next cycle may upload it again.
 
-These steps also apply to the development Compose file in `edge/`. Adding mounts does not require a Central storage migration: snapshots remain organized by `edge_id/edge_instance_id/job_name`.
+The same steps work with the build-from-source Compose file in `edge/`.

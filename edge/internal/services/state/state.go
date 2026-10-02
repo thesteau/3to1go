@@ -40,8 +40,8 @@ type JobState struct {
 
 // StateStore is a SQLite-backed store for JobState values.
 type StateStore struct {
-	db *sql.DB
-	errMu sync.RWMutex
+	db      *sql.DB
+	errMu   sync.RWMutex
 	onError func(error)
 }
 
@@ -49,6 +49,9 @@ type StateStore struct {
 func NewStateStore(db *sql.DB) *StateStore {
 	return &StateStore{db: db}
 }
+
+// DB returns the database the store uses, so related per-job tables can share it.
+func (s *StateStore) DB() *sql.DB { return s.db }
 
 // SetErrorHandler installs a callback for persistence errors that would
 // otherwise be returned only through best-effort snapshot helpers.

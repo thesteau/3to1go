@@ -3,10 +3,10 @@ title: "Central notifications"
 description: "Get an ntfy message whenever Central receives a snapshot."
 ---
 
-Central can post a message to an [ntfy](https://ntfy.sh) topic after the storage step of upload finalization. That includes some storage failures, so a message isn't proof of success. Earlier failures, such as a rejected request or checksum mismatch, do not send a notification. Publishing is optional and best-effort: a failed notification never blocks Central.
+Central can post to an [ntfy](https://ntfy.sh) topic each time it finishes storing an upload. Storage can fail at that point too, so a message isn't proof of success. Uploads rejected earlier, for example by a checksum mismatch, send nothing. A failed notification never blocks Central.
 
 <Note>
-  Edge has its own, separate notification settings that fire when an upload **succeeds from Edge's side**. See [Edge notifications](/edge/notifications). You can use either or both.
+  Edge has separate notification settings that fire when an upload succeeds from Edge's side. See [Edge notifications](/edge/notifications). Use either or both.
 </Note>
 
 ## Set up
@@ -56,3 +56,7 @@ Write your own in **Message Template** using these placeholders. **Defaults** re
 | `{{ stored_as }}` | Filename as stored on Central |
 
 Messages are sent with the header `X-Relay-Event: upload-received`.
+
+## Unusual size alerts
+
+When an archive's size is far from the job's usual size, Central also sends a separate high-priority alert with the reason. It uses the header `X-Relay-Event: unusual-upload`, follows the same match fields, and ignores the message template. See [Unusual sizes](/central/snapshots#unusual-sizes).

@@ -74,6 +74,7 @@ func (r *EdgeRunner) ClearStagedBackup(path string) error {
 	}
 	s.PendingArchive = ""
 	r.clearPendingArchive(&s)
+	r.Anomalies.ClearPending(job.RootPath)
 	s.UploadAttemptCount = 0
 	s.ManualInterventionRequired = false
 	s.LastErrorCategory = ""

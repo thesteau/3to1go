@@ -91,6 +91,31 @@ func TestPublishBestEffort_NoTopicSkips(t *testing.T) {
 	n.PublishBestEffort(s, map[string]any{"edge_id": "e1"})
 }
 
+func TestPublishUnusualUpload_SendsHighPriorityAlert(t *testing.T) {
+	var body, event, priority string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		body, event, priority = string(raw), r.Header.Get("X-Relay-Event"), r.Header.Get("Priority")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	n := NewNtfyPublisher(discardLogger())
+	s := &config.Settings{NtfyURL: srv.URL, NtfyTopic: "alerts", NtfyMatchEdgeID: "edge01"}
+	n.PublishUnusualUpload(s, map[string]any{"edge_id": "other", "job_name": "docs", "unusual": "Small."})
+	if body != "" {
+		t.Fatalf("ignored the Edge filter: %q", body)
+	}
+	n.PublishUnusualUpload(s, map[string]any{
+		"edge_id": "edge01", "edge_instance_id": "inst1", "job_name": "docs",
+		"unusual": "This archive is 1.0 KB, but this job's archives are usually about 1.0 MB.",
+	})
+	want := "Central received an unusual backup from edge01/inst1 job docs. This archive is 1.0 KB, but this job's archives are usually about 1.0 MB."
+	if body != want || event != "unusual-upload" || priority != "high" {
+		t.Errorf("body %q, event %q, priority %q", body, event, priority)
+	}
+}
+
 func TestPublishBestEffort_EdgeIDFilterMatch(t *testing.T) {
 	var called bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

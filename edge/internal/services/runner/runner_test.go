@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -19,7 +18,6 @@ import (
 	"github.com/3to1go/edge/internal/services/state"
 	"github.com/3to1go/edge/internal/services/upload"
 	"github.com/3to1go/shared/hooks"
-	_ "modernc.org/sqlite"
 )
 
 func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadClient) *EdgeRunner {
@@ -27,16 +25,7 @@ func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadCl
 	if err := os.MkdirAll(settings.StateDir, 0o755); err != nil {
 		t.Fatalf("mkdir state: %v", err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(settings.StateDir, "test.db"))
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { db.Close() })
-	stateStore := state.NewStateStore(db)
-	if err := stateStore.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("EnsureSchema: %v", err)
-	}
+	stateStore := newMockStateStore()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	return &EdgeRunner{
 		Settings:      settings,
@@ -47,6 +36,7 @@ func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadCl
 		LockManager:   locks.NewJobLockManager(),
 		HookManager:   hooks.NewHookManager("edge", t.TempDir(), logger),
 		NtfyPublisher: ntfy.NewNtfyPublisher(logger),
+		Anomalies:     newMockAnomalyStore(),
 	}
 }
 

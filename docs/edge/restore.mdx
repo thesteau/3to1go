@@ -5,6 +5,21 @@ description: "Bring a snapshot from Central back into a job's folder on Edge."
 
 Edge can download a snapshot from Central, decrypt it with its own key, and extract it back into the job's folder.
 
+```mermaid
+sequenceDiagram
+    actor You
+    participant Edge
+    participant Central
+    You->>Edge: Preview Restore
+    Edge->>Central: Download snapshot (latest or by fingerprint)
+    Central-->>Edge: Encrypted archive
+    Edge->>Edge: Decrypt and compare with the folder
+    Edge-->>You: Files to replace and add
+    You->>Edge: Restore These Files
+    Edge->>Central: Download snapshot again
+    Edge->>Edge: Decrypt and write files into the job folder
+```
+
 <Warning>
   Restore **overwrites** local files that are also in the snapshot. Files that aren't in the snapshot are left untouched. Check the preview before confirming.
 </Warning>
@@ -22,7 +37,7 @@ Edge can download a snapshot from Central, decrypt it with its own key, and extr
     Click **Preview Restore**. Edge shows how many files the snapshot has, and how many would replace existing files or be added.
   </Step>
   <Step title="Confirm">
-    Click **Restore These Files** to write the files into the job's folder. Search and the **All**, **Replace**, and **Add** filters only change the preview display; they do not select a subset to restore.
+    Click **Restore These Files** to write the files into the job's folder. Search and the **All**, **Replace**, and **Add** filters only change what the preview shows. They don't pick a subset to restore.
   </Step>
 </Steps>
 
@@ -39,9 +54,9 @@ photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
                               ^^^^^^^^ fingerprint
 ```
 
-Enter it in **Snapshot fingerprint**, then preview and confirm as above.
+Enter those eight characters (or the full 64-character fingerprint) in **Snapshot fingerprint**, then preview and confirm as above.
 
-Use the eight lowercase hexadecimal characters shown in **FP** (a full 64-character fingerprint is also accepted). Central matches the first eight characters and returns the matching file with the newest modification time. Forced backups can share a fingerprint, so it is not a unique snapshot ID. To retrieve an exact older file among such matches, use that file's **Download** button in Central.
+Forced backups can share a fingerprint. When several snapshots match, Edge restores the newest. To get an older one, use its **Download** button in Central instead.
 
 A job can only restore its **own** snapshots. You can't restore one job's snapshot into another job's folder.
 
@@ -79,5 +94,5 @@ tar --zstd -xf photos__2026-09-30T02-00-00Z__abcdef12.tar.zst -C /path/to/restor
 ```
 
 <Tip>
-  This is why backing up Edge's whole `config` folder, not just the key, makes recovery much easier.
+  Backing up Edge's whole `config` folder, not just the key, makes this much easier.
 </Tip>

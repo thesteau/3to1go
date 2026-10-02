@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	"github.com/3to1go/central/internal/services/retention"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/anomaly"
 	"github.com/3to1go/shared/protocol"
 )
 
@@ -42,6 +44,8 @@ type snapshotIndexer interface {
 	ReconcileNamespace(ctx context.Context, namespace string, files []store.StorageFile) error
 	GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*store.EdgeRegistration, error)
 	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
+	RecentArchiveSizes(ctx context.Context, namespace string, limit int) ([]int64, error)
+	RecordArchiveSize(ctx context.Context, namespace string, size int64, keep int) error
 }
 
 type ingestBackend interface {
@@ -60,6 +64,7 @@ type hookRunner interface {
 
 type ntfyBroadcaster interface {
 	PublishBestEffort(s *config.Settings, ctx map[string]any)
+	PublishUnusualUpload(s *config.Settings, ctx map[string]any)
 }
 
 // UploadSession holds state for a resumable upload.
@@ -127,6 +132,8 @@ type FinalizeResponse struct {
 	StoredAs  string `json:"stored_as"`
 	Pruned    int    `json:"pruned"`
 	Duplicate bool   `json:"duplicate"`
+	// Unusual explains why the archive's size differs sharply from the job's history.
+	Unusual string `json:"unusual,omitempty"`
 }
 
 // Service manages resumable uploads.
@@ -444,6 +451,11 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		}
 	}
 
+	hookCtx["unusual"] = result.Unusual
+	if result.Unusual != "" {
+		alert := maps.Clone(hookCtx)
+		s.ntfy.PublishUnusualUpload(s.settings, alert)
+	}
 	s.runPostHook(hookCtx, "ok", result.StoredAs, result.Pruned, result.Duplicate)
 	return result, nil
 }
@@ -693,6 +705,7 @@ func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, sta
 			break
 		}
 	}
+	unusual := s.checkArchiveSize(ctx, sess.Namespace, sizeBytes)
 	s.index.UpsertSnapshot(ctx, sess.Namespace, store.SnapshotEntry{
 		StoredAs:    storedAs,
 		ArchiveSHA:  actualSHA,
@@ -700,6 +713,7 @@ func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, sta
 		Timestamp:   sess.Timestamp,
 		SizeBytes:   sizeBytes,
 		Mtime:       mtime,
+		Unusual:     unusual,
 	})
 	s.index.ReconcileNamespace(ctx, sess.Namespace, storageFilesToIndexFiles(files))
 
@@ -712,7 +726,45 @@ func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, sta
 	if err := s.saveSessionContext(ctx, sess); err != nil {
 		return nil, httpError(http.StatusInternalServerError, "failed to persist upload session")
 	}
-	return &FinalizeResponse{Status: "ok", StoredAs: storedAs, Pruned: pruned}, nil
+	return &FinalizeResponse{Status: "ok", StoredAs: storedAs, Pruned: pruned, Unusual: unusual}, nil
+}
+
+// checkArchiveSize compares a new archive's size with the job's recent uploads,
+// then adds it to that history. It returns why the size is unusual, or "".
+// Sizes are recorded even with alerts off, so turning them on has history.
+func (s *Service) checkArchiveSize(ctx context.Context, namespace string, size int64) string {
+	if size <= 0 {
+		return ""
+	}
+	history, err := s.index.RecentArchiveSizes(ctx, namespace, anomaly.MaxHistory)
+	if err := s.index.RecordArchiveSize(ctx, namespace, size, anomaly.MaxHistory); err != nil {
+		slog.Warn("archive_size_history_failed", "namespace", namespace, "error", err)
+	}
+	if err != nil || s.settings.AnomalyMode == anomaly.ModeOff || len(history) < anomaly.MinHistory {
+		return ""
+	}
+	values := make([]float64, len(history))
+	for i, v := range history {
+		values[i] = float64(v)
+	}
+	shift := anomaly.LogShift(values, float64(size))
+	if !shift.Unusual(2) {
+		return ""
+	}
+	return fmt.Sprintf("This archive is %s, but this job's archives are usually about %s.", formatBytes(float64(size)), formatBytes(shift.Typical))
+}
+
+func formatBytes(n float64) string {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	i := 0
+	for n >= 1024 && i < len(units)-1 {
+		n /= 1024
+		i++
+	}
+	if i == 0 {
+		return fmt.Sprintf("%.0f B", n)
+	}
+	return fmt.Sprintf("%.1f %s", n, units[i])
 }
 
 func (s *Service) sessionReferencesMissingSnapshot(ctx context.Context, sess *UploadSession) bool {

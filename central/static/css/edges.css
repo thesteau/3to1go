@@ -168,6 +168,20 @@
   white-space: nowrap;
 }
 
+.snapshot-unusual-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: help;
+}
+
 .instance-title {
   font-weight: bold;
   font-size: 0.95rem;

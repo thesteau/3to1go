@@ -31,7 +31,7 @@ func (r *mockRow) Scan(dest ...any) error {
 	return r.scanFn(dest...)
 }
 
-func noRow() pgx.Row         { return &mockRow{} }
+func noRow() pgx.Row { return &mockRow{} }
 
 func errRow(e error) pgx.Row { return &mockRow{scanFn: func(...any) error { return e }} }
 
@@ -50,23 +50,23 @@ func (r *mockRows) Next() bool {
 	return r.idx <= len(r.scanFns)
 }
 
-func (r *mockRows) Scan(dest ...any) error                       { return r.scanFns[r.idx-1](dest...) }
+func (r *mockRows) Scan(dest ...any) error { return r.scanFns[r.idx-1](dest...) }
 
-func (r *mockRows) Err() error                                   { return r.err }
+func (r *mockRows) Err() error { return r.err }
 
-func (r *mockRows) Close()                                       {}
+func (r *mockRows) Close() {}
 
-func (r *mockRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
+func (r *mockRows) CommandTag() pgconn.CommandTag { return pgconn.CommandTag{} }
 
 func (r *mockRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
 
-func (r *mockRows) Values() ([]any, error)                       { return nil, nil }
+func (r *mockRows) Values() ([]any, error) { return nil, nil }
 
-func (r *mockRows) RawValues() [][]byte                          { return nil }
+func (r *mockRows) RawValues() [][]byte { return nil }
 
-func (r *mockRows) Conn() *pgx.Conn                              { return nil }
+func (r *mockRows) Conn() *pgx.Conn { return nil }
 
-func emptyRows() pgx.Rows      { return &mockRows{} }
+func emptyRows() pgx.Rows { return &mockRows{} }
 
 func errRows(e error) pgx.Rows { return &mockRows{err: e} }
 
@@ -308,6 +308,89 @@ func TestSnapshotIndex_EnsureSchema_ExecError(t *testing.T) {
 	}
 }
 
+func TestSnapshotIndex_EnsureSchema_AddsArchiveSizeHistory(t *testing.T) {
+	var statements []string
+	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+		statements = append(statements, sql)
+		return pgconn.CommandTag{}, nil
+	}})
+	if err := idx.EnsureSchema(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(statements, "\n")
+	for _, want := range []string{"ADD COLUMN IF NOT EXISTS unusual", "CREATE TABLE IF NOT EXISTS archive_size_history", "idx_archive_size_history_namespace"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("schema lacks %q", want)
+		}
+	}
+}
+
+func TestRecentArchiveSizes_ReturnsOldestFirstWithinLimit(t *testing.T) {
+	var gotSQL string
+	var gotArgs []any
+	rows := &mockRows{scanFns: []func(dest ...any) error{
+		func(dest ...any) error { *dest[0].(*int64) = 100; return nil },
+		func(dest ...any) error { *dest[0].(*int64) = 200; return nil },
+	}}
+	idx := newSnapIndex(&mockPool{queryFn: func(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+		gotSQL, gotArgs = sql, args
+		return rows, nil
+	}})
+	sizes, err := idx.RecentArchiveSizes(context.Background(), "edge/inst/job", 20)
+	if err != nil || len(sizes) != 2 || sizes[0] != 100 || sizes[1] != 200 {
+		t.Fatalf("sizes = %v, err %v", sizes, err)
+	}
+	if !strings.Contains(gotSQL, "ORDER BY id DESC LIMIT $4") || !strings.Contains(gotSQL, ") recent ORDER BY id") {
+		t.Errorf("query = %s", gotSQL)
+	}
+	if len(gotArgs) != 4 || gotArgs[0] != "edge" || gotArgs[1] != "inst" || gotArgs[2] != "job" || gotArgs[3] != 20 {
+		t.Errorf("args = %v", gotArgs)
+	}
+	if _, err := idx.RecentArchiveSizes(context.Background(), "bad", 20); err == nil {
+		t.Error("expected invalid namespace error")
+	}
+}
+
+func TestRecordArchiveSize_InsertsThenTrims(t *testing.T) {
+	var statements []string
+	var trimArgs []any
+	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+		statements = append(statements, sql)
+		if strings.Contains(sql, "DELETE") {
+			trimArgs = args
+		}
+		return pgconn.CommandTag{}, nil
+	}})
+	if err := idx.RecordArchiveSize(context.Background(), "edge/inst/job", 1234, 20); err != nil {
+		t.Fatal(err)
+	}
+	if len(statements) != 2 || !strings.Contains(statements[0], "INSERT INTO archive_size_history") || !strings.Contains(statements[1], "DELETE FROM archive_size_history") {
+		t.Fatalf("statements = %v", statements)
+	}
+	if len(trimArgs) != 4 || trimArgs[3] != 20 {
+		t.Errorf("trim args = %v", trimArgs)
+	}
+
+	failing := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+		return pgconn.CommandTag{}, errors.New("insert failed")
+	}})
+	if err := failing.RecordArchiveSize(context.Background(), "edge/inst/job", 1, 20); err == nil {
+		t.Error("expected insert error")
+	}
+}
+
+func TestUpsertSnapshot_StoresUnusualReason(t *testing.T) {
+	var args []any
+	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, a ...any) (pgconn.CommandTag, error) {
+		args = a
+		return pgconn.CommandTag{}, nil
+	}})
+	idx.UpsertSnapshot(context.Background(), "e/i/j", SnapshotEntry{StoredAs: "f.tar.zst", Unusual: "Small."})
+	if len(args) != 10 || args[9] != "Small." {
+		t.Errorf("args = %v", args)
+	}
+}
+
 func TestFindDuplicate_NotFound(t *testing.T) {
 	idx := newSnapIndex(&mockPool{})
 	result, err := idx.FindDuplicate(context.Background(), "edge/inst/job", "sha256")
@@ -476,6 +559,24 @@ func TestUpsertEdgeRegistration(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("UpsertEdgeRegistration: %v", err)
+	}
+}
+
+func TestDeleteArchiveSizes_RemovesWholeInstance(t *testing.T) {
+	var gotSQL string
+	var gotArgs []any
+	idx := newSnapIndex(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+		gotSQL, gotArgs = sql, args
+		return pgconn.CommandTag{}, nil
+	}})
+	if err := idx.DeleteArchiveSizes(context.Background(), "edge1", "inst1"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotSQL, "DELETE FROM archive_size_history WHERE edge_id = $1 AND edge_instance_id = $2") || strings.Contains(gotSQL, "job_name") {
+		t.Errorf("query = %s", gotSQL)
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "edge1" || gotArgs[1] != "inst1" {
+		t.Errorf("args = %v", gotArgs)
 	}
 }
 
