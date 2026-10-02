@@ -76,31 +76,39 @@ test('metadata manifest must agree with the approved version', async () => {
   assert.deepEqual(await bridge.readState(api, {}, 'state'), initial);
 });
 
-test('planning explains a previous release missing from rewritten prod history', () => {
+test('planning after prod is reset counts only what the last release did not ship', (context: any) => {
   const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
   const oldCwd = process.cwd();
   const git = (...args: string[]) => execFileSync('git', ['-C', folder, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  const warnings: string[] = [];
+  context.mock.method(console, 'warn', (message: string) => warnings.push(message));
   try {
     git('init', '-b', 'main');
     git('config', 'user.name', 'Release validation');
     git('config', 'user.email', 'validation@example.invalid');
     writeFileSync(join(folder, 'app.txt'), 'first');
     git('add', '.'); git('commit', '-m', 'feat: initial application');
-    // A release tagged on a commit that a later rewrite dropped from prod.
-    git('checkout', '-b', 'old-prod');
-    git('commit', '--allow-empty', '-m', 'chore: promote main to prod');
+    // Promote main with a merge commit and release that commit.
+    git('checkout', '-b', 'prod');
+    git('commit', '--allow-empty', '-m', 'chore: prod-only setup');
+    git('merge', '--no-ff', 'main', '-m', 'chore: promote main to prod');
     const released = git('rev-parse', 'HEAD');
+    // More work lands on main, then prod is reset to main, dropping the release commit.
     git('checkout', 'main');
     git('commit', '--allow-empty', '-m', 'fix: later change');
-    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'main'));
+    git('commit', '--allow-empty', '-m', 'docs: later docs');
+    git('branch', '-f', 'prod', 'main');
+    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'prod'));
     process.chdir(folder);
-    assert.throws(() => bridge.commitsBetween(git('rev-parse', 'main'), released),
-      /no longer in prod's history[\s\S]*Recovering prod history/);
-    // Restoring the old commit as an ancestor, without changing files, fixes it.
-    git('merge', '-s', 'ours', '--no-ff', released, '-m', 'chore: restore release history');
-    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'main'));
-    const commits = bridge.commitsBetween(git('rev-parse', 'main'), released);
-    assert.deepEqual(commits.map((c: any) => c.message), ['chore: restore release history', 'fix: later change']);
+
+    const commits = bridge.commitsBetween(git('rev-parse', 'prod'), released);
+    assert.deepEqual(commits.map((c: any) => c.message), ['docs: later docs', 'fix: later change'],
+      'the already-released feature is not counted again');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /isn't in prod's history/);
+
+    // A commit that isn't on prod still can't be released.
+    assert.throws(() => bridge.commitsBetween(released, null), /is not on prod/);
   } finally {
     process.chdir(oldCwd);
     assert.equal(dirname(resolve(folder)), resolve(tmpdir()));
