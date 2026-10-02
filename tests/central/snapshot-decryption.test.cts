@@ -1,4 +1,4 @@
-const { loadFeature } = require('./helpers/scripts.cts');
+const { loadFeature } = require('../helpers/scripts.cts');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const nodeCrypto = require('node:crypto');
 
 // Fixture written by Edge's encryption.EncryptFile (minio/sio DARE 2.0): two packages, the second final.
-const fixture = fs.readFileSync(path.join(__dirname, 'fixtures', 'dare-v2-aes-gcm.bin'));
+const fixture = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'dare-v2-aes-gcm.bin'));
 const key = Buffer.from(Array.from({ length: 32 }, (_, i) => i));
 const keyB64 = key.toString('base64url');
 const plaintext = Buffer.from(Array.from({ length: (1 << 16) + 1000 }, (_, i) => (i * 31 + 7) & 0xff));

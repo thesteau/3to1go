@@ -6,7 +6,7 @@
     "build": "tsc -p central/static && tsc -p edge/static",
     "watch": "tsc -p central/static --watch --preserveWatchOutput",
     "watch:edge": "tsc -p edge/static --watch --preserveWatchOutput",
-    "test": "npm run build && node --test tests/*.cts"
+    "test": "npm run build && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""
   },
   "devDependencies": {
     "@types/node": "24.19.0",

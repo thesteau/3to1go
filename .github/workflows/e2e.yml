@@ -24,4 +24,15 @@ jobs:
         run: docker build -t 3to1go-edge-validation -f edge/Dockerfile .
 
       - name: Run end-to-end test
+        env:
+          E2E_LOG_DIR: reports/e2e-logs
         run: bash tests/integration/e2e.sh
+
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-container-logs
+          path: reports/e2e-logs/
+          if-no-files-found: ignore
+          retention-days: 14

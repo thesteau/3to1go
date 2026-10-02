@@ -45,5 +45,25 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      # -json output feeds the HTML report, which also prints failures to this log.
       - name: Run tests
-        run: go test -race ./... ../shared/go/...
+        run: |
+          mkdir -p ../reports
+          status=0
+          go test -race -json -coverprofile=../reports/edge-coverage.out ./... ../shared/go/... > ../reports/edge-go-tests.json || status=$?
+          node ../scripts/test-report.cts go "Edge Go tests" ../reports/edge-go-tests.json ../reports/edge-go-tests.html
+          if [ -s ../reports/edge-coverage.out ]; then
+            go tool cover -html=../reports/edge-coverage.out -o ../reports/edge-coverage.html
+          fi
+          exit "$status"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-test-report
+          path: |
+            reports/*.html
+            reports/*.json
+          if-no-files-found: ignore
+          retention-days: 14

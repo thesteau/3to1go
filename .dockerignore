@@ -6,6 +6,7 @@ edge/static/js/
 # Only source assets belong in the build context.
 .git/
 tests/
+reports/
 **/*_test.go
 **/testdata/
 **/.env
