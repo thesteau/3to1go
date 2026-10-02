@@ -76,6 +76,38 @@ test('metadata manifest must agree with the approved version', async () => {
   assert.deepEqual(await bridge.readState(api, {}, 'state'), initial);
 });
 
+test('planning explains a previous release missing from rewritten prod history', () => {
+  const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
+  const oldCwd = process.cwd();
+  const git = (...args: string[]) => execFileSync('git', ['-C', folder, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  try {
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release validation');
+    git('config', 'user.email', 'validation@example.invalid');
+    writeFileSync(join(folder, 'app.txt'), 'first');
+    git('add', '.'); git('commit', '-m', 'feat: initial application');
+    // A release tagged on a commit that a later rewrite dropped from prod.
+    git('checkout', '-b', 'old-prod');
+    git('commit', '--allow-empty', '-m', 'chore: promote main to prod');
+    const released = git('rev-parse', 'HEAD');
+    git('checkout', 'main');
+    git('commit', '--allow-empty', '-m', 'fix: later change');
+    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'main'));
+    process.chdir(folder);
+    assert.throws(() => bridge.commitsBetween(git('rev-parse', 'main'), released),
+      /no longer in prod's history[\s\S]*Recovering prod history/);
+    // Restoring the old commit as an ancestor, without changing files, fixes it.
+    git('merge', '-s', 'ours', '--no-ff', released, '-m', 'chore: restore release history');
+    git('update-ref', 'refs/remotes/origin/prod', git('rev-parse', 'main'));
+    const commits = bridge.commitsBetween(git('rev-parse', 'main'), released);
+    assert.deepEqual(commits.map((c: any) => c.message), ['chore: restore release history', 'fix: later change']);
+  } finally {
+    process.chdir(oldCwd);
+    assert.equal(dirname(resolve(folder)), resolve(tmpdir()));
+    rmSync(folder, {recursive: true, force: true});
+  }
+});
+
 test('real Release Please handles repeated promotions without release metadata on code branches', async (context: any) => {
   const folder = mkdtempSync(join(tmpdir(), '3to1go-release-'));
   const oldCwd = process.cwd();
