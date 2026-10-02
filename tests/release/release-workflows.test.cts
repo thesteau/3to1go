@@ -5,7 +5,7 @@ const {resolve} = require('node:path');
 const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 function scripts(name: string): string[] {
-  const source = readFileSync(resolve(__dirname, '..', '.github/workflows', name + '.yml'), 'utf8');
+  const source = readFileSync(resolve(__dirname, '..', '..', '.github/workflows', name + '.yml'), 'utf8');
   return [...source.matchAll(/script: \|\r?\n((?: {12}[^\r\n]*(?:\r?\n|$))*)/g)]
     .map((match: any) => match[1].replace(/^ {12}/gm, ''));
 }
@@ -42,7 +42,7 @@ test('release automation dispatches metadata validation and images using trusted
 });
 
 test('a failed next proposal cannot prevent dispatch of already-published release images', async () => {
-  const source = readFileSync(resolve(__dirname, '..', '.github/workflows/release-please.yml'), 'utf8');
+  const source = readFileSync(resolve(__dirname, '..', '..', '.github/workflows/release-please.yml'), 'utf8');
   const steps = source.split(/^      - /m).slice(1);
   const calls: string[] = [];
   const github = {rest: {

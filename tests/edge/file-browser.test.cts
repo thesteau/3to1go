@@ -1,36 +1,36 @@
-const { loadFeature } = require('./helpers/scripts.cts');
+const { loadFeature } = require('../helpers/scripts.cts');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const vm = require('node:vm');
-const path = require('node:path');
 
-function setup(fetch) {
-  function element() {
-    return { children: [], textContent: '', disabled: false, open: true,
-      appendChild(child) { this.children.push(child); },
-      replaceChildren() { this.children = []; },
-    };
-  }
+function element() {
+  return { children: [], textContent: '', disabled: false, open: true,
+    appendChild(child) { this.children.push(child); },
+    replaceChildren() { this.children = []; },
+  };
+}
+
+function fileBrowserContext(fetch) {
   const elements = Object.fromEntries(['files-path', 'files-up', 'files-size', 'files-list', 'files-dialog'].map(id => [id, element()]));
   const messages = [];
+  const actions = [];
   const ctx = vm.createContext({
     fetch, document: { getElementById: id => elements[id], createElement: element },
     currentUser: { is_admin: true },
-    setStatus: (...args) => messages.push(args), setActionStatus: (...args) => messages.push(args),
+    setStatus: (...args) => messages.push(args),
+    setActionStatus: (...args) => { messages.push(args); actions.push(args); },
     loadData: async () => {}, requestEdgeActiveRefreshBurst() {}, confirmApp: async () => true,
   });
-  for (const file of ['utils.js', 'files.js']) {
-    loadFeature(ctx, 'edge', file.replace(/\.js$/, ''));
-  }
-  return { ctx, elements, messages, element };
+  loadFeature(ctx, 'edge', 'utils');
+  loadFeature(ctx, 'edge', 'files');
+  return { ctx, elements, messages, actions };
 }
 
 test('file browser shows file sizes, calculates folder totals, and saves the exact exclusion path', async () => {
   const calls = [];
   const filename = "nested/<photo>[1]'s.jpg";
   let excluded = false;
-  const { ctx, elements } = setup(async (url, options) => {
+  const { ctx, elements } = fileBrowserContext(async (url, options) => {
     calls.push([url, options]);
     if (url.includes('/exclude')) {
       assert.equal(JSON.parse(options.body).relative_path, filename);
@@ -56,18 +56,24 @@ test('file browser shows file sizes, calculates folder totals, and saves the exa
   assert.ok(calls.some(([url]) => url.includes('size?relative_path=nested%2Fsubfolder')));
 });
 
-test('clear staged backup and cancellation use separate endpoints and report errors', async () => {
-  const calls = [];
-  const { ctx, messages, element } = setup(async (url, options) => {
-    calls.push([url, options]);
-    if (url.includes('clear-staged')) return { ok: false, json: async () => ({ detail: 'Backup is still running' }) };
-    return { ok: true, json: async () => ({ status: 'cancelling' }) };
+test('excluding a file shows progress, then updates its row without reloading the folder', async () => {
+  let finishExclude;
+  let browses = 0;
+  const { ctx, elements, actions } = fileBrowserContext(async (url) => {
+    if (url.includes('/exclude')) return new Promise(resolve => { finishExclude = resolve; });
+    browses++;
+    return { ok: true, json: async () => ({ entries: [{ name: 'a.log', relative_path: 'job/a.log', kind: 'file', size: 1, job_path: 'job' }] }) };
   });
-  const btn = element();
-  await ctx.clearStagedBackup('job', btn);
-  assert.equal(messages.at(-1)[1], 'error');
-  assert.equal(btn.disabled, false);
-  await ctx.cancelOperation(btn);
-  assert.deepEqual(calls.map(([url]) => url), ['/api/directories/clear-staged', '/api/cancel-operation']);
-  assert.match(messages.at(-1)[0], /Cancellation requested/);
+  await ctx.browseFiles('job');
+  const row = elements['files-list'].children[0];
+  const button = row.children[4].children[0];
+  const pending = button.onclick();
+  assert.equal(button.textContent, 'Excluding…');
+  assert.equal(button.disabled, true);
+  finishExclude({ ok: true, json: async () => ({ status: 'ok' }) });
+  await pending;
+  assert.equal(row.children[3].textContent, 'Excluded by job settings');
+  assert.equal(row.children[4].children.length, 0);
+  assert.equal(browses, 1);
+  assert.deepEqual(actions.map(([, kind]) => kind), ['success']);
 });

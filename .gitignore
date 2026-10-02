@@ -9,6 +9,8 @@
 data/
 certs/
 node_modules/
+# Test reports written by `npm test`, CI, or scripts/test-report.cts.
+reports/
 # JavaScript is build output only; source and tests belong in TypeScript.
 *.js
 *.mjs

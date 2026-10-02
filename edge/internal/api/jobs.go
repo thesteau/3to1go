@@ -14,6 +14,18 @@ func (a *App) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, a.runner.DirectoriesSnapshot())
 }
 
+func (a *App) handleDirectoryChildren(w http.ResponseWriter, r *http.Request) {
+	if requireUser(w, r) == nil {
+		return
+	}
+	nodes, err := a.runner.DirectoryChildren(r.URL.Query().Get("relative_path"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"directories": nodes})
+}
+
 func (a *App) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return

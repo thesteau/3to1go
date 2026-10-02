@@ -16,6 +16,13 @@ func (r *EdgeRunner) BrowseFiles(path string) ([]directories.FileEntry, error) {
 	return d.Browse(path)
 }
 
+func (r *EdgeRunner) DirectoryChildren(path string) ([]directories.DirectoryNode, error) {
+	r.mu.Lock()
+	d := r.DirService
+	r.mu.Unlock()
+	return d.ListChildren(path)
+}
+
 func (r *EdgeRunner) FolderSize(ctx context.Context, path string) (map[string]any, error) {
 	r.mu.Lock()
 	d := r.DirService

@@ -126,6 +126,11 @@ func (m *mockRunner) BrowseFiles(path string) ([]directories.FileEntry, error) {
 	m.pathActionPath = path
 	return []directories.FileEntry{{Name: "file.txt", Kind: "file", Size: 42}}, m.pathActionErr
 }
+func (m *mockRunner) DirectoryChildren(path string) ([]directories.DirectoryNode, error) {
+	m.pathActionPath = path
+	node := directories.DirectoryNode{DirectoryEntry: directories.DirectoryEntry{RelativePath: "nested/folder/child"}, ChildCount: 2}
+	return []directories.DirectoryNode{node}, m.pathActionErr
+}
 func (m *mockRunner) FolderSize(_ context.Context, path string) (map[string]any, error) {
 	m.pathActionPath = path
 	return map[string]any{"size": 42, "files": 1}, m.pathActionErr
@@ -1128,6 +1133,30 @@ func TestHandleListDirectories_ReturnsSnapshot(t *testing.T) {
 	decodeJSON(t, rr, &resp)
 	if resp["scan_root"] != "/data" {
 		t.Errorf("scan_root = %v, want /data", resp["scan_root"])
+	}
+}
+
+func TestHandleDirectoryChildren_ReturnsOneLevel(t *testing.T) {
+	runner := defaultRunner()
+	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	rr := doAuthRequest(app.Handler(), "GET", "/api/directories/children?relative_path=nested%2Ffolder", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if runner.pathActionPath != "nested/folder" {
+		t.Errorf("path = %q, want nested/folder", runner.pathActionPath)
+	}
+	var resp struct {
+		Directories []map[string]any `json:"directories"`
+	}
+	decodeJSON(t, rr, &resp)
+	if len(resp.Directories) != 1 || resp.Directories[0]["relative_path"] != "nested/folder/child" || resp.Directories[0]["child_count"] != float64(2) {
+		t.Errorf("directories = %v", resp.Directories)
+	}
+
+	runner.pathActionErr = errors.New("directory not found")
+	if rr := doAuthRequest(app.Handler(), "GET", "/api/directories/children?relative_path=missing", nil); rr.Code != http.StatusBadRequest {
+		t.Errorf("missing folder status = %d, want 400", rr.Code)
 	}
 }
 

@@ -96,6 +96,15 @@ interface DirectoriesResponse {
   directories: DirectoryEntry[];
 }
 
+interface DirectoryNode extends DirectoryEntry {
+  child_count?: number;
+  hidden_child_count?: number;
+}
+
+interface DirectoryChildrenResponse extends ApiBody {
+  directories?: DirectoryNode[];
+}
+
 // Status and directory responses load independently and are merged as each arrives.
 interface EdgeData extends StatusResponse {
   directories?: DirectoryEntry[];

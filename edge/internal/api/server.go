@@ -57,6 +57,7 @@ type edgeRunner interface {
 	ClearStagedBackup(relativePath string) error
 	CancelOperation() bool
 	BrowseFiles(relativePath string) ([]directories.FileEntry, error)
+	DirectoryChildren(relativePath string) ([]directories.DirectoryNode, error)
 	ExcludePath(relativePath string) error
 	FolderSize(ctx context.Context, relativePath string) (map[string]any, error)
 
@@ -140,6 +141,7 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/directories/force-send", a.handleForceSend)
 	r.Post("/api/directories/clear-staged", a.handleClearStaged)
 	r.Post("/api/cancel-operation", a.handleCancelOperation)
+	r.Get("/api/directories/children", a.handleDirectoryChildren)
 	r.Get("/api/directories/browse", a.handleBrowseFiles)
 	r.Get("/api/directories/size", a.handleFolderSize)
 	r.Post("/api/directories/exclude", a.handleExcludePath)

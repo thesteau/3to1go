@@ -65,12 +65,12 @@ async function loadData(options: LoadDataOptions = {}): Promise<void> {
 }
 
 async function fetchEdgeData({ silent = false, includeKey = true, refreshDirectoryTree = !silent }: LoadDataOptions = {}): Promise<void> {
+  const spinner = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
   if (!latestData?.directories) {
-    const spinner = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
     setHtmlIfChanged("selected-jobs", spinner);
     setHtmlIfChanged("selected-jobs-count", "-");
-    setHtmlIfChanged("directory-tree", spinner);
   }
+  if (!directoryTreeLoaded()) setHtmlIfChanged("directory-tree", spinner);
 
   const statusFetch = (async () => {
     const res = await fetch("/api/status", { signal: globalThis.AbortSignal?.timeout?.(30000) });
@@ -92,23 +92,29 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
   const dirFetch = (async () => {
     const res = await fetch("/api/directories", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     if (!res.ok) {
-      throw new Error("Directories could not load.");
+      throw new Error("Jobs could not load.");
     }
     const dirData: DirectoriesResponse = await res.json();
-    const firstLoad = !latestData?.directories;
     latestData = { ...(latestData || {}), directories: dirData.directories };
     renderSelectedJobs(dirData.directories);
-    if (refreshDirectoryTree || firstLoad) {
-      requestAnimationFrame(() => renderDirectoryTree(dirData.directories));
-    }
+    // Keeps "contains selected job" current; unchanged markup leaves the DOM alone.
+    renderDirectoryTree();
   })().catch((error) => {
     if (!latestData?.directories) {
-      const failure = '<p role="status">Folders and jobs could not load. <button type="button" onclick="loadData()">Retry</button></p>';
-      setHtmlIfChanged("selected-jobs", failure);
-      setHtmlIfChanged("directory-tree", failure);
+      setHtmlIfChanged("selected-jobs", '<p role="status">Jobs could not load. <button type="button" onclick="loadData()">Retry</button></p>');
     }
     if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
   });
+
+  // Polls fetch only the job list; the folder tree reloads on first load and after changes.
+  const treeFetch = refreshDirectoryTree || !directoryTreeLoaded()
+    ? reloadDirectoryTree().catch((error) => {
+      if (!directoryTreeLoaded()) {
+        setHtmlIfChanged("directory-tree", '<p role="status">Folders could not load. <button type="button" onclick="loadData()">Retry</button></p>');
+      }
+      if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
+    })
+    : null;
 
   const keyFetch = includeKey
     ? (async () => {
@@ -125,7 +131,7 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
     : null;
 
   try {
-    await Promise.all([statusFetch, dirFetch, keyFetch].filter(Boolean));
+    await Promise.all([statusFetch, dirFetch, treeFetch, keyFetch].filter(Boolean));
   } finally {
     isLoadingData = false;
     scheduleEdgeRefresh();

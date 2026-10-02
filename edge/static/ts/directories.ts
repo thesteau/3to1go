@@ -1,11 +1,12 @@
-interface DirectoryIndex {
-  entriesByPath: Map<string, DirectoryEntry>;
-  childrenByParent: Map<string, string[]>;
-}
-
 // Folders start collapsed; only the ones a user opens stay open across refreshes.
 let directoryExpansionState = new Set<string>();
 let showHiddenDirs = false;
+// The tree loads one level at a time: "." holds the top level, other keys an opened folder.
+const directoryChildren = new Map<string, DirectoryNode[]>();
+// Each reload bumps this so responses requested before it cannot overwrite fresher data.
+let directoryTreeGeneration = 0;
+// The generation of each folder's pending request; an older one never blocks a newer one.
+const directoryChildrenLoading = new Map<string, number>();
 
 const JOB_EVENT_LINGER_MS = 10000;
 
@@ -33,35 +34,68 @@ function openJobDialogFromEvent(event: Event, relativePath: string): false {
   return false;
 }
 
-function rememberDirectoryExpansion(): void {
-  const openPaths = Array.from(document.querySelectorAll<HTMLElement>("#directory-tree details[data-path][open]"))
-    .map((element) => element.dataset.path)
-    .filter((path): path is string => Boolean(path));
-  directoryExpansionState = new Set(openPaths);
+async function fetchDirectoryChildren(relativePath: string): Promise<DirectoryNode[]> {
+  const response = await fetch(`/api/directories/children?relative_path=${encodeURIComponent(relativePath)}`, {
+    signal: globalThis.AbortSignal?.timeout?.(30000),
+  });
+  const body: DirectoryChildrenResponse = await response.json();
+  if (!response.ok) throw new Error(body.detail || "Folders could not load.");
+  return body.directories || [];
 }
 
-function buildDirectoryIndex(directories: DirectoryEntry[]): DirectoryIndex {
-  const entriesByPath = new Map<string, DirectoryEntry>();
-  const childrenByParent = new Map<string, string[]>();
+function directoryTreeLoaded(): boolean {
+  return directoryChildren.has(".");
+}
 
-  directories.forEach((entry) => {
-    entriesByPath.set(entry.relative_path, entry);
-    childrenByParent.set(entry.relative_path, []);
-  });
-
-  directories.forEach((entry) => {
-    if (entry.relative_path === ".") {
-      return;
+// Re-fetches the top level and every open folder; folders that vanished close.
+async function reloadDirectoryTree(): Promise<void> {
+  const generation = ++directoryTreeGeneration;
+  const paths = [".", ...directoryExpansionState];
+  const results = await Promise.all(paths.map(async (path) => {
+    try {
+      return [path, await fetchDirectoryChildren(path)] as const;
+    } catch (error) {
+      if (path === ".") throw error;
+      return [path, null] as const;
     }
-    const segments = entry.relative_path.split("/");
-    const parentPath = segments.length > 1 ? segments.slice(0, -1).join("/") : ".";
-    if (!childrenByParent.has(parentPath)) {
-      childrenByParent.set(parentPath, []);
+  }));
+  if (generation !== directoryTreeGeneration) return;
+  // Folders opened while this reload ran were fetched after it began; keep them.
+  for (const path of [...directoryChildren.keys()]) {
+    if (!paths.includes(path) && !directoryExpansionState.has(path)) directoryChildren.delete(path);
+  }
+  for (const [path, nodes] of results) {
+    if (nodes) {
+      directoryChildren.set(path, nodes);
+    } else {
+      // Drop the stale children too, so reopening the folder fetches it again.
+      directoryChildren.delete(path);
+      directoryExpansionState.delete(path);
     }
-    childrenByParent.get(parentPath)!.push(entry.relative_path);
-  });
+  }
+  renderDirectoryTree();
+}
 
-  return { entriesByPath, childrenByParent };
+async function loadDirectoryChildren(relativePath: string): Promise<void> {
+  const generation = directoryTreeGeneration;
+  if (directoryChildrenLoading.get(relativePath) === generation) return;
+  directoryChildrenLoading.set(relativePath, generation);
+  try {
+    const nodes = await fetchDirectoryChildren(relativePath);
+    // A reload started meanwhile, or a newer request for this folder, supplies fresher data.
+    if (generation !== directoryTreeGeneration) return;
+    directoryChildren.set(relativePath, nodes);
+  } catch (error) {
+    if (generation !== directoryTreeGeneration) return;
+    directoryExpansionState.delete(relativePath);
+    const element = Array.from(document.querySelectorAll<HTMLDetailsElement>("#directory-tree details[data-path]"))
+      .find((item) => item.dataset.path === relativePath);
+    if (element) element.open = false;
+    setActionStatus((error as Error).message, "error");
+  } finally {
+    if (directoryChildrenLoading.get(relativePath) === generation) directoryChildrenLoading.delete(relativePath);
+  }
+  renderDirectoryTree();
 }
 
 function formatDirectoryProgress(entry: DirectoryEntry): string {
@@ -210,43 +244,45 @@ function toggleHiddenDirs(): void {
     btn.setAttribute("aria-checked", String(showHiddenDirs));
     btn.classList.toggle("toggle-on", showHiddenDirs);
   }
-  if (latestData) renderDirectories(latestData);
+  renderDirectoryTree();
 }
 
-function renderDirectoryNode(relativePath: string, index: DirectoryIndex): { html: string; hasSelectedDescendant: boolean } {
-  const entry = index.entriesByPath.get(relativePath);
-  if (!entry) {
-    return { html: "", hasSelectedDescendant: false };
+function visibleChildren(nodes: DirectoryNode[]): DirectoryNode[] {
+  return nodes.filter((node) => showHiddenDirs || !isHiddenPath(node.relative_path));
+}
+
+function visibleChildCount(node: DirectoryNode): number {
+  const total = node.child_count || 0;
+  return showHiddenDirs ? total : total - (node.hidden_child_count || 0);
+}
+
+// Job paths come from the job list, so unopened folders still show what they contain.
+function renderDirectoryNode(node: DirectoryNode, jobPaths: string[]): string {
+  const relativePath = node.relative_path;
+  const childCount = visibleChildCount(node);
+  const containsJob = jobPaths.some((path) => path.startsWith(`${relativePath}/`));
+  const header = renderDirectoryHeader(node, childCount, containsJob);
+  const excludedClass = node.excluded ? " dir-excluded" : "";
+
+  if (!childCount) {
+    return `<div class="dir-leaf${excludedClass}" data-path="${escapeHtml(relativePath)}">${header}</div>`;
   }
 
-  const allChildPaths = index.childrenByParent.get(relativePath) || [];
-  const childPaths = allChildPaths.filter((p) => showHiddenDirs || !isHiddenPath(p));
-  const renderedChildren = childPaths.map((childPath) => renderDirectoryNode(childPath, index));
-  const hasSelectedDescendant = Boolean(entry.selected) || renderedChildren.some((child) => child.hasSelectedDescendant);
-  const header = renderDirectoryHeader(entry, childPaths.length, renderedChildren.some((child) => child.hasSelectedDescendant));
-  const excludedClass = entry.excluded ? " dir-excluded" : "";
-
-  if (!childPaths.length) {
-    return {
-      hasSelectedDescendant,
-      html: `<div class="dir-leaf${excludedClass}" data-path="${escapeHtml(relativePath)}">${header}</div>`,
-    };
-  }
-
+  const loaded = directoryChildren.get(relativePath);
   const shouldOpen = directoryExpansionState.has(relativePath);
-  return {
-    hasSelectedDescendant,
-    html: `
-      <details class="dir-branch${excludedClass}" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
-        <summary class="dir-summary">${header}</summary>
-        <div class="dir-children">
-          <div class="dir-children-inner">
-            ${renderedChildren.map((child) => child.html).join("")}
-          </div>
+  const children = loaded
+    ? visibleChildren(loaded).map((child) => renderDirectoryNode(child, jobPaths)).join("")
+    : '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
+  return `
+    <details class="dir-branch${excludedClass}" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
+      <summary class="dir-summary">${header}</summary>
+      <div class="dir-children">
+        <div class="dir-children-inner">
+          ${children}
         </div>
-      </details>
-    `,
-  };
+      </div>
+    </details>
+  `;
 }
 
 function bindDirectoryTreeEvents(): void {
@@ -256,6 +292,7 @@ function bindDirectoryTreeEvents(): void {
       if (!path) return;
       if (element.open) {
         directoryExpansionState.add(path);
+        if (!directoryChildren.has(path)) loadDirectoryChildren(path);
       } else {
         directoryExpansionState.delete(path);
       }
@@ -308,27 +345,24 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined): void {
 }
 
 // The scan root itself is implied, so its folders form the top level of the tree.
-function renderDirectoryTree(directories: DirectoryEntry[] | undefined): void {
-  rememberDirectoryExpansion();
-  const index = buildDirectoryIndex(directories || []);
-  const html = (index.childrenByParent.get(".") || [])
-    .filter((path) => showHiddenDirs || !isHiddenPath(path))
-    .map((path) => renderDirectoryNode(path, index).html)
-    .join("");
+function renderDirectoryTree(): void {
+  const topLevel = directoryChildren.get(".");
+  if (!topLevel) return;
+  const jobPaths = (latestData?.directories || []).filter((entry) => entry.selected).map((entry) => entry.relative_path);
+  const html = visibleChildren(topLevel).map((node) => renderDirectoryNode(node, jobPaths)).join("");
   if (setHtmlIfChanged("directory-tree", html || '<p class="hint">No directories were found under the scan root.</p>')) {
     bindDirectoryTreeEvents();
   }
 }
 
-function renderDirectories(data: EdgeData, { refreshDirectoryTree = true } = {}): void {
-  renderSelectedJobs(data.directories);
-  if (refreshDirectoryTree) {
-    renderDirectoryTree(data.directories);
-  }
-}
-
 function findEntry(relativePath: string): DirectoryEntry | undefined {
-  return latestData?.directories?.find((entry) => entry.relative_path === relativePath);
+  const job = latestData?.directories?.find((entry) => entry.relative_path === relativePath);
+  if (job) return job;
+  for (const nodes of directoryChildren.values()) {
+    const node = nodes.find((entry) => entry.relative_path === relativePath);
+    if (node) return node;
+  }
+  return undefined;
 }
 
 function editPath(relativePath: string): void {
