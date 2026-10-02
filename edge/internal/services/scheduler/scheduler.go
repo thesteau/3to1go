@@ -33,9 +33,9 @@ type SchedulerController struct {
 	runNowRequested   bool
 	startupDelayUntil time.Time
 
-	stopCh chan struct{}
-	wakeCh chan struct{}
-	doneCh chan struct{}
+	stopCh    chan struct{}
+	wakeCh    chan struct{}
+	doneCh    chan struct{}
 	startOnce sync.Once
 	stopOnce  sync.Once
 	started   bool

@@ -78,6 +78,25 @@ func (n *NtfyPublisher) PublishBestEffort(s *config.Settings, ctx map[string]any
 	}
 }
 
+// PublishUnusualUpload alerts that an archive's size differs sharply from the
+// job's history. It honors the same Edge and source filters as upload notices,
+// but uses its own message and a high priority.
+func (n *NtfyPublisher) PublishUnusualUpload(s *config.Settings, ctx map[string]any) {
+	if !n.matches(s, ctx) {
+		return
+	}
+	msg := fmt.Sprintf("Central received an unusual backup from %s/%s job %s. %s",
+		ctxString(ctx, "edge_id"), ctxString(ctx, "edge_instance_id"), ctxString(ctx, "job_name"), ctxString(ctx, "unusual"))
+	err := n.publishWithHeaders(s.NtfyURL, s.NtfyTopic, msg, map[string]string{
+		"X-Relay-Event": "unusual-upload",
+		"Priority":      "high",
+		"Tags":          "warning",
+	})
+	if err != nil {
+		n.logger.Warn("ntfy_publish_failed", "edge_id", ctx["edge_id"], "job_name", ctx["job_name"], "error", err)
+	}
+}
+
 func RenderMessage(template string, ctx map[string]any) string {
 	return notification.Render(template, DefaultNtfyMessageTemplate, func(key string) string { return ctxString(ctx, key) })
 }
@@ -113,6 +132,10 @@ func ctxString(ctx map[string]any, key string) string {
 }
 
 func (n *NtfyPublisher) publish(ntfyURL, ntfyTopic, message string) error {
+	return n.publishWithHeaders(ntfyURL, ntfyTopic, message, map[string]string{"X-Relay-Event": "upload-received"})
+}
+
+func (n *NtfyPublisher) publishWithHeaders(ntfyURL, ntfyTopic, message string, headers map[string]string) error {
 	base := strings.TrimRight(strings.TrimSpace(ntfyURL), "/")
 	topic := strings.TrimSpace(ntfyTopic)
 	if base == "" || topic == "" {
@@ -126,7 +149,9 @@ func (n *NtfyPublisher) publish(ntfyURL, ntfyTopic, message string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
-	req.Header.Set("X-Relay-Event", "upload-received")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 
 	resp, err := n.client.Do(req)
 	if err != nil {

@@ -5,7 +5,7 @@ description: "Let Central and Edge verify internal HTTPS services signed by your
 
 If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Edge needs to trust Central's CA, and each app needs to trust its ntfy server's CA. Each app keeps its own list.
 
-This configures outbound trust. It does not enable HTTPS on either web UI or make your browser trust a private CA; configure HTTPS at your reverse proxy and browser separately.
+This configures outbound trust. It doesn't enable HTTPS on either web UI or make your browser trust a private CA. Set those up in your reverse proxy and browser.
 
 ## Upload from the UI
 
@@ -28,8 +28,6 @@ For automated deployments, drop `.crt` files into the app's persisted config fol
 3to1go-central/config/trusted-certs/home-ca.crt
 3to1go-edge/config/trusted-certs/home-ca.crt
 ```
-
-This keeps your certificates out of the image while letting the apps verify private HTTPS endpoints.
 
 <Note>
   Only CA or root certificates are needed, not each server's certificate. Files must end in `.crt`.

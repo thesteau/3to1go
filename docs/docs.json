@@ -68,7 +68,8 @@
               "central/snapshots",
               "central/notifications",
               "central/hooks",
-              "central/reset-admin-password"
+              "central/reset-admin-password",
+              "central/disaster-recovery"
             ]
           }
         ]
@@ -85,6 +86,7 @@
             "group": "Using Edge",
             "pages": [
               "edge/backup-jobs",
+              "edge/unusual-backups",
               "edge/multiple-folders",
               "edge/restore",
               "edge/encryption-key",

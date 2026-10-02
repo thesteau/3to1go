@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,7 +60,7 @@ func (m *mockUserStore) CreateSession(_ context.Context, _ int) (string, error) 
 	return m.createSessionToken, m.createSessionErr
 }
 
-func (m *mockUserStore) DeleteSession(_ context.Context, _ string) error      { return m.deleteSessionErr }
+func (m *mockUserStore) DeleteSession(_ context.Context, _ string) error { return m.deleteSessionErr }
 
 func (m *mockUserStore) DeleteSessionsForUser(_ context.Context, _ int) error { return nil }
 
@@ -125,6 +126,9 @@ type mockSnapIndex struct {
 	listRegsErr error
 	listNS      []store.NamespaceEntry
 	listNSErr   error
+	// deletedSizes records each edge/instance whose size history was deleted.
+	deletedSizes   []string
+	deleteSizesErr error
 }
 
 func (m *mockSnapIndex) GetEdgeRegistration(_ context.Context, _, _ string) (*store.EdgeRegistration, error) {
@@ -137,6 +141,11 @@ func (m *mockSnapIndex) DeleteEdgeRegistration(_ context.Context, _, _ string) e
 
 func (m *mockSnapIndex) DeleteInstanceEntries(_ context.Context, _, _ string) error {
 	return m.deleteErr
+}
+
+func (m *mockSnapIndex) DeleteArchiveSizes(_ context.Context, edgeID, instID string) error {
+	m.deletedSizes = append(m.deletedSizes, edgeID+"/"+instID)
+	return m.deleteSizesErr
 }
 
 func (m *mockSnapIndex) HasNamespaceEntries(_ context.Context, _, _ string) (bool, error) {
@@ -178,9 +187,9 @@ func (m *mockIngest) FinalizeUpload(_ context.Context, _ string) (*ingest.Finali
 
 func (m *mockIngest) ReconcileNamespace(_ context.Context, _ string) {}
 
-func (m *mockIngest) CleanupLoop(_ context.Context, _ int)           {}
+func (m *mockIngest) CleanupLoop(_ context.Context, _ int) {}
 
-func (m *mockIngest) UpdateSettings(_ *config.Settings)              {}
+func (m *mockIngest) UpdateSettings(_ *config.Settings) {}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -901,6 +910,53 @@ func TestHandleRevokeCredential_NoCredentialHash(t *testing.T) {
 	app.handleRevokeCredential(rr, req)
 	if rr.Code != http.StatusConflict {
 		t.Errorf("code = %d, want 409", rr.Code)
+	}
+}
+
+func deleteInstanceRequest(query string) *http.Request {
+	req := withUser(httptest.NewRequest("DELETE", "/api/instances/edge1/inst1"+query, nil), adminUser())
+	req.SetPathValue("edge_id", "edge1")
+	req.SetPathValue("edge_instance_id", "inst1")
+	return req
+}
+
+func TestHandleDeleteInstance_ForgetsSizeHistory(t *testing.T) {
+	index := &mockSnapIndex{}
+	app := newTestApp(t, nil, nil, nil, index)
+	if err := os.MkdirAll(filepath.Join(app.Settings().BackupRoot, "edge1", "inst1", "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	app.handleDeleteInstance(rr, deleteInstanceRequest(""))
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"deleted"`) {
+		t.Fatalf("code = %d, body %s", rr.Code, rr.Body.String())
+	}
+	if len(index.deletedSizes) != 1 || index.deletedSizes[0] != "edge1/inst1" {
+		t.Errorf("size history deleted for %v", index.deletedSizes)
+	}
+}
+
+func TestHandleDeleteInstance_CleanupMissingForgetsSizeHistory(t *testing.T) {
+	index := &mockSnapIndex{getReg: &store.EdgeRegistration{EdgeID: "edge1", EdgeInstanceID: "inst1"}}
+	app := newTestApp(t, nil, nil, nil, index)
+	rr := httptest.NewRecorder()
+	app.handleDeleteInstance(rr, deleteInstanceRequest("?cleanup_missing=true"))
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"cleaned"`) {
+		t.Fatalf("code = %d, body %s", rr.Code, rr.Body.String())
+	}
+	if len(index.deletedSizes) != 1 || index.deletedSizes[0] != "edge1/inst1" {
+		t.Errorf("size history deleted for %v", index.deletedSizes)
+	}
+}
+
+func TestHandleDeleteInstance_ReportsSizeHistoryFailure(t *testing.T) {
+	index := &mockSnapIndex{deleteSizesErr: errors.New("db down")}
+	app := newTestApp(t, nil, nil, nil, index)
+	os.MkdirAll(filepath.Join(app.Settings().BackupRoot, "edge1", "inst1"), 0o755)
+	rr := httptest.NewRecorder()
+	app.handleDeleteInstance(rr, deleteInstanceRequest(""))
+	if rr.Code != http.StatusInternalServerError || !strings.Contains(rr.Body.String(), "size history") {
+		t.Errorf("code = %d, body %s", rr.Code, rr.Body.String())
 	}
 }
 

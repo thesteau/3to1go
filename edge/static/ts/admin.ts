@@ -62,6 +62,7 @@ function fillSettings(settings: EdgeSettings | null | undefined): void {
   input("settings_max_depth").value = String(data.max_depth ?? 10);
   setToggle("settings_keep_local_pending", data.keep_local_pending ?? true);
   setToggle("settings_uploads_paused", data.uploads_paused || false);
+  (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "hold";
   input("settings_upload_chunk_size_mb").value = String(data.upload_chunk_size_mb ?? 8);
   input("settings_min_upload_chunk_size_mb").value = String(data.min_upload_chunk_size_mb ?? 1);
   input("settings_max_upload_chunk_size_mb").value = String(data.max_upload_chunk_size_mb ?? 16);
@@ -91,6 +92,7 @@ function collectSettingsPayload(overrides: Partial<EdgeSettings> = {}): EdgeSett
     max_depth: Number(value("settings_max_depth") || 0),
     keep_local_pending: getToggle("settings_keep_local_pending"),
     uploads_paused: getToggle("settings_uploads_paused"),
+    anomaly_mode: value("settings_anomaly_mode"),
     upload_chunk_size_mb: Number(value("settings_upload_chunk_size_mb") || 1),
     min_upload_chunk_size_mb: Number(value("settings_min_upload_chunk_size_mb") || 1),
     max_upload_chunk_size_mb: Number(value("settings_max_upload_chunk_size_mb") || 1),

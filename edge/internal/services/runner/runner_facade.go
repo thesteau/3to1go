@@ -89,5 +89,12 @@ func (r *EdgeRunner) DeleteJob(relativePath string) error {
 		return fmt.Errorf("a backup or recovery operation is running; try again when it finishes")
 	}
 	defer r.cycleLock.Unlock()
-	return r.DirService.DeleteJob(relativePath)
+	job, _ := r.DirService.LoadJob(relativePath)
+	if err := r.DirService.DeleteJob(relativePath); err != nil {
+		return err
+	}
+	if job != nil {
+		r.Anomalies.Delete(job.RootPath)
+	}
+	return nil
 }

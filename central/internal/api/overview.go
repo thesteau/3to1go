@@ -145,6 +145,10 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if err := a.snapIndex.DeleteArchiveSizes(r.Context(), edgeID, instID); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance size history")
+			return
+		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{
 			"status":           "cleaned",
 			"edge_id":          edgeID,
@@ -189,6 +193,10 @@ func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := a.snapIndex.DeleteEdgeRegistration(r.Context(), edgeID, instID); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance registration")
+		return
+	}
+	if err := a.snapIndex.DeleteArchiveSizes(r.Context(), edgeID, instID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance size history")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{

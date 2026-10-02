@@ -70,12 +70,37 @@ func (n *NtfyPublisher) PublishBestEffort(cfg *config.Settings, context map[stri
 	}
 }
 
+// PublishUnusualBackup alerts that a backup differs sharply from its history.
+// It uses its own message and a high priority, separate from upload notices.
+func (n *NtfyPublisher) PublishUnusualBackup(cfg *config.Settings, context map[string]string, held bool) {
+	if cfg.NtfyURL == "" || cfg.NtfyTopic == "" {
+		return
+	}
+	action := "uploaded an unusual backup of"
+	if held {
+		action = "is holding an unusual backup for review:"
+	}
+	message := fmt.Sprintf("Edge %s %s job %s. %s", context["edge_id"], action, context["job_name"], context["detail"])
+	err := publishWithHeaders(cfg.NtfyURL, cfg.NtfyTopic, message, map[string]string{
+		"X-Relay-Event": "unusual-backup",
+		"Priority":      "high",
+		"Tags":          "warning",
+	})
+	if err != nil {
+		n.logger.Warn("ntfy_publish_failed", "edge_id", context["edge_id"], "job_name", context["job_name"], "detail", err)
+	}
+}
+
 // RenderNtfyMessage replaces {{ key }} placeholders with values from context.
 func RenderNtfyMessage(template string, context map[string]string) string {
 	return notification.Render(template, DefaultNtfyMessageTemplate, func(key string) string { return context[key] })
 }
 
 func publish(ntfyURL, ntfyTopic, message string) error {
+	return publishWithHeaders(ntfyURL, ntfyTopic, message, map[string]string{"X-Relay-Event": "upload-finished"})
+}
+
+func publishWithHeaders(ntfyURL, ntfyTopic, message string, headers map[string]string) error {
 	base := strings.TrimRight(strings.TrimSpace(ntfyURL), "/")
 	topic := strings.TrimSpace(ntfyTopic)
 	if base == "" || topic == "" {
@@ -90,7 +115,9 @@ func publish(ntfyURL, ntfyTopic, message string) error {
 	}
 	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(payload)))
-	req.Header.Set("X-Relay-Event", "upload-finished")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)

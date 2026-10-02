@@ -3,12 +3,20 @@ title: "Central hooks"
 description: "Run your own commands before and after Central stores an upload."
 ---
 
-Hooks let Central run a shell command at two points while storing an upload:
+Hooks run a shell command at two points while Central stores an upload. Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
 
-- **Pre command**: after an upload has arrived and passed its checksum, before Central stores it. Central waits for it to finish.
-- **Post command**: after storage succeeds, or when storing a new archive fails. Earlier failures, such as a checksum mismatch, do not run the post command. Retrying a completed upload does not rerun hooks.
+```mermaid
+flowchart LR
+    A[Upload complete] --> B{Checksum OK?}
+    B -->|No| X[Edge retries upload<br/>no hooks run]
+    B -->|Yes| PRE[Pre command]
+    PRE --> S[Store archive<br/>and apply retention]
+    S --> POST[Post command<br/>status ok or error]
+    POST --> N[ntfy notification]
+```
 
-Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
+- **Pre command**: after the upload passes its checksum, before Central stores it. Central waits for it to finish.
+- **Post command**: after storing, with `THREETOONEGO_STATUS` set to `ok` or `error`. Retrying an upload that already finished doesn't rerun hooks.
 
 ## Set up
 
@@ -26,7 +34,7 @@ Use them to trigger an offsite sync, write to a log, or ping a monitoring servic
   </Step>
 </Steps>
 
-Commands run with `sh -c` inside the Central container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Output and non-zero exit codes are written to Central's logs; a failing hook doesn't stop the upload.
+Commands run with `sh -c` inside the Central container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Output and non-zero exit codes are written to Central's logs. A failing hook doesn't stop the upload.
 
 ## Environment variables
 
@@ -59,6 +67,7 @@ The **post** command also gets:
 | `THREETOONEGO_STORED_AS` | Final stored filename |
 | `THREETOONEGO_PRUNED` | Number of old snapshots removed by retention |
 | `THREETOONEGO_DUPLICATE` | `true` if Central already had this snapshot |
+| `THREETOONEGO_UNUSUAL` | Why the archive's size looks unusual, or empty. See [Unusual sizes](/central/snapshots#unusual-sizes). |
 
 ## Example: log each stored snapshot
 
@@ -71,5 +80,5 @@ echo "stored $THREETOONEGO_NAMESPACE/$THREETOONEGO_STORED_AS"
 Set **Post Command** to `after-upload.sh`.
 
 <Note>
-  The Central image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included; run those on the host or in another container that reads the same backup folder.
+  The Central image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included. Run those on the host or in another container that reads the same backup folder.
 </Note>

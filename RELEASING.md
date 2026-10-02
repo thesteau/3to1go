@@ -11,13 +11,27 @@ Maintainer notes for the release pipeline. The contributor-facing overview is in
 | Image: Stable release | `stable-docker-images.yml` | Dispatched by Release: Plan and publish, manual | Builds `vX.Y.Z` images from a published release tag. Skips tags that already exist |
 | Release: Validate metadata | `release-state-check.yml` | Release PRs | Posts the `Validate release metadata` status required on `release-state` |
 
-Release Please (pinned in `package.json`) runs through `scripts/release-state.cts` instead of the standard action. The action can't tag a branch other than the one it stores metadata on. `release-please-config.json` uses the `go` strategy, unprefixed `vX.Y.Z` tags, and `initial-version: 1.0.0`.
+```mermaid
+flowchart LR
+    M[Push to main] --> P[Release: Promote main to prod]
+    P -->|opens PR| PR[main → prod PR]
+    PR -->|merge commit| PROD[Push to prod]
+    PROD --> PLAN[Release: Plan and publish<br/>plan]
+    PLAN -->|opens or updates| RPR[Release PR into release-state]
+    PLAN -.->|dispatches| CHECK[Release: Validate metadata]
+    CHECK -->|status| RPR
+    RPR -->|merge| PUB[Release: Plan and publish<br/>publish]
+    PUB --> TAG[Tag + GitHub Release]
+    PUB -.->|dispatches| IMG[Image: Stable release]
+```
 
-Workflows use the built-in `GITHUB_TOKEN`. Events created by that token don't trigger other workflows, so Release: Plan and publish dispatches the validation and image workflows explicitly. Checks on automation-created PRs may show **Approve workflows to run**.
+Release Please (pinned in `package.json`) runs through `scripts/release-state.cts` instead of the standard action, which can't tag a branch other than the one holding its metadata. `release-please-config.json` uses the `go` strategy, unprefixed `vX.Y.Z` tags, and `initial-version: 1.0.0`.
+
+Events from the built-in `GITHUB_TOKEN` don't trigger other workflows, so the release workflow dispatches validation and image builds explicitly. Checks on automation-created PRs may show **Approve workflows to run**.
 
 ### Workflow names
 
-Each workflow's display name starts with its purpose, and its file name uses the matching prefix:
+Display names start with the workflow's purpose, and file names use the matching prefix:
 
 | Prefix | Purpose | Workflows |
 |---|---|---|
@@ -26,14 +40,19 @@ Each workflow's display name starts with its purpose, and its file name uses the
 | `Image:` / `image-` | Docker image publishing | Central latest, Edge latest, Stable release |
 | `Release:` / `release-` | Release pipeline | Promote main to prod, Plan and publish, Validate metadata |
 
-`stable-docker-images.yml` keeps its older file name. `release-please.yml` dispatches it by file name on `prod`, so renaming it on `main` would break image publishing until the rename reached `prod`. `release-please.yml` and `release-state-check.yml` already match the convention, and the Actions policies below name them.
-
-Required checks match **job** names, not workflow names. Renaming a workflow is safe, but renaming a job listed under rulesets below also needs a ruleset update.
+`stable-docker-images.yml` keeps its old file name because `release-please.yml` starts it by name on `prod`. Renaming it means changing both files, and both changes must reach `prod` together. Required checks match **job** names, so renaming a workflow is safe, but renaming a required job needs a ruleset update.
 
 ## Repository settings
 
 **Settings → General → Pull Requests**
-- Allow merge commits and squash merging.
+- Allow merge commits and squash merging. The rulesets below limit each branch to one method:
+
+  | Into | Method | Why |
+  |---|---|---|
+  | `main` | Squash | The PR title becomes the commit Release Please reads |
+  | `prod` | Merge commit | Keeps every promoted commit. A squash would release nothing |
+  | `release-state` | Merge commit | One `Merge pull request #N` per approved release |
+
 - Set the squash commit message default to **Pull request title**.
 - Turn off automatic head-branch deletion, because `main` is the promotion PR's head.
 
@@ -48,9 +67,9 @@ Required checks match **job** names, not workflow names. Renaming a workflow is 
 
 | Target | Rules |
 |---|---|
-| `main` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Checks: `Run central unit tests`, `Run edge unit tests`, `Type-check, compile and run UI tests`, `Edge to Central backup and recovery`, `Validate Conventional Commit PR title` |
-| `prod` | Same as `main`, without the title check, plus `Validate production PR source`. Require up-to-date branches. Allow merge commits and don't require linear history |
-| `release-state` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion, up to date. Check: `Validate release metadata` (the commit status, not `Run release metadata validation`) |
+| `main` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Squash**. Checks: `Run central unit tests`, `Run edge unit tests`, `Type-check, compile and run UI tests`, `Edge to Central backup and recovery`, `Validate Conventional Commit PR title` |
+| `prod` | Same as `main`, without the title check, plus `Validate production PR source`. Merge method: **Merge**. Don't require up-to-date branches or linear history. `prod` is never merged back into `main`, so every later promotion PR would be out of date |
+| `release-state` | PR, 1 approval, dismiss stale approvals, resolve conversations, no force push or deletion. Merge method: **Merge**. Require up-to-date branches, so a PR built on older metadata can't be approved. Check: `Validate release metadata` (the commit status, not `Run release metadata validation`) |
 | Tags `v*` | Restrict creation, update, and deletion, but let the release workflow create tags. Enable immutable releases if available |
 
 Leave `release-please--branches--release-state` unprotected, because Release Please force-pushes it.

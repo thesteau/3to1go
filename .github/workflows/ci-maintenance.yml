@@ -1,0 +1,77 @@
+name: "CI: Repository maintenance"
+
+on:
+  push:
+    branches: [main, prod]
+  pull_request:
+    branches-ignore: [release-state]
+  schedule:
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  formatting:
+    name: Check Go formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+      - name: Check tracked Go sources
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git ls-files -z -- '*.go')
+          unformatted=$(gofmt -l "${files[@]}")
+          if [ -n "$unformatted" ]; then
+            printf 'Run gofmt on these files:\n%s\n' "$unformatted"
+            exit 1
+          fi
+
+  go-vulnerabilities:
+    name: Scan Go vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # Scan with the patched toolchain used by golang:1.26-alpine builds.
+          go-version: "1.26.x"
+          check-latest: true
+          cache-dependency-path: |
+            central/go.sum
+            edge/go.sum
+            shared/go/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install vulnerability scanner
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+      - name: Scan all workspace modules
+        run: |
+          for module in shared/go central edge; do
+            (cd "$module" && govulncheck ./...)
+          done
+
+  npm-vulnerabilities:
+    name: Audit frontend build dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high

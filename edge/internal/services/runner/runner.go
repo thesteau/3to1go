@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/3to1go/edge/internal/anomaly"
 	"github.com/3to1go/edge/internal/backup"
 	"github.com/3to1go/edge/internal/cancelio"
 	"github.com/3to1go/edge/internal/config"
@@ -29,6 +30,21 @@ import (
 	"github.com/3to1go/shared/hooks"
 )
 
+type jobStateStore interface {
+	Get(string) state.JobState
+	Set(string, state.JobState) error
+	Delete(string) error
+	ReferencedPendingArchives() map[string]bool
+}
+
+type anomalyStore interface {
+	History(string) ([]anomaly.Observation, error)
+	SetPending(string, anomaly.Observation) error
+	Accept(string) error
+	ClearPending(string) error
+	Delete(string) error
+}
+
 // EdgeRunner owns all runtime services and drives backup cycles.
 type EdgeRunner struct {
 	mu sync.Mutex
@@ -40,7 +56,7 @@ type EdgeRunner struct {
 	operationCtx    context.Context
 	operationCancel context.CancelFunc
 
-	StateStore    *state.StateStore
+	StateStore    jobStateStore
 	UploadClient  *upload.UploadClient
 	LockManager   *locks.JobLockManager
 	HookManager   *hooks.HookManager
@@ -48,6 +64,7 @@ type EdgeRunner struct {
 	NtfyPublisher *ntfy.NtfyPublisher
 	DirService    *directories.DirectoryService
 	Recovery      *recovery.RecoveryService
+	Anomalies     anomalyStore
 }
 
 // uploadWork is the handoff between the compress goroutines and the serial upload worker.
@@ -76,6 +93,10 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 	if err != nil {
 		return nil, fmt.Errorf("encryption key: %w", err)
 	}
+	anomalies := anomaly.NewStore(stateStore.DB())
+	if err := anomalies.EnsureSchema(context.Background()); err != nil {
+		return nil, fmt.Errorf("anomaly schema: %w", err)
+	}
 
 	uploadClient := upload.NewUploadClient(settings, encKey, certMgr)
 	lockMgr := locks.NewJobLockManager()
@@ -96,6 +117,7 @@ func NewEdgeRunner(settings *config.Settings, logger *slog.Logger, certMgr *cert
 		NtfyPublisher: ntfyPub,
 		DirService:    dirSvc,
 		Recovery:      recoverySvc,
+		Anomalies:     anomalies,
 	}, nil
 }
 
@@ -460,6 +482,10 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 		}
 	}
 
+	// A held archive keeps its reasons while its files stay the same.
+	held := s.ManualInterventionRequired && s.LastErrorCategory == unusualBackupCategory
+	heldDetail := s.LastErrorDetail
+
 	r.setActivePhase(job, s, "scanning", 5)
 	s.LastErrorDetail = ""
 	s.LastErrorCategory = ""
@@ -482,7 +508,9 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 
 	fingerprint := backup.ComputeFingerprint(files)
 	if !forceSend && fingerprint == s.LastSuccessfulFingerprint {
+		// Back to the last uploaded state, so any held archive is moot.
 		r.clearPendingArchive(s)
+		r.Anomalies.ClearPending(job.RootPath)
 		s.LastStatus = "skipped_unchanged"
 		s.ManualInterventionRequired = false
 		r.StateStore.Set(job.RootPath, *s)
@@ -493,6 +521,11 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	if s.ManualInterventionRequired && s.PendingArchive != "" && s.PendingFingerprint == fingerprint {
 		if _, err := os.Stat(s.PendingArchive); err == nil {
 			s.LastStatus = "manual_intervention_required"
+			if held {
+				s.LastStatus = heldForReviewStatus
+				s.LastErrorCategory = unusualBackupCategory
+				s.LastErrorDetail = heldDetail
+			}
 			r.StateStore.Set(job.RootPath, *s)
 			r.logger.Warn("manual_intervention_required",
 				"job_name", job.JobName,
@@ -519,6 +552,11 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 		return false, err
 	}
 
+	// Review the archive before the state first points at it, so a restart can
+	// never find an unchecked archive marked ready to upload.
+	review := r.reviewStagedArchive(job, settings, files, size, forceSend)
+	holdArchive := review != nil && review.hold
+
 	s.PendingArchive = archivePath
 	s.PendingArchiveSize = &size
 	s.PendingArchiveSHA256 = sha256sum
@@ -540,12 +578,67 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	s.ActivePhasePercent = 50
 	s.ManualInterventionRequired = false
 	s.LastStatus = "archive_created"
+	if holdArchive {
+		s.LastStatus = heldForReviewStatus
+		s.ManualInterventionRequired = true
+		s.LastErrorCategory = unusualBackupCategory
+		s.LastErrorDetail = review.summary
+		s.ActivePhase = ""
+		s.ActivePhasePercent = 0
+		s.LastUploadUpdatedAt = utcNow()
+	}
 	r.StateStore.Set(job.RootPath, *s)
 
 	if prevPending != "" && prevPending != archivePath {
 		os.Remove(prevPending)
 	}
-	return true, nil
+	// Alert only once the outcome is saved, so a restart can't lose a hold.
+	if review != nil {
+		r.logger.Warn("unusual_backup", "job_name", job.JobName, "held", review.hold, "detail", review.summary)
+		r.NtfyPublisher.PublishUnusualBackup(settings, map[string]string{
+			"edge_id":  settings.EdgeID,
+			"job_name": job.JobName,
+			"detail":   review.summary,
+		}, review.hold)
+	}
+	return !holdArchive, nil
+}
+
+const (
+	heldForReviewStatus   = "held_for_review"
+	unusualBackupCategory = "unusual_backup"
+)
+
+// unusualReview describes a staged archive that looks unlike its job's history.
+type unusualReview struct {
+	summary string
+	hold    bool // true to keep the archive staged until the operator decides
+}
+
+// reviewStagedArchive records the staged archive's measurements and compares
+// them with the job's history. It returns nil when the archive looks normal,
+// checks are off, or the operator forced the upload.
+func (r *EdgeRunner) reviewStagedArchive(job *backup.JobDefinition, settings *config.Settings, files []*backup.DiscoveredFile, archiveBytes int64, forceSend bool) *unusualReview {
+	obs := anomaly.Observe(files, archiveBytes, time.Now())
+	if err := r.Anomalies.SetPending(job.RootPath, obs); err != nil {
+		r.logger.Warn("anomaly_record_failed", "job_name", job.JobName, "error", err)
+		return nil
+	}
+	// Force Upload is an explicit request to send this backup. Its measurements
+	// still join the history once it uploads.
+	if forceSend || settings.AnomalyMode == anomaly.ModeOff {
+		return nil
+	}
+	history, err := r.Anomalies.History(job.RootPath)
+	if err != nil {
+		r.logger.Warn("anomaly_history_failed", "job_name", job.JobName, "error", err)
+		return nil
+	}
+	result := anomaly.Evaluate(history, obs)
+	if !result.Unusual() {
+		return nil
+	}
+	return &unusualReview{summary: result.Summary(), hold: settings.AnomalyMode == anomaly.ModeHold}
 }
 
 func (r *EdgeRunner) createPendingArchive(job *backup.JobDefinition, files []*backup.DiscoveredFile, fingerprint string, settings *config.Settings, s *state.JobState) (string, string, error) {
@@ -783,6 +876,10 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	r.clearPendingArchive(s)
 	s.LastUploadUpdatedAt = utcNow()
 	r.StateStore.Set(job.RootPath, *s)
+	// The uploaded backup, including one the operator approved, is now "normal".
+	if err := r.Anomalies.Accept(job.RootPath); err != nil {
+		r.logger.Warn("anomaly_history_failed", "job_name", jobName, "error", err)
+	}
 
 	r.logger.Info("upload_success",
 		"job_name", jobName, "archive", archiveName,

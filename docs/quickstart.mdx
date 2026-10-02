@@ -5,7 +5,7 @@ description: "Run Central and Edge with Docker and take your first backup."
 
 This guide uses the published Docker images and the example Compose files from the repository. You need [Docker](https://docs.docker.com/get-docker/) with Compose on each machine.
 
-The examples use the `latest` images. For production, pin a stable version; see [Choose an image version](#choose-an-image-version).
+The examples use the `latest` images. For production, pin a stable version. See [Choose an image version](#choose-an-image-version).
 
 <Tip>
   You can run both apps on the same machine to try things out. In real use, Central usually runs on a separate, always-on host.
@@ -18,7 +18,7 @@ On the machine that will store backups:
 ```sh
 mkdir 3to1go-central && cd 3to1go-central
 curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
 ```
 
 Edit `.env` and set a real `POSTGRES_PASSWORD` (and optionally `INITIAL_ADMIN_PASSWORD`), then start it:
@@ -40,7 +40,7 @@ On the machine that has the files:
 ```sh
 mkdir 3to1go-edge && cd 3to1go-edge
 curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
-curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
 ```
 
 Edit `.env`:
@@ -61,7 +61,7 @@ Open **http://localhost:6556/**, sign in, and paste the credential from step 2 i
 
 ## 4. Mark a folder for backup
 
-Create a file named `.upload_dir` in the folder you want backed up. An empty file works; Edge uses the folder name as the job name:
+Create a file named `.upload_dir` in the folder you want backed up. An empty file works, and Edge uses the folder name as the job name:
 
 ```sh
 touch /home/alice/photos/.upload_dir
@@ -90,13 +90,13 @@ Find versions on the [releases page](https://github.com/thesteau/3to1go/releases
 ```sh Central
 VERSION=v1.0.0
 curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/docker-compose.yml
-curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/.env.example -o .env
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/.env.example -o .env
 ```
 
 ```sh Edge
 VERSION=v1.0.0
 curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/docker-compose.yml
-curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/.env.example -o .env
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/.env.example -o .env
 ```
 
 Then set the same tag as the image in each `docker-compose.yml`:

@@ -21,9 +21,25 @@ The fingerprint in the filename is the first eight characters of Edge's path-and
 
 ## Download a snapshot
 
-Click **Download** on a snapshot. Because snapshots are encrypted by Edge, Central's UI asks for that Edge's **encryption key** the first time:
+Click **Download** on a snapshot. The first time, Central asks for that Edge's **encryption key**.
 
-Browser decryption uses Web Crypto. Open Central over HTTPS, or through `localhost` for local use; a plain HTTP LAN address does not provide the secure browser context needed for decryption.
+```mermaid
+sequenceDiagram
+    actor You
+    participant Browser
+    participant Central
+    You->>Browser: Paste Edge's encryption key
+    Browser->>Browser: Check key against Edge's reported fingerprint
+    Browser->>Central: Download encrypted snapshot
+    Central-->>Browser: Encrypted tar.zst
+    Browser->>Browser: Decrypt as it downloads
+    Browser-->>You: Plain tar.zst file
+    Note over Browser,Central: The key never leaves your browser
+```
+
+<Note>
+  Your browser does the decrypting, so open Central over HTTPS or through `localhost`. A plain HTTP address on your network won't work.
+</Note>
 
 <Steps>
   <Step title="Copy the key from Edge">
@@ -37,7 +53,7 @@ Browser decryption uses Web Crypto. Open Central over HTTPS, or through `localho
   </Step>
 </Steps>
 
-The key is kept in that browser tab's memory and session storage, never sent to Central's server. **Clear** removes a saved key; signing out or returning to the sign-in dialog clears all saved keys in that tab, as does ending the tab session.
+The key stays in that browser tab and is never sent to Central's server. **Clear** removes it. Signing out, an expired session, or closing the tab clears every saved key.
 
 To extract the downloaded archive:
 
@@ -55,15 +71,23 @@ Click **Delete** on a snapshot and confirm. This permanently removes the file.
 
 ## Retention
 
-After each upload, Central keeps the most recent **Keep Last Snapshots** (default `3`) for that job **and Edge instance**, and deletes older ones. Edge instances never prune each other's snapshots, even if they share an `EDGE_ID`.
+After each upload, Central keeps the most recent snapshots for that job **and Edge instance** and deletes older ones. **Keep Last Snapshots** in **Edit Central Settings** sets how many (default `3`). Edge instances never prune each other's snapshots, even if they share an `EDGE_ID`.
 
-Ordering uses the stored files' modification times. Preserve those times when copying archives back into Central's backup folder.
+Age is judged by each file's modification time, so keep those times when copying archives back into the backup folder.
 
-Change it in **Edit Central Settings**. See [Design decisions](/concepts/design-decisions#count-based-retention).
+## Unusual sizes
+
+Central remembers the size of each job's last 20 uploads. When a new archive is less than half or more than double the job's usual size, and far outside its normal range, the snapshot gets an **unusual size** badge. Hover over it to see why, for example:
+
+> This archive is 39.1 KB, but this job's archives are usually about 979.0 KB.
+
+Central also sends an [ntfy alert](/central/notifications#unusual-size-alerts) and passes the reason to the [post hook](/central/hooks). The check needs 5 earlier uploads and can be turned off with **Unusual uploads** in **Edit Central Settings**.
+
+Central only sees archive sizes, and by the time an archive arrives it has already left Edge, so it can flag but not hold. Edge's own checks are stronger and can hold a backup before it uploads. See [Unusual backups](/edge/unusual-backups).
 
 ## Integrity checks
 
-Central can re-check stored snapshots with SHA-256 to catch files that have been corrupted or changed on disk. Each check covers the **latest snapshot of every job**, not the full history, to stay lightweight.
+Central can re-check stored snapshots with SHA-256 to catch files corrupted or changed on disk. Each check covers the **latest snapshot of every job**, not the full history.
 
 - **Run Now**: start a check from the integrity bar on the snapshots page.
 - **Scheduled**: set **Snapshot Integrity Check Interval** (hours) in **Edit Central Settings**. `0` turns scheduled checks off.
@@ -72,4 +96,4 @@ Central can re-check stored snapshots with SHA-256 to catch files that have been
   Central reads the check interval when it starts. After changing it, restart Central: `docker compose restart central`.
 </Note>
 
-The bar shows the result of the most recent check and when it ran. Results are held in memory and reset when Central restarts. Snapshots without a recorded archive checksum are skipped. A successful check verifies the stored encrypted bytes, not whether you still have the correct decryption key.
+The bar shows the latest result and when it ran. Results reset when Central restarts. Snapshots without a recorded checksum are skipped. A passing check confirms the stored bytes are intact, not that you still have the key to decrypt them.

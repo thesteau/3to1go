@@ -13,6 +13,7 @@ interface EdgeSettings {
   max_depth?: number;
   keep_local_pending?: boolean;
   uploads_paused?: boolean;
+  anomaly_mode?: string;
   upload_chunk_size_mb?: number;
   min_upload_chunk_size_mb?: number;
   max_upload_chunk_size_mb?: number;

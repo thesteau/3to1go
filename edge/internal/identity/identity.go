@@ -43,7 +43,7 @@ func LoadOrCreateChecked(path string) (string, error) {
 		tmp.Close()
 		return "", err
 	}
-	if _, err := tmp.WriteString(id+"\n"); err != nil {
+	if _, err := tmp.WriteString(id + "\n"); err != nil {
 		tmp.Close()
 		return "", err
 	}

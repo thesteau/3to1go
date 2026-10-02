@@ -117,7 +117,7 @@ function formatLastState(entry: DirectoryEntry): string {
 function lastStateClass(entry: DirectoryEntry): string {
   const status = String(entry.state?.last_status || "").trim();
   if (["success", "recovered", "skipped_unchanged", "skipped_empty"].includes(status)) return "state-ok";
-  if (["manual_intervention_required", "unexpected_exception", "recovery_failed"].includes(status)) return "state-error";
+  if (["manual_intervention_required", "unexpected_exception", "recovery_failed", "held_for_review"].includes(status)) return "state-error";
   if (["retry_scheduled", "waiting_retry", "circuit_open", "skipped_missing"].includes(status)) return "state-warn";
   return "";
 }
@@ -307,6 +307,12 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined): void {
       const jobName = entry.config?.job_name || entry.relative_path;
       const lastStateLabel = formatLastState(entry);
       const activity = jobActivityDetails(entry);
+      // A held backup waits for the operator, so Force Upload becomes the approval.
+      const held = entry.state?.last_status === "held_for_review";
+      const uploadLabel = held ? "Upload anyway" : "Force Upload";
+      const uploadHint = held
+        ? "This backup looks very different from earlier ones. Upload it if the change is expected, or clear it."
+        : "Upload even if unchanged. Central may reject as duplicate.";
       return `
       <div class="job-card" data-path="${escapeHtml(entry.relative_path)}">
         <div class="job-card-body">
@@ -327,8 +333,8 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined): void {
               <button type="button" class="secondary" onclick="return browseFilesFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Files &amp; exclusions</button>
               ${entry.state?.pending_archive || entry.state?.pending_fingerprint ? `<button type="button" class="danger" onclick="return clearStagedFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), this)">Clear staged backup</button>` : ""}
               <span class="hint-with-help">
-                <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">Force Upload</button>
-                <span class="hover-hint" title="Upload even if unchanged. Central may reject as duplicate.">?</span>
+                <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">${uploadLabel}</button>
+                <span class="hover-hint" title="${escapeHtml(uploadHint)}">?</span>
               </span>
               <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'))">Restore</button>
               ${entry.blocked_by_parent ? "" : `<button type="button" class="btn-edit" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Edit</button>`}

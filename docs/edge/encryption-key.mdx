@@ -3,7 +3,7 @@ title: "Encryption key"
 description: "Find, back up, and rotate the key Edge uses to encrypt every snapshot."
 ---
 
-Each Edge creates its own encryption key on first start and uses it to encrypt every archive before upload. Central's server never receives the key; its browser UI uses a key you paste locally to decrypt downloads.
+Each Edge creates its own encryption key on first start and encrypts every archive with it before upload. Central's server never receives the key. To download a snapshot, you paste the key into Central's UI and your browser decrypts it.
 
 <Warning>
   If you lose the key, that Edge's snapshots are **permanently unrecoverable**. Nobody, including Central, can decrypt them. Back it up now.
@@ -11,16 +11,16 @@ Each Edge creates its own encryption key on first start and uses it to encrypt e
 
 ## Where it is
 
-- In the UI: **Encryption Key** on Edge's main page. It's masked; click **Copy** to copy it.
+- In the UI: **Encryption Key** on Edge's main page. It's masked, so click **Copy** to copy it.
 - On disk: `config/encryption.key` next to Edge's `docker-compose.yml` (`/config/encryption.key` inside the container).
 
-The file contains 32 raw key bytes. The UI's **Copy** button provides their base64url text representation for pasting into Central. Preserve the file as-is when restoring Edge's config; do not replace it with the copied text.
+The file holds 32 raw bytes. **Copy** gives you a text (base64url) version to paste into Central. When restoring Edge's config, keep the original file. Don't replace it with the copied text.
 
-Edge also shows a **fingerprint** of the key. Central uses the fingerprint to confirm you've pasted the right key before it decrypts a download. It isn't secret and can't be used to decrypt anything.
+Edge also shows the key's **fingerprint**, which Central uses to catch a wrongly pasted key. It isn't secret and can't decrypt anything.
 
 ## Back it up
 
-Store the copied key somewhere that survives losing this machine, such as a password manager. Better still, back up the whole `config` folder, which also holds the instance ID needed to [restore through Edge](/edge/restore#rebuilding-a-lost-machine).
+Keep the copied key somewhere that survives losing this machine, such as a password manager. Even better, back up the whole `config` folder, which also holds the instance ID needed to [restore through Edge](/edge/restore#rebuilding-a-lost-machine).
 
 ## When you need it
 
@@ -29,38 +29,31 @@ Store the copied key somewhere that survives losing this machine, such as a pass
 
 ## Rotate the key
 
-**Rotate** generates a new key for archives built afterward. Snapshots already on Central stay encrypted with the old key. Rotation does not rebuild staged archives or force unchanged jobs to upload.
+**Rotate** creates a new key for archives built from then on. Snapshots already on Central keep the old key, and staged archives aren't rebuilt.
 
 <Warning>
-  After rotating, older snapshots become hard to get back. Edge restores only use the new key. Central's UI checks every pasted key against the **latest** fingerprint Edge reported, and that switches to the new key on Edge's next upload. From then on Central rejects the old key, so its snapshots can't be downloaded from the UI either.
+  After rotating, old snapshots are hard to recover. Edge restores only with the new key. Central's UI only accepts the key Edge reported most recently, and that switches to the new key on Edge's next upload. Download anything you need **before** rotating.
 </Warning>
 
 <Steps>
   <Step title="Pause backup cycles">
-    Wait for any backup or restore operation to finish. In **Edit Edge Settings**, enable **Pause uploads (skip backup cycles)** and save. Confirm the setting is saved before continuing; if another cycle started and the save was rejected, wait for it to finish and try again. Keep cycles paused until the new-key backups below are complete.
+    Wait for any backup or restore to finish. In **Edit Edge Settings**, turn on **Pause uploads (skip backup cycles)** and save. If the save is rejected because a cycle started, wait for it to finish and save again.
   </Step>
-  <Step title="Download anything you want to keep">
-    Before rotating, [download](/central/snapshots#download-a-snapshot) any older snapshots you may need from Central's UI while it still accepts the current key.
+  <Step title="Download old snapshots you need">
+    [Download](/central/snapshots#download-a-snapshot) them from Central's UI while it still accepts the current key.
   </Step>
-  <Step title="Copy the old key">
-    Click **Copy** and save the current key somewhere safe. The downloaded archives are already decrypted, but keep the key in case you need it later.
+  <Step title="Save the old key">
+    Click **Copy** and store it somewhere safe.
   </Step>
   <Step title="Rotate">
-    With cycles paused, clear any staged backups, then click **Rotate** and confirm.
+    Click **Clear staged backup** on any job that has one, then click **Rotate** and confirm. Copy and store the new key.
   </Step>
-  <Step title="Save the new key">
-    Copy and store the new key.
-  </Step>
-  <Step title="Create backups with the new key">
-    Refresh Edge and check each job for staged backups again. Before its first **Force Upload** after rotation, use **Clear staged backup** if one is present: Force Upload reuses staged archives, which may still use the old key.
-
-    Use **Force Upload** on each job, including jobs whose paths and sizes have not changed, and wait for each upload to finish. Force Upload works while backup cycles are paused. Confirm each job uploads successfully with the new key before continuing.
+  <Step title="Back up every job with the new key">
+    Refresh Edge and clear any staged backup again, since **Force Upload** reuses staged archives that may use the old key. Then click **Force Upload** on every job, including unchanged ones, and wait for each to succeed. Force Upload works while cycles are paused.
   </Step>
   <Step title="Resume backup cycles">
-    If you paused cycles for this rotation, turn off **Pause uploads (skip backup cycles)** in **Edit Edge Settings** and save. Leave it enabled if you intended to keep cycles paused.
+    Turn off **Pause uploads (skip backup cycles)** and save.
   </Step>
 </Steps>
 
-<Tip>
-  Rotation doesn't remove old snapshots from Central. Retention prunes them as new snapshots arrive, so they'll age out after **Keep Last Snapshots** new backups of each job.
-</Tip>
+Old snapshots stay on Central until retention prunes them, after **Keep Last Snapshots** new backups of each job.

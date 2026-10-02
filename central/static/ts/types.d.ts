@@ -10,6 +10,7 @@ interface CentralSettings {
   upload_cleanup_interval_seconds?: number;
   snapshot_verify_interval_hours?: number;
   uploads_paused?: boolean;
+  anomaly_mode?: string;
   ntfy_url?: string;
   ntfy_topic?: string;
   ntfy_message_template?: string;
@@ -56,6 +57,7 @@ interface Snapshot {
   name: string;
   filename?: string;
   size_bytes?: number;
+  unusual?: string;
 }
 
 interface SnapshotJob {
