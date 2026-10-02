@@ -69,12 +69,18 @@ function isAncestor(ancestor: string, descendant: string): boolean {
   }
 }
 
+// Lists the commits on prodSha that the previous release didn't include. prod is
+// reset from time to time, so the previous release's commit may no longer be in
+// its history; its tag keeps the commit, and `previous..prod` still lists only
+// what it didn't ship. Commits re-created with new IDs (rebased or squashed)
+// would count again, which shows up in the release PR before approval.
 function commitsBetween(prodSha: string, previousSha: string | null): any[] {
   invariant(SHA.test(prodSha) && (!previousSha || SHA.test(previousSha)), 'Invalid history boundary');
   invariant(isAncestor(prodSha, 'origin/prod'), `Commit ${prodSha} is not on prod`);
-  invariant(!previousSha || isAncestor(previousSha, prodSha),
-    `The previous release's commit ${previousSha} is no longer in prod's history, so the changes since it ` +
-    `can't be worked out. prod's history was probably rewritten. See "Recovering prod history" in RELEASING.md.`);
+  if (previousSha && !isAncestor(previousSha, prodSha)) {
+    console.warn(`The previous release's commit ${previousSha} isn't in prod's history, likely after a reset. ` +
+      'Counting the commits it didn\'t include.');
+  }
   const range = previousSha ? `${previousSha}..${prodSha}` : prodSha;
   const fields = git('log', '--format=%H%x00%B%x00', range).split('\0');
   const commits = [];
