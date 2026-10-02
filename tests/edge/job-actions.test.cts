@@ -27,6 +27,31 @@ test('clear staged backup and cancellation use separate endpoints and report err
   assert.match(messages.at(-1)[0], /Cancellation requested/);
 });
 
+test('a held backup offers Upload anyway with its reasons, other jobs keep Force Upload', () => {
+  const jobs = { innerHTML: '' };
+  const count = { innerHTML: '' };
+  const ctx = vm.createContext({
+    document: { getElementById: id => ({ 'selected-jobs': jobs, 'selected-jobs-count': count })[id] || null, querySelectorAll: () => [] },
+    currentUser: { is_admin: true }, latestData: null, ACTIVE_JOB_STATUSES: new Set(['uploading']),
+  });
+  loadFeature(ctx, 'edge', 'utils');
+  loadFeature(ctx, 'edge', 'directories');
+  ctx.renderSelectedJobs([
+    { relative_path: 'docs', selected: true, config: { job_name: 'docs' }, state: {
+      last_status: 'held_for_review',
+      last_error_detail: 'The archive barely compresses (100% of the original size, usually 41%), which is typical of encrypted files.',
+    } },
+    { relative_path: 'photos', selected: true, config: { job_name: 'photos' }, state: { last_status: 'success' } },
+  ]);
+  const [held, normal] = jobs.innerHTML.split('class="job-card"').slice(1);
+  assert.match(held, />Upload anyway<\/button>/);
+  assert.match(held, /Last state: held for review/);
+  assert.match(held, /state-error/);
+  assert.match(held, /typical of encrypted files/);
+  assert.match(normal, />Force Upload<\/button>/);
+  assert.doesNotMatch(normal, /Upload anyway/);
+});
+
 test('folder paths round-trip through executable inline action handlers', () => {
   const ctx = vm.createContext({});
   loadFeature(ctx, 'edge', 'utils');

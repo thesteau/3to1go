@@ -3,12 +3,10 @@ title: "Edge notifications"
 description: "Get an ntfy message when Edge successfully uploads a job to Central."
 ---
 
-Edge can post a message to an [ntfy](https://ntfy.sh) topic after a job uploads **successfully**. Publishing is optional and best-effort: a failed notification never blocks an upload.
-
-This runs for scheduled cycles and **Run Backup Cycle Now**. Individual **Force Upload** actions currently bypass Edge's notification step; Central can still notify when it stores that upload.
+Edge can post to an [ntfy](https://ntfy.sh) topic after a job uploads **successfully** in a scheduled cycle or **Run Backup Cycle Now**. **Force Upload** doesn't notify from Edge, but Central still can. A failed notification never blocks an upload.
 
 <Note>
-  Central has its own, separate notification settings that fire when Central receives an upload. See [Central notifications](/central/notifications). Configure whichever side you prefer, or both.
+  Central has separate notification settings that fire when it stores an upload. See [Central notifications](/central/notifications). Use either or both.
 </Note>
 
 ## Set up
@@ -46,3 +44,7 @@ Write your own in **Message Template**. **Defaults** restores the default.
 | `{{ stored_as }}` | Filename as stored on Central |
 
 Messages are sent with the header `X-Relay-Event: upload-finished`.
+
+## Unusual backup alerts
+
+When a backup looks very different from its history, Edge also sends a separate high-priority alert to the same topic, with the reasons. It uses the header `X-Relay-Event: unusual-backup` and ignores the message template. See [Unusual backups](/edge/unusual-backups).

@@ -1,11 +1,11 @@
 # 3to1go
 
 <p align="center">
-  <img src="assets/3to1go.png" alt="Go gophers racing — 3, 2, 1, Go!" width="480"><br>
+  <img src="assets/3to1go.png" alt="Go gophers racing: 3, 2, 1, Go!" width="480"><br>
   <sup>Go Gopher artwork <a href="#attr-1">[1]</a></sup>
 </p>
 
-The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage)<sup><a href="#attr-2">[2]</a></sup> (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown — 3, 2, 1, Go! — and the "Go" is the literal language [Go](https://go.dev/)<sup><a href="#attr-3">[3]</a></sup>.
+The name works on three levels: it references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Storage)<sup><a href="#attr-2">[2]</a></sup> (keep **3** copies, on **2** different media, with **1** offsite), it reads as a countdown (3, 2, 1, Go!), and it's written in [Go](https://go.dev/)<sup><a href="#attr-3">[3]</a></sup>.
 
 3to1go is a simple backup system with two parts:
 
@@ -29,7 +29,7 @@ Each Edge has its own address and web UI on port **6556**. They all upload to Ce
 ## Why Use 3to1go
 
 - **Choose folders directly.** Create backup jobs in Edge's UI or add a `.upload_dir` marker to a folder.
-- **Encrypt before upload.** Central stores encrypted archives; downloads are decrypted in your browser and restores on Edge.
+- **Encrypt before upload.** Central only stores encrypted archives. Downloads are decrypted in your browser, and restores on Edge itself.
 - **Keep machines separate.** Each installation has its own instance ID and snapshot history, even when Edge IDs are shared.
 - **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect hooks or ntfy notifications.
 - **Control access.** Mint and revoke Edge credentials from Central's UI.
@@ -74,28 +74,28 @@ CENTRAL_URL=http://192.168.1.10:6555
 SCAN_DIR=/home/alice
 ```
 
-`SCAN_DIR` is the host folder mounted at `/scan` inside Edge. Use a distinct `EDGE_ID` for each machine. `CENTRAL_URL` must be reachable from inside Edge's container; on the same Docker Desktop host, it is usually `http://host.docker.internal:6555`. Use HTTPS for both web UIs and Central's URL when the network is untrusted.
+`SCAN_DIR` is the host folder mounted at `/scan` inside Edge. Use a distinct `EDGE_ID` for each machine. `CENTRAL_URL` must be reachable from inside Edge's container. On the same Docker Desktop host, it's usually `http://host.docker.internal:6555`. Use HTTPS for both web UIs and Central's URL when the network is untrusted.
 
 ```sh
 docker compose up -d
 ```
 
-Open `http://<edge-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Edge Settings**, paste the token into **Edge Credential** and save. Copy the **Encryption Key** somewhere safe, independently of this machine.
+Open `http://<edge-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Edge Settings**, paste the token into **Edge Credential** and save. Save a copy of the **Encryption Key** somewhere off this machine.
 
 ### 3. Choose a folder and back it up
 
-In Edge's folder browser, click **Edit** on a folder and **Save Job**. This writes a `.upload_dir` marker; an empty marker created by hand also works and uses the folder name as the job name.
+In Edge's folder browser, click **Edit** on a folder and **Save Job**. This writes a `.upload_dir` marker. An empty marker made by hand works too, and uses the folder name as the job name.
 
 Click **Run Backup Cycle Now** to back up immediately. Central keeps the most recent snapshots per job and Edge instance (three by default).
 
-Backups run weekly by default; change the cron schedule in Edge's settings. Browse snapshots in Central, or use **Restore** on an Edge job to preview and recover its files.
+Backups run weekly by default. Change the cron schedule in Edge's settings. Browse snapshots in Central, or use **Restore** on an Edge job to preview and recover its files.
 
 For more detail, see the [quickstart](https://3to1go.docs.thesteau.com/quickstart), [Central installation](https://3to1go.docs.thesteau.com/central/install), and [Edge installation](https://3to1go.docs.thesteau.com/edge/install). To update either deployment, run `docker compose pull` followed by `docker compose up -d` in its Compose folder.
 
 ## Before You Rely on It
 
 - **Keep your encryption key safe.** Losing it means losing access to the snapshots it encrypted. Practice a [restore](https://3to1go.docs.thesteau.com/edge/restore).
-- **Backups are full snapshots.** Change detection uses sorted file paths and sizes. Same-size edits need **Force Upload**; clear an older staged backup first to build a fresh archive.
+- **Backups are full snapshots.** Change detection uses sorted file paths and sizes. Same-size edits need **Force Upload**. Clear an older staged backup first so Force Upload builds a fresh archive.
 - **Restore replaces matching files.** Local files absent from the snapshot stay untouched. Review the preview before confirming.
 - **Plan a third copy.** Your original files and Central's snapshots are two copies, even when Central is offsite. See [Storage and the 3-2-1 rule](https://3to1go.docs.thesteau.com/concepts/storage-and-3-2-1).
 
@@ -108,6 +108,7 @@ See [Design decisions](https://3to1go.docs.thesteau.com/concepts/design-decision
 | Back up several folders or drives | [Multiple folders and drives](https://3to1go.docs.thesteau.com/edge/multiple-folders) |
 | Configure the apps | [Central](https://3to1go.docs.thesteau.com/central/configuration) · [Edge](https://3to1go.docs.thesteau.com/edge/configuration) |
 | Browse, download, or verify backups | [Snapshots](https://3to1go.docs.thesteau.com/central/snapshots) |
+| Back up and recover Central itself | [Recover Central](https://3to1go.docs.thesteau.com/central/disaster-recovery) |
 | Manage sign-in or recover access | [Accounts](https://3to1go.docs.thesteau.com/shared/sign-in) · [Reset Central's password](https://3to1go.docs.thesteau.com/central/reset-admin-password) |
 | Trust internal HTTPS services | [Trusted certificates](https://3to1go.docs.thesteau.com/shared/trusted-certificates) |
 
@@ -118,17 +119,17 @@ Created by [thesteau](https://github.com/thesteau).
 
 ## Support
 
-If this project is useful to you, consider buying me a coffee — it keeps the project going.
+If this project is useful to you, consider buying me a coffee. It keeps the project going.
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-thesteau-yellow)](https://buymeacoffee.com/thesteau)
 
 ## Attribution
 
-<a id="attr-1"></a>**[1] Go Gopher artwork** — The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community.
+<a id="attr-1"></a>**[1] Go Gopher artwork.** The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community.
 
-<a id="attr-2"></a>**[2] 3-2-1 backup rule** — The backup strategy referenced by this project's name is a widely documented industry practice. See the [Wikipedia article on backup storage](https://en.wikipedia.org/wiki/Backup#Storage) for background.
+<a id="attr-2"></a>**[2] 3-2-1 backup rule.** The backup strategy referenced by this project's name is a widely documented industry practice. See the [Wikipedia article on backup storage](https://en.wikipedia.org/wiki/Backup#Storage) for background.
 
-<a id="attr-3"></a>**[3] Go programming language** — This project is written in [Go](https://go.dev/). Go and the Go logo are trademarks of Google LLC. This project is not affiliated with, endorsed by, or sponsored by Google or the Go team.
+<a id="attr-3"></a>**[3] Go programming language.** This project is written in [Go](https://go.dev/). Go and the Go logo are trademarks of Google LLC. This project is not affiliated with, endorsed by, or sponsored by Google or the Go team.
 
 ## Disclaimers
 
@@ -136,7 +137,7 @@ If this project is useful to you, consider buying me a coffee — it keeps the p
 
 - Verifying that your backups are complete and recoverable.
 - Securing the machine running Central and the network path between Edge and Central.
-- Keeping your `encryption.key` safe — losing it means losing access to encrypted snapshots permanently.
+- Keeping your `encryption.key` safe. Losing it means losing access to encrypted snapshots permanently.
 - Complying with any applicable laws or regulations regarding the storage of your data.
 
 ## License

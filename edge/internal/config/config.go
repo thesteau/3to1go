@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/3to1go/shared/anomaly"
 	"github.com/3to1go/shared/configutil"
 )
 
@@ -46,6 +47,7 @@ type Settings struct {
 	HTTPHost                          string
 	HTTPPort                          int
 	UploadsPaused                     bool
+	AnomalyMode                       string
 }
 
 func (s *Settings) UploadChunkSizeBytes() int64 {
@@ -183,6 +185,7 @@ type SettingsPayload struct {
 	HTTPHost                          string `json:"http_host"`
 	HTTPPort                          int    `json:"http_port"`
 	UploadsPaused                     bool   `json:"uploads_paused"`
+	AnomalyMode                       string `json:"anomaly_mode"`
 }
 
 func SettingsToPayload(s *Settings) SettingsPayload {
@@ -218,6 +221,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HTTPHost:                          s.HTTPHost,
 		HTTPPort:                          s.HTTPPort,
 		UploadsPaused:                     s.UploadsPaused,
+		AnomalyMode:                       s.AnomalyMode,
 	}
 }
 
@@ -287,6 +291,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPHost:                          httpHost,
 		HTTPPort:                          httpPort,
 		UploadsPaused:                     raw.UploadsPaused,
+		AnomalyMode:                       coerceAnomalyMode(raw.AnomalyMode),
 	}, nil
 }
 
@@ -377,6 +382,9 @@ func applyEnvOverrides(p *SettingsPayload) {
 			p.CircuitBreakerCooldownSeconds = n
 		}
 	}
+	if v := os.Getenv("ANOMALY_MODE"); v != "" {
+		p.AnomalyMode = v
+	}
 	if v := os.Getenv("HTTP_HOST"); v != "" {
 		p.HTTPHost = v
 	}
@@ -402,6 +410,15 @@ func coerceText(value, def string) string { return configutil.CoerceText(value, 
 func coerceURL(value, def string) (string, error) { return configutil.CoerceURL(value, def) }
 
 func coerceTheme(value string) string { return configutil.CoerceTheme(value) }
+
+// coerceAnomalyMode defaults to holding unusual backups for review.
+func coerceAnomalyMode(value string) string {
+	switch mode := strings.ToLower(strings.TrimSpace(value)); mode {
+	case anomaly.ModeAlert, anomaly.ModeOff:
+		return mode
+	}
+	return anomaly.ModeHold
+}
 
 func coerceBoolPtr(value *bool, def bool) bool {
 	if value == nil {

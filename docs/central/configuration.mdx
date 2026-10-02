@@ -5,7 +5,7 @@ description: "Environment variables for deployment, and settings you change from
 
 Central is configured in two places:
 
-- **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers; `docker compose restart` alone does not reload `.env`.
+- **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers. `docker compose restart` alone does not reload `.env`.
 - **Edit Central Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
 
 ## Environment variables
@@ -65,6 +65,7 @@ Open **Edit Central Settings**.
 | Upload Chunk Size MB | `8` | Chunk size Central asks Edges to use. |
 | Upload Session TTL Hours | `24` | Upload session lifetime, refreshed as upload activity continues. Expired sessions are removed by cleanup. |
 | Cleanup Interval Seconds | `300` | How often expired upload sessions are cleaned up. Minimum `10`. |
+| Unusual uploads | Flag and alert | Flag archives whose size is far from the job's usual size. See [Unusual sizes](/central/snapshots#unusual-sizes). |
 | Snapshot Integrity Check Interval | `0` (off) | Hours between automatic integrity checks. See [Integrity checks](/central/snapshots#integrity-checks). |
 
 **Trusted Certificates** are also managed here. See [Trusted certificates](/shared/trusted-certificates).

@@ -1,0 +1,93 @@
+---
+title: "Recover Central"
+description: "Back up Central's database, keys, and files, then restore them on a replacement host."
+---
+
+Recovering Central requires its PostgreSQL database, signing key, and encrypted snapshots from the same backup window. The database holds snapshot metadata, accounts, credentials, settings, and upload sessions. Snapshots can't be decrypted without the matching Edge encryption keys, so keep those separately as described in [Encryption key](/edge/encryption-key).
+
+## Back up Central
+
+Run these commands in Bash on a Linux host, from your [Central deployment](/central/install) folder. You'll need Docker Compose, `tar`, and permission to read the deployment files. Change the paths to match your mounts. If you use an external database or a custom `ISSUER_KEY_FILE`, include those in your backup too.
+
+Keep the backup on another device or host. It contains the signing key and database credentials, so restrict access to it.
+
+Save the running Central image tag and image ID (`docker inspect 3to1go-central --format '{{.Config.Image}} {{.Image}}'`) and PostgreSQL major version with the backup. Pin the Compose images to those versions. Restore with the same versions first, then upgrade.
+
+Stop Central to prevent uploads, retention, and cleanup from changing files while the database and folders are copied. PostgreSQL stays running for a logical dump. Let active work finish before stopping. The staging folder is included, so interrupted uploads are kept.
+
+```sh
+set -eu
+# Use absolute paths; RECOVERY_DIR must be outside all folders being copied.
+RECOVERY_DIR=/mnt/recovery/central-2026-10-02
+# Set this to the host folder used by BACKUP_DIR, not the container's /backups.
+SNAPSHOT_DIR=/srv/3to1go-central/data/backups
+mkdir -p "$RECOVERY_DIR"
+chmod 700 "$RECOVERY_DIR"
+test -f config/issuer.key
+docker compose stop central
+
+# Writing the binary dump inside the container avoids shell encoding changes.
+docker compose exec -T postgres sh -ec \
+  'umask 077; pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/central-recovery.dump'
+docker compose cp postgres:/tmp/central-recovery.dump "$RECOVERY_DIR/database.dump"
+docker compose exec -T postgres rm /tmp/central-recovery.dump
+
+# The example creates these folders. Include any additional mounted secrets,
+# custom signing key path, or Compose override files used by your deployment.
+tar -cpf "$RECOVERY_DIR/deployment.tar" \
+  docker-compose.yml .env config hook-scripts secrets data/staging
+tar -cpf "$RECOVERY_DIR/snapshots.tar" -C "$SNAPSHOT_DIR" .
+chmod 600 "$RECOVERY_DIR"/*
+(cd "$RECOVERY_DIR" && sha256sum database.dump deployment.tar snapshots.tar > SHA256SUMS)
+docker compose start central
+```
+
+If a command fails after Central stops, leave it stopped while you fix the problem and take the backup again. Checksums let you check for damaged or changed backup files. A practice restore tells you whether the backup works. Keep snapshot modification times when copying files because [retention](/central/snapshots#retention) uses them.
+
+See PostgreSQL's [pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html) and [pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html) documentation for the database commands. If PostgreSQL runs elsewhere, use that server's connection details and back up any database roles you need to recreate. Don't copy its data directory while PostgreSQL is running.
+
+## Rebuild on a replacement host
+
+Keep the original Central stopped. Block Edge traffic to the replacement while you check the restore. Start with an empty deployment folder and an empty PostgreSQL data folder; these commands are for a new installation.
+
+1. Check the backup with `sha256sum -c SHA256SUMS` from its folder.
+2. Extract `deployment.tar` into the new deployment folder with `tar -xpf /mnt/recovery/central-2026-10-02/deployment.tar`. Check `.env`, the pinned image versions, and all bind mounts. Restore any separately backed-up signing key, certificates, hooks, or secrets. Check that `config/issuer.key` exists **before starting Central**, or it will generate a new key.
+3. Create the destination snapshot folder named by `BACKUP_DIR`, and extract `snapshots.tar` there with `tar -xpf /mnt/recovery/central-2026-10-02/snapshots.tar -C /srv/3to1go-central/data/backups`. Preserve the namespace folder structure and modification times. Restore network storage mounts before starting containers.
+4. Start only PostgreSQL and restore the dump as shown below. Use the original PostgreSQL major version and the original database/user values from `.env`.
+
+```sh
+set -eu
+docker compose up -d postgres
+# Wait until this succeeds before continuing.
+docker compose exec -T postgres sh -ec \
+  'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker compose cp /mnt/recovery/central-2026-10-02/database.dump postgres:/tmp/central-recovery.dump
+docker compose exec -T postgres sh -ec \
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/central-recovery.dump'
+docker compose exec -T postgres rm /tmp/central-recovery.dump
+docker compose up -d central
+```
+
+In the example deployment, PostgreSQL creates the database owner from `.env`. The restore loads the database objects under that owner. If it fails, leave Central stopped, fix the error, and try again with a fresh empty database.
+
+## Check the restore
+
+- Check `docker compose logs central postgres` and `curl -fsS http://localhost:6555/health/ready`.
+- Sign in with the restored account password. Changing `INITIAL_ADMIN_PASSWORD` does not reset an existing account.
+- Check settings, credentials, Edge instances, and snapshot listings against your backup records.
+- Click **Run Now** in the snapshot integrity bar. It checks the latest snapshot per job with a recorded checksum, not the entire history or decryption keys.
+- Download and decrypt a known snapshot, then [restore it](/edge/restore) into a disposable folder and compare the files with known originals. Restore replaces matching destination files.
+- Reconnect one Edge using its existing credential and check that a new backup succeeds. Then reconnect the others. Keep the original Central URL, or update Edge settings and certificate trust for the new address.
+
+Keep the backup until these checks pass. The repository's Docker end-to-end test restores the database and files, then checks that the original credential can download the same encrypted snapshot. Try a full recovery on your own setup too, including storage mounts and decrypting files.
+
+## If something is missing
+
+| Missing item | Consequence |
+|---|---|
+| PostgreSQL backup | Snapshot metadata, settings, accounts, and credential records are lost. Central has no supported automatic rebuild of its index from archive files. |
+| Signing key | Existing Edge credentials stop working. Mint replacement credentials and update each Edge after restoring Central. |
+| Snapshot files | The database cannot recreate the files. Recover them from another copy. |
+| Edge encryption key | Snapshots encrypted with that key cannot be decrypted. Restoring Central does not recover the key. |
+
+If the database dump and snapshot files were copied at different times, their records may not match. Keep the files for manual recovery and check the differences before accepting uploads or letting retention run.

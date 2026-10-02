@@ -8,7 +8,8 @@ Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
 ## Requirements
 
 - Docker with Compose
-- Enough disk for your snapshots (Central keeps full archives; see [retention](/central/snapshots#retention))
+- An x86-64 (`linux/amd64`) host.
+- Enough disk for your snapshots, which are full archives (see [retention](/central/snapshots#retention))
 - A port Edges can reach, `6555` by default
 
 ## Set up
@@ -18,7 +19,7 @@ Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
     ```sh
     mkdir 3to1go-central && cd 3to1go-central
     curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-    curl -fsSL  https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+    curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
     ```
 
     Or copy [`deploy-example/central/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/central) from GitHub.
@@ -34,7 +35,7 @@ Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
     INITIAL_ADMIN_PASSWORD=admin
     ```
 
-    Set a real `POSTGRES_PASSWORD`. Point `BACKUP_DIR` at wherever snapshots should live; see [Storage](/concepts/storage-and-3-2-1#where-central-can-store-snapshots).
+    Set a real `POSTGRES_PASSWORD`. Point `BACKUP_DIR` at wherever snapshots should live. See [Storage](/concepts/storage-and-3-2-1#where-central-can-store-snapshots).
   </Step>
   <Step title="Start it">
     ```sh
@@ -69,8 +70,10 @@ The example Compose file keeps everything next to it:
 ```
 
 <Warning>
-  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records; losing `issuer.key` invalidates every Edge credential.
+  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records. Losing `issuer.key` invalidates every Edge credential.
 </Warning>
+
+See [Recover Central](/central/disaster-recovery) for backup commands and steps to restore it on a replacement host.
 
 ## Update
 

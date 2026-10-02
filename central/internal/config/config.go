@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/3to1go/central/internal/signing"
+	"github.com/3to1go/shared/anomaly"
 	"github.com/3to1go/shared/configutil"
 )
 
@@ -42,6 +43,7 @@ type Settings struct {
 	HTTPPort                    int
 	SnapshotVerifyIntervalHours int
 	UploadsPaused               bool
+	AnomalyMode                 string
 }
 
 func (s *Settings) MaxUploadSizeBytes() int64 {
@@ -123,6 +125,7 @@ type SettingsPayload struct {
 	HookPostCommand             string `json:"hook_post_command"`
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
 	UploadsPaused               bool   `json:"uploads_paused"`
+	AnomalyMode                 string `json:"anomaly_mode"`
 }
 
 func SettingsToPayload(s *Settings) SettingsPayload {
@@ -144,6 +147,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HookPostCommand:             s.HookPostCommand,
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
 		UploadsPaused:               s.UploadsPaused,
+		AnomalyMode:                 s.AnomalyMode,
 	}
 }
 
@@ -215,8 +219,13 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	}
 
 	uploadsPaused := false
+	// Central can only alert: an archive has already left Edge when it arrives.
+	anomalyMode := anomaly.ModeAlert
 	if p != nil {
 		uploadsPaused = p.UploadsPaused
+		if strings.EqualFold(strings.TrimSpace(p.AnomalyMode), anomaly.ModeOff) {
+			anomalyMode = anomaly.ModeOff
+		}
 	}
 
 	port := coerceInt(os.Getenv("HTTP_PORT"), 6555, 1)
@@ -247,6 +256,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPPort:                    port,
 		SnapshotVerifyIntervalHours: verifyIntervalHours,
 		UploadsPaused:               uploadsPaused,
+		AnomalyMode:                 anomalyMode,
 	}, nil
 }
 

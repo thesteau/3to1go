@@ -1,4 +1,4 @@
-name: Production PR source
+name: "PR: Production source"
 
 on:
   pull_request:

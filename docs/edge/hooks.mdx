@@ -3,12 +3,20 @@ title: "Edge hooks"
 description: "Run your own commands before and after Edge processes each backup job."
 ---
 
-Hooks let Edge run a shell command around each job in a backup cycle:
+Hooks run a shell command around each job in a backup cycle.
 
-- **Pre command**: before Edge scans and archives the job. Edge waits for it to finish. Useful for dumping a database into the folder first.
-- **Post command**: after the job is done, whether it uploaded, was unchanged, or failed. Cancellation skips the post command.
+```mermaid
+flowchart LR
+    PRE[Pre command] --> F{Paths or sizes<br/>changed?}
+    F -->|No| POST[Post command]
+    F -->|Yes| A[Archive and encrypt] --> U[Upload to Central] --> POST
+    POST --> N[ntfy, if uploaded]
+```
 
-Hooks run during scheduled cycles and **Run Backup Cycle Now**. The individual **Force Upload** action currently bypasses both hooks.
+- **Pre command**: before Edge scans the job. Edge waits for it, so it can prepare files in the folder first.
+- **Post command**: after the job finishes, whether it uploaded, was unchanged, or failed. Cancelling skips it.
+
+Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force Upload**.
 
 ## Set up
 
@@ -26,7 +34,7 @@ Hooks run during scheduled cycles and **Run Backup Cycle Now**. The individual *
   </Step>
 </Steps>
 
-Commands run with `sh -c` inside the Edge container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout, and is stopped if you **Cancel operation**. Output and non-zero exit codes go to Edge's logs; a failing hook doesn't stop the backup.
+Commands run with `sh -c` inside the Edge container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Output and non-zero exit codes go to Edge's logs. A failing hook doesn't stop the backup.
 
 The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs.
 
@@ -63,7 +71,7 @@ In the **pre** command these describe the job's state from its previous run. In 
 
 ```sh after-job.sh
 #!/bin/sh
-# Ping a health check per job; append /fail when the job needs attention.
+# Ping a health check per job, adding /fail when the job needs attention.
 url="https://hc-ping.com/your-uuid/$THREETOONEGO_JOB_NAME"
 case "$THREETOONEGO_LAST_STATUS" in
   success|skipped_unchanged|skipped_empty) ;;
@@ -79,10 +87,11 @@ Common `THREETOONEGO_LAST_STATUS` values after a job:
 | `success` | Uploaded to Central |
 | `skipped_unchanged` | Nothing changed since the last backup |
 | `skipped_empty` | The folder had no files to back up |
+| `held_for_review` | Looked unusual and is waiting for you. See [Unusual backups](/edge/unusual-backups). |
 | `retry_scheduled`, `waiting_retry` | Upload failed and will be retried |
-| `circuit_open` | Central was unreachable too many times; pausing before retrying |
-| `manual_intervention_required` | Retries ran out; check the job in Edge's UI |
-| `unexpected_exception` | Something else went wrong; see Edge's logs |
+| `circuit_open` | Central was unreachable too many times. Edge waits before retrying |
+| `manual_intervention_required` | Retries ran out. Check the job in Edge's UI |
+| `unexpected_exception` | Something else went wrong. See Edge's logs |
 
 Set **Post Command** to `after-job.sh`.
 

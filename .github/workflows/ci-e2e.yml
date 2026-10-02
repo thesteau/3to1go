@@ -1,0 +1,63 @@
+name: "CI: End-to-end"
+
+# Builds both images and runs them against real databases, so it only runs on
+# the integration and release branches, not on every PR.
+on:
+  push:
+    branches: ["main", "prod"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# No concurrency group: GitHub keeps only one pending run per group, so queued
+# pushes would be skipped. Every push gets its own run, each on its own runner.
+
+jobs:
+  e2e:
+    # Not a required PR check, because PRs don't run it.
+    name: Edge to Central backup and recovery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Reuses layers cached by earlier runs and by the main-branch image builds.
+      - name: Build Central validation image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: central/Dockerfile
+          tags: 3to1go-central-validation
+          load: true
+          cache-from: |
+            type=gha,scope=e2e-central
+            type=gha,scope=central
+          cache-to: type=gha,mode=max,scope=e2e-central
+
+      - name: Build Edge validation image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: edge/Dockerfile
+          tags: 3to1go-edge-validation
+          load: true
+          cache-from: |
+            type=gha,scope=e2e-edge
+            type=gha,scope=edge
+          cache-to: type=gha,mode=max,scope=e2e-edge
+
+      - name: Run end-to-end test
+        env:
+          E2E_LOG_DIR: reports/e2e-logs
+        run: bash tests/integration/e2e.sh
+
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-container-logs
+          path: reports/e2e-logs/
+          if-no-files-found: ignore
+          retention-days: 14

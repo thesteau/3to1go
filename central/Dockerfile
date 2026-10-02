@@ -1,5 +1,5 @@
 # Compiles the TypeScript UI to the static/js directory the Go binary embeds.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:26-alpine AS web
 
 WORKDIR /build
 
@@ -11,7 +11,10 @@ COPY central/static/tsconfig.json ./central/static/
 COPY central/static/ts ./central/static/ts
 RUN npx tsc -p central/static
 
-FROM golang:1.26-alpine AS builder
+# Runs on the build machine and cross-compiles for each target platform. With
+# CGO off, Go needs no emulation, which is far faster than building on QEMU.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
+ARG TARGETOS TARGETARCH TARGETVARIANT
 
 WORKDIR /build
 
@@ -28,10 +31,12 @@ COPY shared/go ./shared/go
 COPY central ./central
 COPY --from=web /build/central/static/js ./central/static/js
 WORKDIR /build/central
+# TARGETVARIANT is v7 for 32-bit ARM, which Go spells GOARM=7.
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /3to1go-central ./cmd/server
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
+    go build -trimpath -ldflags="-s -w" -o /3to1go-central ./cmd/server
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates curl
 

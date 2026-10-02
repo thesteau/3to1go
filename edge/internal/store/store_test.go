@@ -3,286 +3,399 @@ package store
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/3to1go/edge/internal/config"
+	"github.com/3to1go/edge/internal/testutil"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func testDB(t *testing.T) *sql.DB {
+func testUserStore(t *testing.T) (*UserStore, sqlmock.Sqlmock) {
 	t.Helper()
-	db, err := Open(filepath.Join(t.TempDir(), "edge.db"))
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
+	db, mock := testutil.MockDB(t)
+	return NewUserStore(db), mock
 }
 
-func testUserStore(t *testing.T) (*UserStore, context.Context) {
+func userFixture(t *testing.T, id int, name, password string, admin, mustChange bool) *User {
 	t.Helper()
-	ctx := context.Background()
-	s := NewUserStore(testDB(t))
-	if err := s.EnsureSchema(ctx); err != nil {
-		t.Fatalf("EnsureSchema: %v", err)
+	hash, err := hashPassword(password)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return s, ctx
+	return &User{ID: id, Username: name, PasswordHash: hash, IsAdmin: admin, MustChangePassword: mustChange, CreatedAt: "2026-10-02T00:00:00Z"}
+}
+
+func userRows(users ...*User) *sqlmock.Rows {
+	rows := sqlmock.NewRows([]string{"id", "username", "password_hash", "is_admin", "must_change_password", "created_at"})
+	for _, u := range users {
+		admin, change := 0, 0
+		if u.IsAdmin {
+			admin = 1
+		}
+		if u.MustChangePassword {
+			change = 1
+		}
+		rows.AddRow(u.ID, u.Username, u.PasswordHash, admin, change, u.CreatedAt)
+	}
+	return rows
+}
+
+func expectGet(mock sqlmock.Sqlmock, id int, users ...*User) {
+	mock.ExpectQuery("FROM app_users WHERE id =").WithArgs(id).WillReturnRows(userRows(users...))
+}
+
+func expectList(mock sqlmock.Sqlmock, users ...*User) {
+	mock.ExpectQuery("FROM app_users ORDER BY").WillReturnRows(userRows(users...)).RowsWillBeClosed()
+}
+
+type passwordHashArg string
+
+func (p passwordHashArg) Match(value driver.Value) bool {
+	hash, ok := value.(string)
+	return ok && hash != string(p) && verifyPassword(string(p), hash)
+}
+
+type expiryArg struct{}
+
+func (expiryArg) Match(value driver.Value) bool {
+	raw, ok := value.(string)
+	if !ok {
+		return false
+	}
+	expiry, err := time.Parse(time.RFC3339, raw)
+	return err == nil && expiry.After(time.Now().UTC().Add(6*24*time.Hour)) && expiry.Before(time.Now().UTC().Add(8*24*time.Hour))
 }
 
 func TestOpenCreatesParentDirectory(t *testing.T) {
+	db, _ := testutil.MockDB(t)
 	path := filepath.Join(t.TempDir(), "nested", "edge.db")
-	db, err := Open(path)
-	if err != nil {
+	got, err := openWith(path, func(name, dsn string) (*sql.DB, error) {
+		if name != "sqlite" || dsn != path+"?_foreign_keys=on&_journal_mode=WAL" {
+			t.Fatalf("open: %s %s", name, dsn)
+		}
+		return db, nil
+	})
+	if err != nil || got != db {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
-	if err := db.Ping(); err != nil {
-		t.Fatalf("Ping: %v", err)
+	if _, err := os.Stat(filepath.Dir(path)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("mock created database file: %v", err)
+	}
+}
+
+func TestOpenErrors(t *testing.T) {
+	dbErr := errors.New("driver unavailable")
+	if _, err := openWith(filepath.Join(t.TempDir(), "edge.db"), func(string, string) (*sql.DB, error) { return nil, dbErr }); !errors.Is(err, dbErr) {
+		t.Fatalf("Open: %v", err)
+	}
+	parent := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(parent, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openWith(filepath.Join(parent, "edge.db"), func(string, string) (*sql.DB, error) { t.Fatal("opened driver after mkdir failed"); return nil, nil }); err == nil {
+		t.Fatal("expected directory error")
 	}
 }
 
 func TestSettingsStoreRoundTrip(t *testing.T) {
+	db, mock := testutil.MockDB(t)
+	s := NewSettingsStore(db)
 	ctx := context.Background()
-	store := NewSettingsStore(testDB(t))
-	if err := store.EnsureSchema(ctx); err != nil {
-		t.Fatalf("EnsureSchema: %v", err)
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_settings").WillReturnResult(sqlmock.NewResult(0, 0))
+	if err := s.EnsureSchema(ctx); err != nil {
+		t.Fatal(err)
 	}
-	got, err := store.Load(ctx)
-	if err != nil {
-		t.Fatalf("Load empty: %v", err)
+	mock.ExpectQuery("SELECT payload FROM app_settings").WillReturnRows(sqlmock.NewRows([]string{"payload"}))
+	if got, err := s.Load(ctx); err != nil || got != nil {
+		t.Fatalf("empty: %+v, %v", got, err)
 	}
-	if got != nil {
-		t.Fatalf("Load empty = %+v, want nil", got)
+	payload := &config.SettingsPayload{EdgeID: "edge-1", ScanRoot: "/data", CentralURL: "https://central.example", CronSchedule: "*/30 * * * *", UploadChunkSizeMB: 16, NtfyTopic: "backups"}
+	for _, name := range []string{"edge-1", "edge-2"} {
+		payload.EdgeID = name
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mock.ExpectExec("INSERT INTO app_settings").WithArgs(string(raw)).WillReturnResult(sqlmock.NewResult(1, 1))
+		if err := s.Save(ctx, payload); err != nil {
+			t.Fatal(err)
+		}
+		mock.ExpectQuery("SELECT payload FROM app_settings").WillReturnRows(sqlmock.NewRows([]string{"payload"}).AddRow(string(raw)))
+		if got, err := s.Load(ctx); err != nil || !reflect.DeepEqual(got, payload) {
+			t.Fatalf("Load: %+v, %v", got, err)
+		}
 	}
+}
 
-	payload := &config.SettingsPayload{
-		EdgeID:            "edge-1",
-		ScanRoot:          "/data",
-		CentralURL:        "https://central.example",
-		CronSchedule:      "*/30 * * * *",
-		UploadChunkSizeMB: 16,
-		NtfyTopic:         "backups",
+func TestSettingsStoreErrors(t *testing.T) {
+	db, mock := testutil.MockDB(t)
+	s := NewSettingsStore(db)
+	ctx := context.Background()
+	dbErr := errors.New("database unavailable")
+	mock.ExpectExec("CREATE TABLE").WillReturnError(dbErr)
+	if err := s.EnsureSchema(ctx); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	if err := store.Save(ctx, payload); err != nil {
-		t.Fatalf("Save: %v", err)
+	mock.ExpectExec("INSERT INTO app_settings").WillReturnError(dbErr)
+	if err := s.Save(ctx, &config.SettingsPayload{}); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	got, err = store.Load(ctx)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
+	mock.ExpectQuery("SELECT payload").WillReturnError(dbErr)
+	if _, err := s.Load(ctx); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	if got.EdgeID != payload.EdgeID || got.UploadChunkSizeMB != payload.UploadChunkSizeMB {
-		t.Fatalf("Load = %+v", got)
+	mock.ExpectQuery("SELECT payload").WillReturnRows(sqlmock.NewRows([]string{"payload"}).AddRow("invalid json"))
+	if _, err := s.Load(ctx); err == nil {
+		t.Fatal("expected JSON error")
 	}
+}
 
-	payload.EdgeID = "edge-2"
-	if err := store.Save(ctx, payload); err != nil {
-		t.Fatalf("Save replace: %v", err)
+func TestUserStoreEnsureSchema(t *testing.T) {
+	s, mock := testUserStore(t)
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_users").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_sessions").WillReturnResult(sqlmock.NewResult(0, 0))
+	if err := s.EnsureSchema(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	got, err = store.Load(ctx)
-	if err != nil {
-		t.Fatalf("Load replace: %v", err)
+	dbErr := errors.New("schema failed")
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_users").WillReturnError(dbErr)
+	if err := s.EnsureSchema(context.Background()); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	if got.EdgeID != "edge-2" {
-		t.Fatalf("EdgeID = %q", got.EdgeID)
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_users").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_sessions").WillReturnError(dbErr)
+	if err := s.EnsureSchema(context.Background()); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
 }
 
 func TestUserStoreDefaultAdminAndAuthentication(t *testing.T) {
-	store, ctx := testUserStore(t)
-	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
-		t.Fatalf("EnsureDefaultAdmin: %v", err)
+	s, mock := testUserStore(t)
+	ctx := context.Background()
+	admin := userFixture(t, BootstrapAdminID, DefaultAdminUsername, DefaultAdminPassword, true, false)
+	expectList(mock)
+	mock.ExpectExec("INSERT INTO app_users").WithArgs(DefaultAdminUsername, passwordHashArg(DefaultAdminPassword), 1).WillReturnResult(sqlmock.NewResult(BootstrapAdminID, 1))
+	expectGet(mock, admin.ID, admin)
+	expectGet(mock, admin.ID, admin)
+	mock.ExpectExec("UPDATE app_users").WithArgs(admin.Username, admin.PasswordHash, 1, 1, admin.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+	changed := *admin
+	changed.MustChangePassword = true
+	expectGet(mock, admin.ID, &changed)
+	if err := s.EnsureDefaultAdmin(ctx, ""); err != nil {
+		t.Fatal(err)
 	}
-	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
-		t.Fatalf("EnsureDefaultAdmin idempotent: %v", err)
+	expectList(mock, &changed)
+	if err := s.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
+		t.Fatal(err)
 	}
-	users, err := store.ListUsers(ctx)
-	if err != nil {
-		t.Fatalf("ListUsers: %v", err)
+	expectList(mock, &changed)
+	users, err := s.ListUsers(ctx)
+	if err != nil || len(users) != 1 || !users[0].IsAdmin || !users[0].IsBootstrapAdmin || !users[0].MustChangePassword {
+		t.Fatalf("users: %+v, %v", users, err)
 	}
-	if len(users) != 1 || users[0].Username != DefaultAdminUsername || !users[0].IsAdmin {
-		t.Fatalf("users = %+v", users)
+	mock.ExpectQuery("FROM app_users WHERE username =").WithArgs(admin.Username).WillReturnRows(userRows(&changed))
+	if got, err := s.Authenticate(ctx, admin.Username, DefaultAdminPassword); err != nil || got == nil {
+		t.Fatalf("auth: %+v, %v", got, err)
 	}
-	if !users[0].IsBootstrapAdmin || !users[0].MustChangePassword {
-		t.Fatalf("bootstrap flags not set: %+v", users[0])
-	}
-
-	auth, err := store.Authenticate(ctx, DefaultAdminUsername, DefaultAdminPassword)
-	if err != nil {
-		t.Fatalf("Authenticate: %v", err)
-	}
-	if auth == nil || auth.Username != DefaultAdminUsername {
-		t.Fatalf("Authenticate = %+v", auth)
-	}
-	if auth, err = store.Authenticate(ctx, DefaultAdminUsername, "wrong"); err != nil || auth != nil {
-		t.Fatalf("Authenticate wrong = %+v, %v", auth, err)
+	mock.ExpectQuery("FROM app_users WHERE username =").WithArgs(admin.Username).WillReturnRows(userRows(&changed))
+	if got, err := s.Authenticate(ctx, admin.Username, "wrong"); err != nil || got != nil {
+		t.Fatalf("wrong password: %+v, %v", got, err)
 	}
 }
 
 func TestUserStoreCreateUpdateDeleteAndSessions(t *testing.T) {
-	store, ctx := testUserStore(t)
-	admin, err := store.CreateUser(ctx, "AdminUser", "admin-pass", true)
-	if err != nil {
-		t.Fatalf("CreateUser admin: %v", err)
+	s, mock := testUserStore(t)
+	ctx := context.Background()
+	user := userFixture(t, 2, "backup.user", "user-pass", false, false)
+	admin := userFixture(t, 1, "adminuser", "admin-pass", true, false)
+	mock.ExpectExec("INSERT INTO app_users").WithArgs("backup.user", passwordHashArg("user-pass"), 0).WillReturnResult(sqlmock.NewResult(2, 1))
+	expectGet(mock, 2, user)
+	got, err := s.CreateUser(ctx, "  Backup.User  ", "user-pass", false)
+	if err != nil || got.Username != "backup.user" || got.IsAdmin {
+		t.Fatalf("create: %+v, %v", got, err)
 	}
-	user, err := store.CreateUser(ctx, "  Backup.User  ", "user-pass", false)
-	if err != nil {
-		t.Fatalf("CreateUser: %v", err)
-	}
-	if user.Username != "backup.user" || user.IsAdmin {
-		t.Fatalf("normalized user = %+v", user)
-	}
-	if _, err := store.CreateUser(ctx, "backup.user", "other-pass", false); err == nil {
-		t.Fatal("expected duplicate username error")
-	}
-
-	token, err := store.CreateSession(ctx, user.ID)
-	if err != nil {
-		t.Fatalf("CreateSession: %v", err)
-	}
-	sessionUser, err := store.UserForSession(ctx, token)
-	if err != nil {
-		t.Fatalf("UserForSession: %v", err)
-	}
-	if sessionUser == nil || sessionUser.ID != user.ID {
-		t.Fatalf("UserForSession = %+v", sessionUser)
-	}
-	if nilUser, err := store.UserForSession(ctx, ""); err != nil || nilUser != nil {
-		t.Fatalf("UserForSession empty = %+v, %v", nilUser, err)
+	mock.ExpectExec("INSERT INTO app_users").WillReturnError(errors.New("unique constraint"))
+	if _, err := s.CreateUser(ctx, "backup.user", "other-pass", false); err == nil {
+		t.Fatal("expected duplicate error")
 	}
 
-	newName := "operator"
-	newPassword := "operator-pass"
-	makeAdmin := true
-	mustChange := true
-	updated, err := store.UpdateUser(ctx, user.ID, &newName, &newPassword, &makeAdmin, &mustChange)
-	if err != nil {
-		t.Fatalf("UpdateUser: %v", err)
+	mock.ExpectExec("INSERT INTO app_sessions").WithArgs(sqlmock.AnyArg(), 2, expiryArg{}).WillReturnResult(sqlmock.NewResult(0, 1))
+	token, err := s.CreateSession(ctx, 2)
+	if err != nil || token == "" {
+		t.Fatalf("session: %q, %v", token, err)
 	}
-	if updated.Username != newName || !updated.IsAdmin || !updated.MustChangePassword {
-		t.Fatalf("updated = %+v", updated)
+	mock.ExpectExec("DELETE FROM app_sessions WHERE expires_at").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery("FROM app_sessions sess").WithArgs(token, sqlmock.AnyArg()).WillReturnRows(userRows(user))
+	if got, err := s.UserForSession(ctx, token); err != nil || got == nil || got.ID != 2 {
+		t.Fatalf("session user: %+v, %v", got, err)
 	}
-	if _, err := store.Authenticate(ctx, newName, newPassword); err != nil {
-		t.Fatalf("Authenticate updated: %v", err)
+	if got, err := s.UserForSession(ctx, ""); err != nil || got != nil {
+		t.Fatalf("empty session: %+v, %v", got, err)
 	}
 
+	next := userFixture(t, 2, "operator", "operator-pass", true, true)
+	expectGet(mock, 2, user)
+	mock.ExpectExec("UPDATE app_users").WithArgs("operator", passwordHashArg("operator-pass"), 1, 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	expectGet(mock, 2, next)
+	name, password, makeAdmin, mustChange := "operator", "operator-pass", true, true
+	if got, err := s.UpdateUser(ctx, 2, &name, &password, &makeAdmin, &mustChange); err != nil || got.Username != name || !got.IsAdmin || !got.MustChangePassword {
+		t.Fatalf("update: %+v, %v", got, err)
+	}
+	mock.ExpectQuery("FROM app_users WHERE username =").WithArgs(name).WillReturnRows(userRows(next))
+	if got, err := s.Authenticate(ctx, name, password); err != nil || got == nil {
+		t.Fatalf("updated auth: %+v, %v", got, err)
+	}
+
+	expectGet(mock, 2, next)
+	expectList(mock, admin, next)
+	mock.ExpectExec("UPDATE app_users").WithArgs(name, next.PasswordHash, 0, 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	demoted := *next
+	demoted.IsAdmin = false
+	expectGet(mock, 2, &demoted)
 	falseAdmin := false
-	if _, err := store.UpdateUser(ctx, user.ID, nil, nil, &falseAdmin, nil); err != nil {
-		t.Fatalf("demote second admin: %v", err)
+	if _, err := s.UpdateUser(ctx, 2, nil, nil, &falseAdmin, nil); err != nil {
+		t.Fatal(err)
 	}
-	if err := store.DeleteSession(ctx, token); err != nil {
-		t.Fatalf("DeleteSession: %v", err)
+	mock.ExpectExec("DELETE FROM app_sessions WHERE token =").WithArgs(token).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := s.DeleteSession(ctx, token); err != nil {
+		t.Fatal(err)
 	}
-	if got, err := store.UserForSession(ctx, token); err != nil || got != nil {
-		t.Fatalf("deleted session = %+v, %v", got, err)
+	mock.ExpectExec("DELETE FROM app_sessions WHERE expires_at").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery("FROM app_sessions sess").WithArgs(token, sqlmock.AnyArg()).WillReturnRows(userRows())
+	if got, err := s.UserForSession(ctx, token); err != nil || got != nil {
+		t.Fatalf("deleted session: %+v, %v", got, err)
 	}
-	if err := store.DeleteSessionsForUser(ctx, user.ID); err != nil {
-		t.Fatalf("DeleteSessionsForUser: %v", err)
+	mock.ExpectExec("DELETE FROM app_sessions WHERE user_id =").WithArgs(2).WillReturnResult(sqlmock.NewResult(0, 0))
+	if err := s.DeleteSessionsForUser(ctx, 2); err != nil {
+		t.Fatal(err)
 	}
-	if err := store.DeleteUser(ctx, user.ID); err != nil {
-		t.Fatalf("DeleteUser: %v", err)
+	expectGet(mock, 2, &demoted)
+	expectList(mock, admin, &demoted)
+	mock.ExpectExec("DELETE FROM app_sessions WHERE user_id =").WithArgs(2).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("DELETE FROM app_users WHERE id =").WithArgs(2).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := s.DeleteUser(ctx, 2); err != nil {
+		t.Fatal(err)
 	}
-	if got, err := store.GetUserByID(ctx, user.ID); err != nil || got != nil {
-		t.Fatalf("deleted user = %+v, %v", got, err)
-	}
-	if err := store.DeleteUser(ctx, admin.ID); err == nil {
-		t.Fatal("expected last-admin delete to fail")
+	expectGet(mock, 2)
+	if got, err := s.GetUserByID(ctx, 2); err != nil || got != nil {
+		t.Fatalf("deleted user: %+v, %v", got, err)
 	}
 }
 
 func TestUserStoreValidationAndProtection(t *testing.T) {
-	store, ctx := testUserStore(t)
-	if _, err := store.CreateUser(ctx, "ab", "valid-pass", false); err == nil {
-		t.Fatal("expected short username error")
+	s, mock := testUserStore(t)
+	ctx := context.Background()
+	for _, input := range []struct{ name, password string }{
+		{"ab", "valid-pass"}, {strings.Repeat("a", 65), "valid-pass"}, {"bad/name", "valid-pass"},
+		{"valid", "1234"}, {"valid", "     "}, {"admin", "valid-pass"},
+	} {
+		if _, err := s.CreateUser(ctx, input.name, input.password, false); err == nil {
+			t.Fatalf("accepted %q", input.name)
+		}
 	}
-	if _, err := store.CreateUser(ctx, strings.Repeat("a", 65), "valid-pass", false); err == nil {
-		t.Fatal("expected long username error")
+	admin := userFixture(t, 1, "admin", "valid-pass", true, false)
+	expectGet(mock, 1, admin)
+	if err := s.DeleteUser(ctx, 1); err == nil {
+		t.Fatal("deleted bootstrap admin")
 	}
-	if _, err := store.CreateUser(ctx, "bad/name", "valid-pass", false); err == nil {
-		t.Fatal("expected invalid username error")
+	expectGet(mock, 1, admin)
+	mock.ExpectExec("UPDATE app_users").WithArgs("admin", admin.PasswordHash, 1, 0, 1).WillReturnResult(sqlmock.NewResult(0, 1))
+	expectGet(mock, 1, admin)
+	falseAdmin := false
+	if got, err := s.UpdateUser(ctx, 1, nil, nil, &falseAdmin, nil); err != nil || !got.IsAdmin {
+		t.Fatalf("bootstrap demoted: %+v, %v", got, err)
 	}
-	if _, err := store.CreateUser(ctx, "valid", "1234", false); err == nil {
-		t.Fatal("expected short password error")
+	expectGet(mock, 9999)
+	if _, err := s.UpdateUser(ctx, 9999, nil, nil, nil, nil); err == nil {
+		t.Fatal("updated missing user")
 	}
-	if _, err := store.CreateUser(ctx, "valid", "     ", false); err == nil {
-		t.Fatal("expected blank password error")
+	expectGet(mock, 9999)
+	if err := s.DeleteUser(ctx, 9999); err == nil {
+		t.Fatal("deleted missing user")
 	}
 
-	if err := store.EnsureDefaultAdmin(ctx, DefaultAdminPassword); err != nil {
-		t.Fatalf("EnsureDefaultAdmin: %v", err)
+	last := userFixture(t, 2, "operator", "valid-pass", true, false)
+	expectGet(mock, 2, last)
+	expectList(mock, last)
+	if err := s.DeleteUser(ctx, 2); err == nil {
+		t.Fatal("deleted last admin")
 	}
-	if err := store.DeleteUser(ctx, BootstrapAdminID); err == nil {
-		t.Fatal("expected bootstrap delete to fail")
-	}
-	falseAdmin := false
-	if _, err := store.UpdateUser(ctx, BootstrapAdminID, nil, nil, &falseAdmin, nil); err != nil {
-		t.Fatalf("bootstrap remains admin update: %v", err)
-	}
-	got, err := store.GetUserByID(ctx, BootstrapAdminID)
-	if err != nil {
-		t.Fatalf("GetUserByID: %v", err)
-	}
-	if !got.IsAdmin {
-		t.Fatalf("bootstrap admin was demoted: %+v", got)
-	}
-	if _, err := store.UpdateUser(ctx, 9999, nil, nil, nil, nil); err == nil {
-		t.Fatal("expected missing update error")
-	}
-	if err := store.DeleteUser(ctx, 9999); err == nil {
-		t.Fatal("expected missing delete error")
+	expectGet(mock, 2, last)
+	expectList(mock, last)
+	if _, err := s.UpdateUser(ctx, 2, nil, nil, &falseAdmin, nil); err == nil {
+		t.Fatal("demoted last admin")
 	}
 }
 
 func TestUserStoreChangePasswordAndExpiredSession(t *testing.T) {
-	store, ctx := testUserStore(t)
-	user, err := store.CreateUser(ctx, "operator", "old-password", true)
-	if err != nil {
-		t.Fatalf("CreateUser: %v", err)
+	s, mock := testUserStore(t)
+	ctx := context.Background()
+	user := userFixture(t, 2, "operator", "old-password", true, true)
+	expectGet(mock, 2, user)
+	if _, err := s.ChangePassword(ctx, 2, "wrong-password", "new-password"); err == nil {
+		t.Fatal("accepted wrong password")
 	}
-	if _, err := store.ChangePassword(ctx, user.ID, "wrong-password", "new-password"); err == nil {
-		t.Fatal("expected current password error")
+	expectGet(mock, 2, user)
+	expectGet(mock, 2, user)
+	mock.ExpectExec("UPDATE app_users").WithArgs("operator", passwordHashArg("new-password"), 1, 0, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	updated := userFixture(t, 2, "operator", "new-password", true, false)
+	expectGet(mock, 2, updated)
+	if got, err := s.ChangePassword(ctx, 2, "old-password", "new-password"); err != nil || got.MustChangePassword {
+		t.Fatalf("password change: %+v, %v", got, err)
 	}
-	updated, err := store.ChangePassword(ctx, user.ID, "old-password", "new-password")
-	if err != nil {
-		t.Fatalf("ChangePassword: %v", err)
+	mock.ExpectQuery("FROM app_users WHERE username =").WithArgs("operator").WillReturnRows(userRows(updated))
+	if got, err := s.Authenticate(ctx, "operator", "new-password"); err != nil || got == nil {
+		t.Fatalf("new password: %+v, %v", got, err)
 	}
-	if updated.MustChangePassword {
-		t.Fatalf("MustChangePassword = true after explicit change")
+	mock.ExpectExec("DELETE FROM app_sessions WHERE expires_at").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("FROM app_sessions sess").WithArgs("expired-token", sqlmock.AnyArg()).WillReturnRows(userRows())
+	if got, err := s.UserForSession(ctx, "expired-token"); err != nil || got != nil {
+		t.Fatalf("expired: %+v, %v", got, err)
 	}
-	auth, err := store.Authenticate(ctx, user.Username, "new-password")
-	if err != nil {
-		t.Fatalf("Authenticate: %v", err)
-	}
-	if auth == nil {
-		t.Fatal("expected authenticated user")
-	}
+}
 
-	expired := "expired-token"
-	_, err = store.db.ExecContext(ctx,
-		`INSERT INTO app_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
-		expired, user.ID, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339))
-	if err != nil {
-		t.Fatalf("insert expired session: %v", err)
+func TestUserStoreLookupAndSessionErrors(t *testing.T) {
+	s, mock := testUserStore(t)
+	ctx := context.Background()
+	dbErr := errors.New("read failed")
+	mock.ExpectQuery("FROM app_users WHERE id =").WithArgs(2).WillReturnError(dbErr)
+	if _, err := s.GetUserByID(ctx, 2); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	got, err := store.UserForSession(ctx, expired)
-	if err != nil {
-		t.Fatalf("UserForSession expired: %v", err)
+	mock.ExpectQuery("FROM app_users ORDER BY").WillReturnError(dbErr)
+	if _, err := s.ListUsers(ctx); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
-	if got != nil {
-		t.Fatalf("expired session returned %+v", got)
+	mock.ExpectExec("INSERT INTO app_sessions").WillReturnError(dbErr)
+	if _, err := s.CreateSession(ctx, 2); !errors.Is(err, dbErr) {
+		t.Fatal(err)
+	}
+	if err := s.DeleteSession(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectExec("DELETE FROM app_sessions WHERE token").WillReturnError(dbErr)
+	if err := s.DeleteSession(ctx, "token"); !errors.Is(err, dbErr) {
+		t.Fatal(err)
+	}
+	mock.ExpectExec("DELETE FROM app_sessions WHERE user_id").WillReturnError(dbErr)
+	if err := s.DeleteSessionsForUser(ctx, 2); !errors.Is(err, dbErr) {
+		t.Fatal(err)
 	}
 }
 
 func TestPasswordHelpersRejectMalformedHashes(t *testing.T) {
-	for _, encoded := range []string{
-		"",
-		"plain",
-		"pbkdf2_sha1$1$00$00",
-		"pbkdf2_sha256$x$00$00",
-		"pbkdf2_sha256$1$zz$00",
-		"pbkdf2_sha256$1$00$zz",
-	} {
+	for _, encoded := range []string{"", "plain", "pbkdf2_sha1$1$00$00", "pbkdf2_sha256$x$00$00", "pbkdf2_sha256$1$zz$00", "pbkdf2_sha256$1$00$zz"} {
 		if verifyPassword("anything", encoded) {
 			t.Fatalf("verifyPassword accepted %q", encoded)
 		}

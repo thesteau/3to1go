@@ -1,5 +1,7 @@
 # Project decisions
 
+- Unit tests must mock database access; do not open real SQLite databases or connect to PostgreSQL in unit tests. Store tests mock SQL calls, and service tests use store mocks. Real databases belong in the Docker end-to-end tests under `tests/integration/`.
+
 - Backup change detection intentionally fingerprints sorted file paths and sizes, not file contents or timestamps. Same-size edits require a forced fresh backup. Do not recommend content hashing or describe the current fingerprint as content-based detection.
 - Restore intentionally replaces destination files. Do not recommend changing that overwrite behavior.
 - Every backup is a full, self-contained `tar.zst` archive of the job's included regular files; empty directories, special files, and the root `.upload_dir` marker are omitted. Do not recommend incremental backups, block-level deduplication, or delta chains.

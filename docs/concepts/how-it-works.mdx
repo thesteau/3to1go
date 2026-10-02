@@ -3,15 +3,13 @@ title: "How it works"
 description: "Follow a folder from its .upload_dir marker to a stored, encrypted snapshot."
 ---
 
-Edge and Central are separate apps with separate jobs. Edge does all the work that needs your plaintext files. Central only ever receives encrypted archives.
+Edge does all the work that needs your plaintext files. Central only receives encrypted archives.
 
-<Frame caption="Each Edge uploads independently to the same Central. The cloud copy is handled by an external tool.">
+<Frame caption="Each Edge uploads to the same Central. The cloud copy is made by an external tool.">
   <img src="/images/backup-layout.svg" alt="Edge 1 at 192.168.1.21:6556, Edge 2 at 192.168.1.22:6556, and Edge 3 at 192.168.1.23:6556 send backups to Central at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
 </Frame>
 
-The addresses above are examples: each machine has its own IP, so its Edge UI can use the same port, **6556**. All three Edges set their **Central URL** to the same receiver, shown here as `http://192.168.1.10:6555`. Use your own reachable address, with HTTPS when configured.
-
-The numbers count copies of each machine's data: **1** is its original files, **2** is Central's snapshots, and **3** is an independent copy made by an external sync tool. Central does not upload to cloud storage itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1) for how location and storage choices affect those copies.
+The addresses are examples. Each Edge sets its **Central URL** to the same Central, here `http://192.168.1.10:6555`. The numbers count copies of each machine's data. Central doesn't make the third copy itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
 
 | | Edge | Central |
 |---|---|---|
@@ -66,23 +64,13 @@ sequenceDiagram
     end
 ```
 
-## Identity: edge ID and instance ID
+## Edge ID and instance ID
 
-Every Edge has two identifiers:
-
-- **`EDGE_ID`** is a name you choose, such as `laptop-alice`. Central groups snapshots by it.
-- **Instance ID** is generated automatically on first run and saved in Edge's config directory. It keeps each installation separate, even if two machines were given the same `EDGE_ID` by mistake.
-
-Central stores snapshots under both, so two installations never write into the same place or prune each other's snapshots.
-
-<Tip>
-  Still give every Edge its own `EDGE_ID`. It is the name you'll see in Central's UI.
-</Tip>
+- **`EDGE_ID`** is a name you choose, such as `laptop-alice`. Central's UI groups snapshots by it, so give each Edge its own.
+- **Instance ID** is generated on first run and saved in Edge's config folder. It keeps installations separate even if two share an `EDGE_ID`, so they never overwrite or prune each other's snapshots.
 
 ## Where encryption happens
 
-Each Edge generates its own `encryption.key` on first run and encrypts every archive before upload. Central stores the encrypted blobs as-is.
+Each Edge generates its own `encryption.key` on first run and encrypts every archive before upload. Central stores them as-is.
 
-When you download a snapshot from Central's UI, the browser asks for that Edge's key and decrypts the file locally. The browser compares the key's fingerprint with the one Edge reported, so it can tell you if you pasted the wrong key before trying to decrypt. The key is never sent to Central's server.
-
-See [Encryption key](/edge/encryption-key) for how to find, back up, and rotate the key.
+When you download a snapshot in Central's UI, your browser asks for that Edge's key, checks it against the fingerprint Edge reported, and decrypts the file locally. The key is never sent to Central's server. See [Encryption key](/edge/encryption-key).

@@ -124,6 +124,7 @@ function renderSnapshots(edgeId: string, edgeInstanceId: string | null | undefin
           <span class="snapshot-date">${escapeHtml(date)}</span>
           ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
           ${isLatest ? '<span class="snapshot-latest-tag">latest</span>' : ""}
+          ${snap.unusual ? `<span class="snapshot-unusual-tag" tabindex="0" title="${escapeHtml(snap.unusual)}" aria-label="Unusual size: ${escapeHtml(snap.unusual)}">unusual size</span>` : ""}
         </div>
         <span class="snapshot-size">${escapeHtml(size)}</span>
         <div class="snapshot-actions">

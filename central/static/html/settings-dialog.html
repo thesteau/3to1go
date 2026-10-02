@@ -25,6 +25,13 @@
       <span class="hover-hint" tabindex="0" aria-label="When on, Central rejects new upload sessions with 503. In-progress uploads are not interrupted." title="When on, Central rejects new upload sessions with 503. In-progress uploads are not interrupted.">?</span>
     </button>
 
+    <label for="settings_anomaly_mode">Unusual uploads</label>
+    <select id="settings_anomaly_mode" data-requires="settings" disabled>
+      <option value="alert">Flag and alert</option>
+      <option value="off">Off</option>
+    </select>
+    <p class="hint">Central learns each job's usual archive size and flags uploads that are much smaller or larger, with an ntfy alert if notifications are set up.</p>
+
     <div class="split-row">
       <div>
         <label for="settings_retention_keep_last">Keep Last Snapshots</label>

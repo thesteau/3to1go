@@ -13,6 +13,7 @@ function fillSettings(settings: CentralSettings | null | undefined): void {
   (document.getElementById("settings_upload_cleanup_interval_seconds") as HTMLInputElement).value = String(data.upload_cleanup_interval_seconds ?? 300);
   (document.getElementById("settings_snapshot_verify_interval_hours") as HTMLInputElement).value = String(data.snapshot_verify_interval_hours ?? 0);
   setToggle("settings_uploads_paused", data.uploads_paused || false);
+  (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "alert";
 }
 
 function collectSettingsPayload(overrides: Partial<CentralSettings> = {}): CentralSettings {
@@ -26,6 +27,7 @@ function collectSettingsPayload(overrides: Partial<CentralSettings> = {}): Centr
     upload_cleanup_interval_seconds: Number((document.getElementById("settings_upload_cleanup_interval_seconds") as HTMLInputElement).value || 10),
     snapshot_verify_interval_hours: Number((document.getElementById("settings_snapshot_verify_interval_hours") as HTMLInputElement).value || 0),
     uploads_paused: getToggle("settings_uploads_paused"),
+    anomaly_mode: (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value,
     ntfy_url: window.__centralSettings?.ntfy_url || "",
     ntfy_topic: window.__centralSettings?.ntfy_topic || "",
     ntfy_message_template: window.__centralSettings?.ntfy_message_template || "",

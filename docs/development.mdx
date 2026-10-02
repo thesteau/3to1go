@@ -5,7 +5,7 @@ description: "Repository layout, local builds, running the tests, frontend gener
 
 Central and Edge are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
 
-Open normal development PRs against `main`, titled as Conventional Commits (`feat: …`, `fix: …`, `docs: …`). CI enforces this, and the title decides the next version; see [Releases](/releases#pr-titles-and-versions).
+Open normal development PRs against `main`, titled as Conventional Commits (`feat: …`, `fix: …`, `docs: …`). CI enforces this, and the title decides the next version. See [Releases](/releases#pr-titles-and-versions).
 
 ## Repository layout
 
@@ -41,34 +41,25 @@ Use `edge` in place of `central` to build Edge.
 
 ## Run the tests
 
-CI runs three test suites on every pull request. All of them can be run locally. Run every command from the repository root unless a step says otherwise.
-
-### Prerequisites
+CI runs the Go and frontend tests on every PR, and the end-to-end test after each push to `main` or `prod`, since it builds both Docker images. You can run all three locally from the repository root. Go unit tests mock database calls and use in-memory store mocks for service tests. They don't open SQLite databases or connect to PostgreSQL. The Docker end-to-end test starts its own real database.
 
 | Suite | Needs |
 |---|---|
-| Go unit tests | Go, Node.js 24, and `npm ci` (the servers embed the generated UI, so Go cannot compile without it) |
-| Frontend and release tests | Node.js 24, `npm ci`, and `git` on your `PATH` |
+| Go unit tests | Go, Node.js 24, and `npm ci` (Go embeds the generated UI) |
+| Frontend and release tests | Node.js 24, `npm ci`, and `git` |
 | End-to-end test | Docker, `bash`, `curl`, and `jq` |
 
-No database or other running service is needed for the unit or frontend tests.
-
 ### Go unit tests
-
-Generate the UI first, then test all three modules:
 
 ```sh
 npm run build
 go test ./shared/go/... ./central/... ./edge/...
-```
 
-To test one package, name it, and use `-run` to select tests by name:
-
-```sh
+# One package, filtered by test name
 go test ./edge/internal/services/directories/ -run ListChildren -v
 ```
 
-CI also passes `-race`. The race detector needs cgo, so add it locally only if you have a C compiler installed. On Windows, tests that need symlinks, POSIX permission bits, or `sh` are skipped and reported as `SKIP`. They still run in CI.
+CI also passes `-race`, which needs a C compiler. On Windows, tests that need symlinks, POSIX permissions, or `sh` report `SKIP`, but CI still runs them.
 
 ### Frontend and release tests
 
@@ -76,36 +67,29 @@ CI also passes `-race`. The race detector needs cgo, so add it locally only if y
 npm test
 ```
 
-`npm test` rebuilds both UIs and runs every `tests/**/*.test.cts` file with Node's built-in test runner. Test files are grouped by area:
+This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grouped by area:
 
 | Folder | Covers |
 |---|---|
-| `tests/edge/` | Edge UI features, such as the directory tree, file browser, and refresh loop |
-| `tests/central/` | Central UI features, such as the overview, saved encryption keys, and snapshot decryption |
-| `tests/shared/` | Behavior both UIs share, such as page script wiring and settings panels |
-| `tests/release/` | Release automation scripts and workflows |
-| `tests/ci/` | CI tooling, such as the HTML test report generator |
+| `tests/edge/` | Edge UI, such as the directory tree, file browser, and refresh loop |
+| `tests/central/` | Central UI, such as the overview, saved keys, and snapshot decryption |
+| `tests/shared/` | Behavior both UIs share |
+| `tests/release/` | Release scripts and workflows |
+| `tests/ci/` | CI tooling, such as the test report generator |
 
-The tests load the generated scripts from `*/static/js`. To run only some tests without rebuilding each time, run `npm run build` once, then call Node directly:
+To run some tests without rebuilding every time, run `npm run build` once (again after TypeScript changes), then:
 
 ```sh
-# One file
-node --test tests/edge/directory-tree.test.cts
-
-# One area
-node --test "tests/central/**/*.test.cts"
-
-# Tests whose name matches a pattern
-node --test --test-name-pattern="directory tree" "tests/**/*.test.cts"
+node --test tests/edge/directory-tree.test.cts                            # one file
+node --test "tests/central/**/*.test.cts"                                 # one area
+node --test --test-name-pattern="directory tree" "tests/**/*.test.cts"    # by name
 ```
 
-Quote glob patterns so Node expands them rather than your shell. Run `npm run build` again after changing TypeScript in `*/static/ts` or `shared/ts`.
-
-Name a new test file after the feature it covers, end it in `.test.cts`, and put it in the folder for its area so `npm test` picks it up.
+Quote globs so Node expands them, not your shell. Name new test files after their feature, end them in `.test.cts`, and put them in their area's folder.
 
 ### End-to-end test
 
-`tests/integration/e2e.sh` starts PostgreSQL, Central, and Edge in Docker, runs a backup, and recovers the snapshot from Central. It uses locally built images with fixed names, so build them first:
+`tests/integration/e2e.sh` runs PostgreSQL, Central, and Edge in Docker, takes a backup, and recovers it. Build the images it expects first:
 
 ```sh
 docker build -t 3to1go-central-validation -f central/Dockerfile .
@@ -113,52 +97,49 @@ docker build -t 3to1go-edge-validation -f edge/Dockerfile .
 bash tests/integration/e2e.sh
 ```
 
-The script publishes host ports `16555` and `16556`, so stop anything already using them. It removes its containers, network, and temporary files when it finishes. On Windows, run it from Git Bash or WSL with Docker Desktop running.
+It uses host ports `16555` and `16556` and cleans up after itself. On Windows, run it from Git Bash or WSL.
 
 ### Test reports
 
-`scripts/test-report.cts` turns test results into a self-contained HTML report. The report shows pass, fail, and skip counts, and each failure's output. It opens with failing suites expanded and only failures shown; untick **Show failures only** to see every test.
-
-`npm test` writes `reports/frontend-tests.html` on every run. For Go tests, record JSON results and convert them. Go's built-in coverage report is optional:
+`scripts/test-report.cts` turns results into a single HTML page with pass, fail, and skip counts and each failure's output. `npm test` writes `reports/frontend-tests.html`. For Go tests, convert the `go test -json` output. The coverage page is optional:
 
 ```sh
-mkdir -p reports
-cd edge
+mkdir -p reports && cd edge
 go test -json -coverprofile=../reports/edge-coverage.out ./... ../shared/go/... > ../reports/edge-go-tests.json
 node ../scripts/test-report.cts go "Edge Go tests" ../reports/edge-go-tests.json ../reports/edge-go-tests.html
 go tool cover -html=../reports/edge-coverage.out -o ../reports/edge-coverage.html
 ```
 
-The `reports/` folder is gitignored.
-
-In CI, each test job also writes a summary to its run page, listing failed tests, and uploads its reports as a run artifact, kept for 14 days:
+In CI, each test job writes a summary on its run page and uploads its reports as an artifact, kept for 14 days. Download it from **Artifacts** at the bottom of the run, unzip, and open the HTML file.
 
 | Artifact | Contents |
 |---|---|
 | `frontend-test-report` | `frontend-tests.html` |
-| `edge-test-report`, `central-test-report` | `<app>-go-tests.html`, the coverage report `<app>-coverage.html`, and the raw `go test -json` output |
-| `e2e-container-logs` | Full PostgreSQL, Central, and Edge logs, uploaded only when the end-to-end test fails |
+| `edge-test-report`, `central-test-report` | Test report, coverage report, and raw `go test -json` output |
+| `e2e-container-logs` | Container logs, only when the end-to-end test fails |
 
-To view one, open the workflow run on GitHub, download the artifact from the **Artifacts** section at the bottom of the run summary, unzip it, and open the HTML file in a browser.
+## Repository maintenance
+
+The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed. Go tests also run the default `go vet` checks.
+
+Dependabot opens weekly update PRs for Go dependencies, npm tools, GitHub Actions, and Dockerfile base images. These PRs use Conventional Commit titles and go through the usual CI and review. Dependabot isn't set up to merge them automatically. See [Dependabot configuration](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference) and [Go vulnerability management](https://go.dev/doc/security/vuln/) for details.
+
+Report vulnerabilities using the repository's [security policy](https://github.com/thesteau/3to1go/blob/main/SECURITY.md).
 
 ## Frontend sources and generated files
 
-Edit TypeScript in `central/static/ts`, `edge/static/ts`, or `shared/ts`. Each app compiles shared scripts with its own sources. These are classic scripts sharing one global scope per app; inline HTML handlers call their functions, so do not add `import` or `export`.
+Edit TypeScript in `central/static/ts`, `edge/static/ts`, or `shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
 
-The generated `central/static/js` and `edge/static/js` directories are embedded by Go. Generate them before `go build` or `go test`. After `npm ci`, either run `npm run build` at the root or `go generate ./...` from the relevant app directory.
+Go embeds the generated `central/static/js` and `edge/static/js`, so generate them before `go build` or `go test` with `npm run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
 
-Generated JavaScript is gitignored and dockerignored. Do not edit or commit it, JavaScript source maps, or other `.js`, `.mjs`, `.cjs`, or `.jsx` files. Frontend tests belong in TypeScript (`tests/**/*.test.cts`); CI rejects tracked JavaScript.
-
-For continuous compilation, use `npm run watch` for Central or `npm run watch:edge` for Edge. Rebuild and restart the Go server to serve updated embedded assets.
+For continuous compilation, use `npm run watch` (Central) or `npm run watch:edge` (Edge), then rebuild and restart the Go server to serve the new assets.
 
 ## Build with Docker Compose
 
-Use `central/docker-compose.yml` and `edge/docker-compose.yml` for builds from this checkout. Each uses the repository root as its Docker build context so shared code is included. The Dockerfiles compile the frontend in a Node stage before building Go.
-
-Copy the app's `.env.example` to `.env` and configure it as described in [Central installation](/central/install) or [Edge installation](/edge/install). Then, from that app's directory:
+`central/docker-compose.yml` and `edge/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Central installation](/central/install) or [Edge installation](/edge/install), then from that app's folder:
 
 ```sh
 docker compose up -d --build
 ```
 
-Use `deploy-example/` for published-image deployments instead. The same [multiple-folder mount instructions](/edge/multiple-folders) apply to either Edge Compose file.
+For published images, use `deploy-example/` instead.

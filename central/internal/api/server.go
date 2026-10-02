@@ -52,6 +52,7 @@ type snapIndexer interface {
 	GetEdgeRegistration(ctx context.Context, edgeID, instID string) (*store.EdgeRegistration, error)
 	DeleteEdgeRegistration(ctx context.Context, edgeID, instID string) error
 	DeleteInstanceEntries(ctx context.Context, edgeID, instID string) error
+	DeleteArchiveSizes(ctx context.Context, edgeID, instID string) error
 	HasNamespaceEntries(ctx context.Context, edgeID, instID string) (bool, error)
 	UpsertEdgeRegistration(ctx context.Context, r *store.EdgeRegistration) error
 	ListEdgeRegistrations(ctx context.Context, edgeIDFilter *string) ([]store.EdgeRegistration, error)

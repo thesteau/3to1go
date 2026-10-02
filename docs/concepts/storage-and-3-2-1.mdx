@@ -28,20 +28,15 @@ Copy Central's backup folder somewhere independent of Central. Where Central run
   Running Central offsite does **not** give you three copies on its own. If Central's disk fails at the same time as a machine, there's nothing else to restore from.
 </Warning>
 
-Because Central only holds encrypted archives, you can run it on hardware you don't fully control, and push its data to any storage without exposing your files.
+Central only holds encrypted archives, so it can run on hardware you don't fully control, and its folder can be copied anywhere without exposing your files.
 
 ## Where Central can store snapshots
 
-Central writes encrypted archive files into its backup folder (`/backups` inside the container, set by `BACKUP_DIR` in Compose). Storage is accessed through ordinary filesystem operations:
+Central writes ordinary files into its backup folder (`/backups` in the container, set by `BACKUP_DIR` in Compose). Any tool that can replicate a folder can make your third copy.
 
-- **Local disk.** The default. Fast and simple.
-- **Mounted NAS.** Mount it on the Docker host and give Central write access. Central handles moves across filesystems when the backup folder is on a different device from its staging directory.
-- **Removable hard drive.** Mount it and point `BACKUP_DIR` at it.
-- **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The desktop client replicates it to the cloud, and the provider only ever sees encrypted archives.
-- **Object storage.** Central has no native object-storage backend. Use an external tool to copy the local backup folder to your provider. If using a filesystem mount over object storage, verify that it supports Central's file writes, listing, renames, and deletion before relying on it.
+- **Local disk.** The default.
+- **Mounted NAS or removable drive.** Mount it on the Docker host, give Central write access, and point `BACKUP_DIR` at it.
+- **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The provider only sees encrypted archives.
+- **Object storage.** There's no native backend. Copy the backup folder with an external tool. If you use a filesystem mount over object storage instead, check that it supports writes, listing, renames, and deletion first.
 
-<Note>
-  Central is not a sync engine. It just writes files, so any tool that can replicate a directory can handle the rest.
-</Note>
-
-Keep Edge's encryption keys independently of these copies. To recover the Central service as well as the archives, also preserve its signing key and PostgreSQL database as described in [Install Central](/central/install#what-gets-created). A mirror can propagate retention deletions, so its history depends on the replication tool and destination's retention settings.
+Keep Edge's encryption keys separately from these copies. To recover Central itself, not just the archives, also keep its signing key and PostgreSQL database. See [Install Central](/central/install#what-gets-created). A mirror may also copy retention deletions, depending on the sync tool's settings.

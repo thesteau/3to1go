@@ -35,12 +35,12 @@ In Central, `POSTGRES_PASSWORD` is the database password, not your sign-in passw
 
 ## Accounts are for one operator
 
-Sign-in exists so one operator can manage the app and keep unauthorized entrants out. Both apps currently include account management and an admin flag, but they aren't designed for separate tenants or per-user ownership of backups.
+Sign-in is meant for one operator, to keep others out. Both apps have accounts and an admin flag, but no per-user ownership of backups.
 
 Click **Admin** in either app to open **Users & Access**:
 
 - Admins can add accounts, edit usernames, reset another account's password, assign admin access to other accounts, and remove other accounts.
-- Non-admin accounts can view their own account and edit their own username. Non-admin does not mean read-only access to the app.
+- Non-admin accounts can view their own account and edit their own username. A non-admin account isn't read-only.
 - The original admin account cannot be removed or lose admin access, and the `admin` username cannot be renamed. You cannot change your own admin access.
 
 An admin reset signs the target account out of its existing sessions and requires a password change. Creating an additional account with a non-default password does **not** automatically require a first-sign-in password change.
@@ -64,13 +64,13 @@ Open **Admin**, then **Change My Password**. Enter your current password and the
 
 The same dialog appears when a password change is required. Changing your own password keeps your existing sessions signed in.
 
-<Frame caption="Change My Password in Central; Edge provides the same fields.">
+<Frame caption="Change My Password in Central. Edge has the same fields.">
   <img src="/images/sign-in/central-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
 </Frame>
 
 ## Sessions and sign-out
 
-Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session; this does not sign out other browsers. Central and Edge use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
+Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session. Other browsers stay signed in. Central and Edge use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
 
 ## Session cookies over HTTPS
 
@@ -83,5 +83,5 @@ SESSION_COOKIE_SECURE=true
 Accepted "on" values are `1`, `true`, `yes`, and `on`. Anything else, or leaving it unset, keeps the cookie usable over plain HTTP.
 
 <Note>
-  Edge's settings dialog warns when its UI is served over plain HTTP. The UI connection and Edge's connection to Central are separate: use HTTPS for both the Edge UI and `CENTRAL_URL` to protect credentials on both connections.
+  Edge's settings dialog warns when its UI is served over plain HTTP. The UI and Edge's connection to Central are separate, so use HTTPS for both the Edge UI and `CENTRAL_URL` to protect credentials.
 </Note>

@@ -31,6 +31,14 @@
       <span class="hover-hint" tabindex="0" aria-label="When on, Edge skips all scheduled and manual backup cycles without stopping the scheduler." title="When on, Edge skips all scheduled and manual backup cycles without stopping the scheduler.">?</span>
     </button>
 
+    <label for="settings_anomaly_mode">Unusual backups</label>
+    <select id="settings_anomaly_mode" data-requires="settings" disabled>
+      <option value="hold">Hold for review and alert</option>
+      <option value="alert">Alert only</option>
+      <option value="off">Off</option>
+    </select>
+    <p class="hint">Edge learns each job's usual file count, size, file types, and compression. A backup that suddenly looks very different, such as a folder that emptied or files that ransomware encrypted, is held until you upload or clear it.</p>
+
     <label for="settings_edge_id">Edge ID</label>
     <input id="settings_edge_id" placeholder="edge-01" data-requires="settings" disabled>
     <p class="hint">Use the same Edge ID if you want Central to group multiple installations together. Central still keeps snapshots and registration metadata separated per instance.</p>

@@ -2,184 +2,234 @@ package state
 
 import (
 	"context"
-	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
-	_ "modernc.org/sqlite"
+	"github.com/3to1go/edge/internal/testutil"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func newTestStore(t *testing.T) *StateStore {
+func newTestStore(t *testing.T) (*StateStore, sqlmock.Sqlmock) {
 	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
+	db, mock := testutil.MockDB(t)
+	return NewStateStore(db), mock
+}
+
+func stateValues(key string, js JobState) []driver.Value {
+	var pending, chunk, size driver.Value
+	if js.PendingArchiveSize != nil {
+		pending = *js.PendingArchiveSize
 	}
-	db.SetMaxOpenConns(1)
-	s := NewStateStore(db)
+	if js.CurrentChunkSizeBytes != nil {
+		chunk = *js.CurrentChunkSizeBytes
+	}
+	if js.LastBackupSizeBytes != nil {
+		size = *js.LastBackupSizeBytes
+	}
+	return []driver.Value{
+		key, js.JobName, js.LastSuccessfulFingerprint, js.LastSuccessfulUpload,
+		js.PendingArchive, pending, js.PendingArchiveSHA256, js.PendingFingerprint,
+		js.PendingTimestamp, js.UploadID, js.UploadOffset, js.UploadAttemptCount,
+		chunk, js.NextRetryAt, js.LastErrorDetail, js.LastErrorCategory,
+		js.LastUploadStartedAt, js.LastUploadUpdatedAt, js.ActivePhase, js.ActivePhasePercent,
+		boolToInt(js.ManualInterventionRequired), js.LastStatus, js.LastStoredAs,
+		js.LastPruned, boolToInt(js.LastDuplicate), size,
+	}
+}
+
+func stateRows() *sqlmock.Rows {
+	return sqlmock.NewRows(strings.FieldsFunc(selectCols, func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\t' }))
+}
+
+func TestStateStore_EnsureSchema(t *testing.T) {
+	s, mock := newTestStore(t)
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_states").WillReturnResult(sqlmock.NewResult(0, 0))
 	if err := s.EnsureSchema(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	dbErr := errors.New("schema failed")
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_states").WillReturnError(dbErr)
+	if err := s.EnsureSchema(context.Background()); !errors.Is(err, dbErr) {
 		t.Fatalf("EnsureSchema: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
-	return s
 }
 
 func TestStateStore_GetMissingKey_ReturnsZeroValue(t *testing.T) {
-	s := newTestStore(t)
-	got := s.Get("/no/such/path")
-	if got.LastStatus != "" {
-		t.Errorf("expected zero-value JobState, got %+v", got)
+	s, mock := newTestStore(t)
+	mock.ExpectQuery("SELECT .* FROM job_states WHERE key =").WithArgs("missing").WillReturnRows(stateRows())
+	if got := s.Get("missing"); !reflect.DeepEqual(got, JobState{}) {
+		t.Fatalf("Get: %+v", got)
 	}
 }
 
 func TestStateStore_SetAndGet(t *testing.T) {
-	s := newTestStore(t)
-	st := JobState{LastStatus: "success", JobName: "photos"}
-	if err := s.Set("/data/photos", st); err != nil {
-		t.Fatalf("Set: %v", err)
+	s, mock := newTestStore(t)
+	value := int64(123)
+	st := JobState{
+		JobName: "photos", LastStatus: "success", LastSuccessfulFingerprint: "fingerprint",
+		LastSuccessfulUpload: "uploaded", PendingArchive: "/spool/photos.tar.zst",
+		PendingArchiveSize: &value, PendingArchiveSHA256: "sha256", PendingFingerprint: "pending",
+		PendingTimestamp: "timestamp", UploadID: "upload", UploadOffset: 12, UploadAttemptCount: 3,
+		CurrentChunkSizeBytes: &value, NextRetryAt: "retry", LastErrorDetail: "detail",
+		LastErrorCategory: "network", LastUploadStartedAt: "started", LastUploadUpdatedAt: "updated",
+		ActivePhase: "upload", ActivePhasePercent: 50, ManualInterventionRequired: true,
+		LastStoredAs: "stored", LastPruned: 2, LastDuplicate: true, LastBackupSizeBytes: &value,
 	}
-	got := s.Get("/data/photos")
-	if got.LastStatus != "success" {
-		t.Errorf("LastStatus = %q, want success", got.LastStatus)
+	mock.ExpectExec("INSERT INTO job_states").WithArgs(stateValues("photos", st)...).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := s.Set("photos", st); err != nil {
+		t.Fatal(err)
 	}
-	if got.JobName != "photos" {
-		t.Errorf("JobName = %q, want photos", got.JobName)
-	}
-}
-
-func TestStateStore_DeleteRemovesKey(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/photos", JobState{LastStatus: "success"})
-	if err := s.Delete("/data/photos"); err != nil {
-		t.Fatalf("Delete: %v", err)
-	}
-	got := s.Get("/data/photos")
-	if got.LastStatus != "" {
-		t.Errorf("expected zero-value after delete, got %+v", got)
+	mock.ExpectQuery("SELECT .* FROM job_states WHERE key =").WithArgs("photos").WillReturnRows(stateRows().AddRow(stateValues("photos", st)...))
+	if got := s.Get("photos"); !reflect.DeepEqual(got, st) {
+		t.Fatalf("Get: %+v, want %+v", got, st)
 	}
 }
 
-func TestStateStore_DeleteNonExistentKey_NoError(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.Delete("/no/such/path"); err != nil {
-		t.Errorf("Delete missing key should not error, got %v", err)
+func TestStateStore_GetNullSizes(t *testing.T) {
+	s, mock := newTestStore(t)
+	st := JobState{JobName: "photos"}
+	mock.ExpectQuery("SELECT .* FROM job_states WHERE key =").WithArgs("photos").WillReturnRows(stateRows().AddRow(stateValues("photos", st)...))
+	got := s.Get("photos")
+	if got.PendingArchiveSize != nil || got.CurrentChunkSizeBytes != nil || got.LastBackupSizeBytes != nil {
+		t.Fatalf("Get null sizes: %+v", got)
+	}
+}
+
+func TestStateStore_Delete(t *testing.T) {
+	for _, affected := range []int64{0, 1} {
+		s, mock := newTestStore(t)
+		mock.ExpectExec("DELETE FROM job_states WHERE key =").WithArgs("photos").WillReturnResult(sqlmock.NewResult(0, affected))
+		if err := s.Delete("photos"); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestStateStore_ReferencedPendingArchives(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/photos", JobState{PendingArchive: "/spool/photos.tar.zst"})
-	s.Set("/data/docs", JobState{PendingArchive: "/spool/docs.tar.zst"})
-	s.Set("/data/empty", JobState{})
-
-	refs := s.ReferencedPendingArchives()
-	if !refs["/spool/photos.tar.zst"] {
-		t.Error("expected /spool/photos.tar.zst in refs")
-	}
-	if !refs["/spool/docs.tar.zst"] {
-		t.Error("expected /spool/docs.tar.zst in refs")
-	}
-	if refs["/no/archive"] {
-		t.Error("expected /no/archive NOT in refs")
+	s, mock := newTestStore(t)
+	mock.ExpectQuery("SELECT pending_archive FROM job_states").WillReturnRows(sqlmock.NewRows([]string{"pending_archive"}).AddRow("/spool/photos.tar.zst").AddRow("/spool/docs.tar.zst").AddRow("")).RowsWillBeClosed()
+	want := map[string]bool{"/spool/photos.tar.zst": true, "/spool/docs.tar.zst": true}
+	if got := s.ReferencedPendingArchives(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("refs: %v", got)
 	}
 }
 
 func TestStateStore_Snapshot_ReturnsCopy(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/photos", JobState{LastStatus: "success"})
+	s, mock := newTestStore(t)
+	st := JobState{LastStatus: "success"}
+	mock.ExpectQuery("SELECT .* FROM job_states$").WillReturnRows(stateRows().AddRow(stateValues("photos", st)...)).RowsWillBeClosed()
 	snap := s.Snapshot()
-	if len(snap) != 1 {
-		t.Errorf("snapshot len = %d, want 1", len(snap))
+	if !reflect.DeepEqual(snap, map[string]JobState{"photos": st}) {
+		t.Fatalf("Snapshot: %+v", snap)
 	}
-	// Mutating the snapshot map should not affect the store.
-	delete(snap, "/data/photos")
-	got := s.Get("/data/photos")
-	if got.LastStatus != "success" {
-		t.Error("snapshot mutation affected the store")
+	delete(snap, "photos")
+	mock.ExpectQuery("SELECT .* FROM job_states WHERE key =").WithArgs("photos").WillReturnRows(stateRows().AddRow(stateValues("photos", st)...))
+	if got := s.Get("photos"); got.LastStatus != "success" {
+		t.Fatalf("Get after snapshot mutation: %+v", got)
 	}
 }
 
 func TestStateStore_ClearManualInterventions(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/a", JobState{ManualInterventionRequired: true, LastStatus: "manual_intervention_required"})
-	s.Set("/data/b", JobState{ManualInterventionRequired: true, LastStatus: "manual_intervention_required"})
-	s.Set("/data/c", JobState{ManualInterventionRequired: false, LastStatus: "success"})
+	s, mock := newTestStore(t)
+	mock.ExpectExec("UPDATE job_states .*WHERE manual_intervention_required = 1").WillReturnResult(sqlmock.NewResult(0, 2))
+	if count, err := s.ClearManualInterventions(); err != nil || count != 2 {
+		t.Fatalf("clear: %d, %v", count, err)
+	}
+}
 
-	count, err := s.ClearManualInterventions()
-	if err != nil {
-		t.Fatalf("ClearManualInterventions: %v", err)
-	}
-	if count != 2 {
-		t.Errorf("cleared = %d, want 2", count)
-	}
-	for _, key := range []string{"/data/a", "/data/b"} {
-		st := s.Get(key)
-		if st.ManualInterventionRequired {
-			t.Errorf("%s: ManualInterventionRequired should be false after clear", key)
-		}
-		if st.LastStatus != "manual_retry_requested" {
-			t.Errorf("%s: LastStatus = %q, want manual_retry_requested", key, st.LastStatus)
+func TestStateStore_ClearManualIntervention(t *testing.T) {
+	for _, affected := range []int64{0, 1} {
+		s, mock := newTestStore(t)
+		mock.ExpectExec("UPDATE job_states .*WHERE key =").WithArgs("photos").WillReturnResult(sqlmock.NewResult(0, affected))
+		if cleared, err := s.ClearManualIntervention("photos"); err != nil || cleared != (affected == 1) {
+			t.Fatalf("clear: %v, %v", cleared, err)
 		}
 	}
 }
 
-func TestStateStore_ClearManualIntervention_Single(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/a", JobState{ManualInterventionRequired: true})
-
-	cleared, err := s.ClearManualIntervention("/data/a")
-	if err != nil {
-		t.Fatalf("ClearManualIntervention: %v", err)
-	}
-	if !cleared {
-		t.Error("expected cleared=true")
-	}
-	st := s.Get("/data/a")
-	if st.ManualInterventionRequired {
-		t.Error("ManualInterventionRequired should be false")
-	}
-}
-
-func TestStateStore_ClearManualIntervention_NotPending(t *testing.T) {
-	s := newTestStore(t)
-	s.Set("/data/a", JobState{ManualInterventionRequired: false})
-	cleared, err := s.ClearManualIntervention("/data/a")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cleared {
-		t.Error("expected cleared=false for non-pending job")
+func TestStateStore_ReportsReadErrors(t *testing.T) {
+	for _, operation := range []string{"get", "snapshot", "archives"} {
+		t.Run(operation, func(t *testing.T) {
+			s, mock := newTestStore(t)
+			dbErr := errors.New("read failed")
+			var reported error
+			s.SetErrorHandler(func(err error) { reported = err })
+			mock.ExpectQuery("SELECT").WillReturnError(dbErr)
+			switch operation {
+			case "get":
+				s.Get("photos")
+			case "snapshot":
+				s.Snapshot()
+			case "archives":
+				s.ReferencedPendingArchives()
+			}
+			if !errors.Is(reported, dbErr) {
+				t.Fatalf("reported: %v", reported)
+			}
+		})
 	}
 }
 
-func TestStateStore_PersistenceAcrossReload(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "test.db")
+func TestStateStore_WriteErrors(t *testing.T) {
+	for _, operation := range []string{"set", "delete", "clear_all", "clear_one"} {
+		t.Run(operation, func(t *testing.T) {
+			s, mock := newTestStore(t)
+			dbErr := errors.New("write failed")
+			mock.ExpectExec("INSERT|DELETE|UPDATE").WillReturnError(dbErr)
+			var err error
+			switch operation {
+			case "set":
+				err = s.Set("photos", JobState{})
+			case "delete":
+				err = s.Delete("photos")
+			case "clear_all":
+				_, err = s.ClearManualInterventions()
+			case "clear_one":
+				_, err = s.ClearManualIntervention("photos")
+			}
+			if !errors.Is(err, dbErr) {
+				t.Fatalf("error: %v", err)
+			}
+		})
+	}
+}
 
-	db1, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf("open db1: %v", err)
+func TestStateStore_MigrateFromFile(t *testing.T) {
+	s, mock := newTestStore(t)
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, []byte(`{"photos":{"job_name":"photos","last_status":"success"}}`), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	db1.SetMaxOpenConns(1)
-	s1 := NewStateStore(db1)
-	if err := s1.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("EnsureSchema: %v", err)
+	st := JobState{JobName: "photos", LastStatus: "success"}
+	mock.ExpectExec("INSERT INTO job_states").WithArgs(stateValues("photos", st)...).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := s.MigrateFromFile(path); err != nil {
+		t.Fatal(err)
 	}
-	s1.Set("/data/photos", JobState{LastStatus: "success", JobName: "photos"})
-	db1.Close()
+	if _, err := os.Stat(path + ".migrated"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MigrateFromFile(path); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	db2, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf("open db2: %v", err)
+func TestStateStore_MigrateFromFileRetainsSourceOnWriteError(t *testing.T) {
+	s, mock := newTestStore(t)
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, []byte(`{"photos":{}}`), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	db2.SetMaxOpenConns(1)
-	defer db2.Close()
-	s2 := NewStateStore(db2)
-
-	got := s2.Get("/data/photos")
-	if got.LastStatus != "success" {
-		t.Errorf("after reload: LastStatus = %q, want success", got.LastStatus)
+	dbErr := errors.New("write failed")
+	mock.ExpectExec("INSERT INTO job_states").WillReturnError(dbErr)
+	if err := s.MigrateFromFile(path); !errors.Is(err, dbErr) {
+		t.Fatalf("migration: %v", err)
 	}
-	if got.JobName != "photos" {
-		t.Errorf("after reload: JobName = %q, want photos", got.JobName)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
 	}
 }
