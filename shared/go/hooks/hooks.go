@@ -36,7 +36,8 @@ type HookFileInfo struct {
 }
 
 func NewHookManager(app, scriptsDir string, logger *slog.Logger) *HookManager {
-	os.MkdirAll(scriptsDir, 0o755)
+	// Best effort: saving a hook file reports the error if the directory is still missing.
+	_ = os.MkdirAll(scriptsDir, 0o755)
 	var waitDelay time.Duration
 	// Preserve Edge's bound on waiting for subprocess output pipes.
 	if app == "edge" {
@@ -61,7 +62,7 @@ func (h *HookManager) Snapshot(preCommand, postCommand string) map[string]any {
 }
 
 func (h *HookManager) ListFiles() []HookFileInfo {
-	os.MkdirAll(h.ScriptsDir, 0o755)
+	_ = os.MkdirAll(h.ScriptsDir, 0o755)
 	entries, _ := os.ReadDir(h.ScriptsDir)
 	var files []HookFileInfo
 	for _, e := range entries {
@@ -106,7 +107,9 @@ func (h *HookManager) SaveUploadedFile(filename string, content []byte) (HookFil
 	}
 	if ext == ".sh" {
 		if info, err := os.Stat(target); err == nil {
-			os.Chmod(target, info.Mode()|0o700)
+			if err := os.Chmod(target, info.Mode()|0o700); err != nil {
+				return HookFileInfo{}, err
+			}
 		}
 	}
 	info, err := os.Stat(target)

@@ -325,8 +325,12 @@ func buildMultipart(t *testing.T, fieldName, filename string, content []byte) (i
 	if err != nil {
 		t.Fatalf("create form file: %v", err)
 	}
-	fw.Write(content)
-	w.Close()
+	if _, err := fw.Write(content); err != nil {
+		t.Fatalf("write form file: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
 	return &buf, w.FormDataContentType()
 }
 

@@ -1,0 +1,3 @@
+ignored:
+  # Alpine drops old package versions from its mirrors, so pinned apk versions break rebuilds.
+  - DL3018

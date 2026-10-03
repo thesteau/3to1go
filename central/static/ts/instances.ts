@@ -1,4 +1,8 @@
-function renderKeyManager(ns: { edge_id: string; edge_instance_id: string; encryption_key_fingerprint?: string }): string {
+function renderKeyManager(ns: {
+  edge_id: string;
+  edge_instance_id: string;
+  encryption_key_fingerprint?: string;
+}): string {
   const edgeId = ns.edge_id;
   const edgeInstanceId = ns.edge_instance_id;
   const edgeKeyId = buildEdgeKeyId(edgeId, edgeInstanceId);
@@ -24,9 +28,11 @@ function renderKeyManager(ns: { edge_id: string; edge_instance_id: string; encry
 
 function renderInstanceMeta(instance: EdgeInstance): string {
   return `
-    ${instance.advertised_url
-      ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
-      : '<span class="edge-detail edge-detail-muted">No URL set</span>'}
+    ${
+      instance.advertised_url
+        ? renderLinkValue("Edge URL", instance.advertised_url, { className: "edge-detail", clipLength: 28 })
+        : '<span class="edge-detail edge-detail-muted">No URL set</span>'
+    }
   `;
 }
 
@@ -36,9 +42,10 @@ function renderInstanceCard(edgeId: string, instance: EdgeInstance): string {
   const deleteBtn = instanceId
     ? `<button class="btn btn-del btn-del-instance" type="button" onclick="deleteInstance(${inlineString(edgeId)},${inlineString(instanceId)},this)">Delete Instance</button>`
     : "";
-  const revokeBtn = instanceId && instance.credential_configured
-    ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential(${inlineString(edgeId)},${inlineString(instanceId)},this)">Revoke Token</button>`
-    : "";
+  const revokeBtn =
+    instanceId && instance.credential_configured
+      ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential(${inlineString(edgeId)},${inlineString(instanceId)},this)">Revoke Token</button>`
+      : "";
   return `
     <section class="instance-card" data-instance-id="${escapeHtml(instanceId || "_legacy")}">
       <div class="instance-head">
@@ -54,7 +61,10 @@ function renderInstanceCard(edgeId: string, instance: EdgeInstance): string {
       </div>
       ${instance.last_upload_tls === false ? '<p class="instance-http-warning">Last upload from this Edge arrived over plain HTTP. Credentials were not encrypted in transit.</p>' : ""}
       ${instance.edge_instance_id ? renderKeyManager({ edge_id: edgeId, edge_instance_id: instance.edge_instance_id, encryption_key_fingerprint: instance.encryption_key_fingerprint }) : ""}
-      ${jobs.map((job) => `
+      ${
+        jobs
+          .map(
+            (job) => `
         <div class="job-block">
           <div class="job-header">
             <div class="job-header-main">
@@ -66,33 +76,44 @@ function renderInstanceCard(edgeId: string, instance: EdgeInstance): string {
             ${renderSnapshots(edgeId, instance.edge_instance_id, job.job_name, job.snapshots || [])}
           </div>
         </div>
-      `).join("") || '<p class="no-snapshots">No jobs stored yet.</p>'}
+      `,
+          )
+          .join("") || '<p class="no-snapshots">No jobs stored yet.</p>'
+      }
     </section>
   `;
 }
 
 async function revokeInstanceCredential(edgeId: string, edgeInstanceId: string, btn: HTMLButtonElement): Promise<void> {
   const label = edgeInstanceId || "this instance";
-  if (!await confirmApp({
-    title: "Revoke Token",
-    message: `Revoke the Edge credential used by "${label}"? Any other instances using the same token will stop authenticating too.`,
-    confirmLabel: "Revoke Token",
-    danger: true,
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Revoke Token",
+      message: `Revoke the Edge credential used by "${label}"? Any other instances using the same token will stop authenticating too.`,
+      confirmLabel: "Revoke Token",
+      danger: true,
+    }))
+  ) {
     return;
   }
   const restore = setButtonBusy(btn, "Revoking…");
   try {
-    const response = await fetch(`/api/credentials/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `/api/credentials/instances/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}`,
+      {
+        method: "DELETE",
+      },
+    );
     const body = await readJson<RevokeCredentialResponse>(response);
     if (!response.ok) {
       setActionStatus(body.detail || "Revoke failed.", "error");
       return;
     }
     const affected = body.affected_instances || [];
-    setActionStatus(`Revoked token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`, "success");
+    setActionStatus(
+      `Revoked token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`,
+      "success",
+    );
     await loadOverview({ silent: true, force: true });
   } catch (error) {
     setActionStatus((error as Error).message || "Revoke failed.", "error");
@@ -103,12 +124,14 @@ async function revokeInstanceCredential(edgeId: string, edgeInstanceId: string, 
 
 async function deleteInstance(edgeId: string, edgeInstanceId: string, btn: HTMLButtonElement): Promise<void> {
   const label = edgeInstanceId || "this instance";
-  if (!await confirmApp({
-    title: "Delete Instance",
-    message: `Delete all snapshots for instance "${label}" under edge "${edgeId}"? This permanently removes all backup files for this instance and cannot be undone.`,
-    confirmLabel: "Delete Instance",
-    danger: true,
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Delete Instance",
+      message: `Delete all snapshots for instance "${label}" under edge "${edgeId}"? This permanently removes all backup files for this instance and cannot be undone.`,
+      confirmLabel: "Delete Instance",
+      danger: true,
+    }))
+  ) {
     return;
   }
   const restore = setButtonBusy(btn, "Deleting…");
@@ -119,12 +142,14 @@ async function deleteInstance(edgeId: string, edgeInstanceId: string, btn: HTMLB
       const body: InstanceDeleteResponse = await res.json().catch(() => ({}));
       const detail = body.detail || {};
       if (res.status === 409 && typeof detail === "object" && detail.cleanup_available) {
-        if (!await confirmApp({
-          title: "Remove Stale Instance",
-          message: `Central could not find backup files for instance "${label}". Remove this stale instance entry from the UI?`,
-          confirmLabel: "Remove Entry",
-          danger: true,
-        })) {
+        if (
+          !(await confirmApp({
+            title: "Remove Stale Instance",
+            message: `Central could not find backup files for instance "${label}". Remove this stale instance entry from the UI?`,
+            confirmLabel: "Remove Entry",
+            danger: true,
+          }))
+        ) {
           setActionStatus("Cleanup cancelled.", "info");
           return;
         }
@@ -132,7 +157,10 @@ async function deleteInstance(edgeId: string, edgeInstanceId: string, btn: HTMLB
         if (!cleanupRes.ok) {
           const cleanupBody: InstanceDeleteResponse = await cleanupRes.json().catch(() => ({}));
           const cleanupDetail = cleanupBody.detail;
-          setActionStatus((typeof cleanupDetail === "string" ? cleanupDetail : cleanupDetail?.message) || "Cleanup failed.", "error");
+          setActionStatus(
+            (typeof cleanupDetail === "string" ? cleanupDetail : cleanupDetail?.message) || "Cleanup failed.",
+            "error",
+          );
           return;
         }
         setActionStatus(`Removed stale instance entry ${label}.`, "success");

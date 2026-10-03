@@ -214,7 +214,7 @@ func (r *EdgeRunner) prepareJob(job *backup.JobDefinition, settings *config.Sett
 		s.LastErrorCategory = "unexpected"
 		s.LastErrorDetail = err.Error()
 		s.LastUploadUpdatedAt = utcNow()
-		r.StateStore.Set(job.RootPath, s)
+		r.saveState(job, s)
 		r.finishJob(job, settings)
 		unlock()
 		return
@@ -288,7 +288,7 @@ func (r *EdgeRunner) ForceSendJob(ctx context.Context, jobName string) (map[stri
 		s.ManualInterventionRequired = false
 		s.NextRetryAt = ""
 		s.LastStatus = "manual_retry_requested"
-		r.StateStore.Set(job.RootPath, s)
+		r.saveState(job, s)
 	}
 	r.processJobLocked(job, &s, settings, true)
 
@@ -322,7 +322,7 @@ func (r *EdgeRunner) StartForceSendAsync(relativePath string) (map[string]any, e
 		s.ManualInterventionRequired = false
 		s.NextRetryAt = ""
 		s.LastStatus = "manual_retry_requested"
-		r.StateStore.Set(job.RootPath, s)
+		r.saveState(job, s)
 	}
 
 	go func() {
@@ -489,7 +489,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	r.setActivePhase(job, s, "scanning", 5)
 	s.LastErrorDetail = ""
 	s.LastErrorCategory = ""
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 
 	files, err := backup.BuildFileListContext(r.operationContext(), job, func(format string, args ...any) {
 		r.logger.Warn(fmt.Sprintf(format, args...))
@@ -501,7 +501,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 		r.clearPendingArchive(s)
 		s.LastStatus = "skipped_empty"
 		s.ManualInterventionRequired = false
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		r.logger.Info("skipped_empty", "job_name", job.JobName, "path", job.RootPath)
 		return false, nil
 	}
@@ -510,10 +510,12 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	if !forceSend && fingerprint == s.LastSuccessfulFingerprint {
 		// Back to the last uploaded state, so any held archive is moot.
 		r.clearPendingArchive(s)
-		r.Anomalies.ClearPending(job.RootPath)
+		if err := r.Anomalies.ClearPending(job.RootPath); err != nil {
+			r.logger.Warn("anomaly_history_failed", "job_name", job.JobName, "error", err)
+		}
 		s.LastStatus = "skipped_unchanged"
 		s.ManualInterventionRequired = false
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		r.logger.Info("skipped_unchanged", "job_name", job.JobName, "fingerprint", fingerprint[:8])
 		return false, nil
 	}
@@ -526,7 +528,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 				s.LastErrorCategory = unusualBackupCategory
 				s.LastErrorDetail = heldDetail
 			}
-			r.StateStore.Set(job.RootPath, *s)
+			r.saveState(job, *s)
 			r.logger.Warn("manual_intervention_required",
 				"job_name", job.JobName,
 				"archive", filepath.Base(s.PendingArchive),
@@ -548,7 +550,7 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 	}
 	sha256sum, err := sha256FileContext(r.operationContext(), archivePath)
 	if err != nil {
-		os.Remove(archivePath)
+		r.removeSpoolFile(archivePath)
 		return false, err
 	}
 
@@ -587,10 +589,10 @@ func (r *EdgeRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.Jo
 		s.ActivePhasePercent = 0
 		s.LastUploadUpdatedAt = utcNow()
 	}
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 
 	if prevPending != "" && prevPending != archivePath {
-		os.Remove(prevPending)
+		r.removeSpoolFile(prevPending)
 	}
 	// Alert only once the outcome is saved, so a restart can't lose a hold.
 	if review != nil {
@@ -649,19 +651,19 @@ func (r *EdgeRunner) createPendingArchive(job *backup.JobDefinition, files []*ba
 
 	r.setActivePhase(job, s, "compressing", 18)
 	if err := backup.CreateArchiveContext(r.operationContext(), archivePath, files); err != nil {
-		os.Remove(archivePath)
+		r.removeSpoolFile(archivePath)
 		return "", "", err
 	}
 
 	r.setActivePhase(job, s, "encrypting", 40)
 	tmpPath := archivePath + ".enc.tmp"
 	if err := encryption.EncryptFileContext(r.operationContext(), r.encKey, archivePath, tmpPath); err != nil {
-		os.Remove(archivePath)
+		r.removeSpoolFile(archivePath)
 		return "", "", err
 	}
-	os.Remove(archivePath)
+	r.removeSpoolFile(archivePath)
 	if err := os.Rename(tmpPath, archivePath); err != nil {
-		os.Remove(tmpPath)
+		r.removeSpoolFile(tmpPath)
 		return "", "", err
 	}
 
@@ -679,7 +681,7 @@ func (r *EdgeRunner) checkRetry(job *backup.JobDefinition, s *state.JobState) st
 	if s.PendingArchive == "" {
 		if retryAt != nil && retryAt.After(time.Now().UTC()) {
 			s.LastStatus = "waiting_retry"
-			r.StateStore.Set(job.RootPath, *s)
+			r.saveState(job, *s)
 			r.logger.Info("waiting_retry", "job_name", job.JobName, "archive", "rebuild_required", "retry_at", s.NextRetryAt)
 			return "waiting"
 		}
@@ -689,14 +691,14 @@ func (r *EdgeRunner) checkRetry(job *backup.JobDefinition, s *state.JobState) st
 	if _, err := os.Stat(s.PendingArchive); os.IsNotExist(err) {
 		r.clearPendingArchive(s)
 		s.LastStatus = "skipped_missing"
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		r.logger.Warn("skipped_missing", "job_name", job.JobName, "pending_archive", s.PendingArchive)
 		return "none"
 	}
 
 	if retryAt != nil && retryAt.After(time.Now().UTC()) {
 		s.LastStatus = "waiting_retry"
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		r.logger.Info("waiting_retry", "job_name", job.JobName, "archive", filepath.Base(s.PendingArchive), "retry_at", s.NextRetryAt)
 		return "waiting"
 	}
@@ -711,7 +713,7 @@ func (r *EdgeRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSta
 			s.NextRetryAt = ""
 			s.ManualInterventionRequired = false
 			s.LastStatus = "force_send_requested"
-			r.StateStore.Set(job.RootPath, *s)
+			r.saveState(job, *s)
 			r.logger.Info("force_send_pending", "job_name", job.JobName, "archive", filepath.Base(s.PendingArchive))
 			r.uploadPendingArchive(job, s, settings)
 			return
@@ -731,7 +733,7 @@ func (r *EdgeRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSta
 		s.LastErrorCategory = "unexpected"
 		s.LastErrorDetail = err.Error()
 		s.LastUploadUpdatedAt = utcNow()
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		return
 	}
 	if ready {
@@ -750,7 +752,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	if _, err := os.Stat(s.PendingArchive); os.IsNotExist(err) {
 		r.clearPendingArchive(s)
 		s.LastStatus = "skipped_missing"
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		return false
 	}
 
@@ -781,7 +783,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	s.LastUploadUpdatedAt = now
 	s.NextRetryAt = ""
 	s.ManualInterventionRequired = false
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 
 	var preferredChunk int64
 	if s.CurrentChunkSizeBytes != nil {
@@ -797,7 +799,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 		s.ActivePhase = "uploading"
 		s.ActivePhasePercent = uploadPhasePercent(offset, s.PendingArchiveSize)
 		s.LastStatus = "uploading"
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 	}
 
 	result, err := r.UploadClient.UploadArchive(
@@ -805,7 +807,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 		settings.EdgeID, jobName,
 		s.PendingFingerprint, s.PendingTimestamp,
 		s.PendingArchive, s.PendingArchiveSHA256,
-		s.UploadID, s.UploadOffset, preferredChunk,
+		s.UploadOffset, preferredChunk,
 		progress,
 	)
 
@@ -853,11 +855,11 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 			}
 		}
 		s.LastUploadUpdatedAt = utcNow()
-		r.StateStore.Set(job.RootPath, *s)
+		r.saveState(job, *s)
 		return false
 	}
 
-	os.Remove(s.PendingArchive)
+	r.removeSpoolFile(s.PendingArchive)
 	s.LastSuccessfulFingerprint = s.PendingFingerprint
 	s.LastSuccessfulUpload = s.PendingTimestamp
 	s.LastErrorDetail = ""
@@ -875,7 +877,7 @@ func (r *EdgeRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.Jo
 	}
 	r.clearPendingArchive(s)
 	s.LastUploadUpdatedAt = utcNow()
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 	// The uploaded backup, including one the operator approved, is now "normal".
 	if err := r.Anomalies.Accept(job.RootPath); err != nil {
 		r.logger.Warn("anomaly_history_failed", "job_name", jobName, "error", err)
@@ -916,12 +918,28 @@ func (r *EdgeRunner) setActivePhase(job *backup.JobDefinition, s *state.JobState
 	}
 	s.ActivePhasePercent = pct
 	s.LastStatus = phase
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
+}
+
+// saveState persists a job's state. A failed write is logged rather than ending the cycle:
+// the in-memory state stays current, and the next successful write stores it.
+func (r *EdgeRunner) saveState(job *backup.JobDefinition, s state.JobState) {
+	if err := r.StateStore.Set(job.RootPath, s); err != nil {
+		r.logger.Error("state_save_failed", "job_name", job.JobName, "error", err)
+	}
+}
+
+// removeSpoolFile deletes a spool file. A failure is logged; cleanupStaleArchives retries
+// archives that no job references.
+func (r *EdgeRunner) removeSpoolFile(path string) {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		r.logger.Warn("spool_cleanup_failed", "path", path, "error", err)
+	}
 }
 
 func (r *EdgeRunner) clearPendingArchive(s *state.JobState) {
 	if s.PendingArchive != "" {
-		os.Remove(s.PendingArchive)
+		r.removeSpoolFile(s.PendingArchive)
 	}
 	s.PendingArchive = ""
 	s.PendingArchiveSize = nil
@@ -938,7 +956,7 @@ func (r *EdgeRunner) clearPendingArchive(s *state.JobState) {
 
 func (r *EdgeRunner) discardPendingArchiveFile(s *state.JobState) {
 	if s.PendingArchive != "" {
-		os.Remove(s.PendingArchive)
+		r.removeSpoolFile(s.PendingArchive)
 	}
 	s.PendingArchive = ""
 	s.PendingArchiveSize = nil
@@ -962,7 +980,7 @@ func (r *EdgeRunner) cleanupStaleArchives(settings *config.Settings) {
 		}
 		full := filepath.Join(settings.SpoolDir, e.Name())
 		if !referenced[full] {
-			os.Remove(full)
+			r.removeSpoolFile(full)
 		}
 	}
 }
@@ -1019,16 +1037,12 @@ func uploadPhasePercent(uploaded int64, total *int64) int {
 	return 50 + pct/2
 }
 
-func sha256File(path string) (string, error) {
-	return sha256FileContext(context.Background(), path)
-}
-
 func sha256FileContext(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, cancelio.Reader{Context: ctx, Reader: f}); err != nil {
 		return "", err

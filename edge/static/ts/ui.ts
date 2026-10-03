@@ -12,7 +12,15 @@ function openDialog(id: string): void {
 
 function appDialog(options: AppDialogOptions & { input: true }): Promise<string | null>;
 function appDialog(options?: AppDialogOptions): Promise<string | boolean | null>;
-function appDialog({ title, message, input = false, inputLabel = "", inputType = "text", confirmLabel = "Continue", danger = false }: AppDialogOptions = {}): Promise<string | boolean | null> {
+function appDialog({
+  title,
+  message,
+  input = false,
+  inputLabel = "",
+  inputType = "text",
+  confirmLabel = "Continue",
+  danger = false,
+}: AppDialogOptions = {}): Promise<string | boolean | null> {
   const dialog = document.getElementById("app-dialog") as HTMLDialogElement | null;
   if (!dialog?.showModal) {
     return Promise.resolve(input ? null : false);
@@ -64,6 +72,9 @@ function initializeFieldHelp(helpEntries: Record<string, string>): void {
     if (!label || label.querySelector(".field-help")) {
       return;
     }
-    label.insertAdjacentHTML("beforeend", ` <span class="field-help hover-hint" tabindex="0" aria-label="${escapeHtml(helpText)}" title="${escapeHtml(helpText)}">?</span>`);
+    label.insertAdjacentHTML(
+      "beforeend",
+      ` <span class="field-help hover-hint" tabindex="0" aria-label="${escapeHtml(helpText)}" title="${escapeHtml(helpText)}">?</span>`,
+    );
   });
 }

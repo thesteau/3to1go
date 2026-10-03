@@ -20,7 +20,7 @@ cleanup() {
         # CI uploads these full logs as an artifact.
         if [ -n "${E2E_LOG_DIR:-}" ]; then
           mkdir -p "$E2E_LOG_DIR"
-          docker logs "$container" > "$E2E_LOG_DIR/${container%-$$}.log" 2>&1 || true
+          docker logs "$container" > "$E2E_LOG_DIR/${container%-"$$"}.log" 2>&1 || true
         fi
       fi
     done

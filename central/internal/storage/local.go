@@ -135,7 +135,7 @@ func (b *LocalBackend) Healthcheck() bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = f.WriteAt([]byte("ok\n"), 0)
 	return err == nil
 }
@@ -146,29 +146,33 @@ func copyAcrossFilesystems(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.Create(tmpPath)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return err
 	}
 	if err := out.Sync(); err != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
 		return err
 	}
-	out.Close()
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
 
 	if err := os.Rename(tmpPath, dst); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return err
 	}
-	os.Remove(src)
+	// The copy is complete; a source left behind does not undo the move.
+	_ = os.Remove(src)
 	return nil
 }
 
@@ -196,7 +200,8 @@ func DiskUsage(path string) (total, used, free int64, err error) {
 // DirSize sums sizes of all regular files under path recursively.
 func DirSize(path string) int64 {
 	var total int64
-	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+	// The callback skips unreadable entries and never fails, so Walk returns no error.
+	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			total += info.Size()
 		}

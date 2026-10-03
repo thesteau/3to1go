@@ -36,7 +36,9 @@ func TestRunCommand_EnvInjection(t *testing.T) {
 	hasSh(t)
 	hm, dir := newHookManager(t)
 	// Write a script that checks the env vars
-	hm.SaveUploadedFile("check.sh", []byte("#!/bin/sh\necho \"$THREETOONEGO_APP\" \"$THREETOONEGO_HOOK_PHASE\"\n"))
+	if _, err := hm.SaveUploadedFile("check.sh", []byte("#!/bin/sh\necho \"$THREETOONEGO_APP\" \"$THREETOONEGO_HOOK_PHASE\"\n")); err != nil {
+		t.Fatal(err)
+	}
 	hm.RunCommand("check.sh", "pre", map[string]any{})
 	_ = dir // used to create temp script
 }
@@ -44,6 +46,8 @@ func TestRunCommand_EnvInjection(t *testing.T) {
 func TestRunCommand_ScriptInScriptsDir(t *testing.T) {
 	hasSh(t)
 	hm, _ := newHookManager(t)
-	hm.SaveUploadedFile("myscript.sh", []byte("#!/bin/sh\necho ok\n"))
+	if _, err := hm.SaveUploadedFile("myscript.sh", []byte("#!/bin/sh\necho ok\n")); err != nil {
+		t.Fatal(err)
+	}
 	hm.RunCommand("myscript.sh", "pre", map[string]any{})
 }

@@ -118,9 +118,33 @@ In CI, each test job writes a summary on its run page and uploads its reports as
 | `edge-test-report`, `central-test-report` | Test report, coverage report, and raw `go test -json` output |
 | `e2e-container-logs` | Container logs, only when the end-to-end test fails |
 
+## Linting and formatting
+
+The lint workflow runs on PRs and pushes to `main` and `prod`:
+
+| Check | Tool | Config |
+|---|---|---|
+| Go | [golangci-lint](https://golangci-lint.run/) (`errcheck`, `govet`, `ineffassign`, `staticcheck`, `unused`) on each Go module | `.golangci.yml` |
+| TypeScript and JSON | [Biome](https://biomejs.dev/) lint and format check | `biome.jsonc` |
+| Workflows | [actionlint](https://github.com/rhysd/actionlint), which also shellchecks `run:` blocks | |
+| Shell scripts | [ShellCheck](https://www.shellcheck.net/) | |
+| Dockerfiles | [hadolint](https://github.com/hadolint/hadolint) | `.hadolint.yaml` |
+
+Run the TypeScript checks with `npm run lint`, and apply formatting and safe fixes with `npm run fix`. Run golangci-lint from a module folder after `npm run build`:
+
+```sh
+cd edge && golangci-lint run ./...
+```
+
+ESLint isn't used. TypeScript 7 has no JavaScript compiler API, which typescript-eslint needs. Biome parses TypeScript itself.
+
+Biome doesn't flag unused top-level names or `let` globals in the UI folders. Those files share one global scope, so other files and inline `onclick` handlers use and reassign those names.
+
+To run the same checks before each commit, install [pre-commit](https://pre-commit.com/) and run `pre-commit install` once. The hooks in `.pre-commit-config.yaml` need `npm ci`, Go, and golangci-lint locally. The hadolint hook needs Docker.
+
 ## Repository maintenance
 
-The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed. Go tests also run the default `go vet` checks.
+The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed.
 
 Dependabot opens weekly update PRs for Go dependencies, npm tools, GitHub Actions, and Dockerfile base images. These PRs use Conventional Commit titles and go through the usual CI and review. Dependabot isn't set up to merge them automatically. See [Dependabot configuration](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference) and [Go vulnerability management](https://go.dev/doc/security/vuln/) for details.
 

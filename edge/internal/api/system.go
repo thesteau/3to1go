@@ -166,13 +166,16 @@ func (a *App) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return
 	}
-	r.ParseMultipartForm(1 << 20)
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "certificate_file is required")
+		return
+	}
 	file, header, err := r.FormFile("certificate_file")
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "certificate_file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := io.ReadAll(io.LimitReader(file, 1<<20))
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "failed to read file")
@@ -245,13 +248,16 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
 		return
 	}
-	r.ParseMultipartForm(1 << 20)
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "hook_file is required")
+		return
+	}
 	file, header, err := r.FormFile("hook_file")
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "hook_file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := io.ReadAll(io.LimitReader(file, 1<<20))
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "failed to read file")

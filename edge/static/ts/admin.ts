@@ -19,8 +19,10 @@ const EDGE_SETTINGS_HELP: Record<string, string> = {
   settings_upload_retry_max_delay_seconds: "Longest delay Edge will wait between upload retries.",
   settings_upload_connect_timeout_seconds: "How long Edge waits to establish a connection to Central.",
   settings_upload_read_timeout_padding_seconds: "Extra read timeout buffer added while upload chunks are streaming.",
-  settings_upload_min_throughput_bytes_per_second: "Minimum upload speed Edge expects before treating the connection as stalled.",
-  settings_circuit_breaker_failure_threshold: "How many consecutive upload failures cause Edge to pause uploads temporarily.",
+  settings_upload_min_throughput_bytes_per_second:
+    "Minimum upload speed Edge expects before treating the connection as stalled.",
+  settings_circuit_breaker_failure_threshold:
+    "How many consecutive upload failures cause Edge to pause uploads temporarily.",
   settings_circuit_breaker_cooldown_seconds: "How long Edge waits before trying again after the upload circuit opens.",
 };
 
@@ -71,7 +73,9 @@ function fillSettings(settings: EdgeSettings | null | undefined): void {
   input("settings_upload_retry_max_delay_seconds").value = String(data.upload_retry_max_delay_seconds ?? 300);
   input("settings_upload_connect_timeout_seconds").value = String(data.upload_connect_timeout_seconds ?? 10);
   input("settings_upload_read_timeout_padding_seconds").value = String(data.upload_read_timeout_padding_seconds ?? 30);
-  input("settings_upload_min_throughput_bytes_per_second").value = String(data.upload_min_throughput_bytes_per_second ?? 262144);
+  input("settings_upload_min_throughput_bytes_per_second").value = String(
+    data.upload_min_throughput_bytes_per_second ?? 262144,
+  );
   input("settings_circuit_breaker_failure_threshold").value = String(data.circuit_breaker_failure_threshold ?? 5);
   input("settings_circuit_breaker_cooldown_seconds").value = String(data.circuit_breaker_cooldown_seconds ?? 300);
   updateCronScheduleHint();
@@ -140,7 +144,11 @@ async function saveSettings(): Promise<void> {
   }
   const payload = collectSettingsPayload();
   const { response, body } = await postSettings(payload);
-  setStatus("settings-status", response.ok ? "Saved." : (body.detail || "Settings save failed."), response.ok ? "success" : "error");
+  setStatus(
+    "settings-status",
+    response.ok ? "Saved." : body.detail || "Settings save failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     if (latestData && body.settings) {
       latestData.settings = body.settings;

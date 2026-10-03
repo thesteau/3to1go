@@ -71,7 +71,9 @@ func testUploadClient(serverURL string) *upload.UploadClient {
 func writeTestJSON(t *testing.T, w http.ResponseWriter, payload map[string]any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(payload)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		t.Errorf("write JSON response: %v", err)
+	}
 }
 
 func ptrInt64(v int64) *int64 {
@@ -154,7 +156,7 @@ func TestUploadPendingArchiveFailureSchedulesRetryAndDiscard(t *testing.T) {
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]any{"detail": "service unavailable"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "service unavailable"})
 	}))
 	defer server.Close()
 	client := testUploadClient(server.URL)
@@ -207,7 +209,9 @@ func TestRunnerRetryAndPendingHelpers(t *testing.T) {
 	if got := runner.checkRetry(job, s); got != "upload_now" {
 		t.Fatalf("checkRetry upload_now = %q", got)
 	}
-	os.Remove(archivePath)
+	if err := os.Remove(archivePath); err != nil {
+		t.Fatal(err)
+	}
 	if got := runner.checkRetry(job, s); got != "none" {
 		t.Fatalf("checkRetry missing = %q", got)
 	}
@@ -227,7 +231,9 @@ func TestRunnerRetryAndPendingHelpers(t *testing.T) {
 	}
 
 	pending := filepath.Join(settings.SpoolDir, "clear.tar.zst")
-	os.WriteFile(pending, []byte("x"), 0o644)
+	if err := os.WriteFile(pending, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	s.PendingArchive = pending
 	s.PendingArchiveSize = ptrInt64(1)
 	s.PendingArchiveSHA256 = "sha"
@@ -246,7 +252,9 @@ func TestRunnerRetryAndPendingHelpers(t *testing.T) {
 
 	s.PendingArchive = filepath.Join(settings.SpoolDir, "discard.tar.zst")
 	s.PendingFingerprint = "fp"
-	os.WriteFile(s.PendingArchive, []byte("x"), 0o644)
+	if err := os.WriteFile(s.PendingArchive, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	runner.discardPendingArchiveFile(s)
 	if s.PendingArchive != "" || s.PendingFingerprint == "" {
 		t.Fatalf("discard should preserve fingerprint only: %+v", s)
@@ -329,12 +337,12 @@ func TestProcessJobLockedAndForceSendValidation(t *testing.T) {
 		t.Fatalf("write data: %v", err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/backup/uploads/initiate":
+		switch r.URL.Path {
+		case "/backup/uploads/initiate":
 			writeTestJSON(t, w, map[string]any{"upload_id": "u1", "status": "initiated", "next_offset": 0, "recommended_chunk_size_bytes": 10})
-		case r.URL.Path == "/backup/uploads/u1/chunk":
+		case "/backup/uploads/u1/chunk":
 			writeTestJSON(t, w, map[string]any{"next_offset": 999999})
-		case r.URL.Path == "/backup/uploads/u1/finalize":
+		case "/backup/uploads/u1/finalize":
 			writeTestJSON(t, w, map[string]any{"status": "ok", "stored_as": "stored.tar.zst"})
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -448,7 +456,7 @@ func TestDownloadLatestSnapshotPath(t *testing.T) {
 		if r.URL.Path != "/backup/recovery/edge-1/instance-1/job/latest" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		w.Write([]byte("snapshot"))
+		_, _ = w.Write([]byte("snapshot"))
 	}))
 	defer server.Close()
 	client := testUploadClient(server.URL)

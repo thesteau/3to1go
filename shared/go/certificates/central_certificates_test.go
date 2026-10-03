@@ -16,7 +16,9 @@ func newCertManager(t *testing.T) (*CertManager, string) {
 	t.Helper()
 	storageDir := t.TempDir()
 	trustDir := filepath.Join(t.TempDir(), "trust")
-	os.MkdirAll(trustDir, 0o755)
+	if err := os.MkdirAll(trustDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	return &CertManager{
 		StorageDir:     storageDir,
 		TrustTargetDir: trustDir,
@@ -26,7 +28,9 @@ func newCertManager(t *testing.T) (*CertManager, string) {
 
 func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
-	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writeFile %s: %v", path, err)
 	}
@@ -44,7 +48,9 @@ func TestCertListFiles_Empty(t *testing.T) {
 
 func TestCertListFiles_SkipsDirectories(t *testing.T) {
 	cm, dir := newCertManager(t)
-	os.MkdirAll(filepath.Join(dir, "subdir"), 0o755)
+	if err := os.MkdirAll(filepath.Join(dir, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(dir, "cert.crt"), validPEM)
 	files := cm.ListFiles()
 	if len(files) != 1 {

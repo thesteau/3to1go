@@ -82,17 +82,31 @@ function fillMetaFromDir(data: EdgeData): void {
   const set = setHtmlIfChanged;
 
   set("meta-val-edge-id", renderClipValue("", data.edge_id, { className: "clip-code", clipLength: 28 }));
-  set("meta-val-instance-id", renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 }));
+  set(
+    "meta-val-instance-id",
+    renderClipValue("", data.edge_instance_id || "—", { className: "clip-code", clipLength: 28 }),
+  );
   set("meta-val-scan-dir", renderClipValue("", data.scan_root, { className: "clip-code", clipLength: 34 }));
   set("meta-val-central-url", renderClipValue("", data.central_url, { className: "clip-code", clipLength: 34 }));
-  set("meta-val-advertised-url", advertisedUrl ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 }) : '<span class="hint">Not set</span>');
+  set(
+    "meta-val-advertised-url",
+    advertisedUrl
+      ? renderClipValue("", advertisedUrl, { className: "clip-code", clipLength: 34 })
+      : '<span class="hint">Not set</span>',
+  );
   set("meta-hint-cron", renderHelpHint(cronDetails.help));
-  set("meta-val-cron", `<code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div>`);
+  set(
+    "meta-val-cron",
+    `<code title="${escapeHtml(`${cronDetails.summary} ${cronDetails.help}`)}">${escapeHtml(data.cron_schedule)}</code><div class="hint">${escapeHtml(cronDetails.summary)}</div>`,
+  );
   set("meta-hint-upload-circuit", renderHelpHint(uploadCircuitDetails.help));
   set("meta-val-upload-circuit", escapeHtml(uploadCircuitDetails.label));
   set("meta-val-edge-credential", escapeHtml(settingsStatus.edge_credential_configured ? "configured" : "missing"));
   if (data.encryption_key_fingerprint) {
-    set("meta-val-enc-fingerprint", `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`);
+    set(
+      "meta-val-enc-fingerprint",
+      `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`,
+    );
   }
 }
 
@@ -105,7 +119,8 @@ function fillMetaEncKey(key: string, fingerprint: string): void {
   }
   if (fingerprint) {
     const fpEl = document.getElementById("meta-val-enc-fingerprint");
-    if (fpEl) fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`;
+    if (fpEl)
+      fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}. Central uses this to confirm you pasted the right key for this Edge before decrypting.`;
   }
 }
 
@@ -127,7 +142,9 @@ async function copyEncKey(): Promise<void> {
   const btn = document.querySelector(".enc-key-copy");
   if (btn) {
     btn.textContent = "Copied!";
-    setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+    setTimeout(() => {
+      btn.textContent = "Copy";
+    }, 2000);
   }
 }
 
@@ -135,7 +152,8 @@ async function rotateEncKey(): Promise<void> {
   if (!requirePanelReady("encryption-key")) return;
   const confirmed = await confirmApp({
     title: "Rotate Encryption Key",
-    message: "This generates a new key for future backups. Existing snapshots on Central remain encrypted with the old key — you will need the old key to decrypt them.\n\nAre you sure?",
+    message:
+      "This generates a new key for future backups. Existing snapshots on Central remain encrypted with the old key — you will need the old key to decrypt them.\n\nAre you sure?",
     confirmLabel: "Rotate Key",
     danger: true,
   });
@@ -151,7 +169,10 @@ async function rotateEncKey(): Promise<void> {
       return;
     }
     fillMetaEncKey(body.key_base64 || "", body.new_fingerprint || "");
-    setActionStatus("Encryption key rotated. Copy the new key and update Central before downloading future snapshots.", "success");
+    setActionStatus(
+      "Encryption key rotated. Copy the new key and update Central before downloading future snapshots.",
+      "success",
+    );
   } catch {
     setActionStatus("Key rotation failed.", "error");
   } finally {

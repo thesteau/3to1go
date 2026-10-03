@@ -14,7 +14,9 @@ func newBackend(t *testing.T) (*LocalBackend, string) {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
-	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writeFile %s: %v", path, err)
 	}
@@ -36,7 +38,9 @@ func TestNewLocalBackend_ProbePath(t *testing.T) {
 
 func TestList_EmptyDir(t *testing.T) {
 	b, root := newBackend(t)
-	os.MkdirAll(filepath.Join(root, "ns"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, "ns"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	files, err := b.List("ns")
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -82,7 +86,9 @@ func TestList_WithFiles(t *testing.T) {
 func TestList_SkipsDirectories(t *testing.T) {
 	b, root := newBackend(t)
 	ns := "edge/inst/job"
-	os.MkdirAll(filepath.Join(root, ns, "subdir"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, ns, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(root, ns, "file.tar.zst"), "data")
 
 	files, err := b.List(ns)
@@ -289,7 +295,9 @@ func TestCopyAcrossFilesystems_DstIsDirectory(t *testing.T) {
 
 	// Make dst path a directory so the final Rename fails
 	dstDir := filepath.Join(dir, "dstdir")
-	os.MkdirAll(dstDir, 0o755)
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	err := copyAcrossFilesystems(src, dstDir)
 	if err == nil {
@@ -303,7 +311,9 @@ func TestHealthcheck_ProbePathIsDirectory(t *testing.T) {
 	root := t.TempDir()
 	b := NewLocalBackend(root)
 	// Create a directory at the probePath location
-	os.MkdirAll(b.probePath, 0o755)
+	if err := os.MkdirAll(b.probePath, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	// Healthcheck should fail when it can't open probePath as a file
 	if b.Healthcheck() {
 		t.Error("Healthcheck should fail when probePath is a directory")

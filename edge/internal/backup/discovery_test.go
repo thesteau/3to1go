@@ -135,7 +135,9 @@ func TestReadUploadDirPayload_EmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	payload, err := ReadUploadDirPayload(f.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -261,8 +263,12 @@ func TestDiscoverJobs_MultipleJobs(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"photos", "documents", "music"} {
 		sub := filepath.Join(root, name)
-		os.Mkdir(sub, 0o755)
-		os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644)
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	jobs, err := DiscoverJobs(root, 2, func(string, ...any) {})
 	if err != nil {
@@ -275,7 +281,9 @@ func TestDiscoverJobs_MultipleJobs(t *testing.T) {
 
 func TestDiscoverJobs_NoMarkers(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, "sub1", "sub2"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, "sub1", "sub2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	jobs, err := DiscoverJobs(root, 5, func(string, ...any) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -290,9 +298,15 @@ func TestDiscoverJobs_StopsRecursingAtMarker(t *testing.T) {
 	root := t.TempDir()
 	sub := filepath.Join(root, "sub")
 	nested := filepath.Join(sub, "nested")
-	os.MkdirAll(nested, 0o755)
-	os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(nested, UploadDirFilename), []byte(""), 0o644)
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, UploadDirFilename), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, UploadDirFilename), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	jobs, err := DiscoverJobs(root, 5, func(string, ...any) {})
 	if err != nil {

@@ -11,7 +11,8 @@ func TestKeyFingerprint_Deterministic(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i)
 	}
-	if KeyFingerprint(key) != KeyFingerprint(key) {
+	first, second := KeyFingerprint(key), KeyFingerprint(key)
+	if first != second {
 		t.Error("fingerprint is not deterministic")
 	}
 }

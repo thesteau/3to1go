@@ -25,7 +25,12 @@ function formatMessage(value: unknown, fallback = ""): string {
     return value;
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => formatMessage(entry)).filter(Boolean).join("; ") || fallback;
+    return (
+      value
+        .map((entry) => formatMessage(entry))
+        .filter(Boolean)
+        .join("; ") || fallback
+    );
   }
   if (typeof value === "object") {
     const record = value as { message?: unknown; msg?: unknown; loc?: unknown; detail?: unknown };

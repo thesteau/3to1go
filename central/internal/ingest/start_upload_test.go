@@ -94,7 +94,9 @@ func TestStartUpload_IdempotencyKeyChecksumConflict(t *testing.T) {
 		ArchiveSHA256:    "sha-a",
 		IdempotencyKey:   "conflict-key",
 	}
-	svc.StartUpload(context.Background(), req, nil, nil, false)
+	if _, err := svc.StartUpload(context.Background(), req, nil, nil, false); err != nil {
+		t.Fatal(err)
+	}
 
 	req.ArchiveSHA256 = "sha-b"
 	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
@@ -269,8 +271,12 @@ func TestStartUpload_DiscardsMissingIdempotentSession(t *testing.T) {
 		ArchiveSizeBytes: 100,
 		ExpiresAt:        utcAfter(svc.sessionTTL()),
 	}
-	svc.saveSession(completedSess)
-	svc.writeKeyMapping(idemKey, uploadID)
+	if err := svc.saveSession(completedSess); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.writeKeyMapping(idemKey, uploadID); err != nil {
+		t.Fatal(err)
+	}
 	// Backend has no file for ns -> sessionReferencesMissingSnapshot returns true -> session discarded
 
 	req := UploadInitRequest{
@@ -324,9 +330,13 @@ func TestFinalizeUpload_Success(t *testing.T) {
 
 	sess := makeUploadSession(t, svc, int64(len(content)))
 	sess.ArchiveSHA256 = archiveSHA
-	svc.saveSession(sess)
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
 
-	svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content)))
+	if _, err := svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content))); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := svc.FinalizeUpload(context.Background(), sess.UploadID)
 	if err != nil {
@@ -353,8 +363,12 @@ func TestFinalizeUpload_DuplicateUnderLock(t *testing.T) {
 	archiveSHA := computeSHA256(content)
 	sess := makeUploadSession(t, svc, int64(len(content)))
 	sess.ArchiveSHA256 = archiveSHA
-	svc.saveSession(sess)
-	svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content)))
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content))); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := svc.FinalizeUpload(context.Background(), sess.UploadID)
 	if err != nil {
@@ -375,8 +389,12 @@ func TestFinalizeUpload_FindDuplicateError(t *testing.T) {
 	archiveSHA := computeSHA256(content)
 	sess := makeUploadSession(t, svc, int64(len(content)))
 	sess.ArchiveSHA256 = archiveSHA
-	svc.saveSession(sess)
-	svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content)))
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content))); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := svc.FinalizeUpload(context.Background(), sess.UploadID)
 	if err == nil {

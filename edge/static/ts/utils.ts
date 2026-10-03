@@ -44,7 +44,11 @@ function renderClipValue(label: string, value: unknown, { className = "", clipLe
   return renderStaticClipValue(label, full, { className, clipLength });
 }
 
-function renderStaticClipValue(label: string, value: unknown, { className = "", clipLength = 32 }: ClipOptions = {}): string {
+function renderStaticClipValue(
+  label: string,
+  value: unknown,
+  { className = "", clipLength = 32 }: ClipOptions = {},
+): string {
   const full = String(value ?? "").trim();
   if (!full) return "—";
   const short = clipMiddle(full, clipLength);
@@ -103,7 +107,10 @@ function describeDayOfWeek(field: string): string {
     return `${dayNames[start % 7]} through ${dayNames[end % 7]}`;
   }
   if (/^\d(?:,\d)+$/.test(field)) {
-    return field.split(",").map((value) => dayNames[Number(value) % 7]).join(", ");
+    return field
+      .split(",")
+      .map((value) => dayNames[Number(value) % 7])
+      .join(", ");
   }
   return `day-of-week ${field}`;
 }
@@ -169,7 +176,12 @@ function validateCronSchedule(expression: unknown): string {
     { label: "Minute", min: 0, max: 59 },
     { label: "Hour", min: 0, max: 23 },
     { label: "Day of month", min: 1, max: 31 },
-    { label: "Month", min: 1, max: 12, names: { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 } },
+    {
+      label: "Month",
+      min: 1,
+      max: 12,
+      names: { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 },
+    },
     { label: "Day of week", min: 0, max: 6, names: { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 } },
   ];
   for (let i = 0; i < fields.length; i += 1) {

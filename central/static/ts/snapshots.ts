@@ -3,7 +3,7 @@ function parseSnapshotDate(filename: string): Date | null {
   if (parts.length < 3) return null;
   const iso = parts[1].replace(/T(\d{2})-(\d{2})-(\d{2})Z$/, "T$1:$2:$3Z");
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? null : d;
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function parseFingerprint(filename: string): string | null {
@@ -15,8 +15,11 @@ function parseFingerprint(filename: string): string | null {
 function formatDate(d: Date | null): string {
   if (!d) return "—";
   return d.toLocaleString(undefined, {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -33,7 +36,13 @@ async function fetchSnapshot(path: string): Promise<Response | null> {
   return null;
 }
 
-async function downloadSnapshot(edgeId: string, edgeInstanceId: string | null, jobName: string, filename: string, btn: HTMLButtonElement): Promise<void> {
+async function downloadSnapshot(
+  edgeId: string,
+  edgeInstanceId: string | null,
+  jobName: string,
+  filename: string,
+  btn: HTMLButtonElement,
+): Promise<void> {
   const basePath = edgeInstanceId
     ? `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(edgeInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
     : `/api/snapshots/${encodeURIComponent(edgeId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
@@ -80,13 +89,22 @@ async function downloadSnapshot(edgeId: string, edgeInstanceId: string | null, j
   }
 }
 
-async function deleteSnapshot(edgeId: string, edgeInstanceId: string | null, jobName: string, filename: string, btn: HTMLButtonElement): Promise<void> {
-  if (!await confirmApp({
-    title: "Delete Snapshot",
-    message: `Delete ${filename}? This cannot be undone.`,
-    confirmLabel: "Delete",
-    danger: true,
-  })) return;
+async function deleteSnapshot(
+  edgeId: string,
+  edgeInstanceId: string | null,
+  jobName: string,
+  filename: string,
+  btn: HTMLButtonElement,
+): Promise<void> {
+  if (
+    !(await confirmApp({
+      title: "Delete Snapshot",
+      message: `Delete ${filename}? This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+    }))
+  )
+    return;
 
   const restore = setButtonBusy(btn, "Deleting…");
   try {
@@ -110,15 +128,21 @@ async function deleteSnapshot(edgeId: string, edgeInstanceId: string | null, job
   }
 }
 
-function renderSnapshots(edgeId: string, edgeInstanceId: string | null | undefined, jobName: string, snapshots: Snapshot[]): string {
+function renderSnapshots(
+  edgeId: string,
+  edgeInstanceId: string | null | undefined,
+  jobName: string,
+  snapshots: Snapshot[],
+): string {
   if (!snapshots.length) return '<p class="no-snapshots">No snapshots yet.</p>';
-  return snapshots.map((snap, idx) => {
-    const name = snap.name;
-    const size = formatBytes(snap.size_bytes);
-    const date = formatDate(parseSnapshotDate(name));
-    const fp = parseFingerprint(name) || "";
-    const isLatest = idx === 0;
-    return `
+  return snapshots
+    .map((snap, idx) => {
+      const name = snap.name;
+      const size = formatBytes(snap.size_bytes);
+      const date = formatDate(parseSnapshotDate(name));
+      const fp = parseFingerprint(name) || "";
+      const isLatest = idx === 0;
+      return `
       <div class="snapshot-row">
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
@@ -134,5 +158,6 @@ function renderSnapshots(edgeId: string, edgeInstanceId: string | null | undefin
             onclick="deleteSnapshot(${inlineString(edgeId)},${edgeInstanceId ? inlineString(edgeInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Delete</button>
         </div>
       </div>`;
-  }).join("");
+    })
+    .join("");
 }

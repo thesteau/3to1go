@@ -78,7 +78,9 @@ function renderRecoverPreview(body: RecoveryResponse): void {
   preview.querySelectorAll<HTMLElement>("[data-recover-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       filter.action = button.dataset.recoverFilter!;
-      preview.querySelectorAll("[data-recover-filter]").forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+      for (const other of preview.querySelectorAll("[data-recover-filter]")) {
+        other.setAttribute("aria-pressed", String(other === button));
+      }
       renderRecoverPreviewList(entries, filter);
     });
   });
@@ -90,8 +92,14 @@ function renderRecoverPreview(body: RecoveryResponse): void {
 function renderRecoverPreviewList(entries: RecoveryPreviewEntry[], { query, action }: RecoverPreviewFilter): void {
   const list = document.getElementById("recover-preview-list");
   if (!list) return;
-  const matches = entries.filter((entry) => (action === "all" || (entry.action || "add") === action)
-    && (!query || String(entry.path || "").toLowerCase().includes(query)));
+  const matches = entries.filter(
+    (entry) =>
+      (action === "all" || (entry.action || "add") === action) &&
+      (!query ||
+        String(entry.path || "")
+          .toLowerCase()
+          .includes(query)),
+  );
   // Group every match so folder totals stay complete; rendered rows and folders are both capped.
   const groups = new Map<string, (RecoveryPreviewEntry & { name: string })[]>();
   for (const entry of matches) {
@@ -110,31 +118,36 @@ function renderRecoverPreviewList(entries: RecoveryPreviewEntry[], { query, acti
   let rowBudget = RECOVER_PREVIEW_ROW_LIMIT;
 
   list.innerHTML = matches.length
-    ? shownGroups.map(([folder, files]) => {
-      const folderSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
-      const shownFiles = files.slice(0, Math.max(0, rowBudget));
-      rowBudget -= shownFiles.length;
-      const hidden = files.length - shownFiles.length;
-      return `
+    ? shownGroups
+        .map(([folder, files]) => {
+          const folderSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+          const shownFiles = files.slice(0, Math.max(0, rowBudget));
+          rowBudget -= shownFiles.length;
+          const hidden = files.length - shownFiles.length;
+          return `
         <details class="recover-preview-group"${openGroups && shownFiles.length ? " open" : ""}>
           <summary>
             <span class="recover-preview-folder" title="${escapeHtml(folder || "Job root")}">${escapeHtml(folder || "Job root")}</span>
             <span class="hint">${files.length} file${files.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(folderSize))}</span>
           </summary>
-          ${shownFiles.map((file) => {
-            const kind = file.action === "replace" ? "replace" : "add";
-            return `
+          ${shownFiles
+            .map((file) => {
+              const kind = file.action === "replace" ? "replace" : "add";
+              return `
             <div class="recover-preview-row">
               <span class="recover-preview-action ${kind}">${kind === "replace" ? "Replace" : "Add"}</span>
               <span class="recover-preview-path" title="${escapeHtml(file.path || "")}">${escapeHtml(file.name)}</span>
               <span class="recover-preview-size">${escapeHtml(formatBytes(file.size || 0))}</span>
             </div>`;
-          }).join("")}
+            })
+            .join("")}
           ${hidden ? `<p class="recover-preview-more hint">${hidden} file${hidden === 1 ? "" : "s"} in this folder not listed. Filter to narrow the list.</p>` : ""}
         </details>`;
-    }).join("") + (hiddenGroups.length
-      ? `<p class="recover-preview-more hint">${hiddenGroups.length} more folder${hiddenGroups.length === 1 ? "" : "s"} with ${hiddenFiles.length} file${hiddenFiles.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(hiddenSize))} not listed. Filter to narrow the list.</p>`
-      : "")
+        })
+        .join("") +
+      (hiddenGroups.length
+        ? `<p class="recover-preview-more hint">${hiddenGroups.length} more folder${hiddenGroups.length === 1 ? "" : "s"} with ${hiddenFiles.length} file${hiddenFiles.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(hiddenSize))} not listed. Filter to narrow the list.</p>`
+        : "")
     : '<p class="recover-preview-more hint">No files match this filter.</p>';
 }
 

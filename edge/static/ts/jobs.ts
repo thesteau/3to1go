@@ -5,7 +5,10 @@ async function saveJob(): Promise<void> {
     relative_path: relativePath,
     config: {
       job_name: (document.getElementById("job_name") as HTMLInputElement).value.trim() || null,
-      exclude: (document.getElementById("exclude") as HTMLTextAreaElement).value.split("\n").map((value) => value.trim()).filter(Boolean),
+      exclude: (document.getElementById("exclude") as HTMLTextAreaElement).value
+        .split("\n")
+        .map((value) => value.trim())
+        .filter(Boolean),
       include_hidden: (document.getElementById("include_hidden") as HTMLInputElement).checked,
       follow_symlinks: (document.getElementById("follow_symlinks") as HTMLInputElement).checked,
     },
@@ -17,7 +20,11 @@ async function saveJob(): Promise<void> {
     body: JSON.stringify(payload),
   });
   const body: ApiBody = await response.json();
-  setStatus("form-status", response.ok ? "Saved. Closing..." : (body.detail || "Save failed."), response.ok ? "success" : "error");
+  setStatus(
+    "form-status",
+    response.ok ? "Saved. Closing..." : body.detail || "Save failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     await loadData({ silent: true, refreshDirectoryTree: true });
     setActionStatus(`Saved .upload_dir for ${relativePath}.`, "success");
@@ -29,12 +36,14 @@ async function saveJob(): Promise<void> {
 }
 
 async function deleteByPath(relativePath: string): Promise<void> {
-  if (!await confirmApp({
-    title: "Stop Backing Up Folder",
-    message: `Stop backing up ${relativePath}? This only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Central.`,
-    confirmLabel: "Stop Backup",
-    danger: true,
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Stop Backing Up Folder",
+      message: `Stop backing up ${relativePath}? This only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Central.`,
+      confirmLabel: "Stop Backup",
+      danger: true,
+    }))
+  ) {
     return;
   }
   setStatus("form-status", "Removing this folder's upload settings...", "info");
@@ -44,7 +53,11 @@ async function deleteByPath(relativePath: string): Promise<void> {
     body: JSON.stringify({ relative_path: relativePath }),
   });
   const body: ApiBody = await response.json();
-  setStatus("form-status", response.ok ? "This folder is no longer treated as its own backup job." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
+  setStatus(
+    "form-status",
+    response.ok ? "This folder is no longer treated as its own backup job." : body.detail || "Delete failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     await loadData({ silent: true, refreshDirectoryTree: true });
     setActionStatus(`Edge will no longer back up ${relativePath} as its own job.`, "success");
@@ -63,11 +76,13 @@ async function deleteByPath(relativePath: string): Promise<void> {
 
 async function forceUpload(relativePath: string, jobName: string, btn: HTMLButtonElement): Promise<void> {
   const label = jobName || "this job";
-  if (!await confirmApp({
-    title: "Force Upload",
-    message: `Force an upload for ${label}? This bypasses the unchanged check. Central may still reject it as a duplicate if that snapshot already exists.`,
-    confirmLabel: "Force Upload",
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Force Upload",
+      message: `Force an upload for ${label}? This bypasses the unchanged check. Central may still reject it as a duplicate if that snapshot already exists.`,
+      confirmLabel: "Force Upload",
+    }))
+  ) {
     return;
   }
 

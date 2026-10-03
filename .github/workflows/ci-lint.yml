@@ -1,0 +1,79 @@
+name: "CI: Lint"
+
+on:
+  push:
+    branches: ["main", "prod"]
+  pull_request:
+    branches-ignore: [release-state]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same PR makes an in-progress run obsolete; branch pushes always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Lint Go (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [shared/go, central, edge]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            central/go.sum
+            edge/go.sum
+            shared/go/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # The servers embed static/js, so the packages only type-check once it is generated.
+      - name: Generate web UI
+        run: |
+          npm ci
+          npm run build
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          working-directory: ${{ matrix.module }}
+
+  frontend:
+    name: Lint and format TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx biome ci .
+
+  repository:
+    name: Lint workflows, shell scripts and Dockerfiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # actionlint also runs shellcheck on each workflow's run: blocks.
+      - name: Lint workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: Lint shell scripts
+        run: git ls-files -z -- '*.sh' | xargs -0 shellcheck
+
+      - name: Lint Dockerfiles
+        run: docker run --rm -v "$PWD:/repo" -w /repo hadolint/hadolint:v2.15.1 hadolint central/Dockerfile edge/Dockerfile
