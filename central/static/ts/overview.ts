@@ -198,9 +198,11 @@ async function loadOverview(options: OverviewOptions = {}): Promise<boolean> {
   return _overviewInFlight;
 }
 
-async function fetchOverview({ silent = false, notifyNewSnapshots = false }: OverviewOptions = {}): Promise<boolean> {
+async function fetchOverview({ silent = false, notifyNewSnapshots = false, force = false }: OverviewOptions = {}): Promise<boolean> {
   _overviewLoading = true;
-  if (!_settingsInFlight) loadCentralSettings();
+  // A forced refresh follows a change, so it waits for any older settings
+  // request and loads again; otherwise that older response could restore old values.
+  if (force || !_settingsInFlight) loadCentralSettings();
   loadStorageOverview();
   if (!silent && !document.getElementById("namespaces")!.children.length) {
     document.getElementById("namespaces")!.innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';

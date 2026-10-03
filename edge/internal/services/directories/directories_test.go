@@ -199,13 +199,15 @@ func TestListJobs_DoesNotWaitForASlowFirstWalk(t *testing.T) {
 	svc, _ := newDirService(t, root)
 	walks := controlWalks(svc)
 
-	if got := jobPaths(t, svc); len(got) != 0 || !svc.Discovering() {
-		t.Fatalf("jobs = %v, discovering = %v; want an empty list while the first walk runs", got, svc.Discovering())
+	entries, discovering, _ := svc.ListJobsWithState()
+	if len(entries) != 0 || !discovering {
+		t.Fatalf("jobs = %v, discovering = %v; want an empty list while the first walk runs", entries, discovering)
 	}
 	walks.finish(t, filepath.Join(root, "docs"))
 	waitForWalks(t, svc)
-	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs"}) || svc.Discovering() {
-		t.Errorf("after the walk: jobs = %v, discovering = %v", got, svc.Discovering())
+	entries, discovering, _ = svc.ListJobsWithState()
+	if len(entries) != 1 || entries[0].RelativePath != "docs" || discovering {
+		t.Errorf("after the walk: jobs = %v, discovering = %v", entries, discovering)
 	}
 }
 

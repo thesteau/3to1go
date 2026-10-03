@@ -76,7 +76,14 @@ type DirectoryNode struct {
 // ListJobs returns every directory holding a job marker within max_depth, as of
 // the last walk. Job config and state are always read fresh.
 func (d *DirectoryService) ListJobs() ([]DirectoryEntry, error) {
-	dirs := d.jobDirectories()
+	entries, _, err := d.ListJobsWithState()
+	return entries, err
+}
+
+// ListJobsWithState also reports whether the first walk was still running when
+// the list was read, so the two always agree.
+func (d *DirectoryService) ListJobsWithState() ([]DirectoryEntry, bool, error) {
+	dirs, discovering := d.jobDirectories()
 	entries := make([]DirectoryEntry, 0, len(dirs))
 	for _, dir := range dirs {
 		entry, err := d.serializeDirectory(dir)
@@ -86,7 +93,7 @@ func (d *DirectoryService) ListJobs() ([]DirectoryEntry, error) {
 		}
 		entries = append(entries, entry)
 	}
-	return entries, nil
+	return entries, discovering, nil
 }
 
 // Discovering reports whether the first walk is still running, so the job list
@@ -108,8 +115,10 @@ func (d *DirectoryService) StartDiscovery() {
 }
 
 // jobDirectories returns the last walk's job paths and starts a new walk when
-// they are old. Only the first request waits, and only briefly.
-func (d *DirectoryService) jobDirectories() []string {
+// they are old. Only the first request waits, and only briefly. It also reports
+// whether the first walk is still running; the first walk finishes under the
+// same lock, so the paths and that flag always match.
+func (d *DirectoryService) jobDirectories() ([]string, bool) {
 	d.jobsMu.Lock()
 	if d.jobDirs == nil || time.Since(d.jobDirsAt) >= jobDiscoveryTTL {
 		d.startWalkLocked()
@@ -124,7 +133,7 @@ func (d *DirectoryService) jobDirectories() []string {
 	}
 	d.jobsMu.Lock()
 	defer d.jobsMu.Unlock()
-	return slices.Clone(d.jobDirs)
+	return slices.Clone(d.jobDirs), d.Discovering()
 }
 
 func (d *DirectoryService) startWalkLocked() {

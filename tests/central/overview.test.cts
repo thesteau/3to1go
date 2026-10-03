@@ -77,6 +77,29 @@ test('Central settings unlock without waiting for the snapshot list', async () =
   assert.equal(await overview, true);
 });
 
+test('a refresh after a save loads settings again after an older request', async () => {
+  const pending = [];
+  const filled = [];
+  const { ctx } = overviewContext(async url => {
+    if (url.includes('section=settings')) return new Promise(resolve => pending.push(resolve));
+    return { ok: true, json: async () => ({ edges: [] }) };
+  }, { fillSettings: settings => filled.push(settings.theme) });
+  ctx.loadVerifyStatus = () => {};
+  await ctx.loadOverview({ silent: true });
+  assert.equal(pending.length, 1, 'a poll is loading settings');
+
+  // Saved meanwhile: the forced refresh must not settle for the older response.
+  const refresh = ctx.loadOverview({ silent: true, force: true });
+  pending[0]({ ok: true, json: async () => ({ settings: { theme: 'old' } }) });
+  await new Promise(setImmediate);
+  assert.equal(pending.length, 2, 'settings load again after the older request');
+  pending[1]({ ok: true, json: async () => ({ settings: { theme: 'saved' } }) });
+  await refresh;
+  await new Promise(setImmediate);
+  assert.equal(filled.at(-1), 'saved');
+  assert.equal(ctx.window.__centralSettings.theme, 'saved');
+});
+
 test('Central keeps loaded settings editable when a later poll fails', async () => {
   const ready = {};
   let failing = false;
