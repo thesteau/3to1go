@@ -33,6 +33,38 @@ async function loadStorageOverview(): Promise<void> {
   }
 }
 
+let _settingsInFlight: Promise<void> | null = null;
+
+// Loads settings on their own, so the settings editor opens without waiting
+// for the snapshot list. A call during a load waits for it, then loads again,
+// so a caller that just saved gets the saved values.
+async function loadCentralSettings(): Promise<void> {
+  while (_settingsInFlight) await _settingsInFlight;
+  _settingsInFlight = fetchCentralSettings();
+  try {
+    await _settingsInFlight;
+  } finally {
+    _settingsInFlight = null;
+  }
+}
+
+async function fetchCentralSettings(): Promise<void> {
+  try {
+    const response = await fetch("/api/overview?section=settings", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    if (!response.ok) throw new Error("Settings unavailable");
+    const data: OverviewResponse = await response.json();
+    window.__centralSettings = data.settings || {};
+    setPanelReady("settings", Boolean(data.settings && Object.keys(data.settings).length));
+    if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
+      applyTheme(window.__centralSettings.theme || "dark");
+      fillSettings(window.__centralSettings);
+    }
+  } catch {
+    // Settings loaded earlier stay editable; one failed poll must not lock an open editor.
+    if (!window.__centralSettings) setPanelReady("settings", false);
+  }
+}
+
 let _overviewLoading = false;
 let _overviewInFlight: Promise<boolean> | null = null;
 let _knownSnapshotKeys: Set<string> | null = null;
@@ -168,6 +200,7 @@ async function loadOverview(options: OverviewOptions = {}): Promise<boolean> {
 
 async function fetchOverview({ silent = false, notifyNewSnapshots = false }: OverviewOptions = {}): Promise<boolean> {
   _overviewLoading = true;
+  if (!_settingsInFlight) loadCentralSettings();
   loadStorageOverview();
   if (!silent && !document.getElementById("namespaces")!.children.length) {
     document.getElementById("namespaces")!.innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
@@ -179,11 +212,6 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false }: Ove
       throw new Error("Refresh failed.");
     }
     const data: OverviewResponse = await res.json();
-    window.__centralSettings = data.settings || {};
-    setPanelReady("settings", Boolean(data.settings && Object.keys(data.settings).length));
-    if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
-      applyTheme(window.__centralSettings.theme || "dark");
-    }
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
     const edges = data.edges || [];
@@ -238,9 +266,6 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false }: Ove
 
     updateOverviewDom(document.getElementById("namespaces")!, overviewHtml);
     _overviewHasData = true;
-    if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
-      fillSettings(data.settings || {});
-    }
     Promise.allSettled(
       allInstances
         .filter(({ instance }) => instance.edge_instance_id)
@@ -248,8 +273,6 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false }: Ove
     );
   } catch (error) {
     if (!_overviewHasData) {
-      // Settings loaded earlier stay editable; one failed poll must not lock an open editor.
-      setPanelReady("settings", false);
       document.getElementById("namespaces")!.innerHTML = '<p role="status">Snapshots could not load. <button type="button" onclick="loadOverview()">Retry</button></p>';
       document.getElementById("meta")!.innerHTML = '<p class="hint">Snapshot summary unavailable.</p>';
     }

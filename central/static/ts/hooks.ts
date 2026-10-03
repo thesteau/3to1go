@@ -72,7 +72,7 @@ async function saveHookCommands(): Promise<void> {
   setStatus("hooks-status", response.ok ? "Commands saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
     _hookDraftDirty = { pre: false, post: false };
-    await loadOverview({ silent: true, force: true });
+    await loadCentralSettings();
     await loadHookConfig({ preserveDrafts: false });
     setActionStatus("Central hook commands saved.", "success");
   } else {

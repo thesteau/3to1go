@@ -95,6 +95,7 @@ interface DirectoryEntry {
 
 interface DirectoriesResponse {
   directories: DirectoryEntry[];
+  discovering?: boolean;
 }
 
 interface DirectoryNode extends DirectoryEntry {
@@ -109,6 +110,7 @@ interface DirectoryChildrenResponse extends ApiBody {
 // Status and directory responses load independently and are merged as each arrives.
 interface EdgeData extends StatusResponse {
   directories?: DirectoryEntry[];
+  jobs_discovering?: boolean;
 }
 
 interface EncryptionKeyResponse extends ApiBody {

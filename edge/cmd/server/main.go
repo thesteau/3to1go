@@ -96,6 +96,9 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("init runner: %w", err)
 	}
 
+	// Look for jobs now, so the first page load doesn't wait for it.
+	edgeRunner.DirService.StartDiscovery()
+
 	// Build the scheduler.
 	sched, err := scheduler.NewSchedulerController(edgeRunner)
 	if err != nil {

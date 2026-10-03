@@ -22,6 +22,9 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Query().Get("section") {
 	case "storage":
 		data = overview.BuildStorageOverview(a.backend)
+	case "settings":
+		// Small and fast, so the settings editor doesn't wait for the snapshot list.
+		data = map[string]any{"settings": config.SettingsToPayload(s)}
 	case "snapshots":
 		data, err = overview.BuildSnapshotOverview(r.Context(), s, a.snapIndex)
 	default:

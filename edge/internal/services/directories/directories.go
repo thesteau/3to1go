@@ -23,8 +23,15 @@ type jobStateStore interface {
 	Delete(rootPath string) error
 }
 
-// jobDiscoveryTTL bounds how long discovered job paths serve repeated UI loads.
-const jobDiscoveryTTL = 30 * time.Second
+// Finding job markers walks the scan root, which takes minutes on a large tree.
+// The walk runs in the background, and requests use the last list it found.
+// Jobs saved or deleted in the UI update that list at once, so the walk only
+// needs to repeat now and then, to pick up markers changed outside the UI.
+const jobDiscoveryTTL = 5 * time.Minute
+
+// How long the first request waits for the first walk, so small trees load in
+// one go. A variable so tests can shorten it.
+var firstDiscoveryWait = 2 * time.Second
 
 // DirectoryService lists, saves, and deletes backup job definitions under the scan root.
 type DirectoryService struct {
@@ -32,13 +39,19 @@ type DirectoryService struct {
 	logger     *slog.Logger
 	stateStore jobStateStore
 
-	jobsMu    sync.Mutex
-	jobDirs   []string
-	jobDirsAt time.Time
+	jobsMu     sync.Mutex
+	jobDirs    []string // nil until the first walk finishes
+	jobDirsAt  time.Time
+	walking    bool
+	changed    map[string]bool // jobs saved (true) or deleted during the walk
+	firstWalk  chan struct{}   // closed when the first walk finishes
+	discoverFn func() []string
 }
 
 func NewDirectoryService(settings *config.Settings, logger *slog.Logger, stateStore jobStateStore) *DirectoryService {
-	return &DirectoryService{settings: settings, logger: logger, stateStore: stateStore}
+	d := &DirectoryService{settings: settings, logger: logger, stateStore: stateStore, firstWalk: make(chan struct{})}
+	d.discoverFn = d.walkJobDirectories
+	return d
 }
 
 // DirectoryEntry is the JSON representation of a scanned directory.
@@ -60,14 +73,10 @@ type DirectoryNode struct {
 	HiddenChildCount int `json:"hidden_child_count"`
 }
 
-// ListJobs returns every directory holding a job marker within max_depth. Discovery
-// stops at each marker, so job contents are never walked, and the discovered paths
-// are reused briefly across UI polls; job config and state are always read fresh.
+// ListJobs returns every directory holding a job marker within max_depth, as of
+// the last walk. Job config and state are always read fresh.
 func (d *DirectoryService) ListJobs() ([]DirectoryEntry, error) {
-	dirs, err := d.jobDirectories()
-	if err != nil {
-		return nil, err
-	}
+	dirs := d.jobDirectories()
 	entries := make([]DirectoryEntry, 0, len(dirs))
 	for _, dir := range dirs {
 		entry, err := d.serializeDirectory(dir)
@@ -80,17 +89,124 @@ func (d *DirectoryService) ListJobs() ([]DirectoryEntry, error) {
 	return entries, nil
 }
 
-func (d *DirectoryService) jobDirectories() ([]string, error) {
+// Discovering reports whether the first walk is still running, so the job list
+// may be incomplete.
+func (d *DirectoryService) Discovering() bool {
+	select {
+	case <-d.firstWalk:
+		return false
+	default:
+		return true
+	}
+}
+
+// StartDiscovery begins the first walk without waiting for a request.
+func (d *DirectoryService) StartDiscovery() {
 	d.jobsMu.Lock()
 	defer d.jobsMu.Unlock()
-	if d.jobDirs != nil && time.Since(d.jobDirsAt) < jobDiscoveryTTL {
-		return d.jobDirs, nil
+	d.startWalkLocked()
+}
+
+// jobDirectories returns the last walk's job paths and starts a new walk when
+// they are old. Only the first request waits, and only briefly.
+func (d *DirectoryService) jobDirectories() []string {
+	d.jobsMu.Lock()
+	if d.jobDirs == nil || time.Since(d.jobDirsAt) >= jobDiscoveryTTL {
+		d.startWalkLocked()
 	}
+	first := d.jobDirs == nil
+	d.jobsMu.Unlock()
+	if first {
+		select {
+		case <-d.firstWalk:
+		case <-time.After(firstDiscoveryWait):
+		}
+	}
+	d.jobsMu.Lock()
+	defer d.jobsMu.Unlock()
+	return slices.Clone(d.jobDirs)
+}
+
+func (d *DirectoryService) startWalkLocked() {
+	if d.walking {
+		return
+	}
+	d.walking = true
+	go d.runWalks()
+}
+
+func (d *DirectoryService) runWalks() {
+	for {
+		dirs := d.discoverFn()
+		d.jobsMu.Lock()
+		// The walk may have passed a job before it was saved or deleted.
+		changed := d.changed
+		d.changed = nil
+		for dir, saved := range changed {
+			dirs = withJob(dirs, dir, saved)
+		}
+		d.jobDirs, d.jobDirsAt = dirs, time.Now()
+		if d.Discovering() {
+			close(d.firstWalk)
+		}
+		// Walk again after a change, which can hide or reveal jobs nested below it.
+		if len(changed) == 0 {
+			d.walking = false
+			d.jobsMu.Unlock()
+			return
+		}
+		d.jobsMu.Unlock()
+	}
+}
+
+// jobChanged applies a UI save or delete to the job list at once. A walk then
+// runs in the background, because the change can hide or reveal nested jobs.
+func (d *DirectoryService) jobChanged(dir string, saved bool) {
+	d.jobsMu.Lock()
+	defer d.jobsMu.Unlock()
+	if d.jobDirs != nil {
+		d.jobDirs = withJob(d.jobDirs, dir, saved)
+	}
+	if d.changed == nil {
+		d.changed = map[string]bool{}
+	}
+	d.changed[dir] = saved
+	if !d.walking {
+		// Nothing to merge into: the new walk starts after this change.
+		d.changed = nil
+		d.startWalkLocked()
+	}
+}
+
+// withJob returns dirs with dir added or removed, in walk order.
+func withJob(dirs []string, dir string, saved bool) []string {
+	dirs = slices.DeleteFunc(slices.Clone(dirs), func(p string) bool { return p == dir })
+	if saved {
+		dirs = append(dirs, dir)
+		slices.SortFunc(dirs, comparePaths)
+	}
+	return dirs
+}
+
+// comparePaths orders paths the way the walk lists them: folder by folder,
+// ignoring case.
+func comparePaths(a, b string) int {
+	as := strings.Split(filepath.ToSlash(a), "/")
+	bs := strings.Split(filepath.ToSlash(b), "/")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		if c := strings.Compare(strings.ToLower(as[i]), strings.ToLower(bs[i])); c != 0 {
+			return c
+		}
+	}
+	return len(as) - len(bs)
+}
+
+func (d *DirectoryService) walkJobDirectories() []string {
+	dirs := []string{}
 	scanRoot, err := filepath.Abs(d.settings.ScanRoot)
 	if err != nil {
-		return nil, err
+		return dirs
 	}
-	dirs := []string{}
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
 		entries, err := os.ReadDir(dir)
@@ -116,14 +232,7 @@ func (d *DirectoryService) jobDirectories() ([]string, error) {
 		}
 	}
 	walk(scanRoot, 0)
-	d.jobDirs, d.jobDirsAt = dirs, time.Now()
-	return dirs, nil
-}
-
-func (d *DirectoryService) invalidateJobs() {
-	d.jobsMu.Lock()
-	d.jobDirs = nil
-	d.jobsMu.Unlock()
+	return dirs
 }
 
 // ListChildren returns the folders directly below relativePath, within max_depth.
@@ -273,7 +382,7 @@ func (d *DirectoryService) SaveJob(relativePath string, payload map[string]any) 
 	if err := backup.WriteUploadDir(dir, payload); err != nil {
 		return DirectoryEntry{}, err
 	}
-	d.invalidateJobs()
+	d.jobChanged(dir, true)
 	raw, err := backup.ReadUploadDirPayload(markerPath)
 	if err != nil {
 		return DirectoryEntry{}, err
@@ -295,7 +404,7 @@ func (d *DirectoryService) DeleteJob(relativePath string) error {
 	if err := backup.DeleteUploadDir(dir); err != nil {
 		return err
 	}
-	d.invalidateJobs()
+	d.jobChanged(dir, false)
 	d.stateStore.Delete(dir)
 	d.logger.Info("ui_job_deleted", "path", dir)
 	return nil

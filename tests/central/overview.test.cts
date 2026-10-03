@@ -61,6 +61,22 @@ test('Central renders snapshots while storage probes remain pending', async () =
   assert.match(elements['storage-meta'].innerHTML, /1.0 KB/);
 });
 
+test('Central settings unlock without waiting for the snapshot list', async () => {
+  const ready = {};
+  let finishSnapshots;
+  const { ctx } = overviewContext(async url => {
+    if (url.includes('section=settings')) return { ok: true, json: async () => ({ settings: { theme: 'dark' } }) };
+    if (url.includes('section=snapshots')) return new Promise(resolve => { finishSnapshots = resolve; });
+    return { ok: true, json: async () => ({}) };
+  }, { setPanelReady: (name, value) => { ready[name] = value; } });
+  ctx.loadVerifyStatus = () => {};
+  const overview = ctx.loadOverview();
+  await new Promise(setImmediate);
+  assert.equal(ready.settings, true, 'settings are editable while snapshots load');
+  finishSnapshots({ ok: true, json: async () => ({ edges: [] }) });
+  assert.equal(await overview, true);
+});
+
 test('Central keeps loaded settings editable when a later poll fails', async () => {
   const ready = {};
   let failing = false;
@@ -70,7 +86,9 @@ test('Central keeps loaded settings editable when a later poll fails', async () 
   }, { setPanelReady: (name, value) => { ready[name] = value; } });
   ctx.loadVerifyStatus = () => {};
   assert.equal(await ctx.loadOverview(), true);
+  await new Promise(setImmediate);
   failing = true;
   assert.equal(await ctx.loadOverview({ silent: true }), false);
+  await new Promise(setImmediate);
   assert.equal(ready.settings, true);
 });

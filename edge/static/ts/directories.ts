@@ -300,9 +300,13 @@ function bindDirectoryTreeEvents(): void {
   });
 }
 
-function renderSelectedJobs(directories: DirectoryEntry[] | undefined): void {
+// While Edge is still searching the scan root, the list may be missing jobs.
+function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discovering = false): void {
   const selected = (directories || []).filter((entry) => entry.selected && !entry.blocked_by_parent);
-  const html = selected.length
+  const searching = discovering
+    ? '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Looking for backup jobs in the scan folder…</span></div>'
+    : "";
+  const html = searching + (selected.length
     ? selected.map((entry) => {
       const jobName = entry.config?.job_name || entry.relative_path;
       const lastStateLabel = formatLastState(entry);
@@ -345,9 +349,9 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined): void {
       </div>
       `;
     }).join("")
-    : '<p class="hint">No directories are selected yet.</p>';
+    : discovering ? "" : '<p class="hint">No directories are selected yet.</p>');
   setHtmlIfChanged("selected-jobs", html);
-  setHtmlIfChanged("selected-jobs-count", String(selected.length));
+  setHtmlIfChanged("selected-jobs-count", discovering && !selected.length ? "-" : String(selected.length));
 }
 
 // The scan root itself is implied, so its folders form the top level of the tree.
