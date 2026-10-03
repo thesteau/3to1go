@@ -1,0 +1,187 @@
+---
+title: "Run Scout on Kubernetes"
+description: "Run Scout as a pod on the node that holds the files you want to back up."
+---
+
+Scout can run on Kubernetes as well as Docker Compose. Only Scout is covered here. Run Station with [Docker Compose](/station/install).
+
+The repository ships an example in [`deploy-example/kubernetes/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/kubernetes), not a packaged chart. Adapt it to your cluster. Scheduling, networking, and secrets are up to you.
+
+![Flux on the control plane deploys one Scout pod per node. Each pod encrypts that node's folders and uploads to Station outside the cluster.](/images/kubernetes-layout.svg)
+
+## How it maps to Compose
+
+Scout backs up files on a specific machine, so the pod runs on the node that holds them and mounts its folders directly.
+
+| Compose | Kubernetes example |
+|---|---|
+| One Scout per machine | One `DaemonSet` pinned to a node with `nodeSelector` |
+| `./config`, `./hook-scripts`, `./state`, `./spool` volumes | `hostPath` volumes under `/opt/backup-scout` on that node |
+| `${SCAN_DIR}:/scan` | A `hostPath` volume mounted at `/scan` |
+| `.env` values | Container `env`, with `INITIAL_ADMIN_PASSWORD` from a Secret |
+| `ports: "6556:6556"` | `hostPort: 6556` |
+
+## Set up
+
+<Steps>
+  <Step title="Get the example">
+    Copy the three files from [`deploy-example/kubernetes/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/kubernetes): `kustomization.yaml`, `namespace.yaml`, and `backup-scout.yaml`.
+  </Step>
+  <Step title="Edit backup-scout.yaml">
+    Set the node's hostname (replacing `my-node`), `SCOUT_ID`, `STATION_URL`, and the folder to back up. `SCAN_DIR` and the `scan` volume's `path` must be the same host folder:
+
+    ```yaml backup-scout.yaml
+    nodeSelector:
+      kubernetes.io/os: linux
+      kubernetes.io/hostname: my-node   # kubectl get nodes
+    # ...
+    env:
+      - name: SCOUT_ID
+        value: scout-01                   # unique per Scout
+      - name: STATION_URL
+        value: http://station.example.lan:6555
+      - name: SCAN_DIR
+        value: /srv/data
+    # ...
+      - name: scan
+        hostPath:
+          path: /srv/data
+          type: DirectoryOrCreate
+    ```
+  </Step>
+  <Step title="Set the first admin password">
+    Create `.env` next to `kustomization.yaml`. It's gitignored, and the Secret is generated from it:
+
+    ```sh .env
+    INITIAL_ADMIN_PASSWORD=<your-password>
+    ```
+
+    Applying fails until this file exists, so the example never starts with a known password.
+  </Step>
+  <Step title="Apply">
+    ```sh
+    kubectl apply -k deploy-example/kubernetes
+    ```
+
+    This creates the `3to1go` namespace and the Scout pod.
+  </Step>
+  <Step title="Finish in the UI">
+    Open `http://<node>:6556/` and continue from **Sign in and add the credential** in the [Compose install](/scout/install#set-up).
+  </Step>
+</Steps>
+
+## Things to keep in mind
+
+- **Keep `/config` on persistent storage.** It holds the settings, `encryption.key`, and `installation.id`. Losing it means a new instance on Station, and losing the key means losing access to existing snapshots. See [Encryption key](/scout/encryption-key).
+- **One pod per set of folders.** Don't share `/config`, `/data/state`, or `/data/spool` between Scouts. The update strategy (`maxSurge: 0`) stops the old pod before starting a new one.
+- **Scout always scans `/scan`.** `SCAN_DIR` only sets the host path shown in Scout's UI. To back up several folders, mount each at `/scan/<name>` as in [Multiple folders and drives](/scout/multiple-folders).
+- **Mounts need write access.** Scout writes `.upload_dir` markers and restores files into `/scan`. The image runs as root, so files it creates are root-owned.
+- **Reaching the UI.** `hostPort` matches the Compose setup. If you use a Service or Ingress instead, keep it private or use HTTPS. See [Sign-in](/shared/sign-in).
+- **Credentials.** Paste the Scout credential in Scout's UI, as with Compose. It's saved in `/config`.
+- **Moving from Compose.** Stop the Compose container (`docker compose down`, without `-v`), point the `hostPath` volumes at the old Compose folders, and keep the same `SCOUT_ID`. Scout keeps its key, settings, and instance ID.
+- **Updating.** Change the image tag or digest and re-apply, or let a tool such as Renovate or Flux do it.
+
+## Several machines
+
+Copy `backup-scout.yaml` once per node, changing its name, `nodeSelector`, `SCOUT_ID`, and paths, or generate the copies from one template.
+
+### Sample: one template per device with Flux
+
+This keeps one Scout template in Git and builds a copy per device. Flux fills in the `${...}` values from each device's entry. Create a `backup-scout` Secret with an `INITIAL_ADMIN_PASSWORD` key in the namespace first.
+
+```yaml device-template/backup-scout.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: backup-scout-${DEVICE_ID}
+  namespace: backup
+  labels:
+    app.kubernetes.io/name: backup-scout-${DEVICE_ID}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backup-scout-${DEVICE_ID}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0         # stop the old pod before starting the new one
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backup-scout-${DEVICE_ID}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/hostname: ${NODE_HOSTNAME}
+      containers:
+        - name: backup-scout
+          image: ghcr.io/thesteau/3to1go-scout:latest
+          env:
+            - name: SCOUT_ID
+              value: ${SCOUT_ID}
+            - name: STATION_URL
+              value: http://<station-host>:6555
+            - name: SCAN_DIR
+              value: ${HOME_DIR}
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backup-scout
+                  key: INITIAL_ADMIN_PASSWORD
+          ports:
+            - name: web
+              containerPort: 6556
+              hostPort: 6556
+          volumeMounts:
+            - { name: config, mountPath: /config }
+            - { name: hook-scripts, mountPath: /hook-scripts }
+            - { name: scan, mountPath: /scan }
+            - { name: state, mountPath: /data/state }
+            - { name: spool, mountPath: /data/spool }
+      volumes:
+        - name: config
+          hostPath: { path: "${HOME_DIR}/backup-scout/config", type: DirectoryOrCreate }
+        - name: hook-scripts
+          hostPath: { path: "${HOME_DIR}/backup-scout/hook-scripts", type: DirectoryOrCreate }
+        - name: scan
+          hostPath: { path: "${HOME_DIR}", type: DirectoryOrCreate }
+        - name: state
+          hostPath: { path: "${HOME_DIR}/backup-scout/state", type: DirectoryOrCreate }
+        - name: spool
+          hostPath: { path: "${HOME_DIR}/backup-scout/spool", type: DirectoryOrCreate }
+```
+
+```yaml device-template/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - backup-scout.yaml
+```
+
+Add one Flux `Kustomization` per device:
+
+```yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: device-<id>
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./device-template
+  prune: true
+  deletionPolicy: Orphan   # removing the entry leaves the running Scout alone
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  postBuild:
+    substitute:
+      DEVICE_ID: <id>
+      SCOUT_ID: <scout-id>
+      NODE_HOSTNAME: <node-name>
+      HOME_DIR: /home/<user>
+```
+
+The `nodeSelector` pins each copy to its device, so its pod only runs once that node joins the cluster. If the device previously ran Scout with Compose in `<home>/backup-scout`, these folders pick up its existing config, key, and state.

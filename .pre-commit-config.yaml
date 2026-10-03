@@ -15,7 +15,7 @@ repos:
         types: [go]
       - id: golangci-lint
         name: golangci-lint
-        entry: sh -c 'for m in shared/go central edge; do (cd "$m" && golangci-lint run ./...) || exit 1; done'
+        entry: sh -c 'for m in shared/go station scout; do (cd "$m" && golangci-lint run ./...) || exit 1; done'
         language: system
         types: [go]
         pass_filenames: false

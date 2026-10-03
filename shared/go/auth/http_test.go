@@ -32,7 +32,7 @@ func (s *sessionStore) UserForSession(_ context.Context, token string) (*User, e
 
 func TestSessionCookieIsolation(t *testing.T) {
 	t.Setenv("SESSION_COOKIE_SECURE", "true")
-	for _, name := range []string{"three_to_one_go_session", "three_to_one_go_edge_session"} {
+	for _, name := range []string{"three_to_one_go_session", "three_to_one_go_scout_session"} {
 		t.Run(name, func(t *testing.T) {
 			store := &sessionStore{user: &User{ID: 1}}
 			h := &Handler{Store: store, CookieName: name}

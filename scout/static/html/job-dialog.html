@@ -1,0 +1,36 @@
+<dialog id="job-dialog" class="modal" aria-labelledby="job-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="job-dialog-title">Job Editor</h2>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Close</button>
+    </div>
+
+    <label for="relative_path">Directory <span class="field-help hover-hint" tabindex="0" aria-label="Saved to this folder's .upload_dir file, which tells Scout how to back it up." title="Saved to this folder's .upload_dir file, which tells Scout how to back it up.">?</span></label>
+    <input id="relative_path" readonly>
+
+    <label for="job_name">Job Name</label>
+    <input id="job_name" placeholder="Defaults to the folder name">
+
+    <label for="exclude">Exclude Patterns</label>
+    <textarea id="exclude" placeholder="One pattern per line"></textarea>
+
+    <div class="split-row">
+      <label class="checkbox">
+        <input type="checkbox" id="include_hidden" checked>
+        <span>Include hidden files</span>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="follow_symlinks">
+        <span>Follow symlinks</span>
+      </label>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" onclick="saveJob()">Save Job</button>
+      <button type="button" class="danger" onclick="deleteJob()">Stop Backing Up</button>
+      <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Cancel</button>
+    </div>
+  </div>
+</dialog>

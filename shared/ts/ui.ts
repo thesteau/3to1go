@@ -146,10 +146,10 @@ globalThis.addEventListener?.("unhandledrejection", (event) => {
   setActionStatus(message, "error");
   event.preventDefault();
 });
-// New content fades in instead of snapping into place. Keyed items (directories, jobs, edges,
+// New content fades in instead of snapping into place. Keyed items (directories, jobs, scouts,
 // instances) that were already on screen are left alone when re-rendered, so polling never flickers.
 const LOADING_PLACEHOLDER = ".section-loading, .loading-placeholder";
-const FADE_KEY_ATTRS = ["data-path", "data-edge-id", "data-instance-id"];
+const FADE_KEY_ATTRS = ["data-path", "data-scout-id", "data-instance-id"];
 const FADE_KEYED = FADE_KEY_ATTRS.map((attr) => `[${attr}]`).join(", ");
 
 function prefersReducedMotion(): boolean {

@@ -1,0 +1,22 @@
+<dialog id="files-dialog" class="modal" aria-labelledby="files-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="files-dialog-title">Files and exclusions</h2>
+        <p class="hint">Exclusions save right away and apply to the next backup.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('files-dialog')">Close</button>
+    </div>
+    <div class="toolbar">
+      <code id="files-path"></code>
+      <button id="files-size" type="button" class="secondary">Calculate folder size</button>
+    </div>
+    <p id="files-status" role="status"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Size <span class="field-help hover-hint" tabindex="0" aria-label="Sizes are before compression. Folder totals include excluded files but skip symlinks and Scout runtime data." title="Sizes are before compression. Folder totals include excluded files but skip symlinks and Scout runtime data.">?</span></th><th>Backup</th><th>Action</th></tr></thead>
+        <tbody id="files-list"></tbody>
+      </table>
+    </div>
+  </div>
+</dialog>

@@ -1,0 +1,77 @@
+---
+title: "Station configuration"
+description: "Environment variables for deployment, and settings you change from Station's UI."
+---
+
+Station is configured in two places:
+
+- **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers. `docker compose restart` alone does not reload `.env`.
+- **Edit Station Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
+
+## Environment variables
+
+### Compose and database
+
+| Variable | Default | Description |
+|---|---|---|
+| `BACKUP_DIR` | `./data/backups` | Host folder mounted at `/backups`. Used by the example Compose file. |
+| `POSTGRES_DB` | `three_to_one_go` | Database name, shared by Station and the Postgres container. |
+| `POSTGRES_USER` | none | Database user. **Required** unless `INDEX_DATABASE_URL` is set. |
+| `POSTGRES_PASSWORD` | none | Database password. **Required** unless `INDEX_DATABASE_URL` is set. |
+| `INITIAL_ADMIN_PASSWORD` | `admin` | Password for the first `admin` user. Only used when no user accounts exist. A password change is required on first sign-in, even with a custom value. |
+
+### Using an external PostgreSQL
+
+By default Station connects to the `postgres` service on port `5432`. To use another server, either set a full URL:
+
+| Variable | Description |
+|---|---|
+| `INDEX_DATABASE_URL` | Full connection URL, such as `postgresql://user:pass@db.example.lan:5432/three_to_one_go`. Overrides everything below. |
+
+or set the parts individually:
+
+| Variable | Default |
+|---|---|
+| `INDEX_DATABASE_HOST` | `postgres` |
+| `INDEX_DATABASE_PORT` | `5432` |
+| `INDEX_DATABASE_NAME` | `POSTGRES_DB`, then `three_to_one_go` |
+| `INDEX_DATABASE_USER` | `POSTGRES_USER` |
+| `INDEX_DATABASE_PASSWORD` | `POSTGRES_PASSWORD` |
+
+When using an external database, also remove the bundled `postgres` service and Station's `depends_on: postgres` entry from the Compose file if you no longer want to run that database container.
+
+### Server and paths
+
+| Variable | Default | Description |
+|---|---|---|
+| `HTTP_HOST` | `0.0.0.0` | Address Station listens on. |
+| `HTTP_PORT` | `6555` | Port Station listens on. If you change it, update the Compose `ports` mapping too. |
+| `BACKUP_ROOT` | `/backups` | Snapshot folder inside the container. |
+| `STAGING_DIR` | `/staging` | Folder for uploads in progress. |
+| `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Scout credentials. Created on first start if missing. |
+| `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Station over HTTPS. See [Sign-in](/shared/sign-in#session-cookies-over-https). |
+
+## Settings in the UI
+
+Open **Edit Station Settings**.
+
+| Setting | Default | Description |
+|---|---|---|
+| Dark Mode | on | UI theme. |
+| Pause incoming uploads | off | Reject new upload sessions. Uploads already in progress can continue. |
+| Keep Last Snapshots | `3` | How many snapshots to keep per job and Scout instance. Older ones are pruned after each upload. |
+| Log Level | `INFO` | Container log verbosity. |
+| Max Upload (MB) | `2048` | Largest archive Station will accept. |
+| Chunk Size (MB) | `8` | Chunk size Station asks Scouts to use. |
+| Upload Expiry (hours) | `24` | Upload session lifetime, refreshed as upload activity continues. Expired sessions are removed by cleanup. |
+| Cleanup Interval (s) | `300` | How often expired upload sessions are cleaned up. Minimum `10`. |
+| Unusual uploads | Flag and alert | Flag archives whose size is far from the job's usual size. See [Unusual sizes](/station/snapshots#unusual-sizes). |
+| Integrity Check (hours) | `0` (off) | Hours between automatic integrity checks. See [Integrity checks](/station/snapshots#integrity-checks). |
+
+**Trusted Certificates** are also managed here. See [Trusted certificates](/shared/trusted-certificates).
+
+Restart Station after changing **Log Level** or **Integrity Check (hours)** so the running logger or verification schedule uses the new value.
+
+<Note>
+  Raise **Max Upload (MB)** if a job's archive is larger than 2 GB. Otherwise Station rejects its upload.
+</Note>

@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "3to1go",
-  "description": "Self-hosted, encrypted backups: Edge backs up your machines, Central stores the snapshots.",
+  "description": "Self-hosted, encrypted backups: Scout backs up your machines, Station stores the snapshots.",
   "colors": {
     "primary": "#c73346",
     "light": "#e05263",
@@ -50,44 +50,44 @@
         ]
       },
       {
-        "tab": "Central",
+        "tab": "Station",
         "icon": "server",
         "groups": [
           {
-            "group": "Central",
-            "pages": ["central/overview", "central/install", "central/configuration"]
+            "group": "Station",
+            "pages": ["station/overview", "station/install", "station/configuration"]
           },
           {
-            "group": "Using Central",
+            "group": "Using Station",
             "pages": [
-              "central/edge-credentials",
-              "central/snapshots",
-              "central/notifications",
-              "central/hooks",
-              "central/reset-admin-password",
-              "central/disaster-recovery"
+              "station/scout-credentials",
+              "station/snapshots",
+              "station/notifications",
+              "station/hooks",
+              "station/reset-admin-password",
+              "station/disaster-recovery"
             ]
           }
         ]
       },
       {
-        "tab": "Edge",
+        "tab": "Scout",
         "icon": "laptop",
         "groups": [
           {
-            "group": "Edge",
-            "pages": ["edge/overview", "edge/install", "edge/kubernetes", "edge/configuration"]
+            "group": "Scout",
+            "pages": ["scout/overview", "scout/install", "scout/kubernetes", "scout/configuration"]
           },
           {
-            "group": "Using Edge",
+            "group": "Using Scout",
             "pages": [
-              "edge/backup-jobs",
-              "edge/unusual-backups",
-              "edge/multiple-folders",
-              "edge/restore",
-              "edge/encryption-key",
-              "edge/notifications",
-              "edge/hooks"
+              "scout/backup-jobs",
+              "scout/unusual-backups",
+              "scout/multiple-folders",
+              "scout/restore",
+              "scout/encryption-key",
+              "scout/notifications",
+              "scout/hooks"
             ]
           }
         ]

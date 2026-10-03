@@ -9,7 +9,7 @@ import (
 
 func TestApplicationEnvironmentAndCancellation(t *testing.T) {
 	hasSh(t)
-	for _, app := range []string{"central", "edge"} {
+	for _, app := range []string{"station", "scout"} {
 		t.Run(app, func(t *testing.T) {
 			dir := t.TempDir()
 			manager := NewHookManager(app, dir, discardLogger())

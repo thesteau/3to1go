@@ -1,0 +1,23 @@
+<dialog id="recover-dialog" class="modal" aria-labelledby="recover-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="recover-dialog-title">Restore from Station</h2>
+        <p class="hint">Restored files replace local copies. Other files are left alone.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Close</button>
+    </div>
+
+    <p>Job: <strong id="recover-dialog-job-name"></strong></p>
+
+    <label for="recover-fingerprint">Snapshot fingerprint <span class="field-help hover-hint" tabindex="0" aria-label="Leave empty for the latest snapshot, or enter a fingerprint to restore an older snapshot of this job. In the preview, Replace overwrites a local file and Add restores a missing one." title="Leave empty for the latest snapshot, or enter a fingerprint to restore an older snapshot of this job. In the preview, Replace overwrites a local file and Add restores a missing one.">?</span></label>
+    <input id="recover-fingerprint" placeholder="Leave empty to restore the latest snapshot">
+
+    <div id="recover-preview" class="recover-preview" hidden></div>
+
+    <div class="toolbar">
+      <button id="recover-confirm-btn" type="button" onclick="confirmRecover()">Preview Restore</button>
+      <button type="button" class="secondary" onclick="closeDialog('recover-dialog')">Cancel</button>
+    </div>
+  </div>
+</dialog>

@@ -2,8 +2,8 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directories:
-      - /central
-      - /edge
+      - /station
+      - /scout
       - /shared/go
     schedule:
       interval: weekly
@@ -32,8 +32,8 @@ updates:
         patterns: ["*"]
   - package-ecosystem: docker
     directories:
-      - /central
-      - /edge
+      - /station
+      - /scout
     schedule:
       interval: weekly
     commit-message:

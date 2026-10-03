@@ -134,9 +134,9 @@ test("PR titles must be Conventional Commits and report their release effect", a
   const run = new AsyncFunction("core", "process", scripts("pr-title")[0]);
   for (const [title, expected] of [
     ["feat: add restore preview", 'notice:"feat" title: minor release once promoted to prod.'],
-    ["fix(edge): retry uploads", 'notice:"fix" title: patch release once promoted to prod.'],
+    ["fix(scout): retry uploads", 'notice:"fix" title: patch release once promoted to prod.'],
     ["perf: faster scans", 'notice:"perf" title: patch release once promoted to prod.'],
-    ["feat(central)!: drop legacy API", 'notice:"feat!" title: major release once promoted to prod.'],
+    ["feat(station)!: drop legacy API", 'notice:"feat!" title: major release once promoted to prod.'],
     ["chore!: remove old config keys", 'notice:"chore!" title: major release once promoted to prod.'],
     ["docs: explain retention", 'notice:"docs" title: no release on its own once promoted to prod.'],
     ["Add fading", "failed"],
@@ -144,7 +144,7 @@ test("PR titles must be Conventional Commits and report their release effect", a
     ["Feat: capitalised", "failed"],
     ["feature: unknown type", "failed"],
     ["constructor: inherited key", "failed"],
-    ["fix(Edge): uppercase scope", "failed"],
+    ["fix(Scout): uppercase scope", "failed"],
     ["fix: ", "failed"],
   ]) {
     const calls: string[] = [];

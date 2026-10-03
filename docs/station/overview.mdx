@@ -1,0 +1,45 @@
+---
+title: "Station overview"
+description: "The always-on receiver that stores encrypted snapshots from your Scouts."
+---
+
+Station **receives and keeps** backups. Run it on one always-on host, such as a home server, NAS, or VPS. Every Scout uploads to it.
+
+## What Station does
+
+- **Receives uploads** from Scouts in chunks, and verifies each one before storing it.
+- **Stores snapshots** as encrypted archive files under `scout_id/scout_instance_id/job_name` in its backup folder.
+- **Applies retention**, keeping the most recent snapshots per job and instance.
+- **Mints and revokes Scout credentials**, so only Scouts you've authorized can upload.
+- **Checks integrity** on a schedule, if enabled.
+- **Lets you browse, download, and delete snapshots** in its web UI, decrypting downloads in your browser.
+- **Sends notifications** to ntfy and runs your own scripts when uploads arrive.
+
+Station never sees your plaintext files, only archives Scout has already encrypted.
+
+## What it runs
+
+| Component | Purpose |
+|---|---|
+| `ghcr.io/thesteau/3to1go-station` | The Station app and web UI, on port `6555` |
+| `postgres:17-alpine` | Stores snapshot metadata, users, settings, Scout registrations, and credential records |
+
+The example Compose file runs both. See [Install Station](/station/install).
+
+## Folders it uses
+
+| Inside the container | Holds |
+|---|---|
+| `/backups` | Stored snapshots. Point this at the disk, NAS, or synced folder you want. |
+| `/staging` | Uploads in progress |
+| `/config` | Station's signing key (`issuer.key`) and trusted certificates |
+| `/hook-scripts` | Scripts you upload for [hooks](/station/hooks) |
+
+<Warning>
+  Back up Station's `config` folder. `issuer.key` signs Scout credentials. If it's lost, every existing credential stops working and each Scout needs a new one.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Install Station" icon="download" href="/station/install" />
+  <Card title="Configuration" icon="sliders" href="/station/configuration" />
+</CardGroup>

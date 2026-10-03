@@ -6,8 +6,8 @@ kind: Kustomization
 namespace: 3to1go
 resources:
   - namespace.yaml
-  - backup-edge.yaml
+  - backup-scout.yaml
 secretGenerator:
-  - name: backup-edge
+  - name: backup-scout
     envs:
       - .env

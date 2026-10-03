@@ -20,5 +20,5 @@ reports/
 *.mjs.map
 *.cjs.map
 # Compiled from */static/ts by `npm run build`.
-central/static/js/
-edge/static/js/
+station/static/js/
+scout/static/js/

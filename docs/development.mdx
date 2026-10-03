@@ -3,7 +3,7 @@ title: "Developing both apps"
 description: "Repository layout, local builds, running the tests, frontend generation, and local Docker builds."
 ---
 
-Central and Edge are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
+Station and Scout are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
 
 Open normal development PRs against `main`, titled as Conventional Commits (`feat: …`, `fix: …`, `docs: …`). CI enforces this, and the title decides the next version. See [Releases](/releases#pr-titles-and-versions).
 
@@ -11,15 +11,15 @@ Open normal development PRs against `main`, titled as Conventional Commits (`fea
 
 | Path | Contents |
 |---|---|
-| `central/` | Central's receiver API, storage logic, and web UI |
-| `edge/` | Edge's scanning, encryption, upload, restore, and web UI |
+| `station/` | Station's receiver API, storage logic, and web UI |
+| `scout/` | Scout's scanning, encryption, upload, restore, and web UI |
 | `shared/go/` | Wire protocol, authentication, HTTP helpers, certificates, hooks, ntfy templates, locks, configuration helpers, and web UI serving |
 | `shared/ts/` | Browser scripts and types compiled into both UIs |
-| `tests/` | TypeScript tests, grouped by area: `edge/`, `central/`, `shared/` (both UIs), `release/` (release automation), and `ci/` (CI tooling) |
-| `deploy-example/central/`, `deploy-example/edge/` | Compose deployments using published images |
+| `tests/` | TypeScript tests, grouped by area: `scout/`, `station/`, `shared/` (both UIs), `release/` (release automation), and `ci/` (CI tooling) |
+| `deploy-example/station/`, `deploy-example/scout/` | Compose deployments using published images |
 | `docs/` | Mintlify documentation |
 
-The root `go.work` joins three Go modules: `central`, `edge`, and `shared/go`. Behavior specific to one app stays in that app's directory. Go also discovers the parent workspace when commands run inside an app directory.
+The root `go.work` joins three Go modules: `station`, `scout`, and `shared/go`. Behavior specific to one app stays in that app's directory. Go also discovers the parent workspace when commands run inside an app directory.
 
 ## Build locally
 
@@ -33,11 +33,11 @@ npm run build
 Then build an individual server from its app directory:
 
 ```sh
-cd central
+cd station
 go build ./cmd/server
 ```
 
-Use `edge` in place of `central` to build Edge.
+Use `scout` in place of `station` to build Scout.
 
 ## Run the tests
 
@@ -53,10 +53,10 @@ CI runs the Go and frontend tests on every PR, and the end-to-end test after eac
 
 ```sh
 npm run build
-go test ./shared/go/... ./central/... ./edge/...
+go test ./shared/go/... ./station/... ./scout/...
 
 # One package, filtered by test name
-go test ./edge/internal/services/directories/ -run ListChildren -v
+go test ./scout/internal/services/directories/ -run ListChildren -v
 ```
 
 CI also passes `-race`, which needs a C compiler. On Windows, tests that need symlinks, POSIX permissions, or `sh` report `SKIP`, but CI still runs them.
@@ -71,8 +71,8 @@ This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grou
 
 | Folder | Covers |
 |---|---|
-| `tests/edge/` | Edge UI, such as the directory tree, file browser, and refresh loop |
-| `tests/central/` | Central UI, such as the overview, saved keys, and snapshot decryption |
+| `tests/scout/` | Scout UI, such as the directory tree, file browser, and refresh loop |
+| `tests/station/` | Station UI, such as the overview, saved keys, and snapshot decryption |
 | `tests/shared/` | Behavior both UIs share |
 | `tests/release/` | Release scripts and workflows |
 | `tests/ci/` | CI tooling, such as the test report generator |
@@ -80,8 +80,8 @@ This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grou
 To run some tests without rebuilding every time, run `npm run build` once (again after TypeScript changes), then:
 
 ```sh
-node --test tests/edge/directory-tree.test.cts                            # one file
-node --test "tests/central/**/*.test.cts"                                 # one area
+node --test tests/scout/directory-tree.test.cts                            # one file
+node --test "tests/station/**/*.test.cts"                                 # one area
 node --test --test-name-pattern="directory tree" "tests/**/*.test.cts"    # by name
 ```
 
@@ -89,11 +89,11 @@ Quote globs so Node expands them, not your shell. Name new test files after thei
 
 ### End-to-end test
 
-`tests/integration/e2e.sh` runs PostgreSQL, Central, and Edge in Docker, takes a backup, and recovers it. Build the images it expects first:
+`tests/integration/e2e.sh` runs PostgreSQL, Station, and Scout in Docker, takes a backup, and recovers it. Build the images it expects first:
 
 ```sh
-docker build -t 3to1go-central-validation -f central/Dockerfile .
-docker build -t 3to1go-edge-validation -f edge/Dockerfile .
+docker build -t 3to1go-station-validation -f station/Dockerfile .
+docker build -t 3to1go-scout-validation -f scout/Dockerfile .
 bash tests/integration/e2e.sh
 ```
 
@@ -104,10 +104,10 @@ It uses host ports `16555` and `16556` and cleans up after itself. On Windows, r
 `scripts/test-report.cts` turns results into a single HTML page with pass, fail, and skip counts and each failure's output. `npm test` writes `reports/frontend-tests.html`. For Go tests, convert the `go test -json` output. The coverage page is optional:
 
 ```sh
-mkdir -p reports && cd edge
-go test -json -coverprofile=../reports/edge-coverage.out ./... ../shared/go/... > ../reports/edge-go-tests.json
-node ../scripts/test-report.cts go "Edge Go tests" ../reports/edge-go-tests.json ../reports/edge-go-tests.html
-go tool cover -html=../reports/edge-coverage.out -o ../reports/edge-coverage.html
+mkdir -p reports && cd scout
+go test -json -coverprofile=../reports/scout-coverage.out ./... ../shared/go/... > ../reports/scout-go-tests.json
+node ../scripts/test-report.cts go "Scout Go tests" ../reports/scout-go-tests.json ../reports/scout-go-tests.html
+go tool cover -html=../reports/scout-coverage.out -o ../reports/scout-coverage.html
 ```
 
 In CI, each test job writes a summary on its run page and uploads its reports as an artifact, kept for 14 days. Download it from **Artifacts** at the bottom of the run, unzip, and open the HTML file.
@@ -115,7 +115,7 @@ In CI, each test job writes a summary on its run page and uploads its reports as
 | Artifact | Contents |
 |---|---|
 | `frontend-test-report` | `frontend-tests.html` |
-| `edge-test-report`, `central-test-report` | Test report, coverage report, and raw `go test -json` output |
+| `scout-test-report`, `station-test-report` | Test report, coverage report, and raw `go test -json` output |
 | `e2e-container-logs` | Container logs, only when the end-to-end test fails |
 
 ## Linting and formatting
@@ -133,7 +133,7 @@ The lint workflow runs on PRs and pushes to `main` and `prod`:
 Run the TypeScript checks with `npm run lint`, and apply formatting and safe fixes with `npm run fix`. Run golangci-lint from a module folder after `npm run build`:
 
 ```sh
-cd edge && golangci-lint run ./...
+cd scout && golangci-lint run ./...
 ```
 
 ESLint isn't used. TypeScript 7 has no JavaScript compiler API, which typescript-eslint needs. Biome parses TypeScript itself.
@@ -152,15 +152,15 @@ Report vulnerabilities using the repository's [security policy](https://github.c
 
 ## Frontend sources and generated files
 
-Edit TypeScript in `central/static/ts`, `edge/static/ts`, or `shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
+Edit TypeScript in `station/static/ts`, `scout/static/ts`, or `shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
 
-Go embeds the generated `central/static/js` and `edge/static/js`, so generate them before `go build` or `go test` with `npm run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
+Go embeds the generated `station/static/js` and `scout/static/js`, so generate them before `go build` or `go test` with `npm run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
 
-For continuous compilation, use `npm run watch` (Central) or `npm run watch:edge` (Edge), then rebuild and restart the Go server to serve the new assets.
+For continuous compilation, use `npm run watch` (Station) or `npm run watch:scout` (Scout), then rebuild and restart the Go server to serve the new assets.
 
 ## Build with Docker Compose
 
-`central/docker-compose.yml` and `edge/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Central installation](/central/install) or [Edge installation](/edge/install), then from that app's folder:
+`station/docker-compose.yml` and `scout/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Station installation](/station/install) or [Scout installation](/scout/install), then from that app's folder:
 
 ```sh
 docker compose up -d --build

@@ -1,19 +1,19 @@
 ---
 title: "Sign-in and accounts"
-description: "First sign-in, account controls, password changes, and sessions in Central and Edge."
+description: "First sign-in, account controls, password changes, and sessions in Station and Scout."
 ---
 
-Central and Edge each have their **own** web UI and their own accounts. Signing in to one does not sign you in to the other.
+Station and Scout each have their **own** web UI and their own accounts. Signing in to one does not sign you in to the other.
 
 <Tabs>
-  <Tab title="Central">
-    <Frame caption="Central's sign-in dialog.">
-      <img src="/images/sign-in/central-sign-in.png" alt="Central Sign In dialog with username and password fields" />
+  <Tab title="Station">
+    <Frame caption="Station's sign-in dialog.">
+      <img src="/images/sign-in/station-sign-in.png" alt="Station Sign In dialog with username and password fields" />
     </Frame>
   </Tab>
-  <Tab title="Edge">
-    <Frame caption="Edge's separate sign-in dialog.">
-      <img src="/images/sign-in/edge-sign-in.png" alt="Edge Sign In dialog with username and password fields" />
+  <Tab title="Scout">
+    <Frame caption="Scout's separate sign-in dialog.">
+      <img src="/images/sign-in/scout-sign-in.png" alt="Scout Sign In dialog with username and password fields" />
     </Frame>
   </Tab>
 </Tabs>
@@ -28,10 +28,10 @@ When an app starts with no user accounts, it creates an `admin` user. Its passwo
 The first admin must change its password before continuing, **even when you set a custom `INITIAL_ADMIN_PASSWORD`**. Using `admin` as any account's password also requires a password change.
 
 <Warning>
-  `INITIAL_ADMIN_PASSWORD` is only read when the first admin is created. Changing it later does **not** change an existing password. To recover a locked Central account, see [Reset the admin password](/central/reset-admin-password).
+  `INITIAL_ADMIN_PASSWORD` is only read when the first admin is created. Changing it later does **not** change an existing password. To recover a locked Station account, see [Reset the admin password](/station/reset-admin-password).
 </Warning>
 
-In Central, `POSTGRES_PASSWORD` is the database password, not your sign-in password.
+In Station, `POSTGRES_PASSWORD` is the database password, not your sign-in password.
 
 ## Accounts are for one operator
 
@@ -46,14 +46,14 @@ Click **Admin** in either app to open **Users & Access**:
 An admin reset signs the target account out of its existing sessions and requires a password change. Creating an additional account with a non-default password does **not** automatically require a first-sign-in password change.
 
 <Tabs>
-  <Tab title="Central">
-    <Frame caption="Users & Access in Central, with an example additional account.">
-      <img src="/images/sign-in/central-users.png" alt="Central Users and Access dialog showing admin and operator accounts, password reset, admin access, and Add User controls" />
+  <Tab title="Station">
+    <Frame caption="Users & Access in Station, with an example additional account.">
+      <img src="/images/sign-in/station-users.png" alt="Station Users and Access dialog showing admin and operator accounts, password reset, admin access, and Add User controls" />
     </Frame>
   </Tab>
-  <Tab title="Edge">
-    <Frame caption="Users & Access in Edge. These accounts belong to this Edge only.">
-      <img src="/images/sign-in/edge-users.png" alt="Edge Users and Access dialog showing local admin and operator accounts and account management controls" />
+  <Tab title="Scout">
+    <Frame caption="Users & Access in Scout. These accounts belong to this Scout only.">
+      <img src="/images/sign-in/scout-users.png" alt="Scout Users and Access dialog showing local admin and operator accounts and account management controls" />
     </Frame>
   </Tab>
 </Tabs>
@@ -64,13 +64,13 @@ Open **Admin**, then **Change My Password**. Enter your current password and the
 
 The same dialog appears when a password change is required. Changing your own password keeps your existing sessions signed in.
 
-<Frame caption="Change My Password in Central. Edge has the same fields.">
-  <img src="/images/sign-in/central-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
+<Frame caption="Change My Password in Station. Scout has the same fields.">
+  <img src="/images/sign-in/station-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
 </Frame>
 
 ## Sessions and sign-out
 
-Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session. Other browsers stay signed in. Central and Edge use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
+Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session. Other browsers stay signed in. Station and Scout use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
 
 ## Session cookies over HTTPS
 
@@ -83,5 +83,5 @@ SESSION_COOKIE_SECURE=true
 Accepted "on" values are `1`, `true`, `yes`, and `on`. Anything else, or leaving it unset, keeps the cookie usable over plain HTTP.
 
 <Note>
-  Edge's settings dialog warns when its UI is served over plain HTTP. The UI and Edge's connection to Central are separate, so use HTTPS for both the Edge UI and `CENTRAL_URL` to protect credentials.
+  Scout's settings dialog warns when its UI is served over plain HTTP. The UI and Scout's connection to Station are separate, so use HTTPS for both the Scout UI and `STATION_URL` to protect credentials.
 </Note>

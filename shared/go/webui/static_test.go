@@ -70,7 +70,7 @@ func TestStaticHandlerTagsCompressesAndRevalidates(t *testing.T) {
 
 func TestIndexServerTagsTheShell(t *testing.T) {
 	serve := IndexServer(func(name string) ([]byte, error) {
-		return []byte("<!doctype html><main>Edge</main>"), nil
+		return []byte("<!doctype html><main>Scout</main>"), nil
 	})
 	rec := httptest.NewRecorder()
 	serve(rec, httptest.NewRequest(http.MethodGet, "/", nil))

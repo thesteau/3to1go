@@ -1,0 +1,46 @@
+<dialog id="hooks-dialog" class="modal" aria-labelledby="hooks-dialog-title">
+  <div class="modal-card">
+    <div id="hooks-load-status" role="status"></div>
+    <div class="modal-head">
+      <div>
+        <h2 id="hooks-dialog-title">Custom Scripts</h2>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('hooks-dialog')">Close</button>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Pre Command</h3>
+        <div class="hook-inline-actions">
+          <button type="button" class="secondary" onclick="clearHookCommand('pre')" data-requires="hooks" disabled>Clear</button>
+          <button type="button" class="secondary" onclick="saveHookCommands()" data-requires="hooks" disabled>Save</button>
+        </div>
+      </div>
+      <textarea id="hook_pre_command" placeholder="Optional command or script filename" data-requires="hooks" disabled></textarea>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Post Command</h3>
+        <div class="hook-inline-actions">
+          <button type="button" class="secondary" onclick="clearHookCommand('post')" data-requires="hooks" disabled>Clear</button>
+          <button type="button" class="secondary" onclick="saveHookCommands()" data-requires="hooks" disabled>Save</button>
+        </div>
+      </div>
+      <textarea id="hook_post_command" placeholder="Optional command or script filename" data-requires="hooks" disabled></textarea>
+    </div>
+
+    <div class="hook-section">
+      <div class="hook-section-head">
+        <h3>Uploaded Items <span class="field-help hover-hint" tabindex="0" aria-label="Upload .sh scripts and .txt helper files that your pre and post commands can use." title="Upload .sh scripts and .txt helper files that your pre and post commands can use.">?</span></h3>
+        <span class="hint">Up to 3 files. Folder: <code id="hook-script-dir">loading...</code></span>
+      </div>
+      <div class="hook-upload-row">
+        <input id="hook_file_input" type="file" accept=".sh,.txt" data-requires="hooks" disabled>
+        <button type="button" class="secondary" onclick="uploadHookFile()" data-requires="hooks" disabled>Upload</button>
+      </div>
+      <div id="hook-files" class="hook-files"></div>
+    </div>
+
+  </div>
+</dialog>

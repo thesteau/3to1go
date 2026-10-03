@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Run Central and Edge with Docker and take your first backup."
+description: "Run Station and Scout with Docker and take your first backup."
 ---
 
 This guide uses the published Docker images and the example Compose files from the repository. You need [Docker](https://docs.docker.com/get-docker/) with Compose on each machine.
@@ -8,17 +8,17 @@ This guide uses the published Docker images and the example Compose files from t
 The examples use the `latest` images. For production, pin a stable version. See [Choose an image version](#choose-an-image-version).
 
 <Tip>
-  You can run both apps on the same machine to try things out. In real use, Central usually runs on a separate, always-on host.
+  You can run both apps on the same machine to try things out. In real use, Station usually runs on a separate, always-on host.
 </Tip>
 
-## 1. Start Central
+## 1. Start Station
 
 On the machine that will store backups:
 
 ```sh
-mkdir 3to1go-central && cd 3to1go-central
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+mkdir 3to1go-station && cd 3to1go-station
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/.env.example -o .env
 ```
 
 Edit `.env` and set a real `POSTGRES_PASSWORD` (and optionally `INITIAL_ADMIN_PASSWORD`), then start it:
@@ -29,39 +29,39 @@ docker compose up -d
 
 Open **http://localhost:6555/** and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
 
-## 2. Mint an Edge credential
+## 2. Mint a Scout credential
 
-In Central's UI, mint a new Edge credential and copy it. You'll paste it into Edge in the next step. See [Edge credentials](/central/edge-credentials).
+In Station's UI, mint a new Scout credential and copy it. You'll paste it into Scout in the next step. See [Scout credentials](/station/scout-credentials).
 
-## 3. Start Edge
+## 3. Start Scout
 
 On the machine that has the files:
 
 ```sh
-mkdir 3to1go-edge && cd 3to1go-edge
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+mkdir 3to1go-scout && cd 3to1go-scout
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/.env.example -o .env
 ```
 
 Edit `.env`:
 
 ```sh .env
-EDGE_ID=laptop-alice                          # unique per Edge installation
-CENTRAL_URL=http://central.example.lan:6555   # must be reachable from the Edge container
-SCAN_DIR=/home/alice                          # folder on this machine that Edge can see
+SCOUT_ID=laptop-alice                          # unique per Scout installation
+STATION_URL=http://station.example.lan:6555   # must be reachable from the Scout container
+SCAN_DIR=/home/alice                          # folder on this machine that Scout can see
 ```
 
-If Central runs on the same Docker Desktop host, `CENTRAL_URL` is usually `http://host.docker.internal:6555`.
+If Station runs on the same Docker Desktop host, `STATION_URL` is usually `http://host.docker.internal:6555`.
 
 ```sh
 docker compose up -d
 ```
 
-Open **http://localhost:6556/**, sign in, and paste the credential from step 2 into Edge's settings.
+Open **http://localhost:6556/**, sign in, and paste the credential from step 2 into Scout's settings.
 
 ## 4. Choose a folder to back up
 
-In Edge's folder browser, click **Edit** on the folder you want backed up, then **Save Job**.
+In Scout's folder browser, click **Edit** on the folder you want backed up, then **Save Job**.
 
 The Job Editor saves the job as a `.upload_dir` file in the folder. You can also create or edit that file yourself, which does the same thing. An empty file uses the folder name as the job name:
 
@@ -69,14 +69,14 @@ The Job Editor saves the job as a `.upload_dir` file in the folder. You can also
 touch /home/alice/photos/.upload_dir
 ```
 
-See [Backup jobs](/edge/backup-jobs).
+See [Backup jobs](/scout/backup-jobs).
 
 ## 5. Run the first backup
 
-Edge backs up on its schedule (weekly by default). To back up now, click **Run Backup Cycle Now** in Edge's UI. When it finishes, the snapshot appears in Central's UI.
+Scout backs up on its schedule (weekly by default). To back up now, click **Run Backup Cycle Now** in Scout's UI. When it finishes, the snapshot appears in Station's UI.
 
 <Warning>
-  Back up Edge's `encryption.key` right away. Without it, that Edge's snapshots cannot be decrypted. See [Encryption key](/edge/encryption-key).
+  Back up Scout's `encryption.key` right away. Without it, that Scout's snapshots cannot be decrypted. See [Encryption key](/scout/encryption-key).
 </Warning>
 
 ## Choose an image version
@@ -87,39 +87,39 @@ Edge backs up on its schedule (weekly by default). To back up now, click **Run B
 | `latest` | The most recent build of that app from `main`. May be unstable. |
 | 7-character commit SHA | A specific `main` build. |
 
-Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Central and Edge. In steps 1 and 3, download the files from that release's tag instead of `main`, so the configuration matches the image:
+Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Station and Scout. In steps 1 and 3, download the files from that release's tag instead of `main`, so the configuration matches the image:
 
-```sh Central
+```sh Station
 VERSION=v1.0.0
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/.env.example -o .env
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/station/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/station/.env.example -o .env
 ```
 
-```sh Edge
+```sh Scout
 VERSION=v1.0.0
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/.env.example -o .env
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/scout/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/scout/.env.example -o .env
 ```
 
 Then set the same tag as the image in each `docker-compose.yml`:
 
 ```yaml
-image: ghcr.io/thesteau/3to1go-central:v1.0.0
+image: ghcr.io/thesteau/3to1go-station:v1.0.0
 ```
 
 ```yaml
-image: ghcr.io/thesteau/3to1go-edge:v1.0.0
+image: ghcr.io/thesteau/3to1go-scout:v1.0.0
 ```
 
-For the [Kubernetes example](/edge/kubernetes), set the Edge image the same way. To upgrade, read the release notes, change the tag to the newer release, and run `docker compose up -d`. If the notes mention configuration changes, compare your `.env` with that release's `.env.example`.
+For the [Kubernetes example](/scout/kubernetes), set the Scout image the same way. To upgrade, read the release notes, change the tag to the newer release, and run `docker compose up -d`. If the notes mention configuration changes, compare your `.env` with that release's `.env.example`.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Back up several folders or drives" icon="hard-drive" href="/edge/multiple-folders">
-    Mount more than one folder into Edge.
+  <Card title="Back up several folders or drives" icon="hard-drive" href="/scout/multiple-folders">
+    Mount more than one folder into Scout.
   </Card>
-  <Card title="Restore files" icon="clock-rotate-left" href="/edge/restore">
-    Bring a snapshot back onto the Edge machine.
+  <Card title="Restore files" icon="clock-rotate-left" href="/scout/restore">
+    Bring a snapshot back onto the Scout machine.
   </Card>
 </CardGroup>

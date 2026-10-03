@@ -1,0 +1,270 @@
+package api
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/3to1go/shared/httpx"
+	"github.com/3to1go/station/internal/ingest"
+)
+
+var fingerprintQueryRE = regexp.MustCompile(`^[a-f0-9]{8}([a-f0-9]{56})?$`)
+
+func validatedNamespace(scoutID, instID, jobName string) (string, error) {
+	scoutID, err := ingest.ValidateNamespaceComponent(scoutID, "scout_id")
+	if err != nil {
+		return "", err
+	}
+	instID, err = ingest.ValidateNamespaceComponent(instID, "scout_instance_id")
+	if err != nil {
+		return "", err
+	}
+	jobName, err = ingest.ValidateNamespaceComponent(jobName, "job_name")
+	if err != nil {
+		return "", err
+	}
+	return scoutID + "/" + instID + "/" + jobName, nil
+}
+
+func validatedLegacyNamespace(scoutID, jobName string) (string, error) {
+	scoutID, err := ingest.ValidateNamespaceComponent(scoutID, "scout_id")
+	if err != nil {
+		return "", err
+	}
+	jobName, err = ingest.ValidateNamespaceComponent(jobName, "job_name")
+	if err != nil {
+		return "", err
+	}
+	return scoutID + "/" + jobName, nil
+}
+
+func snapshotPath(namespace, filename string) string {
+	return filepath.Join(filepath.FromSlash(namespace), filename)
+}
+
+func (a *App) serveSnapshot(w http.ResponseWriter, r *http.Request, namespace, filename string, includeSnapshotHeader bool) {
+	file, err := os.OpenInRoot(a.Settings().BackupRoot, snapshotPath(namespace, filename))
+	if err != nil {
+		if os.IsNotExist(err) {
+			httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "invalid path")
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	info, err := file.Stat()
+	if err != nil || info.IsDir() {
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
+		return
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if includeSnapshotHeader {
+		w.Header().Set("X-Relay-Snapshot-Filename", filename)
+	}
+	http.ServeContent(w, r, filename, info.ModTime(), file)
+}
+
+func (a *App) removeSnapshot(namespace, filename string) error {
+	root, err := os.OpenRoot(a.Settings().BackupRoot)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	return root.Remove(snapshotPath(namespace, filename))
+}
+
+func (a *App) handleDownloadSnapshotForInstance(w http.ResponseWriter, r *http.Request) {
+	if requireUser(w, r) == nil {
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	instID := r.PathValue("scout_instance_id")
+	jobName := r.PathValue("job_name")
+	filename := r.PathValue("filename")
+
+	namespace, err := validatedNamespace(scoutID, instID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a.serveSnapshot(w, r, namespace, filename, false)
+}
+
+func (a *App) handleDownloadSnapshot(w http.ResponseWriter, r *http.Request) {
+	if requireUser(w, r) == nil {
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	jobName := r.PathValue("job_name")
+	filename := r.PathValue("filename")
+
+	namespace, err := validatedLegacyNamespace(scoutID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a.serveSnapshot(w, r, namespace, filename, false)
+}
+
+func (a *App) handleDeleteSnapshotForInstance(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	instID := r.PathValue("scout_instance_id")
+	jobName := r.PathValue("job_name")
+	filename := r.PathValue("filename")
+
+	namespace, err := validatedNamespace(scoutID, instID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.removeSnapshot(namespace, filename); err != nil {
+		if !os.IsNotExist(err) {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid path")
+			return
+		}
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
+		return
+	}
+	a.ingest.ReconcileNamespace(r.Context(), namespace)
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
+}
+
+func (a *App) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	jobName := r.PathValue("job_name")
+	filename := r.PathValue("filename")
+
+	namespace, err := validatedLegacyNamespace(scoutID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.removeSnapshot(namespace, filename); err != nil {
+		if !os.IsNotExist(err) {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid path")
+			return
+		}
+		httpx.WriteError(w, http.StatusNotFound, "snapshot not found")
+		return
+	}
+	a.ingest.ReconcileNamespace(r.Context(), namespace)
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted", "filename": filename})
+}
+
+func (a *App) handleDownloadLatest(w http.ResponseWriter, r *http.Request) {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	instID := r.PathValue("scout_instance_id")
+	jobName := r.PathValue("job_name")
+	namespace, err := validatedNamespace(scoutID, instID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if status, detail := a.authorizeCredentialForInstance(r, cred, scoutID, instID, false); status != 0 {
+		httpx.WriteError(w, status, detail)
+		return
+	}
+
+	files, err := a.backend.List(namespace)
+	if err != nil || len(files) == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "no snapshots found")
+		return
+	}
+
+	best := files[0]
+	for _, f := range files[1:] {
+		if f.Mtime > best.Mtime || (f.Mtime == best.Mtime && f.Filename > best.Filename) {
+			best = f
+		}
+	}
+
+	a.serveSnapshot(w, r, namespace, best.Filename, true)
+}
+
+func (a *App) handleDownloadByFingerprint(w http.ResponseWriter, r *http.Request) {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	scoutID := r.PathValue("scout_id")
+	instID := r.PathValue("scout_instance_id")
+	jobName := r.PathValue("job_name")
+	fp := strings.TrimSpace(r.URL.Query().Get("fp"))
+	if fp == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "fp parameter is required")
+		return
+	}
+	if !fingerprintQueryRE.MatchString(fp) {
+		httpx.WriteError(w, http.StatusBadRequest, "fp must be an 8- or 64-character lowercase hex fingerprint")
+		return
+	}
+	fpPrefix := fp
+	if len(fpPrefix) > 8 {
+		fpPrefix = fpPrefix[:8]
+	}
+	namespace, err := validatedNamespace(scoutID, instID, jobName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if status, detail := a.authorizeCredentialForInstance(r, cred, scoutID, instID, false); status != 0 {
+		httpx.WriteError(w, status, detail)
+		return
+	}
+
+	files, err := a.backend.List(namespace)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to list snapshots")
+		return
+	}
+
+	type fileMatch struct {
+		mtime    float64
+		filename string
+	}
+	var matchSlice []fileMatch
+	for _, f := range files {
+		if snapshotFingerprintPrefix(f.Filename) == fpPrefix {
+			matchSlice = append(matchSlice, fileMatch{mtime: f.Mtime, filename: f.Filename})
+		}
+	}
+
+	if len(matchSlice) == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "no snapshot found with that fingerprint")
+		return
+	}
+	best := matchSlice[0]
+	for _, m := range matchSlice[1:] {
+		if m.mtime > best.mtime {
+			best = m
+		}
+	}
+
+	a.serveSnapshot(w, r, namespace, best.filename, true)
+}
+
+func snapshotFingerprintPrefix(filename string) string {
+	base := strings.TrimSuffix(filename, ".tar.zst")
+	if idx := strings.LastIndex(base, "__"); idx >= 0 {
+		return base[idx+2:]
+	}
+	return ""
+}

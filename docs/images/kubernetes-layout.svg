@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" role="img" aria-labelledby="title description">
-  <title id="title">Edge pods on Kubernetes back up to one Central</title>
-  <desc id="description">In a Kubernetes cluster, Flux on the control plane deploys one Edge pod to each node. Each pod mounts that node's folders, encrypts backups locally, and uploads them to Central, which runs outside the cluster with Docker Compose.</desc>
+  <title id="title">Scout pods on Kubernetes back up to one Station</title>
+  <desc id="description">In a Kubernetes cluster, Flux on the control plane deploys one Scout pod to each node. Each pod mounts that node's folders, encrypts backups locally, and uploads them to Station, which runs outside the cluster with Docker Compose.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
@@ -36,9 +36,9 @@
       <rect x="274" y="295" width="200" height="80" rx="12"/>
     </g>
     <g font-size="18" font-weight="700">
-      <text x="374" y="99">Node 1 · Edge pod</text>
-      <text x="374" y="209">Node 2 · Edge pod</text>
-      <text x="374" y="319">Node 3 · Edge pod</text>
+      <text x="374" y="99">Node 1 · Scout pod</text>
+      <text x="374" y="209">Node 2 · Scout pod</text>
+      <text x="374" y="319">Node 3 · Scout pod</text>
     </g>
     <g font-size="14">
       <text x="374" y="121">Host folders → /scan</text>
@@ -59,11 +59,11 @@
     <text x="520" y="100" font-size="13" fill="#6a3440">Upload</text>
 
     <rect x="548" y="165" width="180" height="120" rx="14" fill="#fff0f2" stroke="#a52b3d" stroke-width="2"/>
-    <text x="638" y="201" font-size="24" font-weight="700">Central</text>
+    <text x="638" y="201" font-size="24" font-weight="700">Station</text>
     <text x="638" y="229" font-size="14">Outside the cluster</text>
-    <text x="638" y="256" font-size="13">Stores all Edge snapshots</text>
+    <text x="638" y="256" font-size="13">Stores all Scout snapshots</text>
 
 
-    <text x="380" y="413" font-size="13" fill="#586273">One Edge pod per node · Each pod has its own web UI on port 6556 · Central on port 6555</text>
+    <text x="380" y="413" font-size="13" fill="#586273">One Scout pod per node · Each pod has its own web UI on port 6556 · Station on port 6555</text>
   </g>
 </svg>

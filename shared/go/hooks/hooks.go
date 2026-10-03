@@ -39,8 +39,8 @@ func NewHookManager(app, scriptsDir string, logger *slog.Logger) *HookManager {
 	// Best effort: saving a hook file reports the error if the directory is still missing.
 	_ = os.MkdirAll(scriptsDir, 0o755)
 	var waitDelay time.Duration
-	// Preserve Edge's bound on waiting for subprocess output pipes.
-	if app == "edge" {
+	// Preserve Scout's bound on waiting for subprocess output pipes.
+	if app == "scout" {
 		waitDelay = time.Second
 	}
 	return &HookManager{ScriptsDir: scriptsDir, logger: logger, app: app, waitDelay: waitDelay}

@@ -1,41 +1,43 @@
 ---
 title: "Introduction"
-description: "Self-hosted, encrypted backups: Edge backs up your machines, Central stores the snapshots."
+description: "Self-hosted, encrypted backups: Scout backs up your machines, Station stores the snapshots."
 ---
 
 <img src="/images/3to1go.png" alt="Go gophers racing: 3, 2, 1, Go!" width="420" />
 
-3to1go is a self-hosted backup system. Run one **Central** and an **Edge** on each machine you want to back up. Each has its own container, web UI, sign-in, and settings.
+3to1go is a self-hosted backup system. Run one **Station** and a **Scout** on each machine you want to back up. Each has its own container, web UI, sign-in, and settings.
+
+Like the gophers racing above, each Scout heads out on one of your machines, gathers the folders you chose, seals them, and carries them back to the Station. The Station keeps every pack safe but never opens one, because only the Scout has the key. To get files back, the Scout fetches a pack from the Station and unpacks it at home.
 
 <CardGroup cols={2}>
-  <Card title="Edge" icon="laptop" href="/edge/overview">
-    Finds the folders you marked, packs and **encrypts** them, and uploads them to Central on a schedule.
+  <Card title="Scout" icon="laptop" href="/scout/overview">
+    Finds the folders you marked, packs and **encrypts** them, and uploads them to Station on a schedule.
   </Card>
-  <Card title="Central" icon="server" href="/central/overview">
+  <Card title="Station" icon="server" href="/station/overview">
     Stores the encrypted snapshots, keeps the most recent ones per job, and lets you browse and download them.
   </Card>
 </CardGroup>
 
-<Frame caption="Three example machines sending backups to one Central. You can add more Edges.">
-  <img src="/images/backup-layout.svg" alt="Three Edges with separate IP addresses on port 6556 upload to Central on port 6555, with an optional external sync to cloud storage for a third copy." />
+<Frame caption="Three example machines sending backups to one Station. You can add more Scouts.">
+  <img src="/images/backup-layout.svg" alt="Three Scouts with separate IP addresses on port 6556 upload to Station on port 6555, with an optional external sync to cloud storage for a third copy." />
 </Frame>
 
-Your original files and Central's snapshots are two copies. For a third, sync Central's backup folder somewhere else. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
+Your original files and Station's snapshots are two copies. For a third, sync Station's backup folder somewhere else. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
 
 ## The short version
 
 <Steps>
-  <Step title="Run Central on an always-on machine">
+  <Step title="Run Station on an always-on machine">
     A home server, NAS, or VPS.
   </Step>
-  <Step title="Run Edge on each machine you want to back up">
-    Give each a unique `EDGE_ID` and a credential minted by Central.
+  <Step title="Run Scout on each machine you want to back up">
+    Give each a unique `SCOUT_ID` and a credential minted by Station.
   </Step>
-  <Step title="Choose folders in Edge">
-    Each folder you save in Edge's Job Editor becomes a backup job. The editor stores it as a `.upload_dir` file in the folder, which you can also write yourself.
+  <Step title="Choose folders in Scout">
+    Each folder you save in Scout's Job Editor becomes a backup job. The editor stores it as a `.upload_dir` file in the folder, which you can also write yourself.
   </Step>
   <Step title="Back up and restore">
-    Edge encrypts each job before upload. Browse and download snapshots in Central, or restore them from Edge.
+    Scout encrypts each job before upload. Browse and download snapshots in Station, or restore them from Scout.
   </Step>
 </Steps>
 
@@ -45,16 +47,16 @@ It references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Stora
 
 ## Why use 3to1go
 
-- **Encrypted before upload.** Central never sees your plaintext files.
-- **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `EDGE_ID`.
-- **Revocable credentials.** Mint and revoke Edge credentials from Central's UI without deleting snapshots.
-- **No central manifest.** Mark folders with a small file instead of maintaining a backup config.
+- **Encrypted before upload.** Station never sees your plaintext files.
+- **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `SCOUT_ID`.
+- **Revocable credentials.** Mint and revoke Scout credentials from Station's UI without deleting snapshots.
+- **No station manifest.** Mark folders with a small file instead of maintaining a backup config.
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Run Central and Edge with Docker and take your first backup.
+    Run Station and Scout with Docker and take your first backup.
   </Card>
   <Card title="How it works" icon="diagram-project" href="/concepts/how-it-works">
     Follow a folder from marker to stored snapshot.

@@ -18,13 +18,13 @@ function loadPageScripts(app) {
 }
 
 test("shared helpers preserve each application's formatting and certificate styling", () => {
-  const central = loadPageScripts("central").ctx;
-  const edge = loadPageScripts("edge").ctx;
-  assert.equal(central.formatBytes(0), "—");
-  assert.equal(edge.formatBytes(0), "0 B");
-  assert.match(central.renderCertificateFiles([{ name: "trusted.crt" }]), /class="btn btn-del"/);
-  assert.match(edge.renderCertificateFiles([{ name: "trusted.crt" }]), /class="danger"/);
-  for (const ctx of [central, edge]) {
+  const station = loadPageScripts("station").ctx;
+  const scout = loadPageScripts("scout").ctx;
+  assert.equal(station.formatBytes(0), "—");
+  assert.equal(scout.formatBytes(0), "0 B");
+  assert.match(station.renderCertificateFiles([{ name: "trusted.crt" }]), /class="btn btn-del"/);
+  assert.match(scout.renderCertificateFiles([{ name: "trusted.crt" }]), /class="danger"/);
+  for (const ctx of [station, scout]) {
     assert.equal(ctx.escapeHtml("<operator>"), "&lt;operator&gt;");
     assert.equal(typeof ctx.createUser, "function");
   }
@@ -38,7 +38,7 @@ function handlers(html) {
   );
 }
 
-for (const app of ["central", "edge"]) {
+for (const app of ["station", "scout"]) {
   test(`${app} page loads feature scripts and exposes its inline actions`, () => {
     const { ctx, base, html } = loadPageScripts(app);
     const templates = fs
@@ -70,9 +70,9 @@ for (const app of ["central", "edge"]) {
   });
 }
 
-test("Central snapshot and instance actions preserve quoted identifiers", () => {
-  const { ctx } = loadPageScripts("central");
-  const edge = "edge's\\id";
+test("Station snapshot and instance actions preserve quoted identifiers", () => {
+  const { ctx } = loadPageScripts("station");
+  const scout = "scout's\\id";
   const instance = 'instance"<&';
   const job = "job');throw new Error('unexpected');//";
   const name = "snapshot's.tar.zst";
@@ -87,14 +87,14 @@ test("Central snapshot and instance actions preserve quoted identifiers", () => 
   ]) {
     ctx[action] = (...args) => calls.push([action, ...args.slice(0, action.endsWith("Snapshot") ? 4 : 2)]);
   }
-  const html = ctx.renderInstanceCard(edge, {
-    edge_instance_id: instance,
+  const html = ctx.renderInstanceCard(scout, {
+    scout_instance_id: instance,
     credential_configured: true,
     jobs: [{ job_name: job, snapshots: [{ name }] }],
   });
   for (const handler of handlers(html)) vm.runInContext(handler, ctx);
   assert.equal(calls.length, 6);
   for (const [action, ...args] of calls) {
-    assert.deepEqual(args, action.endsWith("Snapshot") ? [edge, instance, job, name] : [edge, instance]);
+    assert.deepEqual(args, action.endsWith("Snapshot") ? [scout, instance, job, name] : [scout, instance]);
   }
 });

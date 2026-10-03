@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3to1go Station</title>
+  <link rel="icon" type="image/png" href="/static/img/favicon-app.png">
+  <!-- app-styles -->
+</head>
+<body>
+  <main class="page-shell">
+    <div id="connection-status" role="status"></div>
+    <section class="hero panel">
+      <div class="hero-top">
+        <div class="hero-text">
+          <h1>3to1go Station</h1>
+          <p class="eyebrow">Stores your backups</p>
+          <p class="lede">
+            Browse, download, and delete snapshots.
+          </p>
+        </div>
+        <img src="/static/img/3to1go.png" alt="Go gophers racing" class="hero-gopher" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded')">
+      </div>
+      <div class="meta-grid" id="meta"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+      <div class="meta-grid" id="storage-meta"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+      <div class="toolbar">
+        <button type="button" onclick="manualRefresh()">Refresh</button>
+<button type="button" class="secondary" onclick="openCredentialDialog()">Mint Scout Credential</button>
+        <button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="secondary" onclick="openUserManagementDialog()">Admin</button>
+        <button type="button" data-requires="settings" disabled onclick="openSettingsDialog()">Edit Station Settings</button>
+      </div>
+      <div id="verify-status"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Stored Snapshots</h2>
+        <p class="hint">Read straight from the backup folder.</p>
+      </div>
+      <div id="namespaces" class="namespaces-list"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+    </section>
+  </main>
+
+  <div id="toast-region" class="toast-region" popover="manual" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- app-dialogs -->
+
+  <script defer src="/static/js/shared/ts/utils.js"></script>
+  <script defer src="/static/js/station/static/ts/utils.js"></script>
+  <script defer src="/static/js/station/static/ts/crypto.js"></script>
+  <script defer src="/static/js/shared/ts/ui.js"></script>
+  <script defer src="/static/js/station/static/ts/ui.js"></script>
+  <script defer src="/static/js/shared/ts/auth.js"></script>
+  <script defer src="/static/js/station/static/ts/auth.js"></script>
+  <script defer src="/static/js/shared/ts/users.js"></script>
+  <script defer src="/static/js/shared/ts/admin.js"></script>
+  <script defer src="/static/js/station/static/ts/admin.js"></script>
+  <script defer src="/static/js/shared/ts/notifications.js"></script>
+  <script defer src="/static/js/station/static/ts/notifications.js"></script>
+  <script defer src="/static/js/shared/ts/certificates.js"></script>
+  <script defer src="/static/js/station/static/ts/certificates.js"></script>
+  <script defer src="/static/js/shared/ts/hooks.js"></script>
+  <script defer src="/static/js/station/static/ts/hooks.js"></script>
+  <script defer src="/static/js/station/static/ts/credentials.js"></script>
+  <script defer src="/static/js/station/static/ts/keys.js"></script>
+  <script defer src="/static/js/station/static/ts/snapshots.js"></script>
+  <script defer src="/static/js/station/static/ts/instances.js"></script>
+  <script defer src="/static/js/station/static/ts/verification.js"></script>
+  <script defer src="/static/js/station/static/ts/overview.js"></script>
+  <script defer src="/static/js/station/static/ts/app.js"></script>
+</body>
+</html>

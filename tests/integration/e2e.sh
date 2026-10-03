@@ -2,17 +2,17 @@
 set -euo pipefail
 
 network="3to1go-e2e-$$"
-central="3to1go-e2e-central-$$"
+station="3to1go-e2e-station-$$"
 postgres="3to1go-e2e-postgres-$$"
-edge="3to1go-e2e-edge-$$"
+scout="3to1go-e2e-scout-$$"
 root="$(mktemp -d)"
-cookie_central="$root/central.cookies"
-cookie_edge="$root/edge.cookies"
+cookie_station="$root/station.cookies"
+cookie_scout="$root/scout.cookies"
 
 cleanup() {
   local result=$?
   if [ "$result" -ne 0 ]; then
-    for container in "$postgres" "$central" "$edge"; do
+    for container in "$postgres" "$station" "$scout"; do
       if docker inspect "$container" >/dev/null 2>&1; then
         echo "--- $container startup diagnostics ---" >&2
         docker inspect --format '{{json .State}}' "$container" >&2 || true
@@ -25,7 +25,7 @@ cleanup() {
       fi
     done
   fi
-  docker rm -f "$edge" "$central" "$postgres" >/dev/null 2>&1 || true
+  docker rm -f "$scout" "$station" "$postgres" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
   docker run --rm -v "$root:/cleanup" alpine:3.21 sh -c 'rm -rf /cleanup/*' >/dev/null 2>&1 || true
   rm -rf "$root"
@@ -48,43 +48,43 @@ wait_for_service() {
   return 1
 }
 
-edge_login() {
-  curl -fsS -c "$cookie_edge" -H 'Content-Type: application/json' \
+scout_login() {
+  curl -fsS -c "$cookie_scout" -H 'Content-Type: application/json' \
     -d '{"username":"admin","password":"e2e-admin"}' \
     http://127.0.0.1:16556/api/session/login >/dev/null
 }
 
 # Prints the e2e job's directory entry, including its saved state.
-edge_job() {
-  curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/directories | \
+scout_job() {
+  curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/directories | \
     jq -ec '.directories[] | select(.config.job_name == "e2e")'
 }
 
-# Runs one Edge backup cycle and waits for it to finish. Only call it on a
-# freshly started Edge, whose last completed cycle is still empty.
-edge_cycle() {
-  curl -fsS -b "$cookie_edge" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
+# Runs one Scout backup cycle and waits for it to finish. Only call it on a
+# freshly started Scout, whose last completed cycle is still empty.
+scout_cycle() {
+  curl -fsS -b "$cookie_scout" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
   for _ in $(seq 1 60); do
-    if curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/status | \
+    if curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/status | \
       jq -e '.scheduler.last_completed_at != null' >/dev/null; then
       return 0
     fi
     sleep 1
   done
-  echo "Timed out waiting for an Edge backup cycle" >&2
+  echo "Timed out waiting for a Scout backup cycle" >&2
   return 1
 }
 
-restart_edge() {
-  docker restart "$edge" >/dev/null
-  wait_for_service "$edge" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
-  edge_login
+restart_scout() {
+  docker restart "$scout" >/dev/null
+  wait_for_service "$scout" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
+  scout_login
 }
 
-mkdir -p "$root/central-config" "$root/backups" "$root/staging" \
-  "$root/edge-config" "$root/edge-state" "$root/edge-spool" "$root/scan"
+mkdir -p "$root/station-config" "$root/backups" "$root/staging" \
+  "$root/scout-config" "$root/scout-state" "$root/scout-spool" "$root/scan"
 printf 'job_name: e2e\n' > "$root/scan/.upload_dir"
-# Enough files for Edge's changed-files check, which the restart test uses.
+# Enough files for Scout's changed-files check, which the restart test uses.
 for i in $(seq -w 1 25); do
   printf '3to1go end-to-end payload %s\n' "$i" > "$root/scan/file-$i.txt"
 done
@@ -97,63 +97,63 @@ docker run -d --name "$postgres" --network "$network" \
   postgres:17-alpine >/dev/null
 
 # The initialization server only listens on a Unix socket. Require TCP and a
-# successful query so Central starts only after the final server is ready.
+# successful query so Station starts only after the final server is ready.
 wait_for_service "$postgres" docker exec -e PGPASSWORD=e2e-password "$postgres" \
   psql -h 127.0.0.1 -U three_to_one_go -d three_to_one_go \
   -w -v ON_ERROR_STOP=1 -c 'SELECT 1'
 
-docker run -d --name "$central" --network "$network" -p 16555:6555 \
+docker run -d --name "$station" --network "$network" -p 16555:6555 \
   -e INDEX_DATABASE_URL="postgresql://three_to_one_go:e2e-password@$postgres:5432/three_to_one_go" \
   -e INITIAL_ADMIN_PASSWORD=admin \
   -e HTTP_HOST=0.0.0.0 -e HTTP_PORT=6555 \
   -e BACKUP_ROOT=/backups -e STAGING_DIR=/staging \
   -e SESSION_COOKIE_SECURE=false \
-  -v "$root/central-config:/config" -v "$root/backups:/backups" \
+  -v "$root/station-config:/config" -v "$root/backups:/backups" \
   -v "$root/staging:/staging" \
-  3to1go-central-validation >/dev/null
+  3to1go-station-validation >/dev/null
 
-wait_for_service "$central" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16555/health
+wait_for_service "$station" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16555/health
 
-curl -fsS -c "$cookie_central" -H 'Content-Type: application/json' \
+curl -fsS -c "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' \
   http://127.0.0.1:16555/api/session/login >/dev/null
-curl -fsS -b "$cookie_central" -H 'Content-Type: application/json' \
+curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"current_password":"admin","new_password":"e2e-admin","confirm_new_password":"e2e-admin"}' \
   http://127.0.0.1:16555/api/session/change-password >/dev/null
-minted="$(curl -fsS -b "$cookie_central" -H 'Content-Type: application/json' \
+minted="$(curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"shared":false}' http://127.0.0.1:16555/api/credentials/mint)"
 credential="$(printf '%s' "$minted" | jq -er '.credential')"
 
-docker run -d --name "$edge" --network "$network" -p 16556:6556 \
-  -e CENTRAL_URL="http://$central:6555" -e EDGE_ID=e2e-edge \
+docker run -d --name "$scout" --network "$network" -p 16556:6556 \
+  -e STATION_URL="http://$station:6555" -e SCOUT_ID=e2e-scout \
   -e SCAN_ROOT=/scan \
   -e HTTP_HOST=0.0.0.0 -e HTTP_PORT=6556 \
   -e SESSION_COOKIE_SECURE=false \
-  -v "$root/edge-config:/config" -v "$root/edge-state:/data/state" \
-  -v "$root/edge-spool:/data/spool" -v "$root/scan:/scan" \
-  3to1go-edge-validation >/dev/null
+  -v "$root/scout-config:/config" -v "$root/scout-state:/data/state" \
+  -v "$root/scout-spool:/data/spool" -v "$root/scan:/scan" \
+  3to1go-scout-validation >/dev/null
 
-wait_for_service "$edge" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
+wait_for_service "$scout" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
 
-curl -fsS -c "$cookie_edge" -H 'Content-Type: application/json' \
+curl -fsS -c "$cookie_scout" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' \
   http://127.0.0.1:16556/api/session/login >/dev/null
-curl -fsS -b "$cookie_edge" -H 'Content-Type: application/json' \
+curl -fsS -b "$cookie_scout" -H 'Content-Type: application/json' \
   -d '{"current_password":"admin","new_password":"e2e-admin","confirm_new_password":"e2e-admin"}' \
   http://127.0.0.1:16556/api/session/change-password >/dev/null
-settings_payload="$(curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/settings | \
-  jq -ec --arg credential "$credential" '.settings | objects | .edge_credential = $credential')"
-curl -fsS -b "$cookie_edge" -H 'Content-Type: application/json' \
+settings_payload="$(curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/settings | \
+  jq -ec --arg credential "$credential" '.settings | objects | .scout_credential = $credential')"
+curl -fsS -b "$cookie_scout" -H 'Content-Type: application/json' \
   -X POST -d "$settings_payload" http://127.0.0.1:16556/api/settings >/dev/null
-curl -fsS -b "$cookie_edge" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
+curl -fsS -b "$cookie_scout" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
 
-instance="$(curl -fsS -b "$cookie_edge" http://127.0.0.1:16556/api/status | \
-  jq -er '.edge_instance_id')"
+instance="$(curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/status | \
+  jq -er '.scout_instance_id')"
 
 for _ in $(seq 1 90); do
   if curl -fsS -H "Authorization: Bearer $credential" \
     -o "$root/recovered.snapshot" \
-    "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"; then
+    "http://127.0.0.1:16555/backup/recovery/e2e-scout/$instance/e2e/latest"; then
     test -s "$root/recovered.snapshot"
     break
   fi
@@ -161,104 +161,104 @@ for _ in $(seq 1 90); do
 done
 
 if [ ! -s "$root/recovered.snapshot" ]; then
-  echo "Timed out waiting for the Edge snapshot" >&2
-  docker logs "$edge" >&2
-  docker logs "$central" >&2
+  echo "Timed out waiting for the Scout snapshot" >&2
+  docker logs "$scout" >&2
+  docker logs "$station" >&2
   exit 1
 fi
 
-# Keep the fingerprint Edge saved for this backup, for the restart checks below.
-edge_login
+# Keep the fingerprint Scout saved for this backup, for the restart checks below.
+scout_login
 fingerprint=""
 for _ in $(seq 1 30); do
-  fingerprint="$(edge_job | jq -r '.state.last_successful_fingerprint // empty')"
+  fingerprint="$(scout_job | jq -r '.state.last_successful_fingerprint // empty')"
   [ -n "$fingerprint" ] && break
   sleep 1
 done
 if [ -z "$fingerprint" ]; then
-  echo "Edge never saved the backup's fingerprint" >&2
+  echo "Scout never saved the backup's fingerprint" >&2
   exit 1
 fi
 
-# Rehearse Central recovery with a logical dump while its filesystem is frozen.
+# Rehearse Station recovery with a logical dump while its filesystem is frozen.
 # All destructive database operations below target this test's disposable DB.
-docker stop "$edge" "$central" >/dev/null
+docker stop "$scout" "$station" >/dev/null
 docker exec "$postgres" sh -ec \
-  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/central-recovery.dump'
-docker cp "$postgres:/tmp/central-recovery.dump" "$root/database.dump"
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/station-recovery.dump'
+docker cp "$postgres:/tmp/station-recovery.dump" "$root/database.dump"
 docker run --rm -v "$root:/recovery" alpine:3.21 sh -ec \
-  'cd /recovery; tar -cpf deployment.tar central-config staging; tar -cpf snapshots.tar -C backups .'
+  'cd /recovery; tar -cpf deployment.tar station-config staging; tar -cpf snapshots.tar -C backups .'
 
 docker exec "$postgres" sh -ec \
   'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB"; createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
 docker exec "$postgres" sh -ec \
-  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/central-recovery.dump'
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/station-recovery.dump'
 
 # Move the old files aside so the server actually starts from restored copies.
 docker run --rm -v "$root:/recovery" alpine:3.21 sh -ec \
-  'cd /recovery; mv central-config central-config-original; mv staging staging-original; mv backups backups-original; mkdir backups; tar -xpf deployment.tar; tar -xpf snapshots.tar -C backups'
-docker start "$central" >/dev/null
-wait_for_service "$central" curl -fsS --connect-timeout 2 --max-time 3 \
+  'cd /recovery; mv station-config station-config-original; mv staging staging-original; mv backups backups-original; mkdir backups; tar -xpf deployment.tar; tar -xpf snapshots.tar -C backups'
+docker start "$station" >/dev/null
+wait_for_service "$station" curl -fsS --connect-timeout 2 --max-time 3 \
   http://127.0.0.1:16555/health/ready
 
-# A restored account and the original Edge token must work without replacement.
-curl -fsS -c "$cookie_central" -H 'Content-Type: application/json' \
+# A restored account and the original Scout token must work without replacement.
+curl -fsS -c "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"e2e-admin"}' \
   http://127.0.0.1:16555/api/session/login >/dev/null
 curl -fsS -H "Authorization: Bearer $credential" \
   -o "$root/recovered-after-restore.snapshot" \
-  "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"
+  "http://127.0.0.1:16555/backup/recovery/e2e-scout/$instance/e2e/latest"
 cmp "$root/recovered.snapshot" "$root/recovered-after-restore.snapshot"
 
-# Edge keeps its saved job state across a restart.
-docker start "$edge" >/dev/null
-wait_for_service "$edge" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
-edge_login
-edge_job | jq -e --arg fp "$fingerprint" '.state.last_successful_fingerprint == $fp' >/dev/null
+# Scout keeps its saved job state across a restart.
+docker start "$scout" >/dev/null
+wait_for_service "$scout" curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:16556/health
+scout_login
+scout_job | jq -e --arg fp "$fingerprint" '.state.last_successful_fingerprint == $fp' >/dev/null
 
 # Renaming every file keeps the count but matches nothing from the last backup,
-# so Edge holds the new archive for review instead of uploading it.
+# so Scout holds the new archive for review instead of uploading it.
 docker run --rm -v "$root/scan:/scan" alpine:3.21 sh -ec \
   'cd /scan; for f in file-*.txt; do mv "$f" "renamed-$f"; done'
-edge_cycle
-held="$(edge_job)"
+scout_cycle
+held="$(scout_job)"
 if ! printf '%s' "$held" | jq -e '.state.last_status == "held_for_review" and (.state.pending_archive // "") != ""' >/dev/null; then
-  echo "Edge did not hold the renamed backup: $held" >&2
+  echo "Scout did not hold the renamed backup: $held" >&2
   exit 1
 fi
 pending="$(printf '%s' "$held" | jq -r '.state.pending_archive')"
 
 # The hold, its staged archive, and the last fingerprint survive a restart,
 # and the next cycle still doesn't upload the held archive.
-restart_edge
-edge_job | jq -e --arg p "$pending" --arg fp "$fingerprint" \
+restart_scout
+scout_job | jq -e --arg p "$pending" --arg fp "$fingerprint" \
   '.state.last_status == "held_for_review" and .state.pending_archive == $p and .state.last_successful_fingerprint == $fp' >/dev/null
-test -s "$root/edge-spool/$(basename "$pending")"
-edge_cycle
-edge_job | jq -e '.state.last_status == "held_for_review"' >/dev/null
+test -s "$root/scout-spool/$(basename "$pending")"
+scout_cycle
+scout_job | jq -e '.state.last_status == "held_for_review"' >/dev/null
 curl -fsS -H "Authorization: Bearer $credential" -o "$root/after-held-cycle.snapshot" \
-  "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"
+  "http://127.0.0.1:16555/backup/recovery/e2e-scout/$instance/e2e/latest"
 cmp "$root/recovered.snapshot" "$root/after-held-cycle.snapshot"
 
-# Upload anyway approves the held archive, which then reaches Central.
-curl -fsS -b "$cookie_edge" -H 'Content-Type: application/json' \
+# Upload anyway approves the held archive, which then reaches Station.
+curl -fsS -b "$cookie_scout" -H 'Content-Type: application/json' \
   -d '{"relative_path":"."}' http://127.0.0.1:16556/api/directories/force-send >/dev/null
 approved=""
 for _ in $(seq 1 60); do
-  if edge_job | jq -e '.state.last_status == "success"' >/dev/null; then
+  if scout_job | jq -e '.state.last_status == "success"' >/dev/null; then
     approved=yes
     break
   fi
   sleep 1
 done
 if [ -z "$approved" ]; then
-  echo "Edge did not upload the approved archive: $(edge_job)" >&2
+  echo "Scout did not upload the approved archive: $(scout_job)" >&2
   exit 1
 fi
 curl -fsS -H "Authorization: Bearer $credential" -o "$root/approved.snapshot" \
-  "http://127.0.0.1:16555/backup/recovery/e2e-edge/$instance/e2e/latest"
+  "http://127.0.0.1:16555/backup/recovery/e2e-scout/$instance/e2e/latest"
 if cmp -s "$root/recovered.snapshot" "$root/approved.snapshot"; then
-  echo "Central's latest snapshot is still the original after approval" >&2
+  echo "Station's latest snapshot is still the original after approval" >&2
   exit 1
 fi
-echo "Edge -> Central -> recovery, Central disaster-recovery, and Edge restart tests passed"
+echo "Scout -> Station -> recovery, Station disaster-recovery, and Scout restart tests passed"
