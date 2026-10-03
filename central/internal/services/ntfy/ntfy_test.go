@@ -199,7 +199,7 @@ func TestPublishBestEffort_SourceFilterNoMatch(t *testing.T) {
 func TestPublishBestEffort_ServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("server error"))
+		_, _ = w.Write([]byte("server error"))
 	}))
 	defer srv.Close()
 
@@ -251,7 +251,7 @@ func TestPublish_Success(t *testing.T) {
 func TestPublish_400Response(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("bad request"))
+		_, _ = w.Write([]byte("bad request"))
 	}))
 	defer srv.Close()
 
@@ -271,7 +271,9 @@ func TestPublish_TopicEncoded(t *testing.T) {
 	defer srv.Close()
 
 	n := NewNtfyPublisher(discardLogger())
-	n.publish(srv.URL, "my topic", "msg")
+	if err := n.publish(srv.URL, "my topic", "msg"); err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(gotURI, "my%20topic") {
 		t.Errorf("topic not URL-encoded, got request URI %q", gotURI)
 	}
@@ -310,7 +312,9 @@ func TestPublishTest_DefaultTemplate(t *testing.T) {
 		"ntfy_url":   srv.URL,
 		"ntfy_topic": "testtopic",
 	}
-	n.PublishTest(cfg)
+	if err := n.PublishTest(cfg); err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(gotBody, "Central received") {
 		t.Errorf("expected default template in body, got %q", gotBody)
 	}

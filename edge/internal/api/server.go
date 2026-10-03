@@ -195,12 +195,6 @@ func isPublicPath(path string) bool {
 		strings.HasPrefix(path, "/health")
 }
 
-type contextKey = auth.ContextKey
-
-const contextKeyUser = auth.ContextKeyUser
-
-func currentUser(r *http.Request) *store.User { return auth.CurrentUser(r) }
-
 func requireUser(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireUser(w, r) }
 
 func requireAdmin(w http.ResponseWriter, r *http.Request) *store.User { return auth.RequireAdmin(w, r) }

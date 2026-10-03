@@ -103,7 +103,7 @@ func EncryptFileContext(ctx context.Context, key []byte, src, dst string) error 
 	if err != nil {
 		return fmt.Errorf("open plaintext: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
@@ -112,23 +112,23 @@ func EncryptFileContext(ctx context.Context, key []byte, src, dst string) error 
 	closeOut := true
 	defer func() {
 		if closeOut {
-			out.Close()
+			_ = out.Close()
 		}
 	}()
 
 	if _, err := sio.Encrypt(cancelio.Writer{Context: ctx, Writer: out}, cancelio.Reader{Context: ctx, Reader: in}, sioConfig(key)); err != nil {
-		out.Close()
-		os.Remove(dst)
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return fmt.Errorf("encrypt: %w", err)
 	}
 	if err := out.Sync(); err != nil {
-		out.Close()
-		os.Remove(dst)
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return err
 	}
 	if err := out.Close(); err != nil {
 		closeOut = false
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return err
 	}
 	closeOut = false
@@ -141,7 +141,7 @@ func DecryptFile(key []byte, src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("open ciphertext: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
@@ -150,23 +150,23 @@ func DecryptFile(key []byte, src, dst string) error {
 	closeOut := true
 	defer func() {
 		if closeOut {
-			out.Close()
+			_ = out.Close()
 		}
 	}()
 
 	if _, err := sio.Decrypt(out, in, sioConfig(key)); err != nil {
-		out.Close()
-		os.Remove(dst)
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return fmt.Errorf("decrypt: %w", err)
 	}
 	if err := out.Sync(); err != nil {
-		out.Close()
-		os.Remove(dst)
+		_ = out.Close()
+		_ = os.Remove(dst)
 		return err
 	}
 	if err := out.Close(); err != nil {
 		closeOut = false
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return err
 	}
 	closeOut = false

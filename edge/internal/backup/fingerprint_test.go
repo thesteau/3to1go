@@ -39,7 +39,8 @@ func TestComputeFingerprint_Deterministic(t *testing.T) {
 		{ArchivePath: "a.txt", Size: 100},
 		{ArchivePath: "b.txt", Size: 200},
 	}
-	if ComputeFingerprint(files) != ComputeFingerprint(files) {
+	first, second := ComputeFingerprint(files), ComputeFingerprint(files)
+	if first != second {
 		t.Error("fingerprint is not deterministic")
 	}
 }

@@ -312,13 +312,16 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 	}
 
 	stagePath := s.uploadDataPath(uploadID)
-	os.MkdirAll(filepath.Dir(stagePath), 0o755)
+	if err := os.MkdirAll(filepath.Dir(stagePath), 0o755); err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to persist upload chunk")
+	}
 
 	f, err := os.OpenFile(stagePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, httpError(http.StatusInternalServerError, "failed to persist upload chunk")
 	}
-	defer f.Close()
+	// Error paths only; the success path checks Close below.
+	defer func() { _ = f.Close() }()
 
 	buf := make([]byte, 32*1024)
 	var bytesReceived int64
@@ -341,6 +344,9 @@ func (s *Service) AppendChunk(ctx context.Context, uploadID string, offset int64
 		}
 	}
 	if err := f.Sync(); err != nil {
+		return nil, httpError(http.StatusInternalServerError, "failed to persist upload chunk")
+	}
+	if err := f.Close(); err != nil {
 		return nil, httpError(http.StatusInternalServerError, "failed to persist upload chunk")
 	}
 
@@ -414,7 +420,10 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 		return nil, httpError(http.StatusInternalServerError, "failed to checksum upload")
 	}
 	if actualSHA != session.ArchiveSHA256 {
-		os.Remove(stagedPath)
+		// The retry restarts at offset 0, so the bad data must not stay to be appended to.
+		if err := os.Remove(stagedPath); err != nil && !os.IsNotExist(err) {
+			return nil, httpError(http.StatusInternalServerError, "failed to reset upload")
+		}
 		session.UploadedBytes = 0
 		session.Status = "checksum_retry_required"
 		session.UpdatedAt = utcNow()
@@ -464,7 +473,7 @@ func (s *Service) CleanupStaleUploads() {
 	cutoff := time.Now().UTC()
 	expired, _ := s.sessionStore().DeleteExpired(context.Background(), cutoff)
 	for _, sess := range expired {
-		os.RemoveAll(s.sessionDir(sess.UploadID))
+		s.removeSessionDir(sess.UploadID)
 	}
 }
 
@@ -482,8 +491,7 @@ func (s *Service) CleanupLoop(ctx context.Context, intervalSeconds int) {
 }
 
 func (s *Service) ReconcileNamespace(ctx context.Context, namespace string) {
-	files, _ := s.backend.List(namespace)
-	s.index.ReconcileNamespace(ctx, namespace, storageFilesToIndexFiles(files))
+	s.reconcileNamespace(ctx, namespace)
 }
 
 func (s *Service) registerEdge(ctx context.Context, meta UploadMetadata, credHash *string) error {
@@ -673,7 +681,8 @@ func (s *Service) resolveIdempotentSession(ctx context.Context, key, archiveSHA2
 }
 
 func (s *Service) commitDuplicate(ctx context.Context, sess *UploadSession, dup *store.SnapshotEntry, stagedPath string) (*FinalizeResponse, error) {
-	os.Remove(stagedPath)
+	// Leftover data is removed with the session directory when the session expires.
+	_ = os.Remove(stagedPath)
 	storedAs := dup.StoredAs
 	sess.UploadedBytes = sess.ArchiveSizeBytes
 	sess.Status = "completed"
@@ -706,7 +715,7 @@ func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, sta
 		}
 	}
 	unusual := s.checkArchiveSize(ctx, sess.Namespace, sizeBytes)
-	s.index.UpsertSnapshot(ctx, sess.Namespace, store.SnapshotEntry{
+	if err := s.index.UpsertSnapshot(ctx, sess.Namespace, store.SnapshotEntry{
 		StoredAs:    storedAs,
 		ArchiveSHA:  actualSHA,
 		Fingerprint: sess.Fingerprint,
@@ -714,8 +723,10 @@ func (s *Service) commitNewArchive(ctx context.Context, sess *UploadSession, sta
 		SizeBytes:   sizeBytes,
 		Mtime:       mtime,
 		Unusual:     unusual,
-	})
-	s.index.ReconcileNamespace(ctx, sess.Namespace, storageFilesToIndexFiles(files))
+	}); err != nil {
+		slog.Warn("snapshot_index_failed", "namespace", sess.Namespace, "stored_as", storedAs, "error", err)
+	}
+	s.reconcileIndex(ctx, sess.Namespace, files)
 
 	sess.UploadedBytes = sess.ArchiveSizeBytes
 	sess.Status = "completed"
@@ -786,7 +797,15 @@ func (s *Service) sessionReferencesMissingSnapshot(ctx context.Context, sess *Up
 
 func (s *Service) reconcileNamespace(ctx context.Context, namespace string) {
 	files, _ := s.backend.List(namespace)
-	s.index.ReconcileNamespace(ctx, namespace, storageFilesToIndexFiles(files))
+	s.reconcileIndex(ctx, namespace, files)
+}
+
+// reconcileIndex brings the snapshot index in line with the stored files. A failure is logged;
+// the next reconcile of the namespace corrects the index.
+func (s *Service) reconcileIndex(ctx context.Context, namespace string, files []storage.StorageFile) {
+	if err := s.index.ReconcileNamespace(ctx, namespace, storageFilesToIndexFiles(files)); err != nil {
+		slog.Warn("snapshot_index_failed", "namespace", namespace, "error", err)
+	}
 }
 
 func (s *Service) discardSession(sess *UploadSession) {
@@ -795,7 +814,15 @@ func (s *Service) discardSession(sess *UploadSession) {
 
 func (s *Service) discardSessionContext(ctx context.Context, sess *UploadSession) {
 	_ = s.sessionStore().Delete(ctx, sess)
-	os.RemoveAll(s.sessionDir(sess.UploadID))
+	s.removeSessionDir(sess.UploadID)
+}
+
+// removeSessionDir deletes an upload's staged data. A failure is logged because the data
+// otherwise stays in the staging directory.
+func (s *Service) removeSessionDir(uploadID string) {
+	if err := os.RemoveAll(s.sessionDir(uploadID)); err != nil {
+		slog.Warn("upload_cleanup_failed", "upload_id", uploadID, "error", err)
+	}
 }
 
 func (s *Service) sessionDir(uploadID string) string {
@@ -849,7 +876,8 @@ func (s *Service) loadSessionForKeyContext(ctx context.Context, key string) *Upl
 	}
 	sess, err = s.loadSessionContext(ctx, uploadID)
 	if err != nil {
-		os.Remove(s.keyMappingPath(key))
+		// A stale mapping is harmless: lookups that hit it fail the same way.
+		_ = os.Remove(s.keyMappingPath(key))
 		return nil
 	}
 	return sess
@@ -929,7 +957,7 @@ func sha256File(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

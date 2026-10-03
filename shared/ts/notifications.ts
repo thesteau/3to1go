@@ -18,7 +18,7 @@ async function testNtfyConfig(): Promise<void> {
   const body: ApiBody = await response.json();
   setStatus(
     "ntfy-status",
-    response.ok ? "Connection test succeeded." : (body.detail || "Test failed."),
+    response.ok ? "Connection test succeeded." : body.detail || "Test failed.",
     response.ok ? "success" : "error",
   );
   if (response.ok) {

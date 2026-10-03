@@ -144,7 +144,7 @@ func (s *UserStore) ListUsers(ctx context.Context) ([]*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var users []*User
 	for rows.Next() {
 		u := &User{}
@@ -305,7 +305,9 @@ func (s *UserStore) DeleteUser(ctx context.Context, userID int) error {
 	if existing.IsAdmin && adminCount == 1 {
 		return errors.New("at least one admin is required")
 	}
-	s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE user_id = ?`, userID)
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
 	_, err = s.db.ExecContext(ctx, `DELETE FROM app_users WHERE id = ?`, userID)
 	return err
 }
@@ -323,7 +325,7 @@ func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
 	}
 	s.lastCleanup = time.Now()
 	s.cleanupMu.Unlock()
-	s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE expires_at < ?`,
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE expires_at < ?`,
 		time.Now().UTC().Format(time.RFC3339))
 }
 

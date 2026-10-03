@@ -64,7 +64,9 @@ func TestUploadArchiveSuccess(t *testing.T) {
 			offset := mustParseOffset(t, r.URL.Query().Get("offset"))
 			chunkOffsets = append(chunkOffsets, offset)
 			buf := new(bytes.Buffer)
-			buf.ReadFrom(r.Body)
+			if _, err := buf.ReadFrom(r.Body); err != nil {
+				t.Errorf("read chunk: %v", err)
+			}
 			writeTestJSON(t, w, map[string]any{
 				"upload_id":       "upload-1",
 				"status":          "in_progress",
@@ -91,7 +93,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 	client := testUploadClient(server.URL)
 	client.http = server.Client()
 	var progress []int64
-	result, err := client.UploadArchive(context.Background(), "edge-1", "job", "abcdef123456", "2024-01-01T00:00:00Z", archivePath, "", "", 0, 0, func(_ string, offset, _ int64) {
+	result, err := client.UploadArchive(context.Background(), "edge-1", "job", "abcdef123456", "2024-01-01T00:00:00Z", archivePath, "", 0, 0, func(_ string, offset, _ int64) {
 		progress = append(progress, offset)
 	})
 	if err != nil {
@@ -136,7 +138,7 @@ func TestUploadArchiveCompletedDuplicateSkipsChunks(t *testing.T) {
 
 	client := testUploadClient(server.URL)
 	client.http = server.Client()
-	result, err := client.UploadArchive(context.Background(), "edge-1", "job", "fp", "ts", archivePath, "sha", "", 0, 0, nil)
+	result, err := client.UploadArchive(context.Background(), "edge-1", "job", "fp", "ts", archivePath, "sha", 0, 0, nil)
 	if err != nil {
 		t.Fatalf("UploadArchive: %v", err)
 	}
@@ -151,7 +153,7 @@ func TestDownloadSnapshot(t *testing.T) {
 			t.Fatalf("query = %s", r.URL.RawQuery)
 		}
 		w.Header().Set("X-Relay-Snapshot-Filename", "snapshot.tar.zst")
-		fmt.Fprint(w, "snapshot bytes")
+		_, _ = fmt.Fprint(w, "snapshot bytes")
 	}))
 	defer server.Close()
 	client := testUploadClient(server.URL)

@@ -157,7 +157,7 @@ func (n *NtfyPublisher) publishWithHeaders(ntfyURL, ntfyTopic, message string, h
 	if err != nil {
 		return fmt.Errorf("unable to reach ntfy server: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("ntfy returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))

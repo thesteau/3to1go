@@ -80,7 +80,9 @@ func TestCertManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 	// Fill to the limit.
 	for i := range MaxCertificateFiles {
 		name := filepath.Join(c.StorageDir, "ca"+string(rune('a'+i))+".crt")
-		os.WriteFile(name, []byte(fakePEM), 0o644)
+		if err := os.WriteFile(name, []byte(fakePEM), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	_, err := c.SaveUploadedFile("extra.crt", []byte(fakePEM))
 	if err == nil {
@@ -90,7 +92,9 @@ func TestCertManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 
 func TestCertManager_DeleteFile_Success(t *testing.T) {
 	c := newTestCertManager(t)
-	c.SaveUploadedFile("ca.crt", []byte(fakePEM))
+	if _, err := c.SaveUploadedFile("ca.crt", []byte(fakePEM)); err != nil {
+		t.Fatal(err)
+	}
 	if err := c.DeleteFile("ca.crt"); err != nil {
 		t.Fatalf("DeleteFile: %v", err)
 	}
@@ -130,7 +134,9 @@ func TestCertManager_TLSConfig_NoCerts_ReturnsNil(t *testing.T) {
 
 func TestCertManager_ListFiles_AfterSave(t *testing.T) {
 	c := newTestCertManager(t)
-	c.SaveUploadedFile("ca.crt", []byte(fakePEM))
+	if _, err := c.SaveUploadedFile("ca.crt", []byte(fakePEM)); err != nil {
+		t.Fatal(err)
+	}
 	files := c.ListFiles()
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))

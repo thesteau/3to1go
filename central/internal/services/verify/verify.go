@@ -114,7 +114,7 @@ func (s *Service) checkOne(ctx context.Context, namespace string, entry store.Sn
 	if err != nil {
 		return "open failed: " + err.Error()
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, rc); err != nil {

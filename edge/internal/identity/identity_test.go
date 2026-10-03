@@ -41,7 +41,9 @@ func TestLoadOrCreate_ReadsExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "id.txt")
 	want := "deadbeefdeadbeefdeadbeefdeadbeef"
-	os.WriteFile(path, []byte(want+"\n"), 0o600)
+	if err := os.WriteFile(path, []byte(want+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	got := LoadOrCreate(path)
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -63,7 +65,9 @@ func TestLoadOrCreate_CreatesParentDirectories(t *testing.T) {
 func TestLoadOrCreate_IgnoresEmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "id.txt")
-	os.WriteFile(path, []byte("   \n"), 0o600)
+	if err := os.WriteFile(path, []byte("   \n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	id := LoadOrCreate(path)
 	if id == "" {
 		t.Fatal("expected new ID when file is whitespace-only")

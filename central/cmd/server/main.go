@@ -155,7 +155,9 @@ func run(logger *slog.Logger) error {
 		app.Shutdown()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		srv.Shutdown(shutCtx)
+		if err := srv.Shutdown(shutCtx); err != nil {
+			logger.Error("server shutdown failed", "error", err)
+		}
 	}()
 
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {

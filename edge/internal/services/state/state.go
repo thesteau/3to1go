@@ -250,7 +250,7 @@ func (s *StateStore) ReferencedPendingArchives() map[string]bool {
 		s.reportError(err)
 		return map[string]bool{}
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := make(map[string]bool)
 	for rows.Next() {
 		var archive string
@@ -271,7 +271,7 @@ func (s *StateStore) Snapshot() map[string]JobState {
 		s.reportError(err)
 		return map[string]JobState{}
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make(map[string]JobState)
 	for rows.Next() {
 		key, js, err := scanJobState(rows.Scan)

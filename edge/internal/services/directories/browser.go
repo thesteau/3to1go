@@ -113,7 +113,7 @@ func (d *DirectoryService) Browse(relativePath string) ([]FileEntry, error) {
 		return nil, err
 	}
 	if backup.IsRuntimePath(dir) {
-		return nil, fmt.Errorf("Edge runtime data is excluded automatically")
+		return nil, fmt.Errorf("Edge runtime data is excluded automatically") //nolint:staticcheck // Shown to users; "Edge" is the product name.
 	}
 	children, err := os.ReadDir(dir)
 	if err != nil {
@@ -179,7 +179,7 @@ func (d *DirectoryService) ExcludePath(relativePath string) error {
 		return err
 	}
 	if backup.IsRuntimePath(path) {
-		return fmt.Errorf("Edge runtime data is already excluded")
+		return fmt.Errorf("Edge runtime data is already excluded") //nolint:staticcheck // Shown to users; "Edge" is the product name.
 	}
 	if filepath.Base(path) == backup.UploadDirFilename {
 		return fmt.Errorf("cannot exclude backup settings")

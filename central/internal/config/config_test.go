@@ -8,11 +8,6 @@ import (
 )
 
 // helpers to isolate env vars
-func setEnv(t *testing.T, key, val string) {
-	t.Helper()
-	t.Setenv(key, val)
-}
-
 func clearEnvKeys(t *testing.T, keys ...string) {
 	for _, k := range keys {
 		t.Setenv(k, "")

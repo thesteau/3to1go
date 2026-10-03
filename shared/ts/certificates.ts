@@ -6,13 +6,13 @@ function fillCertificateForm(config: CertificateConfig | null | undefined): void
 
 async function loadCertificateConfig(): Promise<CertificateConfig> {
   return loadEditorPanel("certificates", async () => {
-  const response = await fetch("/api/certificates", { signal: globalThis.AbortSignal?.timeout?.(30000) });
-  const body: CertificateConfig = await response.json();
-  if (!response.ok) {
-    throw new Error(body.detail || "Failed to load certificates.");
-  }
-  fillCertificateForm(body);
-  return body;
+    const response = await fetch("/api/certificates", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    const body: CertificateConfig = await response.json();
+    if (!response.ok) {
+      throw new Error(body.detail || "Failed to load certificates.");
+    }
+    fillCertificateForm(body);
+    return body;
   });
 }
 
@@ -28,7 +28,11 @@ async function uploadCertificateFile(): Promise<void> {
   formData.append("certificate_file", file);
   const response = await fetch("/api/certificates/files", { method: "POST", body: formData });
   const body: ApiBody = await response.json();
-  setStatus("certificates-status", response.ok ? "Certificate uploaded." : (body.detail || "Upload failed."), response.ok ? "success" : "error");
+  setStatus(
+    "certificates-status",
+    response.ok ? "Certificate uploaded." : body.detail || "Upload failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     input.value = "";
     await loadCertificateConfig();
@@ -40,17 +44,23 @@ async function uploadCertificateFile(): Promise<void> {
 
 async function deleteCertificateFile(filename: string): Promise<void> {
   if (!requirePanelReady("certificates")) return;
-  if (!await confirmApp({
-    title: "Delete Certificate",
-    message: `Delete ${filename}?`,
-    confirmLabel: "Delete",
-    danger: true,
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Delete Certificate",
+      message: `Delete ${filename}?`,
+      confirmLabel: "Delete",
+      danger: true,
+    }))
+  ) {
     return;
   }
   const response = await fetch(`/api/certificates/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
   const body: ApiBody = await response.json();
-  setStatus("certificates-status", response.ok ? "Certificate deleted." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
+  setStatus(
+    "certificates-status",
+    response.ok ? "Certificate deleted." : body.detail || "Delete failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     await loadCertificateConfig();
     setActionStatus(`Deleted ${filename}.`, "success");

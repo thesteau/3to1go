@@ -108,7 +108,9 @@ func jobPaths(t *testing.T, svc *DirectoryService) []string {
 func TestListJobs_FindsMarkersWithinDepthWithoutEnteringJobs(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"photos/nested", "docs/work/q1", "deep/a/b/c/d/e", "plain"} {
-		os.MkdirAll(filepath.Join(root, dir), fs.ModePerm)
+		if err := os.MkdirAll(filepath.Join(root, dir), fs.ModePerm); err != nil {
+			t.Fatal(err)
+		}
 	}
 	writeMarker(t, filepath.Join(root, "photos"), map[string]any{"job_name": "photos"})
 	writeMarker(t, filepath.Join(root, "photos", "nested"), map[string]any{"job_name": "nested"})
@@ -126,8 +128,12 @@ func TestListJobs_FindsMarkersWithinDepthWithoutEnteringJobs(t *testing.T) {
 func TestListJobs_ReportsInvalidConfig(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "broken")
-	os.Mkdir(dir, fs.ModePerm)
-	os.WriteFile(filepath.Join(dir, backup.UploadDirFilename), []byte("job_name: [unclosed"), 0o644)
+	if err := os.Mkdir(dir, fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, backup.UploadDirFilename), []byte("job_name: [unclosed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	svc, _ := newDirService(t, root)
 	entries, err := svc.ListJobs()
@@ -194,7 +200,9 @@ func TestListJobs_DoesNotWaitForASlowFirstWalk(t *testing.T) {
 	firstDiscoveryWait = 10 * time.Millisecond
 	t.Cleanup(func() { firstDiscoveryWait = old })
 	root := t.TempDir()
-	os.Mkdir(filepath.Join(root, "docs"), fs.ModePerm)
+	if err := os.Mkdir(filepath.Join(root, "docs"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	writeMarker(t, filepath.Join(root, "docs"), map[string]any{"job_name": "docs"})
 	svc, _ := newDirService(t, root)
 	walks := controlWalks(svc)
@@ -214,7 +222,9 @@ func TestListJobs_DoesNotWaitForASlowFirstWalk(t *testing.T) {
 func TestListJobs_ServesTheLastWalkWhileAnotherRuns(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"docs", "photos"} {
-		os.Mkdir(filepath.Join(root, dir), fs.ModePerm)
+		if err := os.Mkdir(filepath.Join(root, dir), fs.ModePerm); err != nil {
+			t.Fatal(err)
+		}
 		writeMarker(t, filepath.Join(root, dir), map[string]any{"job_name": dir})
 	}
 	svc, _ := newDirService(t, root)
@@ -242,7 +252,9 @@ func TestListJobs_ServesTheLastWalkWhileAnotherRuns(t *testing.T) {
 func TestListJobs_SaveAndDeleteShowAtOnce(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"docs", "photos", "zeta"} {
-		os.Mkdir(filepath.Join(root, dir), fs.ModePerm)
+		if err := os.Mkdir(filepath.Join(root, dir), fs.ModePerm); err != nil {
+			t.Fatal(err)
+		}
 	}
 	writeMarker(t, filepath.Join(root, "zeta"), map[string]any{"job_name": "zeta"})
 	svc, ms := newDirService(t, root)
@@ -254,7 +266,9 @@ func TestListJobs_SaveAndDeleteShowAtOnce(t *testing.T) {
 	if _, err := svc.SaveJob("photos", map[string]any{"job_name": "photos"}); err != nil {
 		t.Fatalf("SaveJob: %v", err)
 	}
-	ms.Set(filepath.Join(root, "photos"), state.JobState{LastStatus: "uploading"})
+	if err := ms.Set(filepath.Join(root, "photos"), state.JobState{LastStatus: "uploading"}); err != nil {
+		t.Fatal(err)
+	}
 	entries, _ := svc.ListJobs()
 	if len(entries) != 2 || entries[0].RelativePath != "photos" || entries[0].State.LastStatus != "uploading" {
 		t.Errorf("after save, before the walk: %+v", entries)
@@ -274,7 +288,9 @@ func TestListJobs_SaveAndDeleteShowAtOnce(t *testing.T) {
 
 func TestListJobs_ChangeDuringAWalkIsKeptAndWalkedAgain(t *testing.T) {
 	root := t.TempDir()
-	os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm)
+	if err := os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	svc, _ := newDirService(t, root)
 	walks := controlWalks(svc)
 	svc.StartDiscovery()
@@ -326,7 +342,9 @@ func childrenByPath(t *testing.T, svc *DirectoryService, relativePath string) ma
 func TestListChildren_ListsOneLevelWithCounts(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"photos/2024", "photos/.thumbs", "docs"} {
-		os.MkdirAll(filepath.Join(root, dir), fs.ModePerm)
+		if err := os.MkdirAll(filepath.Join(root, dir), fs.ModePerm); err != nil {
+			t.Fatal(err)
+		}
 	}
 	writeMarker(t, filepath.Join(root, "photos"), map[string]any{"job_name": "photos"})
 
@@ -353,8 +371,12 @@ func TestListChildren_ListsOneLevelWithCounts(t *testing.T) {
 func TestListChildren_ReportsParentJobBlocksAndExclusions(t *testing.T) {
 	root := t.TempDir()
 	parentDir := filepath.Join(root, "parent")
-	os.MkdirAll(filepath.Join(parentDir, "skip", "deeper"), fs.ModePerm)
-	os.MkdirAll(filepath.Join(parentDir, "keep"), fs.ModePerm)
+	if err := os.MkdirAll(filepath.Join(parentDir, "skip", "deeper"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(parentDir, "keep"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	writeMarker(t, parentDir, map[string]any{"job_name": "parent"})
 
 	svc, _ := newDirService(t, root)
@@ -376,7 +398,9 @@ func TestListChildren_ReportsParentJobBlocksAndExclusions(t *testing.T) {
 
 func TestListChildren_StopsAtMaxDepthAndRejectsEscapes(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, "a", "b", "c", "d", "e", "f"), fs.ModePerm)
+	if err := os.MkdirAll(filepath.Join(root, "a", "b", "c", "d", "e", "f"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	svc, _ := newDirService(t, root) // MaxDepth 5
 
 	d := childrenByPath(t, svc, "a/b/c")["a/b/c/d"]
@@ -398,8 +422,12 @@ func TestListChildren_StopsAtMaxDepthAndRejectsEscapes(t *testing.T) {
 func TestListChildren_RejectsSymlinkLeavingScanRoot(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
-	os.Mkdir(filepath.Join(outside, "secret"), fs.ModePerm)
-	os.Mkdir(filepath.Join(root, "inside"), fs.ModePerm)
+	if err := os.Mkdir(filepath.Join(outside, "secret"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "inside"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
@@ -426,7 +454,9 @@ func TestListChildren_RejectsSymlinkLeavingScanRoot(t *testing.T) {
 func TestSaveJob_CreatesMarkerFile(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
-	os.Mkdir(photoDir, fs.ModePerm)
+	if err := os.Mkdir(photoDir, fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 
 	svc, _ := newDirService(t, root)
 	entry, err := svc.SaveJob("photos", map[string]any{"job_name": "myphotos"})
@@ -465,7 +495,9 @@ func TestSaveJob_NestedUnderExistingJob(t *testing.T) {
 	root := t.TempDir()
 	parentDir := filepath.Join(root, "parent")
 	childDir := filepath.Join(parentDir, "child")
-	os.MkdirAll(childDir, fs.ModePerm)
+	if err := os.MkdirAll(childDir, fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	writeMarker(t, parentDir, map[string]any{})
 
 	svc, _ := newDirService(t, root)
@@ -482,12 +514,16 @@ func TestSaveJob_NestedUnderExistingJob(t *testing.T) {
 func TestDeleteJob_RemovesMarkerAndClearsState(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
-	os.Mkdir(photoDir, fs.ModePerm)
+	if err := os.Mkdir(photoDir, fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	writeMarker(t, photoDir, map[string]any{"job_name": "photos"})
 
 	svc, ms := newDirService(t, root)
 	// Pre-seed some state.
-	ms.Set(photoDir, state.JobState{LastStatus: "success"})
+	if err := ms.Set(photoDir, state.JobState{LastStatus: "success"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := svc.DeleteJob("photos"); err != nil {
 		t.Fatalf("DeleteJob: %v", err)
@@ -518,7 +554,9 @@ func TestDeleteJob_NonexistentDirectory(t *testing.T) {
 func TestLoadJob_Success(t *testing.T) {
 	root := t.TempDir()
 	photoDir := filepath.Join(root, "photos")
-	os.Mkdir(photoDir, fs.ModePerm)
+	if err := os.Mkdir(photoDir, fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	writeMarker(t, photoDir, map[string]any{"job_name": "myphotos"})
 
 	svc, _ := newDirService(t, root)
@@ -533,7 +571,9 @@ func TestLoadJob_Success(t *testing.T) {
 
 func TestLoadJob_NoMarker(t *testing.T) {
 	root := t.TempDir()
-	os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm)
+	if err := os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
 	svc, _ := newDirService(t, root)
 	_, err := svc.LoadJob("photos")
 	if err == nil {

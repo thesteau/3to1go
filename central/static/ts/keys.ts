@@ -7,7 +7,7 @@ let _keySessionGeneration = 0;
 function clearSessionEncKeys(): void {
   // Invalidate key validation and prompts already in flight as well as stored keys.
   _keySessionGeneration += 1;
-  Object.keys(_encKeys).forEach((key) => delete _encKeys[key]);
+  for (const key of Object.keys(_encKeys)) delete _encKeys[key];
   for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
     const key = sessionStorage.key(index);
     if (key?.startsWith("3to1go_enc_")) sessionStorage.removeItem(key);
@@ -61,7 +61,12 @@ function keyStatusElement(edgeId: string, edgeInstanceId: string | null | undefi
   return document.querySelector(selector);
 }
 
-function setKeyStatus(edgeId: string, edgeInstanceId: string | null | undefined, message: string, kind: KeyStatusKind = "info"): void {
+function setKeyStatus(
+  edgeId: string,
+  edgeInstanceId: string | null | undefined,
+  message: string,
+  kind: KeyStatusKind = "info",
+): void {
   const element = keyStatusElement(edgeId, edgeInstanceId);
   if (!element) return;
   element.textContent = message;

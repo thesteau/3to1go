@@ -23,11 +23,23 @@ async function loadStorageOverview(): Promise<void> {
     const response = await fetch("/api/overview?section=storage", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     if (!response.ok) throw new Error("Storage status unavailable");
     const data: StorageOverview = await response.json();
-    panel.innerHTML = `<div><strong>Storage status</strong><br>${escapeHtml(data.status)}</div>` +
-      ([["Backups Used", data.disk_used_bytes], ["Disk Free", data.disk_free_bytes], ["Disk Total", data.disk_total_bytes]] as const)
-        .map(([label, value]) => `<div><strong>${label}</strong><br>${typeof value === "number" ? formatBytes(value) : "—"}</div>`).join("");
+    panel.innerHTML =
+      `<div><strong>Storage status</strong><br>${escapeHtml(data.status)}</div>` +
+      (
+        [
+          ["Backups Used", data.disk_used_bytes],
+          ["Disk Free", data.disk_free_bytes],
+          ["Disk Total", data.disk_total_bytes],
+        ] as const
+      )
+        .map(
+          ([label, value]) =>
+            `<div><strong>${label}</strong><br>${typeof value === "number" ? formatBytes(value) : "—"}</div>`,
+        )
+        .join("");
   } catch {
-    panel.innerHTML = '<p role="status">Storage status could not load. <button type="button" onclick="loadStorageOverview()">Retry</button></p>';
+    panel.innerHTML =
+      '<p role="status">Storage status could not load. <button type="button" onclick="loadStorageOverview()">Retry</button></p>';
   } finally {
     _storageLoading = false;
   }
@@ -50,7 +62,9 @@ async function loadCentralSettings(): Promise<void> {
 
 async function fetchCentralSettings(): Promise<void> {
   try {
-    const response = await fetch("/api/overview?section=settings", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    const response = await fetch("/api/overview?section=settings", {
+      signal: globalThis.AbortSignal?.timeout?.(30000),
+    });
     if (!response.ok) throw new Error("Settings unavailable");
     const data: OverviewResponse = await response.json();
     window.__centralSettings = data.settings || {};
@@ -77,23 +91,25 @@ async function manualRefresh(): Promise<void> {
 }
 
 function collectSnapshotEvents(data: OverviewResponse): SnapshotEvent[] {
-  return (data.edges || []).flatMap((edge) => (
-    (edge.instances || []).flatMap((instance) => (
-      (instance.jobs || []).flatMap((job) => (
-        (job.snapshots || []).map((snapshot) => {
-          const edgeInstanceId = instance.edge_instance_id || "";
-          const name = snapshot.name || snapshot.filename || "";
-          return {
-            key: `${edge.edge_id}::${edgeInstanceId}::${job.job_name}::${name}`,
-            edgeId: edge.edge_id,
-            edgeInstanceId,
-            jobName: job.job_name,
-            name,
-          };
-        })
-      ))
-    ))
-  )).filter((event) => event.name);
+  return (data.edges || [])
+    .flatMap((edge) =>
+      (edge.instances || []).flatMap((instance) =>
+        (instance.jobs || []).flatMap((job) =>
+          (job.snapshots || []).map((snapshot) => {
+            const edgeInstanceId = instance.edge_instance_id || "";
+            const name = snapshot.name || snapshot.filename || "";
+            return {
+              key: `${edge.edge_id}::${edgeInstanceId}::${job.job_name}::${name}`,
+              edgeId: edge.edge_id,
+              edgeInstanceId,
+              jobName: job.job_name,
+              name,
+            };
+          }),
+        ),
+      ),
+    )
+    .filter((event) => event.name);
 }
 
 function updateSnapshotArrivalToasts(data: OverviewResponse, { notify = false } = {}): void {
@@ -111,11 +127,9 @@ function updateSnapshotArrivalToasts(data: OverviewResponse, { notify = false } 
 
   arrivals.slice(0, 4).forEach((event) => {
     const instanceLabel = event.edgeInstanceId ? ` / ${event.edgeInstanceId}` : "";
-    showToast(
-      `Received ${event.jobName} from ${event.edgeId}${instanceLabel}.`,
-      "success",
-      { title: "Snapshot received" },
-    );
+    showToast(`Received ${event.jobName} from ${event.edgeId}${instanceLabel}.`, "success", {
+      title: "Snapshot received",
+    });
   });
   if (arrivals.length > 4) {
     showToast(`${arrivals.length - 4} more snapshots received.`, "success", { title: "Snapshot received" });
@@ -134,21 +148,31 @@ function captureOverviewUiState(): { expandedEdges: Set<string> } {
 // Reconcile existing cards in place so refresh never replaces a surviving key input.
 // Its value, focus and selection belong to the user, not the overview response.
 function updateOverviewDom(container: HTMLElement, html: string): void {
-  const focusedInput = container.contains(document.activeElement) && document.activeElement!.matches("[data-edge-key-input]")
-    ? document.activeElement as HTMLInputElement : null;
-  const selection = focusedInput ? [focusedInput.selectionStart, focusedInput.selectionEnd, focusedInput.selectionDirection] : null;
+  const focusedInput =
+    container.contains(document.activeElement) && document.activeElement!.matches("[data-edge-key-input]")
+      ? (document.activeElement as HTMLInputElement)
+      : null;
+  const selection = focusedInput
+    ? [focusedInput.selectionStart, focusedInput.selectionEnd, focusedInput.selectionDirection]
+    : null;
   const template = document.createElement("template");
   template.innerHTML = html;
-  const nodeKey = (node: Node) => node.nodeType === 1
-    ? (node as Element).getAttribute("data-edge-id") ?? (node as Element).getAttribute("data-instance-id") ?? (node as Element).getAttribute("data-key-panel") ?? (node as Element).getAttribute("data-edge-key-input")
-    : null;
+  const nodeKey = (node: Node) =>
+    node.nodeType === 1
+      ? ((node as Element).getAttribute("data-edge-id") ??
+        (node as Element).getAttribute("data-instance-id") ??
+        (node as Element).getAttribute("data-key-panel") ??
+        (node as Element).getAttribute("data-edge-key-input"))
+      : null;
   function syncChildren(target: Node, source: Node): void {
     let cursor: ChildNode | null = target.firstChild;
     for (const next of Array.from(source.childNodes)) {
       const key = nodeKey(next);
       let existing: ChildNode | null | undefined = cursor;
       if (key !== null) {
-        existing = Array.from(target.childNodes).find((node) => nodeKey(node) === key && node.nodeName === next.nodeName);
+        existing = Array.from(target.childNodes).find(
+          (node) => nodeKey(node) === key && node.nodeName === next.nodeName,
+        );
       }
       if (!existing || existing.nodeName !== next.nodeName || nodeKey(existing) !== key) {
         target.insertBefore(next.cloneNode(true), cursor);
@@ -164,7 +188,8 @@ function updateOverviewDom(container: HTMLElement, html: string): void {
             if (!nextElement.hasAttribute(attr.name)) existingElement.removeAttribute(attr.name);
           }
           for (const attr of Array.from(nextElement.attributes)) {
-            if (existingElement.getAttribute(attr.name) !== attr.value) existingElement.setAttribute(attr.name, attr.value);
+            if (existingElement.getAttribute(attr.name) !== attr.value)
+              existingElement.setAttribute(attr.name, attr.value);
           }
           syncChildren(existingElement, nextElement);
         }
@@ -183,7 +208,9 @@ function updateOverviewDom(container: HTMLElement, html: string): void {
   // Moving a card after server-side reordering can blur a retained input.
   if (focusedInput?.isConnected && document.activeElement !== focusedInput) {
     focusedInput.focus({ preventScroll: true });
-    focusedInput.setSelectionRange(...(selection as [number | null, number | null, "forward" | "backward" | "none" | undefined]));
+    focusedInput.setSelectionRange(
+      ...(selection as [number | null, number | null, "forward" | "backward" | "none" | undefined]),
+    );
   }
 }
 
@@ -198,14 +225,19 @@ async function loadOverview(options: OverviewOptions = {}): Promise<boolean> {
   return _overviewInFlight;
 }
 
-async function fetchOverview({ silent = false, notifyNewSnapshots = false, force = false }: OverviewOptions = {}): Promise<boolean> {
+async function fetchOverview({
+  silent = false,
+  notifyNewSnapshots = false,
+  force = false,
+}: OverviewOptions = {}): Promise<boolean> {
   _overviewLoading = true;
   // A forced refresh follows a change, so it waits for any older settings
   // request and loads again; otherwise that older response could restore old values.
   if (force || !_settingsInFlight) loadCentralSettings();
   loadStorageOverview();
   if (!silent && !document.getElementById("namespaces")!.children.length) {
-    document.getElementById("namespaces")!.innerHTML = '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
+    document.getElementById("namespaces")!.innerHTML =
+      '<div class="section-loading"><span class="section-spinner" aria-label="Loading…"></span></div>';
   }
 
   try {
@@ -217,17 +249,33 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false, force
     updateSnapshotArrivalToasts(data, { notify: notifyNewSnapshots });
 
     const edges = data.edges || [];
-    const allInstances = edges.flatMap((edge) => (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })));
+    const allInstances = edges.flatMap((edge) =>
+      (edge.instances || []).map((instance) => ({ edgeId: edge.edge_id, instance })),
+    );
     _edgeKeyFingerprints = Object.fromEntries(
       allInstances
         .filter(({ instance }) => instance.edge_instance_id)
-        .map(({ edgeId, instance }) => [buildEdgeKeyId(edgeId, instance.edge_instance_id), instance.encryption_key_fingerprint || ""]),
+        .map(({ edgeId, instance }) => [
+          buildEdgeKeyId(edgeId, instance.edge_instance_id),
+          instance.encryption_key_fingerprint || "",
+        ]),
     );
 
     const totalEdges = edges.length;
     const totalInstances = edges.reduce((t, e) => t + (e.instances || []).length, 0);
-    const totalJobs = edges.reduce((t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).length, 0), 0);
-    const totalSnapshots = edges.reduce((t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).reduce((ttt, j) => ttt + (j.snapshot_count || 0), 0), 0), 0);
+    const totalJobs = edges.reduce(
+      (t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).length, 0),
+      0,
+    );
+    const totalSnapshots = edges.reduce(
+      (t, e) =>
+        t +
+        (e.instances || []).reduce(
+          (tt, i) => tt + (i.jobs || []).reduce((ttt, j) => ttt + (j.snapshot_count || 0), 0),
+          0,
+        ),
+      0,
+    );
 
     document.getElementById("meta")!.innerHTML = `
       <div><strong>Edges</strong> ${renderHelpHint("Unique Edge device IDs that have stored at least one snapshot on this Central.")}<br>${totalEdges}</div>
@@ -241,11 +289,15 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false, force
     // Capture after the request: edits and expanded cards may change while it is in flight.
     const uiState = captureOverviewUiState();
     const overviewHtml = edges.length
-      ? edges.map((edge) => {
-          const edgeInstances = edge.instances || [];
-          const edgeJobCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).length, 0);
-          const edgeSnapCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).reduce((tt, j) => tt + (j.snapshot_count || 0), 0), 0);
-          return `
+      ? edges
+          .map((edge) => {
+            const edgeInstances = edge.instances || [];
+            const edgeJobCount = edgeInstances.reduce((t, i) => t + (i.jobs || []).length, 0);
+            const edgeSnapCount = edgeInstances.reduce(
+              (t, i) => t + (i.jobs || []).reduce((tt, j) => tt + (j.snapshot_count || 0), 0),
+              0,
+            );
+            return `
           <details class="edge-card edge-card-collapsible" data-edge-id="${escapeHtml(edge.edge_id)}"${uiState.expandedEdges.has(edge.edge_id) ? " open" : ""}>
             <summary class="edge-header edge-card-summary">
               <div class="edge-header-main">
@@ -263,7 +315,8 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false, force
             </div>
           </details>
         `;
-        }).join("")
+          })
+          .join("")
       : '<p class="hint">No snapshots have been stored yet.</p>';
 
     updateOverviewDom(document.getElementById("namespaces")!, overviewHtml);
@@ -275,7 +328,8 @@ async function fetchOverview({ silent = false, notifyNewSnapshots = false, force
     );
   } catch (error) {
     if (!_overviewHasData) {
-      document.getElementById("namespaces")!.innerHTML = '<p role="status">Snapshots could not load. <button type="button" onclick="loadOverview()">Retry</button></p>';
+      document.getElementById("namespaces")!.innerHTML =
+        '<p role="status">Snapshots could not load. <button type="button" onclick="loadOverview()">Retry</button></p>';
       document.getElementById("meta")!.innerHTML = '<p class="hint">Snapshot summary unavailable.</p>';
     }
     if (!silent) {

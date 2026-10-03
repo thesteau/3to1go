@@ -67,7 +67,9 @@ func TestLoadOrCreateIssuerKeypair_PathIsDirectory(t *testing.T) {
 func TestLoadOrCreateIssuerKeypair_WrongSeedLength(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.key")
-	os.WriteFile(path, []byte("tooshort"), 0o600)
+	if err := os.WriteFile(path, []byte("tooshort"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	_, _, err := LoadOrCreateIssuerKeypair(path)
 	if err == nil {

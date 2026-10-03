@@ -37,11 +37,7 @@
           },
           {
             "group": "Concepts",
-            "pages": [
-              "concepts/how-it-works",
-              "concepts/storage-and-3-2-1",
-              "concepts/design-decisions"
-            ]
+            "pages": ["concepts/how-it-works", "concepts/storage-and-3-2-1", "concepts/design-decisions"]
           },
           {
             "group": "Both apps",

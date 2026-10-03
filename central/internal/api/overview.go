@@ -240,6 +240,9 @@ func (a *App) handleHealthReady(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusServiceUnavailable, "storage backend unavailable")
 		return
 	}
-	os.MkdirAll(s.StagingDir, 0o755)
+	if err := os.MkdirAll(s.StagingDir, 0o755); err != nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "staging directory unavailable")
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

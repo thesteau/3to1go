@@ -72,8 +72,6 @@ func (r *mockRows) TypeMap() *pgtype.Map { return nil }
 
 func emptyRows() pgx.Rows { return &mockRows{} }
 
-func errRows(e error) pgx.Rows { return &mockRows{err: e} }
-
 // ---------------------------------------------------------------------------
 // Mock dbPool
 // ---------------------------------------------------------------------------
@@ -103,34 +101,6 @@ func (m *mockPool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Ro
 		return m.queryRowFn(ctx, sql, args...)
 	}
 	return noRow()
-}
-
-// queuePool returns a pool where each call pops the next function off a queue.
-type queuePool struct {
-	rows []pgx.Row
-	rowQ []pgx.Rows
-}
-
-func (q *queuePool) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (q *queuePool) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
-	if len(q.rowQ) == 0 {
-		return emptyRows(), nil
-	}
-	r := q.rowQ[0]
-	q.rowQ = q.rowQ[1:]
-	return r, nil
-}
-
-func (q *queuePool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	if len(q.rows) == 0 {
-		return noRow()
-	}
-	r := q.rows[0]
-	q.rows = q.rows[1:]
-	return r
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +382,9 @@ func TestUpsertSnapshot_StoresUnusualReason(t *testing.T) {
 		args = a
 		return pgconn.CommandTag{}, nil
 	}})
-	idx.UpsertSnapshot(context.Background(), "e/i/j", SnapshotEntry{StoredAs: "f.tar.zst", Unusual: "Small."})
+	if err := idx.UpsertSnapshot(context.Background(), "e/i/j", SnapshotEntry{StoredAs: "f.tar.zst", Unusual: "Small."}); err != nil {
+		t.Fatal(err)
+	}
 	if len(args) != 10 || args[9] != "Small." {
 		t.Errorf("args = %v", args)
 	}
@@ -954,18 +926,13 @@ func TestCredentialStore_Mint_Success(t *testing.T) {
 
 func TestCredentialStore_Verify_Revoked(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	keyDir := t.TempDir()
-	keyPath := keyDir + "/issuer.key"
-	storedPub, _, err := signing.LoadOrCreateIssuerKeypair(keyPath)
-	// Use a fresh key to ensure no collision with the test key
-	_ = storedPub
 
 	// Create a valid token with our key
 	token, _ := signing.MintCredential(priv, 1)
 
 	// Pool returns no rows (revoked / not in DB)
 	s := newCredStore(&mockPool{})
-	_, err = s.Verify(context.Background(), token, pub)
+	_, err := s.Verify(context.Background(), token, pub)
 	if err == nil {
 		t.Error("expected error for revoked/not-found credential")
 	}

@@ -99,7 +99,9 @@ func TestSaveUploadedFile_MaxFilesLimit(t *testing.T) {
 	// Fill to max
 	for i := range MaxHookFiles {
 		name := strings.Repeat("x", i+1) + ".sh"
-		hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n"))
+		if _, err := hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n")); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// One more different file should fail
 	_, err := hm.SaveUploadedFile("extra.sh", []byte("#!/bin/sh\necho hi\n"))
@@ -113,7 +115,9 @@ func TestSaveUploadedFile_OverwriteExisting(t *testing.T) {
 	// Fill to max
 	for i := range MaxHookFiles {
 		name := strings.Repeat("x", i+1) + ".sh"
-		hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n"))
+		if _, err := hm.SaveUploadedFile(name, []byte("#!/bin/sh\necho ok\n")); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Overwriting an existing file at max should succeed
 	_, err := hm.SaveUploadedFile("x.sh", []byte("#!/bin/sh\necho updated\n"))
@@ -134,8 +138,12 @@ func TestListFiles_Empty(t *testing.T) {
 
 func TestListFiles_WithFiles(t *testing.T) {
 	hm, _ := newHookManager(t)
-	hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n"))
-	hm.SaveUploadedFile("helper.txt", []byte("notes"))
+	if _, err := hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hm.SaveUploadedFile("helper.txt", []byte("notes")); err != nil {
+		t.Fatal(err)
+	}
 
 	files := hm.ListFiles()
 	if len(files) != 2 {
@@ -145,8 +153,12 @@ func TestListFiles_WithFiles(t *testing.T) {
 
 func TestListFiles_SkipsDirectories(t *testing.T) {
 	hm, dir := newHookManager(t)
-	os.MkdirAll(filepath.Join(dir, "subdir"), 0o755)
-	hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\n"))
+	if err := os.MkdirAll(filepath.Join(dir, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\n")); err != nil {
+		t.Fatal(err)
+	}
 
 	files := hm.ListFiles()
 	if len(files) != 1 {
@@ -156,7 +168,9 @@ func TestListFiles_SkipsDirectories(t *testing.T) {
 
 func TestListFiles_Viewable(t *testing.T) {
 	hm, _ := newHookManager(t)
-	hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n"))
+	if _, err := hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n")); err != nil {
+		t.Fatal(err)
+	}
 	files := hm.ListFiles()
 	if len(files) == 0 || !files[0].Viewable {
 		t.Error("text file should be viewable")
@@ -167,7 +181,9 @@ func TestListFiles_Viewable(t *testing.T) {
 
 func TestDeleteFile_Existing(t *testing.T) {
 	hm, _ := newHookManager(t)
-	hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n"))
+	if _, err := hm.SaveUploadedFile("run.sh", []byte("#!/bin/sh\necho hi\n")); err != nil {
+		t.Fatal(err)
+	}
 	if err := hm.DeleteFile("run.sh"); err != nil {
 		t.Fatalf("DeleteFile: %v", err)
 	}
@@ -188,7 +204,9 @@ func TestDeleteFile_Missing(t *testing.T) {
 
 func TestReadTextFile_Existing(t *testing.T) {
 	hm, _ := newHookManager(t)
-	hm.SaveUploadedFile("helper.txt", []byte("some notes"))
+	if _, err := hm.SaveUploadedFile("helper.txt", []byte("some notes")); err != nil {
+		t.Fatal(err)
+	}
 	name, content, err := hm.ReadTextFile("helper.txt")
 	if err != nil {
 		t.Fatalf("ReadTextFile: %v", err)
@@ -209,7 +227,9 @@ func TestReadTextFile_Missing(t *testing.T) {
 func TestReadTextFile_BinaryFile(t *testing.T) {
 	hm, dir := newHookManager(t)
 	// Write binary directly (bypassing SaveUploadedFile validation)
-	os.WriteFile(filepath.Join(dir, "binary.txt"), []byte{0xff, 0xfe, 0x00}, 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "binary.txt"), []byte{0xff, 0xfe, 0x00}, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	_, _, err := hm.ReadTextFile("binary.txt")
 	if err == nil || !strings.Contains(err.Error(), "not text") {
 		t.Errorf("expected not text error, got %v", err)
@@ -242,7 +262,9 @@ func TestResolveCommand_WithSpaces(t *testing.T) {
 
 func TestResolveCommand_FileInScriptsDir(t *testing.T) {
 	hm, dir := newHookManager(t)
-	os.WriteFile(filepath.Join(dir, "myscript.sh"), []byte("#!/bin/sh"), 0o755)
+	if err := os.WriteFile(filepath.Join(dir, "myscript.sh"), []byte("#!/bin/sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	got := hm.resolveCommand("myscript.sh")
 	if got != "./myscript.sh" {
 		t.Errorf("got %q, want ./myscript.sh", got)

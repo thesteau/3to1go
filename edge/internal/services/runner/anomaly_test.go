@@ -61,10 +61,14 @@ func TestUnusualBackupIsHeldUntilForceUpload(t *testing.T) {
 	// Six ordinary weekly backups of 100 compressible documents, one edit each week.
 	text := strings.Repeat("quarterly report, nothing unusual here. ", 300)
 	for i := 0; i < 100; i++ {
-		os.WriteFile(filepath.Join(jobRoot, fmt.Sprintf("report-%03d.txt", i)), []byte(text), 0o644)
+		if err := os.WriteFile(filepath.Join(jobRoot, fmt.Sprintf("report-%03d.txt", i)), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for week := 0; week < 6; week++ {
-		os.WriteFile(filepath.Join(jobRoot, fmt.Sprintf("report-%03d.txt", week)), []byte(text+fmt.Sprint(week)), 0o644)
+		if err := os.WriteFile(filepath.Join(jobRoot, fmt.Sprintf("report-%03d.txt", week)), []byte(text+fmt.Sprint(week)), 0o644); err != nil {
+			t.Fatal(err)
+		}
 		cycle()
 		if st := runner.StateStore.Get(jobRoot); st.LastStatus != "success" {
 			t.Fatalf("week %d: %s (%s)", week, st.LastStatus, st.LastErrorDetail)
@@ -79,8 +83,12 @@ func TestUnusualBackupIsHeldUntilForceUpload(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		name := filepath.Join(jobRoot, fmt.Sprintf("report-%03d.txt", i))
 		rand.Read(noise)
-		os.WriteFile(name+".locked", noise, 0o644)
-		os.Remove(name)
+		if err := os.WriteFile(name+".locked", noise, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(name); err != nil {
+			t.Fatal(err)
+		}
 	}
 	recorder := &recordingStateStore{jobStateStore: runner.StateStore}
 	runner.StateStore = recorder
@@ -139,8 +147,12 @@ func TestAlertModeUploadsUnusualBackups(t *testing.T) {
 	history := anomaly.Observe([]*backup.DiscoveredFile{{ArchivePath: "a.txt", Size: 1}}, 1, timeZero)
 	for i := 0; i < 6; i++ {
 		history.FileCount = 1000
-		runner.Anomalies.SetPending(jobRoot, history)
-		runner.Anomalies.Accept(jobRoot)
+		if err := runner.Anomalies.SetPending(jobRoot, history); err != nil {
+			t.Fatal(err)
+		}
+		if err := runner.Anomalies.Accept(jobRoot); err != nil {
+			t.Fatal(err)
+		}
 	}
 	files := []*backup.DiscoveredFile{{ArchivePath: "a.txt", Size: 1}}
 	if review := runner.reviewStagedArchive(job, settings, files, 1, false); review == nil || review.hold {

@@ -20,7 +20,11 @@ function renderClipValue(label: string, value: unknown, { className = "", clipLe
   return renderStaticClipValue(label, full, { className, clipLength });
 }
 
-function renderStaticClipValue(label: string, value: unknown, { className = "", clipLength = 28 }: ClipOptions = {}): string {
+function renderStaticClipValue(
+  label: string,
+  value: unknown,
+  { className = "", clipLength = 28 }: ClipOptions = {},
+): string {
   const full = String(value ?? "").trim();
   if (!full) return "";
   const short = clipMiddle(full, clipLength);
@@ -38,10 +42,10 @@ function renderLinkValue(label: string, value: unknown, { className = "", clipLe
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "—";
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + " MB";
-  return (bytes / 1024 ** 3).toFixed(2) + " GB";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
 // Removed items fade out rather than vanishing, so it is clear which one went away.
@@ -51,6 +55,10 @@ function fadeOutAndRemove(element: Element | null | undefined): void {
     element.remove();
     return;
   }
-  element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-in", fill: "forwards" })
-    .finished.then(() => element.remove(), () => element.remove());
+  element
+    .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-in", fill: "forwards" })
+    .finished.then(
+      () => element.remove(),
+      () => element.remove(),
+    );
 }

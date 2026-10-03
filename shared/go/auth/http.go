@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -56,7 +57,10 @@ func (a *Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, _ := r.Cookie(a.CookieName)
 	if cookie != nil {
-		a.Store.DeleteSession(r.Context(), cookie.Value)
+		// Sign-out always succeeds for the browser; a session left behind expires on its own.
+		if err := a.Store.DeleteSession(r.Context(), cookie.Value); err != nil {
+			slog.Warn("session_delete_failed", "error", err)
+		}
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:   a.CookieName,
@@ -173,7 +177,10 @@ func (a *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if passPtr != nil {
-		a.Store.DeleteSessionsForUser(r.Context(), userID)
+		if err := a.Store.DeleteSessionsForUser(r.Context(), userID); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "password changed, but existing sessions could not be signed out")
+			return
+		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": updated})
 }

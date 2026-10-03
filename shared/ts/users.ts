@@ -36,14 +36,15 @@ function renderBuildInfo(build: BuildInfo | undefined): void {
 function renderUsers(users: CurrentUser[]): void {
   const canAdmin = Boolean(currentUser?.is_admin);
   document.getElementById("add-user-section")!.hidden = !canAdmin;
-  document.getElementById("users-list")!.innerHTML = users.map((user) => {
-    const isSelf = currentUser?.id === user.id;
-    const isBootstrapAdmin = Boolean(user.is_bootstrap_admin);
-    const canEditUsername = canAdmin || isSelf;
-    const canResetPassword = canAdmin && !isSelf;
-    const canToggleAdmin = canAdmin && !isSelf && !isBootstrapAdmin;
-    const canRemove = canAdmin && !isSelf && !isBootstrapAdmin;
-    return `
+  document.getElementById("users-list")!.innerHTML = users
+    .map((user) => {
+      const isSelf = currentUser?.id === user.id;
+      const isBootstrapAdmin = Boolean(user.is_bootstrap_admin);
+      const canEditUsername = canAdmin || isSelf;
+      const canResetPassword = canAdmin && !isSelf;
+      const canToggleAdmin = canAdmin && !isSelf && !isBootstrapAdmin;
+      const canRemove = canAdmin && !isSelf && !isBootstrapAdmin;
+      return `
       <div class="user-row">
         <div>
           <strong>${escapeHtml(user.username)}</strong>
@@ -62,7 +63,8 @@ function renderUsers(users: CurrentUser[]): void {
         </div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 }
 
 async function saveUser(userId: number): Promise<void> {
@@ -96,7 +98,7 @@ async function saveUser(userId: number): Promise<void> {
     body: JSON.stringify(payload),
   });
   const body = await readJson<UserResponse>(response);
-  setStatus("users-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
+  setStatus("users-status", response.ok ? "Saved." : body.detail || "Save failed.", response.ok ? "success" : "error");
   if (response.ok) {
     if (currentUser?.id === userId) currentUser = body.user;
     await loadUsers();
@@ -126,7 +128,11 @@ async function createUser(): Promise<void> {
     }),
   });
   const body = await readJson(response);
-  setStatus("users-status", response.ok ? "User added." : (body.detail || "Add failed."), response.ok ? "success" : "error");
+  setStatus(
+    "users-status",
+    response.ok ? "User added." : body.detail || "Add failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     usernameInput.value = "";
     passwordInput.value = "";
@@ -136,11 +142,17 @@ async function createUser(): Promise<void> {
 }
 
 async function deleteUser(userId: number): Promise<void> {
-  if (!await confirmApp({ title: "Remove User", message: "Remove this user?", confirmLabel: "Remove", danger: true })) {
+  if (
+    !(await confirmApp({ title: "Remove User", message: "Remove this user?", confirmLabel: "Remove", danger: true }))
+  ) {
     return;
   }
   const response = await fetch(`/api/users/${userId}`, { method: "DELETE" });
   const body = await readJson(response);
-  setStatus("users-status", response.ok ? "User removed." : (body.detail || "Remove failed."), response.ok ? "success" : "error");
+  setStatus(
+    "users-status",
+    response.ok ? "User removed." : body.detail || "Remove failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) await loadUsers();
 }

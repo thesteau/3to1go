@@ -15,9 +15,12 @@ async function cancelOperation(btn: HTMLButtonElement): Promise<void> {
     const response = await fetch("/api/cancel-operation", { method: "POST" });
     const body: OperationResponse = await response.json();
     if (!response.ok) throw new Error(body.detail || "Cancellation failed.");
-    setActionStatus(body.status === "cancelling"
-      ? "Cancellation requested. Active backup work is stopping; completed staged archives are kept until you clear them."
-      : "No active backup operation to cancel.", "info");
+    setActionStatus(
+      body.status === "cancelling"
+        ? "Cancellation requested. Active backup work is stopping; completed staged archives are kept until you clear them."
+        : "No active backup operation to cancel.",
+      "info",
+    );
     requestEdgeActiveRefreshBurst();
     await loadData({ silent: true });
   } catch (error) {
@@ -119,15 +122,17 @@ async function calculateFolderSize(path: string, btn: HTMLButtonElement): Promis
 }
 
 function directoryTreeItem(path: string): HTMLElement | undefined {
-  return Array.from(document.querySelectorAll?.<HTMLElement>("#directory-tree [data-path]") || [])
-    .find((element) => element.dataset.path === path);
+  return Array.from(document.querySelectorAll?.<HTMLElement>("#directory-tree [data-path]") || []).find(
+    (element) => element.dataset.path === path,
+  );
 }
 
 async function excludeFilePath(path: string, btn: HTMLButtonElement): Promise<void> {
   const restore = setButtonBusy(btn, "Excluding…");
   try {
     const response = await fetch("/api/directories/exclude", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ relative_path: path }),
     });
     const body: ApiBody = await response.json();
@@ -162,23 +167,31 @@ function clearStagedFromEvent(event: Event, path: string, btn: HTMLButtonElement
 }
 
 async function clearStagedBackup(path: string, btn: HTMLButtonElement): Promise<void> {
-  if (!await confirmApp({
-    title: "Clear staged backup",
-    message: `Discard the local staged backup for ${path} and reset its retry state? Source files and backups stored in Central are kept. The next backup can build a fresh archive.`,
-    confirmLabel: "Clear staged backup", danger: true,
-  })) return;
+  if (
+    !(await confirmApp({
+      title: "Clear staged backup",
+      message: `Discard the local staged backup for ${path} and reset its retry state? Source files and backups stored in Central are kept. The next backup can build a fresh archive.`,
+      confirmLabel: "Clear staged backup",
+      danger: true,
+    }))
+  )
+    return;
   const restore = setButtonBusy(btn, "Clearing…");
   try {
     const response = await fetch("/api/directories/clear-staged", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ relative_path: path }),
     });
     const body: ApiBody = await response.json();
     if (!response.ok) throw new Error(body.detail || "Could not clear staged backup.");
     setActionStatus(`Cleared the staged backup for ${path}. The next backup builds a fresh archive.`, "success");
     await loadData({ silent: true, refreshDirectoryTree: true });
-    flashElement(Array.from(document.querySelectorAll?.<HTMLElement>("#selected-jobs .job-card") || [])
-      .find((card) => card.dataset.path === path));
+    flashElement(
+      Array.from(document.querySelectorAll?.<HTMLElement>("#selected-jobs .job-card") || []).find(
+        (card) => card.dataset.path === path,
+      ),
+    );
   } catch (error) {
     setActionStatus((error as Error).message, "error");
   } finally {

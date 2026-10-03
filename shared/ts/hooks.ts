@@ -20,7 +20,11 @@ async function uploadHookFile(): Promise<void> {
   formData.append("hook_file", file);
   const response = await fetch("/api/hooks/files", { method: "POST", body: formData });
   const body: ApiBody = await response.json();
-  setStatus("hooks-status", response.ok ? "File uploaded." : (body.detail || "Upload failed."), response.ok ? "success" : "error");
+  setStatus(
+    "hooks-status",
+    response.ok ? "File uploaded." : body.detail || "Upload failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     input.value = "";
     await loadHookConfig({ preserveDrafts: true });
@@ -48,17 +52,23 @@ async function viewHookFile(filename: string, viewable: boolean): Promise<void> 
 
 async function deleteHookFile(filename: string): Promise<void> {
   if (!requirePanelReady("hooks")) return;
-  if (!await confirmApp({
-    title: "Delete Hook File",
-    message: `Delete ${filename}?`,
-    confirmLabel: "Delete",
-    danger: true,
-  })) {
+  if (
+    !(await confirmApp({
+      title: "Delete Hook File",
+      message: `Delete ${filename}?`,
+      confirmLabel: "Delete",
+      danger: true,
+    }))
+  ) {
     return;
   }
   const response = await fetch(`/api/hooks/files/${encodeURIComponent(filename)}`, { method: "DELETE" });
   const body: ApiBody = await response.json();
-  setStatus("hooks-status", response.ok ? "File deleted." : (body.detail || "Delete failed."), response.ok ? "success" : "error");
+  setStatus(
+    "hooks-status",
+    response.ok ? "File deleted." : body.detail || "Delete failed.",
+    response.ok ? "success" : "error",
+  );
   if (response.ok) {
     await loadHookConfig({ preserveDrafts: true });
     setActionStatus(`Deleted ${filename}.`, "success");

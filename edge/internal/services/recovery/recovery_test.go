@@ -66,7 +66,9 @@ func (m *mockDownloader) DownloadLatestSnapshot(_ context.Context, _, _, destPat
 		return "", m.err
 	}
 	if m.content != nil {
-		os.WriteFile(destPath, m.content, 0o600)
+		if err := os.WriteFile(destPath, m.content, 0o600); err != nil {
+			return "", err
+		}
 	}
 	return m.filename, nil
 }

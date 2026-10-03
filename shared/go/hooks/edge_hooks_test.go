@@ -75,7 +75,9 @@ func TestHookManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 	// Fill up to the limit.
 	for i := range MaxHookFiles {
 		name := filepath.Join(h.ScriptsDir, "file"+string(rune('a'+i))+".sh")
-		os.WriteFile(name, []byte("#!/bin/sh\n"), 0o644)
+		if err := os.WriteFile(name, []byte("#!/bin/sh\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	_, err := h.SaveUploadedFile("extra.sh", []byte("#!/bin/sh\n"))
 	if err == nil {
@@ -85,7 +87,9 @@ func TestHookManager_SaveUploadedFile_MaxFilesExceeded(t *testing.T) {
 
 func TestHookManager_ReadTextFile_Success(t *testing.T) {
 	h := newTestHookManager(t)
-	h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\necho hello\n"))
+	if _, err := h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\necho hello\n")); err != nil {
+		t.Fatal(err)
+	}
 	name, content, err := h.ReadTextFile("pre.sh")
 	if err != nil {
 		t.Fatalf("ReadTextFile: %v", err)
@@ -112,7 +116,9 @@ func TestHookManager_ReadTextFile_NotFound(t *testing.T) {
 
 func TestHookManager_DeleteFile_Success(t *testing.T) {
 	h := newTestHookManager(t)
-	h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\n"))
+	if _, err := h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\n")); err != nil {
+		t.Fatal(err)
+	}
 	if err := h.DeleteFile("pre.sh"); err != nil {
 		t.Fatalf("DeleteFile: %v", err)
 	}
@@ -149,7 +155,9 @@ func TestHookManager_Snapshot_Structure(t *testing.T) {
 
 func TestHookManager_ListFiles_ReturnsViewable(t *testing.T) {
 	h := newTestHookManager(t)
-	h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\n"))
+	if _, err := h.SaveUploadedFile("pre.sh", []byte("#!/bin/sh\n")); err != nil {
+		t.Fatal(err)
+	}
 	files := h.ListFiles()
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))

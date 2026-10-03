@@ -213,7 +213,9 @@ func TestSha256File(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.bin")
 	content := []byte("hello world")
-	os.WriteFile(path, content, 0o644)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := sha256File(path)
 	if err != nil {
@@ -262,8 +264,12 @@ func newTestService(t *testing.T) *Service {
 	tmpDir := t.TempDir()
 	uploadRoot := filepath.Join(tmpDir, "uploads")
 	keyRoot := filepath.Join(uploadRoot, "keys")
-	os.MkdirAll(uploadRoot, 0o755)
-	os.MkdirAll(keyRoot, 0o755)
+	if err := os.MkdirAll(uploadRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(keyRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
 	lockMgr := locks.NewNamespaceLockManager()
@@ -361,8 +367,12 @@ func TestCurrentUploadSize_WithData(t *testing.T) {
 	svc := newTestService(t)
 	// Create session directory and partial file
 	dir := svc.sessionDir("mysess")
-	os.MkdirAll(dir, 0o755)
-	os.WriteFile(svc.uploadDataPath("mysess"), []byte("hello"), 0o644)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(svc.uploadDataPath("mysess"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	if got := svc.currentUploadSize("mysess"); got != 5 {
 		t.Errorf("got %d, want 5", got)
@@ -381,8 +391,12 @@ func TestCleanupStaleUploads(t *testing.T) {
 		ArchiveSizeBytes: 100,
 		ExpiresAt:        "2000-01-01T00:00:00Z", // in the past
 	}
-	svc.saveSession(sess)
-	svc.writeKeyMapping("ikey-expired", expiredID)
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.writeKeyMapping("ikey-expired", expiredID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a valid session
 	validID := "valid456"
@@ -393,7 +407,9 @@ func TestCleanupStaleUploads(t *testing.T) {
 		ArchiveSizeBytes: 100,
 		ExpiresAt:        utcAfter(24 * time.Hour),
 	}
-	svc.saveSession(sessValid)
+	if err := svc.saveSession(sessValid); err != nil {
+		t.Fatal(err)
+	}
 
 	svc.CleanupStaleUploads()
 
@@ -410,7 +426,9 @@ func TestCleanupStaleUploads(t *testing.T) {
 func TestCleanupStaleUploads_IgnoresFiles(t *testing.T) {
 	svc := newTestService(t)
 	// Place a non-directory file in uploadRoot — should be ignored
-	os.WriteFile(filepath.Join(svc.uploadRoot, "notadir.txt"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(svc.uploadRoot, "notadir.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	svc.CleanupStaleUploads() // should not panic
 }
 
@@ -425,15 +443,19 @@ func TestReservedBytes(t *testing.T) {
 			ArchiveSizeBytes: 500,
 			ExpiresAt:        utcAfter(time.Hour),
 		}
-		svc.saveSession(sess)
+		if err := svc.saveSession(sess); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Create one completed session (should not be counted)
-	svc.saveSession(&UploadSession{
+	if err := svc.saveSession(&UploadSession{
 		UploadID:         "s3",
 		Status:           "completed",
 		ArchiveSizeBytes: 200,
 		ExpiresAt:        utcAfter(time.Hour),
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	if got := svc.reservedBytes(); got != 1000 {
 		t.Errorf("reservedBytes = %d, want 1000", got)
@@ -519,7 +541,7 @@ func TestSessionTTL(t *testing.T) {
 func TestSessionReferencesMissingSnapshot_NonCompleted(t *testing.T) {
 	svc := newTestService(t)
 	sess := &UploadSession{Status: "initiated"}
-	if svc.sessionReferencesMissingSnapshot(nil, sess) {
+	if svc.sessionReferencesMissingSnapshot(context.Background(), sess) {
 		t.Error("non-completed session should never reference missing snapshot")
 	}
 }
@@ -582,8 +604,12 @@ func TestDiscardSession(t *testing.T) {
 		Status:         "initiated",
 		ExpiresAt:      utcAfter(time.Hour),
 	}
-	svc.saveSession(sess)
-	svc.writeKeyMapping("ikey-disc", "disc123")
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.writeKeyMapping("ikey-disc", "disc123"); err != nil {
+		t.Fatal(err)
+	}
 
 	svc.discardSession(sess)
 
@@ -609,7 +635,7 @@ func TestSessionReferencesMissingSnapshot_TrueWhenMissing(t *testing.T) {
 		StoredAs:  &storedAs,
 	}
 	// backend has no files in this namespace, so snapshot is missing
-	if !svc.sessionReferencesMissingSnapshot(nil, sess) {
+	if !svc.sessionReferencesMissingSnapshot(context.Background(), sess) {
 		t.Error("expected true when snapshot file is missing from backend")
 	}
 }
@@ -620,8 +646,12 @@ func TestSessionReferencesMissingSnapshot_FalseWhenPresent(t *testing.T) {
 	ns := "edge/inst/job"
 	filename := "job__2024-01-01T00-00-00Z__abcdef12.tar.zst"
 	nsDir := filepath.Join(svc.settings.BackupRoot, ns)
-	os.MkdirAll(nsDir, 0o755)
-	os.WriteFile(filepath.Join(nsDir, filename), []byte("data"), 0o644)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nsDir, filename), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	sess := &UploadSession{
 		Status:    "completed",
@@ -629,7 +659,7 @@ func TestSessionReferencesMissingSnapshot_FalseWhenPresent(t *testing.T) {
 		Filename:  filename,
 		StoredAs:  &filename,
 	}
-	if svc.sessionReferencesMissingSnapshot(nil, sess) {
+	if svc.sessionReferencesMissingSnapshot(context.Background(), sess) {
 		t.Error("expected false when snapshot file is present in backend")
 	}
 }
@@ -832,7 +862,9 @@ func TestValidateNewReservation_InsufficientStagingSpace(t *testing.T) {
 		ArchiveSizeBytes: 1 << 60, // 1 exabyte - way more than any disk
 		ExpiresAt:        utcAfter(time.Hour),
 	}
-	svc.saveSession(hugeSess)
+	if err := svc.saveSession(hugeSess); err != nil {
+		t.Fatal(err)
+	}
 
 	err := svc.validateNewReservation(1024)
 	if err == nil {
@@ -1013,7 +1045,9 @@ func TestAppendChunk_AlreadyCompleted(t *testing.T) {
 	// Mark session as completed
 	sess.Status = "completed"
 	sess.UploadedBytes = archiveSize
-	svc.saveSession(sess)
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader("data"))
 	if err != nil {
@@ -1060,8 +1094,12 @@ func TestFinalizeUpload_AlreadyCompleted(t *testing.T) {
 	ns := "edge/inst/job"
 	filename := "job__2024-01-01T00-00-00Z__abcdef12.tar.zst"
 	nsDir := filepath.Join(svc.settings.BackupRoot, ns)
-	os.MkdirAll(nsDir, 0o755)
-	os.WriteFile(filepath.Join(nsDir, filename), []byte("data"), 0o644)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nsDir, filename), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	sess := makeUploadSession(t, svc, 4)
 	sess.Status = "completed"
@@ -1070,7 +1108,9 @@ func TestFinalizeUpload_AlreadyCompleted(t *testing.T) {
 	sess.Filename = filename
 	sess.StoredAs = &filename
 	sess.Pruned = 1
-	svc.saveSession(sess)
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := svc.FinalizeUpload(context.Background(), sess.UploadID)
 	if err != nil {
@@ -1104,10 +1144,14 @@ func TestFinalizeUpload_ChecksumMismatch(t *testing.T) {
 	content := []byte("hello")
 	sess := makeUploadSession(t, svc, int64(len(content)))
 	sess.ArchiveSHA256 = "wrongchecksum1234567890abcdef1234567890abcdef1234567890abcdef1234"
-	svc.saveSession(sess)
+	if err := svc.saveSession(sess); err != nil {
+		t.Fatal(err)
+	}
 
 	// Append the actual data
-	svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content)))
+	if _, err := svc.AppendChunk(context.Background(), sess.UploadID, 0, strings.NewReader(string(content))); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := svc.FinalizeUpload(context.Background(), sess.UploadID)
 	if err == nil {
@@ -1142,8 +1186,12 @@ func TestLoadSession_CorruptJSON(t *testing.T) {
 	svc := newTestService(t)
 	id := "corrupt123"
 	dir := svc.sessionDir(id)
-	os.MkdirAll(dir, 0o755)
-	os.WriteFile(svc.metadataPath(id), []byte("not json at all"), 0o644)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(svc.metadataPath(id), []byte("not json at all"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := svc.loadSession(id)
 	if err == nil {
@@ -1161,7 +1209,9 @@ func TestLoadSessionForKey_CorruptKeyMapping(t *testing.T) {
 	svc := newTestService(t)
 	key := "corrupt-key"
 	keyPath := svc.keyMappingPath(key)
-	os.WriteFile(keyPath, []byte("not json"), 0o644)
+	if err := os.WriteFile(keyPath, []byte("not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	got := svc.loadSessionForKey(key)
 	if got != nil {
@@ -1174,7 +1224,9 @@ func TestLoadSessionForKey_EmptyUploadID(t *testing.T) {
 	key := "empty-id-key"
 	keyPath := svc.keyMappingPath(key)
 	data, _ := json.Marshal(map[string]string{"idempotency_key": key, "upload_id": "  "})
-	os.WriteFile(keyPath, data, 0o644)
+	if err := os.WriteFile(keyPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	got := svc.loadSessionForKey(key)
 	if got != nil {
@@ -1188,8 +1240,12 @@ func TestCleanupStaleUploads_BadJSON(t *testing.T) {
 	svc := newTestService(t)
 	// Create a directory that looks like a session but has bad JSON
 	dir := filepath.Join(svc.uploadRoot, "badsess")
-	os.MkdirAll(dir, 0o755)
-	os.WriteFile(filepath.Join(dir, "metadata.json"), []byte("not json"), 0o644)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte("not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	svc.CleanupStaleUploads() // should not panic
 }
 

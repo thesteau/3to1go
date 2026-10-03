@@ -11,7 +11,15 @@ function openDialog(id: string): void {
 
 function appDialog(options: AppDialogOptions & { input: true }): Promise<string | null>;
 function appDialog(options?: AppDialogOptions): Promise<string | boolean | null>;
-function appDialog({ title, message, input = false, inputLabel = "", inputType = "text", confirmLabel = "Continue", danger = false }: AppDialogOptions = {}): Promise<string | boolean | null> {
+function appDialog({
+  title,
+  message,
+  input = false,
+  inputLabel = "",
+  inputType = "text",
+  confirmLabel = "Continue",
+  danger = false,
+}: AppDialogOptions = {}): Promise<string | boolean | null> {
   const dialog = document.getElementById("app-dialog") as HTMLDialogElement | null;
   if (!dialog?.showModal) {
     return Promise.resolve(input ? null : false);
