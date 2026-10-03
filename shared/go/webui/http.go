@@ -2,16 +2,18 @@ package webui
 
 import "net/http"
 
-func ServeIndex(w http.ResponseWriter, r *http.Request, readFile func(string) ([]byte, error)) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
+// IndexServer serves the assembled page shell with a cache tag and gzip.
+func IndexServer(readFile func(string) ([]byte, error)) http.HandlerFunc {
+	cache := &assetCache{read: readFile}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		if _, err := cache.get("index.html"); err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		cache.serve(w, r, "index.html")
 	}
-	content, err := readFile("index.html")
-	if err != nil {
-		http.Error(w, "index.html not found", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(content)
 }

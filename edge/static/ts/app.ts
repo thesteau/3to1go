@@ -23,6 +23,8 @@ function startEdgeApp(): void {
     }
   });
   _edgeAutoRefreshStarted = true;
+  // Show the last jobs and folders from this tab at once, then load fresh data.
+  restoreEdgeView();
   loadData();
 }
 

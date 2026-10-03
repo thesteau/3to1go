@@ -6,11 +6,10 @@ import (
 	"github.com/3to1go/central/internal/store"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
-	"github.com/3to1go/shared/webui"
 )
 
 func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
-	webui.ServeIndex(w, r, readStaticFile)
+	serveIndex(w, r)
 }
 
 func (a *App) accountHandler() *auth.Handler {

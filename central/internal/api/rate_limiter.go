@@ -9,7 +9,7 @@ import (
 func specsForPath(path string) []httpx.RateSpec {
 	var specs []httpx.RateSpec
 	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/backup/") {
-		specs = append(specs, httpx.RateSpec{Name: "all-api", PerSecond: 10, Burst: 120, RetryAfter: 1})
+		specs = append(specs, httpx.RateSpec{Name: "all-api", PerSecond: 50, Burst: 600, RetryAfter: 1})
 	}
 	switch path {
 	case "/api/session/login":

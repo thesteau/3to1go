@@ -29,7 +29,8 @@ func RequestLogger(logger *slog.Logger, skip func(string) bool, next http.Handle
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
 		level := slog.LevelDebug
-		if r.Method != http.MethodGet {
+		// Slow reads show at the normal level too, so they can be found in the logs.
+		if r.Method != http.MethodGet || time.Since(start) >= time.Second {
 			level = slog.LevelInfo
 		}
 		logger.Log(r.Context(), level, "request",
