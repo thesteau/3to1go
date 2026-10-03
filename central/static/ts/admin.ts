@@ -74,10 +74,11 @@ async function saveSettings(): Promise<void> {
     window.__centralSettings = body.settings || { ...window.__centralSettings, ...payload };
     applyTheme(window.__centralSettings.theme);
     _settingsSnapshot = null;
-    await loadOverview({ silent: true, force: true });
     setActionStatus("Central settings saved.", "success");
     await pause(450);
     closeDialog("settings-dialog");
+    // Refresh in the background; the snapshot list can take a while.
+    loadOverview({ silent: true, force: true });
   } else {
     setActionStatus(body.detail || "Settings save failed.", "error");
   }

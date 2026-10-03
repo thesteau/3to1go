@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/3to1go/edge/internal/backup"
 	"github.com/3to1go/edge/internal/config"
@@ -72,6 +73,8 @@ func newDirService(t *testing.T, scanRoot string) (*DirectoryService, *mockState
 	ms := newMockStateStore()
 	settings := &config.Settings{ScanRoot: scanRoot, MaxDepth: 5}
 	svc := NewDirectoryService(settings, discardSlogLogger(), ms)
+	// Saves and deletes start a background walk; let it end before the folder is removed.
+	t.Cleanup(func() { waitForWalks(t, svc) })
 	return svc, ms
 }
 
@@ -136,35 +139,170 @@ func TestListJobs_ReportsInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestListJobs_ReusesDiscoveryUntilJobsChange(t *testing.T) {
-	root := t.TempDir()
-	os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm)
-	os.Mkdir(filepath.Join(root, "docs"), fs.ModePerm)
-	svc, ms := newDirService(t, root)
-	if got := jobPaths(t, svc); len(got) != 0 {
-		t.Fatalf("jobs = %v, want none", got)
-	}
+// controlledWalks replaces the folder walk with one the test releases by hand.
+type controlledWalks struct {
+	calls   chan struct{}
+	release chan []string
+}
 
-	// A marker written outside the UI waits for the discovery cache to expire.
-	writeMarker(t, filepath.Join(root, "docs"), map[string]any{"job_name": "docs"})
-	if got := jobPaths(t, svc); len(got) != 0 {
-		t.Errorf("jobs = %v, want cached empty list", got)
+func controlWalks(svc *DirectoryService) *controlledWalks {
+	c := &controlledWalks{calls: make(chan struct{}, 10), release: make(chan []string)}
+	svc.discoverFn = func() []string {
+		c.calls <- struct{}{}
+		return <-c.release
 	}
+	return c
+}
+
+func (c *controlledWalks) finish(t *testing.T, dirs ...string) {
+	t.Helper()
+	select {
+	case <-c.calls:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no walk started")
+	}
+	c.release <- dirs
+}
+
+// finishLater ends the next walk from another goroutine, for calls that wait on it.
+func (c *controlledWalks) finishLater(dirs ...string) {
+	go func() {
+		<-c.calls
+		c.release <- dirs
+	}()
+}
+
+func waitForWalks(t *testing.T, svc *DirectoryService) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		svc.jobsMu.Lock()
+		walking := svc.walking
+		svc.jobsMu.Unlock()
+		if !walking {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("walk did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestListJobs_DoesNotWaitForASlowFirstWalk(t *testing.T) {
+	old := firstDiscoveryWait
+	firstDiscoveryWait = 10 * time.Millisecond
+	t.Cleanup(func() { firstDiscoveryWait = old })
+	root := t.TempDir()
+	os.Mkdir(filepath.Join(root, "docs"), fs.ModePerm)
+	writeMarker(t, filepath.Join(root, "docs"), map[string]any{"job_name": "docs"})
+	svc, _ := newDirService(t, root)
+	walks := controlWalks(svc)
+
+	entries, discovering, _ := svc.ListJobsWithState()
+	if len(entries) != 0 || !discovering {
+		t.Fatalf("jobs = %v, discovering = %v; want an empty list while the first walk runs", entries, discovering)
+	}
+	walks.finish(t, filepath.Join(root, "docs"))
+	waitForWalks(t, svc)
+	entries, discovering, _ = svc.ListJobsWithState()
+	if len(entries) != 1 || entries[0].RelativePath != "docs" || discovering {
+		t.Errorf("after the walk: jobs = %v, discovering = %v", entries, discovering)
+	}
+}
+
+func TestListJobs_ServesTheLastWalkWhileAnotherRuns(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"docs", "photos"} {
+		os.Mkdir(filepath.Join(root, dir), fs.ModePerm)
+		writeMarker(t, filepath.Join(root, dir), map[string]any{"job_name": dir})
+	}
+	svc, _ := newDirService(t, root)
+	walks := controlWalks(svc)
+	walks.finishLater(filepath.Join(root, "docs"))
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs"}) {
+		t.Fatalf("jobs = %v", got)
+	}
+	waitForWalks(t, svc)
+
+	// An old list is still returned at once, and a new walk starts behind it.
+	svc.jobsMu.Lock()
+	svc.jobDirsAt = time.Now().Add(-2 * jobDiscoveryTTL)
+	svc.jobsMu.Unlock()
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs"}) {
+		t.Errorf("stale jobs = %v", got)
+	}
+	walks.finish(t, filepath.Join(root, "docs"), filepath.Join(root, "photos"))
+	waitForWalks(t, svc)
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs", "photos"}) {
+		t.Errorf("after the new walk: %v", got)
+	}
+}
+
+func TestListJobs_SaveAndDeleteShowAtOnce(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"docs", "photos", "zeta"} {
+		os.Mkdir(filepath.Join(root, dir), fs.ModePerm)
+	}
+	writeMarker(t, filepath.Join(root, "zeta"), map[string]any{"job_name": "zeta"})
+	svc, ms := newDirService(t, root)
+	walks := controlWalks(svc)
+	walks.finishLater(filepath.Join(root, "zeta"))
+	jobPaths(t, svc)
+	waitForWalks(t, svc)
 
 	if _, err := svc.SaveJob("photos", map[string]any{"job_name": "photos"}); err != nil {
 		t.Fatalf("SaveJob: %v", err)
 	}
 	ms.Set(filepath.Join(root, "photos"), state.JobState{LastStatus: "uploading"})
 	entries, _ := svc.ListJobs()
-	if len(entries) != 2 || entries[1].RelativePath != "photos" || entries[1].State.LastStatus != "uploading" {
-		t.Errorf("after save: %+v", entries)
+	if len(entries) != 2 || entries[0].RelativePath != "photos" || entries[0].State.LastStatus != "uploading" {
+		t.Errorf("after save, before the walk: %+v", entries)
 	}
+	walks.finish(t, filepath.Join(root, "photos"), filepath.Join(root, "zeta"))
+	waitForWalks(t, svc)
 
 	if err := svc.DeleteJob("photos"); err != nil {
 		t.Fatalf("DeleteJob: %v", err)
 	}
-	if got := jobPaths(t, svc); !slices.Equal(got, []string{"docs"}) {
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"zeta"}) {
 		t.Errorf("after delete: %v", got)
+	}
+	walks.finish(t, filepath.Join(root, "zeta"))
+	waitForWalks(t, svc)
+}
+
+func TestListJobs_ChangeDuringAWalkIsKeptAndWalkedAgain(t *testing.T) {
+	root := t.TempDir()
+	os.Mkdir(filepath.Join(root, "photos"), fs.ModePerm)
+	svc, _ := newDirService(t, root)
+	walks := controlWalks(svc)
+	svc.StartDiscovery()
+
+	// Saved while the first walk runs; that walk already passed the folder.
+	if _, err := svc.SaveJob("photos", map[string]any{"job_name": "photos"}); err != nil {
+		t.Fatalf("SaveJob: %v", err)
+	}
+	walks.finish(t)
+	// The change triggers a second walk, but the first result is published now.
+	select {
+	case <-svc.firstWalk:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first walk not published")
+	}
+	if got := jobPaths(t, svc); !slices.Equal(got, []string{"photos"}) {
+		t.Errorf("jobs = %v, want the saved job kept", got)
+	}
+	walks.finish(t, filepath.Join(root, "photos"))
+	waitForWalks(t, svc)
+}
+
+func TestComparePaths_MatchesWalkOrder(t *testing.T) {
+	paths := []string{"/r/b", "/r/A/z", "/r/a", "/r/B/c"}
+	slices.SortFunc(paths, comparePaths)
+	want := []string{"/r/a", "/r/A/z", "/r/b", "/r/B/c"}
+	if !slices.Equal(paths, want) {
+		t.Errorf("order = %v, want %v", paths, want)
 	}
 }
 

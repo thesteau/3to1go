@@ -57,7 +57,7 @@ async function saveNtfyConfig(): Promise<void> {
   const body: ApiBody = await response.json();
   setStatus("ntfy-status", response.ok ? "Saved." : (body.detail || "Save failed."), response.ok ? "success" : "error");
   if (response.ok) {
-    await loadOverview({ silent: true, force: true });
+    await loadCentralSettings();
     await loadNtfyConfig();
     setActionStatus("Central ntfy settings saved.", "success");
   } else {

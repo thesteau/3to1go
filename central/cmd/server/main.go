@@ -19,6 +19,7 @@ import (
 	"github.com/3to1go/central/internal/services/verify"
 	"github.com/3to1go/central/internal/storage"
 	"github.com/3to1go/central/internal/store"
+	"github.com/3to1go/shared/buildinfo"
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/configutil"
 	"github.com/3to1go/shared/hooks"
@@ -143,7 +144,7 @@ func run(logger *slog.Logger) error {
 		IdleTimeout:  30 * time.Second,
 	}
 
-	logger.Info("server starting", "addr", addr)
+	logger.Info("server starting", "addr", addr, "version", buildinfo.Summary(), "commit", buildinfo.Commit)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

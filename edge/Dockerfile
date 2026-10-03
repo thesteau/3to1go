@@ -15,6 +15,9 @@ RUN npx tsc -p edge/static
 # CGO off, Go needs no emulation, which is far faster than building on QEMU.
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS TARGETARCH TARGETVARIANT
+# Tag and commit hash shown in Admin and the startup log.
+ARG VERSION=
+ARG REVISION=
 
 WORKDIR /build
 
@@ -34,9 +37,14 @@ WORKDIR /build/edge
 # TARGETVARIANT is v7 for 32-bit ARM, which Go spells GOARM=7.
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
-    go build -trimpath -ldflags="-s -w" -o /3to1go-edge ./cmd/server
+    go build -trimpath -o /3to1go-edge \
+    -ldflags="-s -w -X github.com/3to1go/shared/buildinfo.Version=$VERSION -X github.com/3to1go/shared/buildinfo.Commit=$REVISION" \
+    ./cmd/server
 
 FROM alpine:3.24
+ARG VERSION=
+ARG REVISION=
+LABEL org.opencontainers.image.version=$VERSION org.opencontainers.image.revision=$REVISION
 
 RUN apk add --no-cache ca-certificates curl
 
