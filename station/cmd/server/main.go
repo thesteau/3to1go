@@ -61,11 +61,7 @@ func run(logger *slog.Logger) error {
 	snapIndex := store.NewSnapshotIndex(pool)
 	uploadSessionStore := ingest.NewPGSessionStore(pool)
 
-	// Run migrations. Old table and column names are renamed first, so EnsureSchema doesn't
-	// create empty tables next to them.
-	if err := store.MigrateLegacyNames(ctx, pool); err != nil {
-		return fmt.Errorf("rename legacy schema: %w", err)
-	}
+	// Run migrations
 	if err := userStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("user schema: %w", err)
 	}

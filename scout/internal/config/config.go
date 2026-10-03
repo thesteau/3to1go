@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,9 +13,6 @@ import (
 )
 
 const AppDirName = "3to1goScout"
-
-// legacyDatabaseName is the database file of an older release. MigrateLegacyDatabase renames it.
-const legacyDatabaseName = "3to1go-edge.db"
 
 // Settings holds all runtime configuration for the scout server.
 type Settings struct {
@@ -111,32 +107,6 @@ func DefaultSpoolDir() string {
 		return filepath.Join(xdg, AppDirName, "spool")
 	}
 	return filepath.Join(home, ".cache", AppDirName, "spool")
-}
-
-// MigrateLegacyDatabase renames the database file of an older release in the config folder,
-// along with SQLite's -wal and -shm files, which hold its most recent writes. It reports whether
-// it renamed the database, and does nothing once a database with the current name exists.
-func MigrateLegacyDatabase() (bool, error) {
-	oldDB, newDB := filepath.Join(DefaultConfigDir(), legacyDatabaseName), AppDatabasePath()
-	if _, err := os.Lstat(newDB); err == nil {
-		return false, nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return false, err
-	}
-	if _, err := os.Lstat(oldDB); errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	for _, suffix := range []string{"-wal", "-shm"} {
-		if err := os.Rename(oldDB+suffix, newDB+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return false, err
-		}
-	}
-	if err := os.Rename(oldDB, newDB); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func DefaultScanRoot() string {

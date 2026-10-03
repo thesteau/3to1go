@@ -44,51 +44,6 @@ func (s *SettingsStore) Load(ctx context.Context) (*config.SettingsPayload, erro
 	return &p, nil
 }
 
-// legacySettingsKeys maps setting keys saved by an older release to their current names.
-var legacySettingsKeys = map[string]string{
-	"edge_id":         "scout_id",
-	"central_url":     "station_url",
-	"edge_credential": "scout_credential",
-}
-
-// MigrateLegacyKeys renames setting keys saved by an older release. A key that already has its
-// current name keeps its value. It does nothing once no old keys remain.
-func (s *SettingsStore) MigrateLegacyKeys(ctx context.Context) error {
-	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT payload FROM app_settings WHERE id = 1`).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-		return err
-	}
-	changed := false
-	for old, current := range legacySettingsKeys {
-		value, ok := payload[old]
-		if !ok {
-			continue
-		}
-		if _, exists := payload[current]; !exists {
-			payload[current] = value
-		}
-		delete(payload, old)
-		changed = true
-	}
-	if !changed {
-		return nil
-	}
-	migrated, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.ExecContext(ctx, `UPDATE app_settings SET payload = ? WHERE id = 1`, string(migrated))
-	return err
-}
-
 // Save persists the payload, replacing any previous row.
 func (s *SettingsStore) Save(ctx context.Context, payload *config.SettingsPayload) error {
 	raw, err := json.Marshal(payload)

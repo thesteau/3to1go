@@ -3,12 +3,11 @@
     <div class="modal-head">
       <div>
         <h2 id="job-dialog-title">Job Editor</h2>
-        <p class="hint">Click Save Job to add or update the <code>.upload_dir</code> settings for this folder. Those settings tell Scout how this folder should be backed up.</p>
       </div>
       <button type="button" class="secondary" onclick="closeDialog('job-dialog')">Close</button>
     </div>
 
-    <label for="relative_path">Directory</label>
+    <label for="relative_path">Directory <span class="field-help hover-hint" tabindex="0" aria-label="Saved to this folder's .upload_dir file, which tells Scout how to back it up." title="Saved to this folder's .upload_dir file, which tells Scout how to back it up.">?</span></label>
     <input id="relative_path" readonly>
 
     <label for="job_name">Job Name</label>

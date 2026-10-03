@@ -29,7 +29,7 @@ test("clear staged backup and cancellation use separate endpoints and report err
     calls.map(([url]) => url),
     ["/api/directories/clear-staged", "/api/cancel-operation"],
   );
-  assert.match(messages.at(-1)[0], /Cancellation requested/);
+  assert.match(messages.at(-1)[0], /^Stopping\./);
 });
 
 test("a held backup offers Upload anyway with its reasons, other jobs keep Force Upload", () => {

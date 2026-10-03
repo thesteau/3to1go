@@ -1,29 +1,30 @@
 let _settingsSnapshot: string | null = null;
 
 const SCOUT_SETTINGS_HELP: Record<string, string> = {
-  settings_scout_id: "A friendly name Station uses to group this Scout with related installations.",
-  settings_station_url: "The Station server URL Scout uploads backups to.",
-  settings_advertised_url: "Optional URL Station displays as a link to this Scout instance.",
-  settings_scout_credential: "JWT credential minted from Station. Scout includes this when uploading.",
-  settings_cron_schedule: "Five cron fields: minute, hour, day of month, month, day of week.",
-  settings_state_dir: "Where Scout keeps retry state, progress, and other local bookkeeping.",
-  settings_spool_dir: "Where Scout stages local archive files before and during upload.",
-  settings_log_level: "How chatty Scout logs should be.",
-  settings_max_depth: "How many nested folders below the scan root Scout will inspect.",
-  settings_keep_local_pending: "Keep unfinished local archives on disk so Scout can retry later after a failure.",
-  settings_upload_chunk_size_mb: "Preferred chunk size Scout asks Station to accept for each upload part.",
-  settings_min_upload_chunk_size_mb: "Smallest chunk Scout will shrink down to when adapting to network conditions.",
-  settings_max_upload_chunk_size_mb: "Largest chunk Scout will grow up to when uploads are healthy.",
-  settings_upload_retry_max_attempts: "How many times Scout retries a failed upload before requiring manual attention.",
-  settings_upload_retry_base_delay_seconds: "Starting delay before retry backoff grows.",
-  settings_upload_retry_max_delay_seconds: "Longest delay Scout will wait between upload retries.",
-  settings_upload_connect_timeout_seconds: "How long Scout waits to establish a connection to Station.",
-  settings_upload_read_timeout_padding_seconds: "Extra read timeout buffer added while upload chunks are streaming.",
-  settings_upload_min_throughput_bytes_per_second:
-    "Minimum upload speed Scout expects before treating the connection as stalled.",
-  settings_circuit_breaker_failure_threshold:
-    "How many consecutive upload failures cause Scout to pause uploads temporarily.",
-  settings_circuit_breaker_cooldown_seconds: "How long Scout waits before trying again after the upload circuit opens.",
+  settings_scout_id:
+    "Name shown on Station. Scouts that share an ID are grouped together, but each installation keeps its own snapshots.",
+  settings_anomaly_mode:
+    "Scout learns each job's usual file count, size, file types, and compression. A backup that suddenly looks very different, such as a folder that emptied or files encrypted by ransomware, is held until you upload or clear it.",
+  settings_station_url: "Where backups are sent.",
+  settings_advertised_url: "Optional. Shown as a link on Station.",
+  settings_scout_credential: "Minted on Station.",
+  settings_cron_schedule: "minute hour day month weekday",
+  settings_state_dir: "Retry state and progress.",
+  settings_spool_dir: "Archives waiting to upload.",
+  settings_log_level: "Log detail.",
+  settings_max_depth: "Folder levels scanned below the scan root.",
+  settings_keep_local_pending: "Keep failed uploads to retry.",
+  settings_upload_chunk_size_mb: "Preferred upload chunk size.",
+  settings_min_upload_chunk_size_mb: "Smallest chunk on a slow network.",
+  settings_max_upload_chunk_size_mb: "Largest chunk on a healthy network.",
+  settings_upload_retry_max_attempts: "Retries before a job needs attention.",
+  settings_upload_retry_base_delay_seconds: "First retry delay. It doubles each retry.",
+  settings_upload_retry_max_delay_seconds: "Longest wait between retries.",
+  settings_upload_connect_timeout_seconds: "Time allowed to connect to Station.",
+  settings_upload_read_timeout_padding_seconds: "Extra read time per chunk.",
+  settings_upload_min_throughput_bytes_per_second: "Slower uploads count as stalled.",
+  settings_circuit_breaker_failure_threshold: "Failures in a row before uploads pause.",
+  settings_circuit_breaker_cooldown_seconds: "How long uploads stay paused.",
 };
 
 async function manualRefresh(): Promise<void> {

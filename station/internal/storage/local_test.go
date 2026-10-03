@@ -320,7 +320,7 @@ func TestHealthcheck_ProbePathIsDirectory(t *testing.T) {
 	}
 }
 
-// --- Healthcheck edge cases ---
+// --- Healthcheck corner cases ---
 
 func TestHealthcheck_RootIsFile(t *testing.T) {
 	dir := t.TempDir()

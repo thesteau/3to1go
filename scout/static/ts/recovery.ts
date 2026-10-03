@@ -54,7 +54,6 @@ function renderRecoverPreview(body: RecoveryResponse): void {
         <span class="hint">${entries.length} file${entries.length === 1 ? "" : "s"} · ${escapeHtml(formatBytes(totalSize))}</span>
       </div>
     </div>
-    <p class="hint">Replace overwrites the local copy and Add creates a missing file. Local files not listed stay untouched.</p>
     <div class="recover-preview-tools">
       <input id="recover-preview-search" type="search" placeholder="Filter by file or folder" aria-label="Filter restore preview">
       <div class="recover-preview-filters" role="group" aria-label="Show files">

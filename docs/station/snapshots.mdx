@@ -90,7 +90,7 @@ Station only sees archive sizes, and by the time an archive arrives it has alrea
 Station can re-check stored snapshots with SHA-256 to catch files corrupted or changed on disk. Each check covers the **latest snapshot of every job**, not the full history.
 
 - **Run Now**: start a check from the integrity bar on the snapshots page.
-- **Scheduled**: set **Snapshot Integrity Check Interval** (hours) in **Edit Station Settings**. `0` turns scheduled checks off.
+- **Scheduled**: set **Integrity Check (hours)** in **Edit Station Settings**. `0` turns scheduled checks off.
 
 <Note>
   Station reads the check interval when it starts. After changing it, restart Station: `docker compose restart station`.

@@ -13,10 +13,7 @@ const JOB_EVENT_LINGER_MS = 10000;
 function openJobDialog(relativePath = "."): void {
   const entry = findEntry(relativePath);
   if (entry?.blocked_by_parent) {
-    setActionStatus(
-      `That folder is nested under ${entry.blocked_by_parent}, so Scout follows the parent job instead of opening separate upload settings here.`,
-      "error",
-    );
+    setActionStatus(`That folder is inside the ${entry.blocked_by_parent} job.`, "error");
     return;
   }
   editPath(relativePath);
@@ -226,7 +223,7 @@ function renderDirectoryHeader(entry: DirectoryEntry, childCount: number, hasSel
   const absolutePath = renderClipValue("", entry.absolute_path, { className: "clip-hint", clipLength: 52 });
   const pathValue = renderClipValue("", entry.relative_path, { className: "clip-code", clipLength: 44 });
   const actionMarkup = entry.blocked_by_parent
-    ? `<span class="dir-action-note" title="Nested folders under an already-selected parent are backed up through that parent job instead of getting their own .upload_dir settings.">Covered by parent job</span>`
+    ? `<span class="dir-action-note" title="Covered by its parent job.">Covered by parent job</span>`
     : `<button type="button" class="secondary" onclick="return openJobDialogFromEvent(event, decodeURIComponent('${encodedPath(relativePath)}'))">Edit</button>`;
 
   return `
@@ -340,7 +337,7 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
             const held = entry.state?.last_status === "held_for_review";
             const uploadLabel = held ? "Upload anyway" : "Force Upload";
             const uploadHint = held
-              ? "This backup looks very different from earlier ones. Upload it if the change is expected, or clear it."
+              ? "Unusual backup. Upload it if expected, or clear it."
               : "Upload even if unchanged. Station may reject as duplicate.";
             return `
       <div class="job-card" data-path="${escapeHtml(entry.relative_path)}">
@@ -421,10 +418,10 @@ function editPath(relativePath: string): void {
   setStatus(
     "form-status",
     entry?.blocked_by_parent
-      ? `This folder sits under ${entry.blocked_by_parent}. Scout follows the parent job, so nested folders here should not have their own active upload settings.`
+      ? `This folder is inside the ${entry.blocked_by_parent} job, which already covers it.`
       : entry?.selected
         ? "You are editing the upload settings Scout already uses for this folder."
-        : "You are creating upload settings so Scout starts treating this folder as its own backup job.",
+        : "Saving makes this folder a new backup job.",
     entry?.blocked_by_parent ? "error" : "info",
   );
 }
@@ -435,9 +432,5 @@ function resetForm(): void {
   (document.getElementById("exclude") as HTMLTextAreaElement).value = "";
   (document.getElementById("include_hidden") as HTMLInputElement).checked = true;
   (document.getElementById("follow_symlinks") as HTMLInputElement).checked = false;
-  setStatus(
-    "form-status",
-    "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.",
-    "info",
-  );
+  setStatus("form-status", "Choose a folder, then click Save Job.", "info");
 }

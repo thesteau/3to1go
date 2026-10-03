@@ -4,14 +4,13 @@
     <div class="modal-head">
       <div>
         <h2 id="ntfy-dialog-title">Configure ntfy</h2>
-        <p class="hint">Publishing is optional and best-effort. Failed ntfy posts never block Scout uploads.</p>
       </div>
       <button type="button" class="secondary" onclick="closeDialog('ntfy-dialog')">Close</button>
     </div>
 
     <div class="split-row">
       <div>
-        <label for="ntfy_url">ntfy Server URL</label>
+        <label for="ntfy_url">ntfy Server URL <span class="field-help hover-hint" tabindex="0" aria-label="Optional. Scout posts here after a job uploads. A failed notification never blocks uploads." title="Optional. Scout posts here after a job uploads. A failed notification never blocks uploads.">?</span></label>
         <input id="ntfy_url" type="url" placeholder="https://ntfy.sh" data-requires="ntfy" disabled>
       </div>
       <div>

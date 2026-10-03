@@ -34,15 +34,6 @@ func main() {
 func run(logger *slog.Logger) error {
 	ctx := context.Background()
 
-	// An older release's database has another file name. Rename it before opening.
-	migrated, err := config.MigrateLegacyDatabase()
-	if err != nil {
-		return fmt.Errorf("migrate legacy database: %w", err)
-	}
-	if migrated {
-		logger.Info("migrated_legacy_database", "path", config.AppDatabasePath())
-	}
-
 	// Load initial settings (env only, no DB payload yet).
 	settings, err := config.BuildSettings(nil)
 	if err != nil {
@@ -67,9 +58,6 @@ func run(logger *slog.Logger) error {
 	}
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)
-	}
-	if err := settingsStore.MigrateLegacyKeys(ctx); err != nil {
-		return fmt.Errorf("migrate legacy settings: %w", err)
 	}
 	if err := stateStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("state schema: %w", err)
