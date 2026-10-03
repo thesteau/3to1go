@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "3to1go",
-  "description": "Self-hosted, encrypted backups: Edge backs up your machines, Central stores the snapshots.",
+  "description": "Self-hosted, encrypted backups: Scout backs up your machines, Station stores the snapshots.",
   "colors": {
     "primary": "#c73346",
     "light": "#e05263",
@@ -50,50 +50,72 @@
         ]
       },
       {
-        "tab": "Central",
+        "tab": "Station",
         "icon": "server",
         "groups": [
           {
-            "group": "Central",
-            "pages": ["central/overview", "central/install", "central/configuration"]
+            "group": "Station",
+            "pages": ["station/overview", "station/install", "station/configuration"]
           },
           {
-            "group": "Using Central",
+            "group": "Using Station",
             "pages": [
-              "central/edge-credentials",
-              "central/snapshots",
-              "central/notifications",
-              "central/hooks",
-              "central/reset-admin-password",
-              "central/disaster-recovery"
+              "station/scout-credentials",
+              "station/snapshots",
+              "station/notifications",
+              "station/hooks",
+              "station/reset-admin-password",
+              "station/disaster-recovery"
             ]
           }
         ]
       },
       {
-        "tab": "Edge",
+        "tab": "Scout",
         "icon": "laptop",
         "groups": [
           {
-            "group": "Edge",
-            "pages": ["edge/overview", "edge/install", "edge/kubernetes", "edge/configuration"]
+            "group": "Scout",
+            "pages": ["scout/overview", "scout/install", "scout/kubernetes", "scout/configuration"]
           },
           {
-            "group": "Using Edge",
+            "group": "Using Scout",
             "pages": [
-              "edge/backup-jobs",
-              "edge/unusual-backups",
-              "edge/multiple-folders",
-              "edge/restore",
-              "edge/encryption-key",
-              "edge/notifications",
-              "edge/hooks"
+              "scout/backup-jobs",
+              "scout/unusual-backups",
+              "scout/multiple-folders",
+              "scout/restore",
+              "scout/encryption-key",
+              "scout/notifications",
+              "scout/hooks"
             ]
           }
         ]
       }
     ]
   },
+  "redirects": [
+    { "source": "/central/configuration", "destination": "/station/configuration" },
+    { "source": "/central/disaster-recovery", "destination": "/station/disaster-recovery" },
+    { "source": "/central/edge-credentials", "destination": "/station/scout-credentials" },
+    { "source": "/central/hooks", "destination": "/station/hooks" },
+    { "source": "/central/install", "destination": "/station/install" },
+    { "source": "/central/notifications", "destination": "/station/notifications" },
+    { "source": "/central/overview", "destination": "/station/overview" },
+    { "source": "/central/reset-admin-password", "destination": "/station/reset-admin-password" },
+    { "source": "/central/snapshots", "destination": "/station/snapshots" },
+    { "source": "/edge/backup-jobs", "destination": "/scout/backup-jobs" },
+    { "source": "/edge/configuration", "destination": "/scout/configuration" },
+    { "source": "/edge/encryption-key", "destination": "/scout/encryption-key" },
+    { "source": "/edge/hooks", "destination": "/scout/hooks" },
+    { "source": "/edge/install", "destination": "/scout/install" },
+    { "source": "/edge/kubernetes", "destination": "/scout/kubernetes" },
+    { "source": "/edge/multiple-folders", "destination": "/scout/multiple-folders" },
+    { "source": "/edge/notifications", "destination": "/scout/notifications" },
+    { "source": "/edge/overview", "destination": "/scout/overview" },
+    { "source": "/edge/restore", "destination": "/scout/restore" },
+    { "source": "/edge/unusual-backups", "destination": "/scout/unusual-backups" }
+  ],
   "footer": {
     "socials": {
       "github": "https://github.com/thesteau/3to1go"

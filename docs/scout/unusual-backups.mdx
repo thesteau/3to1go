@@ -1,9 +1,9 @@
 ---
 title: "Unusual backups"
-description: "How Edge spots backups that look nothing like a job's history, such as ransomware damage, and holds them for review."
+description: "How Scout spots backups that look nothing like a job's history, such as ransomware damage, and holds them for review."
 ---
 
-Each job builds up a picture of what its backups normally look like. When a new backup looks very different, such as a folder that suddenly emptied or files that ransomware encrypted, Edge holds it instead of uploading it. Your good snapshots on Central stay safe from retention until you decide.
+Each job builds up a picture of what its backups normally look like. When a new backup looks very different, such as a folder that suddenly emptied or files that ransomware encrypted, Scout holds it instead of uploading it. Your good snapshots on Station stay safe from retention until you decide.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
 
 Detection only uses file paths, sizes, file types, and how well the archive compresses. It never reads your files' contents.
 
-## What Edge checks
+## What Scout checks
 
 | Check | Flags | Needs |
 |---|---|---|
@@ -30,7 +30,7 @@ Each job keeps its last 20 uploaded backups as its "normal". Photo and video fol
 
 ## Machine learning
 
-Detection is unsupervised anomaly detection. Edge doesn't use a trained model. It learns each job's own baseline from that job's past backups and flags a backup that falls far outside it. There's nothing to download or train, nothing leaves the Edge, and a check takes milliseconds.
+Detection is unsupervised anomaly detection. Scout doesn't use a trained model. It learns each job's own baseline from that job's past backups and flags a backup that falls far outside it. There's nothing to download or train, nothing leaves the Scout, and a check takes milliseconds.
 
 | Check | Method |
 |---|---|
@@ -41,7 +41,7 @@ Detection is unsupervised anomaly detection. Edge doesn't use a trained model. I
 
 The median and MAD ignore a few odd backups in the history, where an average would be pulled off by them. The log scale treats growing from 1 GB to 2 GB the same as 10 GB to 20 GB.
 
-The baseline keeps learning. Every uploaded backup joins the history, including one you approve with **Upload anyway**. A held backup doesn't join it until you approve it, so a bad backup can't teach Edge that bad is normal.
+The baseline keeps learning. Every uploaded backup joins the history, including one you approve with **Upload anyway**. A held backup doesn't join it until you approve it, so a bad backup can't teach Scout that bad is normal.
 
 ## When a backup is held
 
@@ -49,10 +49,10 @@ The job shows **held for review** with the reasons, for example:
 
 > The archive barely compresses (100% of the original size, usually 41%), which is typical of encrypted files. Files ending in .locked went from 0% to 100% of the folder.
 
-Edge also sends a high-priority [ntfy](/edge/notifications) alert if notifications are set up. Then either:
+Scout also sends a high-priority [ntfy](/scout/notifications) alert if notifications are set up. Then either:
 
 - **The change is expected**, such as a reorganized folder: click **Upload anyway**. The backup uploads and becomes part of the job's normal, so the same pattern won't be flagged again.
-- **Something is wrong**: click **Clear staged backup** to discard it, then fix the folder, for example by [restoring](/edge/restore) the last good snapshot.
+- **Something is wrong**: click **Clear staged backup** to discard it, then fix the folder, for example by [restoring](/scout/restore) the last good snapshot.
 
 A held job stays held on later cycles while its files stay the same. If the files return to their last uploaded state, the hold clears by itself.
 
@@ -68,4 +68,4 @@ Choose **Unusual backups** in **Edit Edge Settings**, or set `ANOMALY_MODE` in `
 
 **Force Upload** always uploads without checking, since it's an explicit request.
 
-Central runs its own, simpler check on archive sizes as a second line of defense. See [Unusual sizes](/central/snapshots#unusual-sizes).
+Station runs its own, simpler check on archive sizes as a second line of defense. See [Unusual sizes](/station/snapshots#unusual-sizes).

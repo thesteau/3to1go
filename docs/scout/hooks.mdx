@@ -1,6 +1,6 @@
 ---
-title: "Edge hooks"
-description: "Run your own commands before and after Edge processes each backup job."
+title: "Scout hooks"
+description: "Run your own commands before and after Scout processes each backup job."
 ---
 
 Hooks run a shell command around each job in a backup cycle.
@@ -9,11 +9,11 @@ Hooks run a shell command around each job in a backup cycle.
 flowchart LR
     PRE[Pre command] --> F{Paths or sizes<br/>changed?}
     F -->|No| POST[Post command]
-    F -->|Yes| A[Archive and encrypt] --> U[Upload to Central] --> POST
+    F -->|Yes| A[Archive and encrypt] --> U[Upload to Station] --> POST
     POST --> N[ntfy, if uploaded]
 ```
 
-- **Pre command**: before Edge scans the job. Edge waits for it, so it can prepare files in the folder first.
+- **Pre command**: before Scout scans the job. Scout waits for it, so it can prepare files in the folder first.
 - **Post command**: after the job finishes, whether it uploaded, was unchanged, or failed. Cancelling skips it.
 
 Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force Upload**.
@@ -22,7 +22,7 @@ Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force 
 
 <Steps>
   <Step title="Open Custom Scripts">
-    In Edge, click **Custom Scripts**.
+    In Scout, click **Custom Scripts**.
   </Step>
   <Step title="Upload a script (optional)">
     Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable, and Windows line endings are converted.
@@ -34,11 +34,11 @@ Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force 
   </Step>
 </Steps>
 
-Commands run with `sh -c` inside the Edge container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Output and non-zero exit codes go to Edge's logs. A failing hook doesn't stop the backup.
+Commands run with `sh -c` inside the Scout container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Output and non-zero exit codes go to Scout's logs. A failing hook doesn't stop the backup.
 
 The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs.
 
-Edge prepares different jobs concurrently, so their hooks can overlap. Keep per-job output separate when your scripts write files.
+Scout prepares different jobs concurrently, so their hooks can overlap. Keep per-job output separate when your scripts write files.
 
 ## Environment variables
 
@@ -47,7 +47,7 @@ Edge prepares different jobs concurrently, so their hooks can overlap. Keep per-
 | `THREETOONEGO_APP` | `edge` |
 | `THREETOONEGO_HOOK_PHASE` | `pre` or `post` |
 | `THREETOONEGO_HOOK_SCRIPTS_DIR` | The hook scripts folder |
-| `THREETOONEGO_EDGE_ID` | This Edge's ID |
+| `THREETOONEGO_EDGE_ID` | This Scout's ID |
 | `THREETOONEGO_EDGE_INSTANCE_ID` | This installation's instance ID |
 | `THREETOONEGO_JOB_NAME` | Backup job name |
 | `THREETOONEGO_JOB_ROOT` | Job folder inside the container |
@@ -55,9 +55,9 @@ Edge prepares different jobs concurrently, so their hooks can overlap. Keep per-
 | `THREETOONEGO_LAST_STATUS` | Job's last status, such as `success` |
 | `THREETOONEGO_LAST_ERROR_CATEGORY` | Category of the last error, if any |
 | `THREETOONEGO_LAST_ERROR_DETAIL` | Detail of the last error, if any |
-| `THREETOONEGO_STORED_AS` | Filename of the last upload on Central |
-| `THREETOONEGO_PRUNED` | Old snapshots Central removed after the last upload |
-| `THREETOONEGO_DUPLICATE` | `true` if Central already had the last upload |
+| `THREETOONEGO_STORED_AS` | Filename of the last upload on Station |
+| `THREETOONEGO_PRUNED` | Old snapshots Station removed after the last upload |
+| `THREETOONEGO_DUPLICATE` | `true` if Station already had the last upload |
 | `THREETOONEGO_PENDING_ARCHIVE` | Staged archive waiting to upload, if any |
 | `THREETOONEGO_PENDING_FINGERPRINT` | Fingerprint of the staged archive |
 | `THREETOONEGO_PENDING_TIMESTAMP` | Timestamp of the staged archive |
@@ -84,17 +84,17 @@ Common `THREETOONEGO_LAST_STATUS` values after a job:
 
 | Status | Meaning |
 |---|---|
-| `success` | Uploaded to Central |
+| `success` | Uploaded to Station |
 | `skipped_unchanged` | Nothing changed since the last backup |
 | `skipped_empty` | The folder had no files to back up |
-| `held_for_review` | Looked unusual and is waiting for you. See [Unusual backups](/edge/unusual-backups). |
+| `held_for_review` | Looked unusual and is waiting for you. See [Unusual backups](/scout/unusual-backups). |
 | `retry_scheduled`, `waiting_retry` | Upload failed and will be retried |
-| `circuit_open` | Central was unreachable too many times. Edge waits before retrying |
-| `manual_intervention_required` | Retries ran out. Check the job in Edge's UI |
-| `unexpected_exception` | Something else went wrong. See Edge's logs |
+| `circuit_open` | Station was unreachable too many times. Scout waits before retrying |
+| `manual_intervention_required` | Retries ran out. Check the job in Scout's UI |
+| `unexpected_exception` | Something else went wrong. See Scout's logs |
 
 Set **Post Command** to `after-job.sh`.
 
 <Note>
-  The Edge image is a minimal Alpine image with `sh` and `curl`. Other tools, such as database clients, aren't included. To dump a database before a backup, run the dump on the host on a schedule ahead of Edge's cycle.
+  The Scout image is a minimal Alpine image with `sh` and `curl`. Other tools, such as database clients, aren't included. To dump a database before a backup, run the dump on the host on a schedule ahead of Scout's cycle.
 </Note>

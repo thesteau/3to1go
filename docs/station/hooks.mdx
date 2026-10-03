@@ -1,28 +1,28 @@
 ---
-title: "Central hooks"
-description: "Run your own commands before and after Central stores an upload."
+title: "Station hooks"
+description: "Run your own commands before and after Station stores an upload."
 ---
 
-Hooks run a shell command at two points while Central stores an upload. Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
+Hooks run a shell command at two points while Station stores an upload. Use them to trigger an offsite sync, write to a log, or ping a monitoring service.
 
 ```mermaid
 flowchart LR
     A[Upload complete] --> B{Checksum OK?}
-    B -->|No| X[Edge retries upload<br/>no hooks run]
+    B -->|No| X[Scout retries upload<br/>no hooks run]
     B -->|Yes| PRE[Pre command]
     PRE --> S[Store archive<br/>and apply retention]
     S --> POST[Post command<br/>status ok or error]
     POST --> N[ntfy notification]
 ```
 
-- **Pre command**: after the upload passes its checksum, before Central stores it. Central waits for it to finish.
+- **Pre command**: after the upload passes its checksum, before Station stores it. Station waits for it to finish.
 - **Post command**: after storing, with `THREETOONEGO_STATUS` set to `ok` or `error`. Retrying an upload that already finished doesn't rerun hooks.
 
 ## Set up
 
 <Steps>
   <Step title="Open Custom Scripts">
-    In Central, click **Custom Scripts**.
+    In Station, click **Custom Scripts**.
   </Step>
   <Step title="Upload a script (optional)">
     Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable, and Windows line endings are converted.
@@ -34,7 +34,7 @@ flowchart LR
   </Step>
 </Steps>
 
-Commands run with `sh -c` inside the Central container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Output and non-zero exit codes are written to Central's logs. A failing hook doesn't stop the upload.
+Commands run with `sh -c` inside the Station container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Output and non-zero exit codes are written to Station's logs. A failing hook doesn't stop the upload.
 
 ## Environment variables
 
@@ -45,8 +45,8 @@ Every hook gets these variables:
 | `THREETOONEGO_APP` | `central` |
 | `THREETOONEGO_HOOK_PHASE` | `pre` or `post` |
 | `THREETOONEGO_HOOK_SCRIPTS_DIR` | The hook scripts folder |
-| `THREETOONEGO_EDGE_ID` | Sending Edge's ID |
-| `THREETOONEGO_EDGE_INSTANCE_ID` | Sending Edge's instance ID |
+| `THREETOONEGO_EDGE_ID` | Sending Scout's ID |
+| `THREETOONEGO_EDGE_INSTANCE_ID` | Sending Scout's instance ID |
 | `THREETOONEGO_JOB_NAME` | Backup job name |
 | `THREETOONEGO_UPLOAD_ID` | Upload session ID |
 | `THREETOONEGO_NAMESPACE` | Storage path, `edge_id/instance_id/job_name` |
@@ -56,7 +56,7 @@ Every hook gets these variables:
 | `THREETOONEGO_ARCHIVE_SHA256` | SHA-256 of the encrypted archive |
 | `THREETOONEGO_ARCHIVE_SIZE_BYTES` | Archive size |
 | `THREETOONEGO_SOURCE_ADDRESS` | IP the upload came from |
-| `THREETOONEGO_ADVERTISED_URL` | URL the Edge advertises, if set |
+| `THREETOONEGO_ADVERTISED_URL` | URL the Scout advertises, if set |
 | `THREETOONEGO_STAGED_PATH` | Where the upload is staged before storing |
 
 The **post** command also gets:
@@ -66,8 +66,8 @@ The **post** command also gets:
 | `THREETOONEGO_STATUS` | `ok` or `error` |
 | `THREETOONEGO_STORED_AS` | Final stored filename |
 | `THREETOONEGO_PRUNED` | Number of old snapshots removed by retention |
-| `THREETOONEGO_DUPLICATE` | `true` if Central already had this snapshot |
-| `THREETOONEGO_UNUSUAL` | Why the archive's size looks unusual, or empty. See [Unusual sizes](/central/snapshots#unusual-sizes). |
+| `THREETOONEGO_DUPLICATE` | `true` if Station already had this snapshot |
+| `THREETOONEGO_UNUSUAL` | Why the archive's size looks unusual, or empty. See [Unusual sizes](/station/snapshots#unusual-sizes). |
 
 ## Example: log each stored snapshot
 
@@ -80,5 +80,5 @@ echo "stored $THREETOONEGO_NAMESPACE/$THREETOONEGO_STORED_AS"
 Set **Post Command** to `after-upload.sh`.
 
 <Note>
-  The Central image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included. Run those on the host or in another container that reads the same backup folder.
+  The Station image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included. Run those on the host or in another container that reads the same backup folder.
 </Note>

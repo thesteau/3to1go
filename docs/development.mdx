@@ -3,7 +3,7 @@ title: "Developing both apps"
 description: "Repository layout, local builds, running the tests, frontend generation, and local Docker builds."
 ---
 
-Central and Edge are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
+Station and Scout are independently deployable apps in one repository. For deployment with published images, start with the [quickstart](/quickstart). This page covers working on the source.
 
 Open normal development PRs against `main`, titled as Conventional Commits (`feat: …`, `fix: …`, `docs: …`). CI enforces this, and the title decides the next version. See [Releases](/releases#pr-titles-and-versions).
 
@@ -11,8 +11,8 @@ Open normal development PRs against `main`, titled as Conventional Commits (`fea
 
 | Path | Contents |
 |---|---|
-| `central/` | Central's receiver API, storage logic, and web UI |
-| `edge/` | Edge's scanning, encryption, upload, restore, and web UI |
+| `central/` | Station's receiver API, storage logic, and web UI |
+| `edge/` | Scout's scanning, encryption, upload, restore, and web UI |
 | `shared/go/` | Wire protocol, authentication, HTTP helpers, certificates, hooks, ntfy templates, locks, configuration helpers, and web UI serving |
 | `shared/ts/` | Browser scripts and types compiled into both UIs |
 | `tests/` | TypeScript tests, grouped by area: `edge/`, `central/`, `shared/` (both UIs), `release/` (release automation), and `ci/` (CI tooling) |
@@ -37,7 +37,7 @@ cd central
 go build ./cmd/server
 ```
 
-Use `edge` in place of `central` to build Edge.
+Use `edge` in place of `central` to build Scout.
 
 ## Run the tests
 
@@ -71,8 +71,8 @@ This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grou
 
 | Folder | Covers |
 |---|---|
-| `tests/edge/` | Edge UI, such as the directory tree, file browser, and refresh loop |
-| `tests/central/` | Central UI, such as the overview, saved keys, and snapshot decryption |
+| `tests/edge/` | Scout UI, such as the directory tree, file browser, and refresh loop |
+| `tests/central/` | Station UI, such as the overview, saved keys, and snapshot decryption |
 | `tests/shared/` | Behavior both UIs share |
 | `tests/release/` | Release scripts and workflows |
 | `tests/ci/` | CI tooling, such as the test report generator |
@@ -89,7 +89,7 @@ Quote globs so Node expands them, not your shell. Name new test files after thei
 
 ### End-to-end test
 
-`tests/integration/e2e.sh` runs PostgreSQL, Central, and Edge in Docker, takes a backup, and recovers it. Build the images it expects first:
+`tests/integration/e2e.sh` runs PostgreSQL, Station, and Scout in Docker, takes a backup, and recovers it. Build the images it expects first:
 
 ```sh
 docker build -t 3to1go-central-validation -f central/Dockerfile .
@@ -156,11 +156,11 @@ Edit TypeScript in `central/static/ts`, `edge/static/ts`, or `shared/ts`. Each a
 
 Go embeds the generated `central/static/js` and `edge/static/js`, so generate them before `go build` or `go test` with `npm run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
 
-For continuous compilation, use `npm run watch` (Central) or `npm run watch:edge` (Edge), then rebuild and restart the Go server to serve the new assets.
+For continuous compilation, use `npm run watch` (Station) or `npm run watch:edge` (Scout), then rebuild and restart the Go server to serve the new assets.
 
 ## Build with Docker Compose
 
-`central/docker-compose.yml` and `edge/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Central installation](/central/install) or [Edge installation](/edge/install), then from that app's folder:
+`central/docker-compose.yml` and `edge/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Station installation](/station/install) or [Scout installation](/scout/install), then from that app's folder:
 
 ```sh
 docker compose up -d --build

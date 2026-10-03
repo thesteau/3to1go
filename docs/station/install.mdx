@@ -1,16 +1,16 @@
 ---
-title: "Install Central"
-description: "Run Central and its PostgreSQL database with Docker Compose."
+title: "Install Station"
+description: "Run Station and its PostgreSQL database with Docker Compose."
 ---
 
-Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs PostgreSQL. The example deployment in the repository runs both.
+Station ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs PostgreSQL. The example deployment in the repository runs both.
 
 ## Requirements
 
 - Docker with Compose
 - An x86-64 (`linux/amd64`) host.
-- Enough disk for your snapshots, which are full archives (see [retention](/central/snapshots#retention))
-- A port Edges can reach, `6555` by default
+- Enough disk for your snapshots, which are full archives (see [retention](/station/snapshots#retention))
+- A port Scouts can reach, `6555` by default
 
 ## Set up
 
@@ -35,20 +35,20 @@ Central ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
     INITIAL_ADMIN_PASSWORD=admin
     ```
 
-    Set a real `POSTGRES_PASSWORD`. Point `BACKUP_DIR` at wherever snapshots should live. See [Storage](/concepts/storage-and-3-2-1#where-central-can-store-snapshots).
+    Set a real `POSTGRES_PASSWORD`. Point `BACKUP_DIR` at wherever snapshots should live. See [Storage](/concepts/storage-and-3-2-1#where-station-can-store-snapshots).
   </Step>
   <Step title="Start it">
     ```sh
     docker compose up -d
     ```
 
-    Central waits for PostgreSQL to be healthy before starting.
+    Station waits for PostgreSQL to be healthy before starting.
   </Step>
   <Step title="Sign in">
     Open `http://<central-host>:6555/` and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
   </Step>
-  <Step title="Connect your first Edge">
-    Click **Mint Edge Credential** and paste the result into Edge. See [Edge credentials](/central/edge-credentials).
+  <Step title="Connect your first Scout">
+    Click **Mint Edge Credential** and paste the result into Scout. See [Scout credentials](/station/scout-credentials).
   </Step>
 </Steps>
 
@@ -70,10 +70,10 @@ The example Compose file keeps everything next to it:
 ```
 
 <Warning>
-  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records. Losing `issuer.key` invalidates every Edge credential.
+  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records. Losing `issuer.key` invalidates every Scout credential.
 </Warning>
 
-See [Recover Central](/central/disaster-recovery) for backup commands and steps to restore it on a replacement host.
+See [Recover Station](/station/disaster-recovery) for backup commands and steps to restore it on a replacement host.
 
 ## Update
 

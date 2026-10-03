@@ -11,27 +11,27 @@ Each backup is a complete `tar.zst` archive of the job's included regular files.
 
 ## Path-and-size fingerprinting
 
-Edge decides whether a new snapshot is needed from a fingerprint of the folder's **sorted file paths and sizes**. It doesn't hash contents or check modification times, so an edit that keeps every path and size the same does **not** trigger a backup.
+Scout decides whether a new snapshot is needed from a fingerprint of the folder's **sorted file paths and sizes**. It doesn't hash contents or check modification times, so an edit that keeps every path and size the same does **not** trigger a backup.
 
 <Tip>
-  To capture that kind of edit, use **Force Upload** on the job in Edge. If the job has an older staged archive, use **Clear staged backup** first so Force Upload builds a fresh one.
+  To capture that kind of edit, use **Force Upload** on the job in Scout. If the job has an older staged archive, use **Clear staged backup** first so Force Upload builds a fresh one.
 </Tip>
 
 ## Count-based retention
 
-Central keeps the most recent **N** snapshots per job and Edge instance, where N is **Keep Last Snapshots** (default `3`). Retention is by count, not by age or total size. The per-archive upload size limit is a separate setting.
+Station keeps the most recent **N** snapshots per job and Scout instance, where N is **Keep Last Snapshots** (default `3`). Retention is by count, not by age or total size. The per-archive upload size limit is a separate setting.
 
 ## Restore replaces files
 
-Restore writes a snapshot's files into the job's folder and **overwrites** local copies of the same files. Files not in the snapshot are left alone. Edge previews how many files will be replaced and added first. See [Restore](/edge/restore).
+Restore writes a snapshot's files into the job's folder and **overwrites** local copies of the same files. Files not in the snapshot are left alone. Scout previews how many files will be replaced and added first. See [Restore](/scout/restore).
 
 ## Permissions
 
 Snapshots keep regular files' permission bits, such as executable and private-file permissions, and restore applies them where the system supports it. Ownership, ACLs, and special permission bits are not kept.
 
-## Edge skips its own runtime data
+## Scout skips its own runtime data
 
-On startup, Edge marks its spool and state folders with a hidden `.3to1go-runtime` file and never backs them up, even through another mount path. Its configuration and encryption key are still included.
+On startup, Scout marks its spool and state folders with a hidden `.3to1go-runtime` file and never backs them up, even through another mount path. Its configuration and encryption key are still included.
 
 ## One operator per app
 

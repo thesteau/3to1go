@@ -1,9 +1,9 @@
 ---
-title: "Install Edge"
-description: "Run Edge with Docker Compose on a machine you want to back up."
+title: "Install Scout"
+description: "Run Scout with Docker Compose on a machine you want to back up."
 ---
 
-Edge ships as a Docker image, `ghcr.io/thesteau/3to1go-edge`. You need a running [Central](/central/install) and a [credential](/central/edge-credentials) minted from it.
+Scout ships as a Docker image, `ghcr.io/thesteau/3to1go-edge`. You need a running [Station](/station/install) and a [credential](/station/scout-credentials) minted from it.
 
 The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including Raspberry Pi.
 
@@ -31,9 +31,9 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
     SCAN_DIR=/home/alice
     ```
 
-    If Central runs on the same Docker Desktop host, use `CENTRAL_URL=http://host.docker.internal:6555`.
+    If Station runs on the same Docker Desktop host, use `CENTRAL_URL=http://host.docker.internal:6555`.
 
-    To back up more than one folder or drive, see [Multiple folders and drives](/edge/multiple-folders).
+    To back up more than one folder or drive, see [Multiple folders and drives](/scout/multiple-folders).
   </Step>
   <Step title="Start it">
     ```sh
@@ -41,18 +41,18 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
     ```
   </Step>
   <Step title="Sign in and add the credential">
-    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Edge Settings**, paste the credential from Central into **Edge Credential**, and save.
+    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Edge Settings**, paste the credential from Station into **Edge Credential**, and save.
   </Step>
   <Step title="Save your encryption key">
-    Copy the **Encryption Key** from Edge's UI and store it somewhere safe, such as a password manager. See [Encryption key](/edge/encryption-key).
+    Copy the **Encryption Key** from Scout's UI and store it somewhere safe, such as a password manager. See [Encryption key](/scout/encryption-key).
   </Step>
   <Step title="Choose what to back up">
-    See [Backup jobs](/edge/backup-jobs).
+    See [Backup jobs](/scout/backup-jobs).
   </Step>
 </Steps>
 
 <Note>
-  Edge needs **write** access to the mounted folders to save `.upload_dir` markers and to restore files.
+  Scout needs **write** access to the mounted folders to save `.upload_dir` markers and to restore files.
 </Note>
 
 ## What gets created

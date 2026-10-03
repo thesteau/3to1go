@@ -1,0 +1,59 @@
+---
+title: "Encryption key"
+description: "Find, back up, and rotate the key Scout uses to encrypt every snapshot."
+---
+
+Each Scout creates its own encryption key on first start and encrypts every archive with it before upload. Station's server never receives the key. To download a snapshot, you paste the key into Station's UI and your browser decrypts it.
+
+<Warning>
+  If you lose the key, that Scout's snapshots are **permanently unrecoverable**. Nobody, including Station, can decrypt them. Back it up now.
+</Warning>
+
+## Where it is
+
+- In the UI: **Encryption Key** on Scout's main page. It's masked, so click **Copy** to copy it.
+- On disk: `config/encryption.key` next to Scout's `docker-compose.yml` (`/config/encryption.key` inside the container).
+
+The file holds 32 raw bytes. **Copy** gives you a text (base64url) version to paste into Station. When restoring Scout's config, keep the original file. Don't replace it with the copied text.
+
+Scout also shows the key's **fingerprint**, which Station uses to catch a wrongly pasted key. It isn't secret and can't decrypt anything.
+
+## Back it up
+
+Keep the copied key somewhere that survives losing this machine, such as a password manager. Even better, back up the whole `config` folder, which also holds the instance ID needed to [restore through Scout](/scout/restore#rebuilding-a-lost-machine).
+
+## When you need it
+
+- **Downloading from Station's UI.** Station asks for the key and decrypts the snapshot in your browser. See [Download a snapshot](/station/snapshots#download-a-snapshot).
+- **Restoring from Scout.** Scout uses its current key automatically. See [Restore](/scout/restore).
+
+## Rotate the key
+
+**Rotate** creates a new key for archives built from then on. Snapshots already on Station keep the old key, and staged archives aren't rebuilt.
+
+<Warning>
+  After rotating, old snapshots are hard to recover. Scout restores only with the new key. Station's UI only accepts the key Scout reported most recently, and that switches to the new key on Scout's next upload. Download anything you need **before** rotating.
+</Warning>
+
+<Steps>
+  <Step title="Pause backup cycles">
+    Wait for any backup or restore to finish. In **Edit Edge Settings**, turn on **Pause uploads (skip backup cycles)** and save. If the save is rejected because a cycle started, wait for it to finish and save again.
+  </Step>
+  <Step title="Download old snapshots you need">
+    [Download](/station/snapshots#download-a-snapshot) them from Station's UI while it still accepts the current key.
+  </Step>
+  <Step title="Save the old key">
+    Click **Copy** and store it somewhere safe.
+  </Step>
+  <Step title="Rotate">
+    Click **Clear staged backup** on any job that has one, then click **Rotate** and confirm. Copy and store the new key.
+  </Step>
+  <Step title="Back up every job with the new key">
+    Refresh Scout and clear any staged backup again, since **Force Upload** reuses staged archives that may use the old key. Then click **Force Upload** on every job, including unchanged ones, and wait for each to succeed. Force Upload works while cycles are paused.
+  </Step>
+  <Step title="Resume backup cycles">
+    Turn off **Pause uploads (skip backup cycles)** and save.
+  </Step>
+</Steps>
+
+Old snapshots stay on Station until retention prunes them, after **Keep Last Snapshots** new backups of each job.

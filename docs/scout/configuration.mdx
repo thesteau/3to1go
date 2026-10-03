@@ -1,33 +1,33 @@
 ---
-title: "Edge configuration"
-description: "Settings you change in Edge's UI, and the environment variables that override them."
+title: "Scout configuration"
+description: "Settings you change in Scout's UI, and the environment variables that override them."
 ---
 
-Most Edge settings are changed in **Edit Edge Settings** and saved in Edge's local database. Many can also be set as environment variables in `.env`.
+Most Scout settings are changed in **Edit Edge Settings** and saved in Scout's local database. Many can also be set as environment variables in `.env`.
 
 <Warning>
-  A supported environment variable **overrides** the UI value when Edge starts and whenever settings are saved. To change that value through the UI, remove the override from `.env` and recreate the container with `docker compose up -d`.
+  A supported environment variable **overrides** the UI value when Scout starts and whenever settings are saved. To change that value through the UI, remove the override from `.env` and recreate the container with `docker compose up -d`.
 </Warning>
 
 ## Connection and identity
 
 | UI setting | Environment variable | Default | Description |
 |---|---|---|---|
-| Edge ID | `EDGE_ID` | `edge-01` | Name used to group installations in Central. A unique name per machine is easiest to recognize. Instance IDs keep installations separate either way. |
-| Central URL | `CENTRAL_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
-| Advertised Edge URL | none | empty | Optional URL for this Edge's UI that Edge reports to Central. Central can include it in [notifications](/central/notifications). |
-| Edge Credential | none | empty | Credential minted by Central. See [Edge credentials](/central/edge-credentials). |
+| Scout ID | `EDGE_ID` | `edge-01` | Name used to group installations in Station. A unique name per machine is easiest to recognize. Instance IDs keep installations separate either way. |
+| Station URL | `CENTRAL_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
+| Advertised Scout URL | none | empty | Optional URL for this Scout's UI that Scout reports to Station. Station can include it in [notifications](/station/notifications). |
+| Scout Credential | none | empty | Credential minted by Station. See [Scout credentials](/station/scout-credentials). |
 
 ## Schedule and scanning
 
 | UI setting | Environment variable | Default | Description |
 |---|---|---|---|
 | Cron Schedule | none | `0 2 * * 0` | When backup cycles run, as a 5-field cron expression. The default is Sundays at 02:00. |
-| Max Depth | `MAX_DEPTH` | `10` | How many folder levels below the scan root Edge searches for `.upload_dir` markers. Also how deep **Directories Under Scan Root** lets you browse. |
-| Unusual backups | `ANOMALY_MODE` | `hold` | Hold, alert on, or ignore backups that look very different from a job's history: `hold`, `alert`, or `off`. See [Unusual backups](/edge/unusual-backups). |
+| Max Depth | `MAX_DEPTH` | `10` | How many folder levels below the scan root Scout searches for `.upload_dir` markers. Also how deep **Directories Under Scan Root** lets you browse. |
+| Unusual backups | `ANOMALY_MODE` | `hold` | Hold, alert on, or ignore backups that look very different from a job's history: `hold`, `alert`, or `off`. See [Unusual backups](/scout/unusual-backups). |
 | Pause uploads (skip backup cycles) | none | off | Skip scheduled cycles and Run Backup Cycle Now. Individual Force Upload actions still run. |
 | Keep failed-upload archives for retry | `KEEP_LOCAL_PENDING` | on | Keep an archive that failed to upload so the next cycle retries it instead of rebuilding. |
-| none | `SCAN_ROOT` | `/scan` | Folder Edge scans. Leave at `/scan` in Docker. |
+| none | `SCAN_ROOT` | `/scan` | Folder Scout scans. Leave at `/scan` in Docker. |
 
 The schedule can't run more often than every **5 minutes**.
 
@@ -47,7 +47,7 @@ A few schedules:
 
 ## Uploads
 
-These rarely need changing. They control how Edge talks to Central over slow or unreliable links.
+These rarely need changing. They control how Scout talks to Station over slow or unreliable links.
 
 | UI setting | Environment variable | Default |
 |---|---|---|
@@ -63,7 +63,7 @@ These rarely need changing. They control how Edge talks to Central over slow or 
 | Circuit Breaker Failure Threshold | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` |
 | Circuit Breaker Cooldown Seconds | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` |
 
-After the circuit breaker's failure threshold is reached, Edge stops trying Central for the cooldown period instead of retrying endlessly.
+After the circuit breaker's failure threshold is reached, Scout stops trying Station for the cooldown period instead of retrying endlessly.
 
 ## Other
 
@@ -76,6 +76,6 @@ After the circuit breaker's failure threshold is reached, Edge stops trying Cent
 | none | `HTTP_HOST` | `0.0.0.0` in Docker | Address the UI listens on. |
 | none | `HTTP_PORT` | `6556` | UI port. If you change it, update the Compose `ports` mapping too. |
 | none | `INITIAL_ADMIN_PASSWORD` | `admin` | First admin's password, used only when no user accounts exist. A password change is required on first sign-in, even with a custom value. See [Sign-in](/shared/sign-in). |
-| none | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Edge over HTTPS. |
+| none | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Scout over HTTPS. |
 
 **Trusted Certificates** are also managed in this dialog. See [Trusted certificates](/shared/trusted-certificates).

@@ -1,9 +1,9 @@
 ---
 title: "Multiple folders and drives"
-description: "Let one Edge back up folders from several locations or drives."
+description: "Let one Scout back up folders from several locations or drives."
 ---
 
-Edge can only see folders that Docker mounts beneath `/scan` inside the container. To back up more than one location, add one volume entry per folder. Your files stay where they are on your computer, including on other drives.
+Scout can only see folders that Docker mounts beneath `/scan` inside the container. To back up more than one location, add one volume entry per folder. Your files stay where they are on your computer, including on other drives.
 
 Each entry has the form:
 
@@ -11,7 +11,7 @@ Each entry has the form:
 "folder on your computer:folder inside Edge"
 ```
 
-For example, `"D:/Projects:/scan/projects"` makes `D:\Projects` appear as `/scan/projects` in Edge. Use forward slashes in Compose, including for Windows paths.
+For example, `"D:/Projects:/scan/projects"` makes `D:\Projects` appear as `/scan/projects` in Scout. Use forward slashes in Compose, including for Windows paths.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ flowchart LR
         B["D:\Projects"]
         C["E:\Photos"]
     end
-    subgraph Edge["Edge container, under /scan"]
+    subgraph Scout["Scout container, under /scan"]
         M["/scan/main"]
         P["/scan/projects"]
         PH["/scan/photos"]
@@ -70,7 +70,7 @@ flowchart LR
     ```
   </Step>
   <Step title="Choose what to back up">
-    Refresh Edge's UI. The folder browser now shows:
+    Refresh Scout's UI. The folder browser now shows:
 
     ```text
     /scan
@@ -78,7 +78,7 @@ flowchart LR
       projects   (D:\Projects on your computer)
     ```
 
-    Create jobs for the folders you want. See [Backup jobs](/edge/backup-jobs).
+    Create jobs for the folders you want. See [Backup jobs](/scout/backup-jobs).
   </Step>
 </Steps>
 
@@ -88,7 +88,7 @@ flowchart LR
 
 ## Add another drive later
 
-Add another line to the same `volumes` section, recreate the container, refresh Edge, and create a job for the new folder:
+Add another line to the same `volumes` section, recreate the container, refresh Scout, and create a job for the new folder:
 
 ```yaml
       - "E:/Photos:/scan/photos"
@@ -98,9 +98,9 @@ Adding a volume only makes a folder **visible**. It isn't backed up until you cr
 
 ## Things to know
 
-- **Job names must be unique across all mounted folders.** The `main` and `projects` labels don't separate same-named jobs on Central, so use names like `main-photos` and `projects-photos`.
-- **Mounts need write access** for Edge to save markers and restore files.
+- **Job names must be unique across all mounted folders.** The `main` and `projects` labels don't separate same-named jobs on Station, so use names like `main-photos` and `projects-photos`.
+- **Mounts need write access** for Scout to save markers and restore files.
 - **Max Depth counts the extra level.** The `/scan/<name>` folders add one level, so raise **Max Depth** in settings if your markers are deep.
-- **Moving an existing folder under a new mount?** Keep its job name so its history on Central continues. Edge tracks local state by path, so the next cycle may upload it again.
+- **Moving an existing folder under a new mount?** Keep its job name so its history on Station continues. Scout tracks local state by path, so the next cycle may upload it again.
 
 The same steps work with the build-from-source Compose file in `edge/`.

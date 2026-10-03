@@ -1,9 +1,9 @@
 ---
-title: "Central configuration"
-description: "Environment variables for deployment, and settings you change from Central's UI."
+title: "Station configuration"
+description: "Environment variables for deployment, and settings you change from Station's UI."
 ---
 
-Central is configured in two places:
+Station is configured in two places:
 
 - **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers. `docker compose restart` alone does not reload `.env`.
 - **Edit Central Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
@@ -15,14 +15,14 @@ Central is configured in two places:
 | Variable | Default | Description |
 |---|---|---|
 | `BACKUP_DIR` | `./data/backups` | Host folder mounted at `/backups`. Used by the example Compose file. |
-| `POSTGRES_DB` | `three_to_one_go` | Database name, shared by Central and the Postgres container. |
+| `POSTGRES_DB` | `three_to_one_go` | Database name, shared by Station and the Postgres container. |
 | `POSTGRES_USER` | none | Database user. **Required** unless `INDEX_DATABASE_URL` is set. |
 | `POSTGRES_PASSWORD` | none | Database password. **Required** unless `INDEX_DATABASE_URL` is set. |
 | `INITIAL_ADMIN_PASSWORD` | `admin` | Password for the first `admin` user. Only used when no user accounts exist. A password change is required on first sign-in, even with a custom value. |
 
 ### Using an external PostgreSQL
 
-By default Central connects to the `postgres` service on port `5432`. To use another server, either set a full URL:
+By default Station connects to the `postgres` service on port `5432`. To use another server, either set a full URL:
 
 | Variable | Description |
 |---|---|
@@ -38,18 +38,18 @@ or set the parts individually:
 | `INDEX_DATABASE_USER` | `POSTGRES_USER` |
 | `INDEX_DATABASE_PASSWORD` | `POSTGRES_PASSWORD` |
 
-When using an external database, also remove the bundled `postgres` service and Central's `depends_on: postgres` entry from the Compose file if you no longer want to run that database container.
+When using an external database, also remove the bundled `postgres` service and Station's `depends_on: postgres` entry from the Compose file if you no longer want to run that database container.
 
 ### Server and paths
 
 | Variable | Default | Description |
 |---|---|---|
-| `HTTP_HOST` | `0.0.0.0` | Address Central listens on. |
-| `HTTP_PORT` | `6555` | Port Central listens on. If you change it, update the Compose `ports` mapping too. |
+| `HTTP_HOST` | `0.0.0.0` | Address Station listens on. |
+| `HTTP_PORT` | `6555` | Port Station listens on. If you change it, update the Compose `ports` mapping too. |
 | `BACKUP_ROOT` | `/backups` | Snapshot folder inside the container. |
 | `STAGING_DIR` | `/staging` | Folder for uploads in progress. |
-| `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Edge credentials. Created on first start if missing. |
-| `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Central over HTTPS. See [Sign-in](/shared/sign-in#session-cookies-over-https). |
+| `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Scout credentials. Created on first start if missing. |
+| `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Station over HTTPS. See [Sign-in](/shared/sign-in#session-cookies-over-https). |
 
 ## Settings in the UI
 
@@ -59,19 +59,19 @@ Open **Edit Central Settings**.
 |---|---|---|
 | Dark Mode | on | UI theme. |
 | Pause incoming uploads | off | Reject new upload sessions. Uploads already in progress can continue. |
-| Keep Last Snapshots | `3` | How many snapshots to keep per job and Edge instance. Older ones are pruned after each upload. |
+| Keep Last Snapshots | `3` | How many snapshots to keep per job and Scout instance. Older ones are pruned after each upload. |
 | Log Level | `INFO` | Container log verbosity. |
-| Max Upload Size MB | `2048` | Largest archive Central will accept. |
-| Upload Chunk Size MB | `8` | Chunk size Central asks Edges to use. |
+| Max Upload Size MB | `2048` | Largest archive Station will accept. |
+| Upload Chunk Size MB | `8` | Chunk size Station asks Scouts to use. |
 | Upload Session TTL Hours | `24` | Upload session lifetime, refreshed as upload activity continues. Expired sessions are removed by cleanup. |
 | Cleanup Interval Seconds | `300` | How often expired upload sessions are cleaned up. Minimum `10`. |
-| Unusual uploads | Flag and alert | Flag archives whose size is far from the job's usual size. See [Unusual sizes](/central/snapshots#unusual-sizes). |
-| Snapshot Integrity Check Interval | `0` (off) | Hours between automatic integrity checks. See [Integrity checks](/central/snapshots#integrity-checks). |
+| Unusual uploads | Flag and alert | Flag archives whose size is far from the job's usual size. See [Unusual sizes](/station/snapshots#unusual-sizes). |
+| Snapshot Integrity Check Interval | `0` (off) | Hours between automatic integrity checks. See [Integrity checks](/station/snapshots#integrity-checks). |
 
 **Trusted Certificates** are also managed here. See [Trusted certificates](/shared/trusted-certificates).
 
-Restart Central after changing **Log Level** or **Snapshot Integrity Check Interval** so the running logger or verification schedule uses the new value.
+Restart Station after changing **Log Level** or **Snapshot Integrity Check Interval** so the running logger or verification schedule uses the new value.
 
 <Note>
-  Raise **Max Upload Size MB** if a job's archive is larger than 2 GB. Otherwise Central rejects its upload.
+  Raise **Max Upload Size MB** if a job's archive is larger than 2 GB. Otherwise Station rejects its upload.
 </Note>

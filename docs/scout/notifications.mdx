@@ -1,0 +1,50 @@
+---
+title: "Scout notifications"
+description: "Get an ntfy message when Scout successfully uploads a job to Station."
+---
+
+Scout can post to an [ntfy](https://ntfy.sh) topic after a job uploads **successfully** in a scheduled cycle or **Run Backup Cycle Now**. **Force Upload** doesn't notify from Scout, but Station still can. A failed notification never blocks an upload.
+
+<Note>
+  Station has separate notification settings that fire when it stores an upload. See [Station notifications](/station/notifications). Use either or both.
+</Note>
+
+## Set up
+
+<Steps>
+  <Step title="Open the dialog">
+    In Scout, click **Configure ntfy**.
+  </Step>
+  <Step title="Enter your server and topic">
+    - **ntfy Server URL**: for example `https://ntfy.sh` or your own server.
+    - **Topic**: for example `backups`.
+  </Step>
+  <Step title="Test and save">
+    Click **Test** to send a sample message, then **Save**.
+  </Step>
+</Steps>
+
+If your ntfy server uses a private CA, add it under [Trusted certificates](/shared/trusted-certificates).
+
+## Message template
+
+The default message is:
+
+```text
+Edge uploaded {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} to Central as {{ stored_as }}.
+```
+
+Write your own in **Message Template**. **Defaults** restores the default.
+
+| Placeholder | Value |
+|---|---|
+| `{{ edge_id }}` | This Scout's ID |
+| `{{ edge_instance_id }}` | This Scout installation's instance ID |
+| `{{ job_name }}` | Name of the backup job |
+| `{{ stored_as }}` | Filename as stored on Station |
+
+Messages are sent with the header `X-Relay-Event: upload-finished`.
+
+## Unusual backup alerts
+
+When a backup looks very different from its history, Scout also sends a separate high-priority alert to the same topic, with the reasons. It uses the header `X-Relay-Event: unusual-backup` and ignores the message template. See [Unusual backups](/scout/unusual-backups).
