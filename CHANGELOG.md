@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/thesteau/3to1go/compare/v1.1.1...v1.1.2) (2026-10-03)
+
+
+### Bug Fixes
+
+* Update docs and fix directories update time ([#82](https://github.com/thesteau/3to1go/issues/82)) ([0523349](https://github.com/thesteau/3to1go/commit/0523349e5fca28fb374ece8f1fc35137699adb8b))
+
 ## [1.1.1](https://github.com/thesteau/3to1go/compare/v1.1.0...v1.1.1) (2026-10-03)
 
 
