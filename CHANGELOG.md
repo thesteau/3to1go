@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/thesteau/3to1go/compare/v1.1.0...v1.1.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* Make both apps faster upon first load ([#76](https://github.com/thesteau/3to1go/issues/76)) ([a3a295d](https://github.com/thesteau/3to1go/commit/a3a295da6a783f0a32cda9137810fb245ba6753f))
+
 ## [1.1.0](https://github.com/thesteau/3to1go/compare/v1.0.1...v1.1.0) (2026-10-02)
 
 
