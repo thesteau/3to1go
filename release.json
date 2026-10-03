@@ -1,8 +1,8 @@
 {
-  "version": "1.1.2",
-  "tag": "v1.1.2",
-  "prodSha": "0523349e5fca28fb374ece8f1fc35137699adb8b",
-  "previousTag": "v1.1.1",
-  "previousSha": "a3a295da6a783f0a32cda9137810fb245ba6753f",
-  "notes": "## [1.1.2](https://github.com/thesteau/3to1go/compare/v1.1.1...v1.1.2) (2026-10-03)\n\n\n### Bug Fixes\n\n* Update docs and fix directories update time ([#82](https://github.com/thesteau/3to1go/issues/82)) ([0523349](https://github.com/thesteau/3to1go/commit/0523349e5fca28fb374ece8f1fc35137699adb8b))"
+  "version": "1.2.0",
+  "tag": "v1.2.0",
+  "prodSha": "9b6371f03d8f32fac88a4839f2fbb0438c981842",
+  "previousTag": "v1.1.2",
+  "previousSha": "0523349e5fca28fb374ece8f1fc35137699adb8b",
+  "notes": "## [1.2.0](https://github.com/thesteau/3to1go/compare/v1.1.2...v1.2.0) (2026-10-03)\n\n\n### Features\n\n* Initial migrations refactor ([#85](https://github.com/thesteau/3to1go/issues/85)) ([a104497](https://github.com/thesteau/3to1go/commit/a104497e3dfd705855aef2273d9104deb48d1e41))"
 }

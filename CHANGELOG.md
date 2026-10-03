@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/thesteau/3to1go/compare/v1.1.2...v1.2.0) (2026-10-03)
+
+
+### Features
+
+* Initial migrations refactor ([#85](https://github.com/thesteau/3to1go/issues/85)) ([a104497](https://github.com/thesteau/3to1go/commit/a104497e3dfd705855aef2273d9104deb48d1e41))
+
 ## [1.1.2](https://github.com/thesteau/3to1go/compare/v1.1.1...v1.1.2) (2026-10-03)
 
 
