@@ -25,7 +25,7 @@ async function loadUsers(): Promise<void> {
   }
 }
 
-// Stable builds show their release tag, main builds their commit.
+// Prod builds show the tag, main builds the commit hash.
 function renderBuildInfo(build: BuildInfo | undefined): void {
   const element = document.getElementById("build-info");
   if (!element || !build?.summary) return;

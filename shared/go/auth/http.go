@@ -111,7 +111,7 @@ func (a *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to list users")
 		return
 	}
-	// The Admin dialog shows which build is running.
+	// Admin shows the running version.
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"users": users, "build": buildinfo.Fields()})
 }
 

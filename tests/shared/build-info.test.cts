@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 for (const app of ['edge', 'central']) {
-  test(`${app} Admin dialog shows the running build and links to the docs`, async () => {
+  test(`${app} Admin shows the version and links to the docs`, async () => {
     const dialog = fs.readFileSync(path.join(__dirname, '../..', app, 'static/html/users-dialog.html'), 'utf8');
     assert.match(dialog, /id="build-info"/);
     assert.match(dialog, /href="https:\/\/3to1go\.docs\.thesteau\.com\/"/);
@@ -31,6 +31,6 @@ for (const app of ['edge', 'central']) {
 
     build = { version: '', commit: sha, summary: '1a2b3c4' };
     await ctx.loadUsers();
-    assert.equal(buildInfo.textContent, 'Version 1a2b3c4', 'main builds show the commit');
+    assert.equal(buildInfo.textContent, 'Version 1a2b3c4', 'main builds show the commit hash');
   });
 }

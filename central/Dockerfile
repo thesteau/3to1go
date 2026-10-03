@@ -15,7 +15,7 @@ RUN npx tsc -p central/static
 # CGO off, Go needs no emulation, which is far faster than building on QEMU.
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS TARGETARCH TARGETVARIANT
-# Release tag and Git commit, shown in the UI and logs. Image workflows set them.
+# Tag and commit hash shown in Admin and the startup log.
 ARG VERSION=
 ARG REVISION=
 
