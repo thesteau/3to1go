@@ -29,8 +29,9 @@ type jobStateStore interface {
 // needs to repeat now and then, to pick up markers changed outside the UI.
 const jobDiscoveryTTL = 5 * time.Minute
 
-// How long the first request waits for the first walk, so small trees load in
-// one go. A variable so tests can shorten it.
+// How long after the first walk starts requests may wait for it, so small trees
+// load in one go. Counted from the start of the walk, so reloading during a long
+// first walk doesn't wait each time. A variable so tests can shorten it.
 var firstDiscoveryWait = 2 * time.Second
 
 // DirectoryService lists, saves, and deletes backup job definitions under the scan root.
@@ -43,6 +44,7 @@ type DirectoryService struct {
 	jobDirs    []string // nil until the first walk finishes
 	jobDirsAt  time.Time
 	walking    bool
+	firstStart time.Time       // when the first walk began
 	changed    map[string]bool // jobs saved (true) or deleted during the walk
 	firstWalk  chan struct{}   // closed when the first walk finishes
 	discoverFn func() []string
@@ -84,16 +86,40 @@ func (d *DirectoryService) ListJobs() ([]DirectoryEntry, error) {
 // the list was read, so the two always agree.
 func (d *DirectoryService) ListJobsWithState() ([]DirectoryEntry, bool, error) {
 	dirs, discovering := d.jobDirectories()
-	entries := make([]DirectoryEntry, 0, len(dirs))
-	for _, dir := range dirs {
-		entry, err := d.serializeDirectory(dir)
+	all := make([]DirectoryEntry, len(dirs))
+	ok := make([]bool, len(dirs))
+	inParallel(len(dirs), func(i int) {
+		entry, err := d.serializeDirectory(dirs[i])
 		// A marker removed outside the UI drops out until the next discovery.
-		if err != nil || !entry.Selected {
-			continue
+		all[i], ok[i] = entry, err == nil && entry.Selected
+	})
+	entries := make([]DirectoryEntry, 0, len(dirs))
+	for i, entry := range all {
+		if ok[i] {
+			entries = append(entries, entry)
 		}
-		entries = append(entries, entry)
 	}
 	return entries, discovering, nil
+}
+
+// folderReaders bounds how many folders are read at once. Each read mostly
+// waits on the disk, or on a slow Docker bind mount, so parallel reads overlap.
+const folderReaders = 16
+
+// inParallel runs fn for 0..n-1 with up to folderReaders at a time.
+func inParallel(n int, fn func(int)) {
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, folderReaders)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+			fn(i)
+		}()
+	}
+	wg.Wait()
 }
 
 // Discovering reports whether the first walk is still running, so the job list
@@ -123,12 +149,15 @@ func (d *DirectoryService) jobDirectories() ([]string, bool) {
 	if d.jobDirs == nil || time.Since(d.jobDirsAt) >= jobDiscoveryTTL {
 		d.startWalkLocked()
 	}
-	first := d.jobDirs == nil
+	wait := time.Duration(0)
+	if d.jobDirs == nil {
+		wait = firstDiscoveryWait - time.Since(d.firstStart)
+	}
 	d.jobsMu.Unlock()
-	if first {
+	if wait > 0 {
 		select {
 		case <-d.firstWalk:
-		case <-time.After(firstDiscoveryWait):
+		case <-time.After(wait):
 		}
 	}
 	d.jobsMu.Lock()
@@ -141,6 +170,9 @@ func (d *DirectoryService) startWalkLocked() {
 		return
 	}
 	d.walking = true
+	if d.firstStart.IsZero() {
+		d.firstStart = time.Now()
+	}
 	go d.runWalks()
 }
 
@@ -267,13 +299,14 @@ func (d *DirectoryService) ListChildren(relativePath string) ([]DirectoryNode, e
 		return nil, err
 	}
 	owner, blockedBy := d.nearestJob(scanRoot, dir)
-	for _, child := range children {
-		node := DirectoryNode{DirectoryEntry: d.describeDirectory(scanRoot, child, owner, blockedBy)}
+	nodes = make([]DirectoryNode, len(children))
+	inParallel(len(children), func(i int) {
+		node := DirectoryNode{DirectoryEntry: d.describeDirectory(scanRoot, children[i], owner, blockedBy)}
 		if depth+1 < d.settings.MaxDepth {
-			node.ChildCount, node.HiddenChildCount = countSubdirs(child)
+			node.ChildCount, node.HiddenChildCount = countSubdirs(children[i])
 		}
-		nodes = append(nodes, node)
-	}
+		nodes[i] = node
+	})
 	return nodes, nil
 }
 

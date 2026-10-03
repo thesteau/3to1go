@@ -92,6 +92,7 @@ async function changeOwnPassword(): Promise<void> {
 
 async function logoutUser(): Promise<void> {
   await rawFetch("/api/session/logout", { method: "POST" });
+  clearEdgeView();
   currentUser = null;
   closeDialog("users-dialog");
   openLoginDialog();
