@@ -59,15 +59,17 @@ docker compose up -d
 
 Open **http://localhost:6556/**, sign in, and paste the credential from step 2 into Edge's settings.
 
-## 4. Mark a folder for backup
+## 4. Choose a folder to back up
 
-Create a file named `.upload_dir` in the folder you want backed up. An empty file works, and Edge uses the folder name as the job name:
+In Edge's folder browser, click **Edit** on the folder you want backed up, then **Save Job**.
+
+The Job Editor saves the job as a `.upload_dir` file in the folder. You can also create or edit that file yourself, which does the same thing. An empty file uses the folder name as the job name:
 
 ```sh
 touch /home/alice/photos/.upload_dir
 ```
 
-Or click **Edit** on the folder in Edge's folder browser and save it as a job, which writes the marker for you. See [Backup jobs](/edge/backup-jobs).
+See [Backup jobs](/edge/backup-jobs).
 
 ## 5. Run the first backup
 

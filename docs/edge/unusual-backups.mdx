@@ -28,9 +28,20 @@ Detection only uses file paths, sizes, file types, and how well the archive comp
 
 Each job keeps its last 20 uploaded backups as its "normal". Photo and video folders that never compress well aren't flagged by the compression check, and adding lots of new files only trips the count check, not the changed-files check.
 
-<Note>
-  Behind the scenes, sizes and counts use a robust z-score (median and median absolute deviation) on a log scale, changed files are estimated with MinHash, and the file-type mix is compared with the Jensen-Shannon divergence. All of it is plain statistics that runs in milliseconds, with no model to download.
-</Note>
+## Machine learning
+
+Detection is unsupervised anomaly detection. Edge doesn't use a trained model. It learns each job's own baseline from that job's past backups and flags a backup that falls far outside it. There's nothing to download or train, nothing leaves the Edge, and a check takes milliseconds.
+
+| Check | Method |
+|---|---|
+| File count and size | A robust z-score on a log scale. The baseline is the median of past backups, and the spread is the median absolute deviation (MAD). A backup is flagged only if it's at least 4 spreads from the median **and** at least half or double the usual value. |
+| Compression | The archive's size divided by the original size, compared with the median ratio of past backups. |
+| Changed files | Similarity to the last backup, estimated with MinHash over file paths and sizes. Flagged when under 25% of files are unchanged. |
+| File types | The share of each file extension, compared with the last backup using the Jensen-Shannon divergence. Flagged when one new type takes over the folder. |
+
+The median and MAD ignore a few odd backups in the history, where an average would be pulled off by them. The log scale treats growing from 1 GB to 2 GB the same as 10 GB to 20 GB.
+
+The baseline keeps learning. Every uploaded backup joins the history, including one you approve with **Upload anyway**. A held backup doesn't join it until you approve it, so a bad backup can't teach Edge that bad is normal.
 
 ## When a backup is held
 
