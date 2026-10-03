@@ -4,12 +4,10 @@
 //	go build -ldflags "-X github.com/3to1go/shared/buildinfo.Version=v1.2.0 -X github.com/3to1go/shared/buildinfo.Commit=<sha>"
 //
 // The Dockerfiles set both from the VERSION and REVISION build arguments.
-// Stable images built from prod set both. The latest images built from main
-// set only the commit.
+// Prod builds set both. Main builds set only the commit.
 package buildinfo
 
-// Version is the release tag, such as v1.2.0, or empty for builds that are not
-// releases.
+// Version is the tag, such as v1.2.0. Empty on main builds.
 var Version = ""
 
 // Commit is the Git commit the binary was built from, or empty when unknown.
@@ -23,8 +21,8 @@ func ShortCommit() string {
 	return Commit
 }
 
-// Summary names the build for people: the release tag for stable builds, the
-// short commit for main builds, and "dev" for local builds.
+// Summary is the tag on prod builds, the short commit hash on main builds,
+// and "dev" otherwise.
 func Summary() string {
 	switch {
 	case Version != "":

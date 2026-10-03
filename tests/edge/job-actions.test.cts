@@ -52,6 +52,30 @@ test('a held backup offers Upload anyway with its reasons, other jobs keep Force
   assert.doesNotMatch(normal, /Upload anyway/);
 });
 
+test('the job list says Edge is still looking until the first search finishes', () => {
+  const jobs = { innerHTML: '' };
+  const count = { innerHTML: '' };
+  const ctx = vm.createContext({
+    document: { getElementById: id => ({ 'selected-jobs': jobs, 'selected-jobs-count': count })[id] || null, querySelectorAll: () => [] },
+    currentUser: { is_admin: true }, latestData: null, ACTIVE_JOB_STATUSES: new Set(['uploading']),
+  });
+  loadFeature(ctx, 'edge', 'utils');
+  loadFeature(ctx, 'edge', 'directories');
+  ctx.renderSelectedJobs([], true);
+  assert.match(jobs.innerHTML, /Looking for backup jobs/);
+  assert.doesNotMatch(jobs.innerHTML, /No directories are selected/);
+  assert.equal(count.innerHTML, '-');
+
+  ctx.renderSelectedJobs([{ relative_path: 'docs', selected: true, config: { job_name: 'docs' }, state: {} }], true);
+  assert.match(jobs.innerHTML, /Looking for backup jobs/);
+  assert.match(jobs.innerHTML, /class="job-card"/, 'jobs found so far still show');
+  assert.equal(count.innerHTML, '1');
+
+  ctx.renderSelectedJobs([], false);
+  assert.doesNotMatch(jobs.innerHTML, /Looking for backup jobs/);
+  assert.match(jobs.innerHTML, /No directories are selected/);
+});
+
 test('folder paths round-trip through executable inline action handlers', () => {
   const ctx = vm.createContext({});
   loadFeature(ctx, 'edge', 'utils');

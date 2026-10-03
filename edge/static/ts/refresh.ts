@@ -18,7 +18,8 @@ const EDGE_ACTIVE_REFRESH_BURST_COUNT = 6;
 const EDGE_PAUSED_REFRESH_CHECK_MS = 2000;
 
 function edgeHasActiveWork(data: EdgeData | null = latestData): boolean {
-  if (data?.scheduler?.state === "running") return true;
+  // Check back soon while the first search for jobs is still running.
+  if (data?.scheduler?.state === "running" || data?.jobs_discovering) return true;
   return (data?.directories || []).some((entry) => ACTIVE_JOB_STATUSES.has(String(entry.state?.last_status || "").trim()));
 }
 
@@ -95,8 +96,8 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
       throw new Error("Jobs could not load.");
     }
     const dirData: DirectoriesResponse = await res.json();
-    latestData = { ...(latestData || {}), directories: dirData.directories };
-    renderSelectedJobs(dirData.directories);
+    latestData = { ...(latestData || {}), directories: dirData.directories, jobs_discovering: Boolean(dirData.discovering) };
+    renderSelectedJobs(dirData.directories, Boolean(dirData.discovering));
     // Keeps "contains selected job" current; unchanged markup leaves the DOM alone.
     renderDirectoryTree();
   })().catch((error) => {
