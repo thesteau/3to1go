@@ -1,9 +1,9 @@
 ---
 title: "Backup jobs"
-description: "Mark folders for backup with .upload_dir, set exclusions, and manage each job."
+description: "Choose folders to back up in Edge, set exclusions, and manage each job."
 ---
 
-A **job** is a folder Edge backs up. Any folder under the scan root that contains a file named `.upload_dir` becomes a job. You can create the marker yourself, or let Edge's UI write it for you.
+A **job** is a folder Edge backs up. Create and change jobs in Edge's Job Editor. Behind the scenes, the editor stores each job's settings in a file named `.upload_dir` in the folder, which you can also [write or edit yourself](#edit-the-upload_dir-file).
 
 ## Create a job from the UI
 
@@ -32,15 +32,17 @@ A **job** is a folder Edge backs up. Any folder under the scan root that contain
   <img src="/images/workflows/job-editor.png" alt="Edge Job Editor with directory, job name, exclusion patterns, hidden files, and symlink settings" />
 </Frame>
 
-## Create a job with a file
+## Edit the .upload_dir file
 
-Create `.upload_dir` in the folder. An empty file uses the folder name as the job name:
+Saving in the Job Editor writes the folder's `.upload_dir`. Writing that file yourself does the same thing as using the editor. Use it for scripts, configuration management, or folders you set up before Edge runs.
+
+To create a job, create `.upload_dir` in the folder. An empty file uses the folder name as the job name:
 
 ```sh
 touch /home/alice/photos/.upload_dir
 ```
 
-Or write YAML to set options:
+To set or change options, add or edit YAML in the file. These are the same fields as the Job Editor:
 
 ```yaml .upload_dir
 job_name: photos
@@ -52,9 +54,11 @@ exclude:
   - /exports/old/
 ```
 
+Edits go both ways. Changes you make in the file show in the Job Editor, and saving in the editor rewrites the file. Deleting the file stops backing up the folder, like **Stop Backing Up**.
+
 If the YAML is invalid or `job_name` has disallowed characters, Edge skips the job and shows the error on it.
 
-Edge looks for new markers at most every 30 seconds, so one you create by hand can take that long to appear under **Selected Jobs**. Deleted markers, and jobs saved or removed in the UI, show up right away.
+Edge looks for new `.upload_dir` files every 30 seconds, so one you create by hand can take that long to appear under **Selected Jobs**. Edits to an existing file, deleted files, and jobs saved or removed in the Job Editor show up right away.
 
 <Warning>
   Job names must be **unique** across the whole Edge. Two folders both named `photos` need different `job_name` values, such as `main-photos` and `projects-photos`.

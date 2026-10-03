@@ -16,7 +16,7 @@ If you want the shortest mental model:
 
 1. Pick a machine to run Central.
 2. Run Edge on each machine you want to back up.
-3. Mark folders on Edge with a `.upload_dir` file.
+3. Choose folders in Edge's UI. Each is saved as a `.upload_dir` file, which you can also edit directly.
 4. Edge packs and encrypts those folders.
 5. Central stores the snapshots and lets you browse them in a web UI.
 
@@ -28,7 +28,7 @@ Each Edge has its own address and web UI on port **6556**. They all upload to Ce
 
 ## Why Use 3to1go
 
-- **Choose folders directly.** Create backup jobs in Edge's UI or add a `.upload_dir` marker to a folder.
+- **Choose folders directly.** Create backup jobs in Edge's UI. Each job is a `.upload_dir` file in its folder, which you can also write or edit yourself.
 - **Encrypt before upload.** Central only stores encrypted archives. Downloads are decrypted in your browser, and restores on Edge itself.
 - **Keep machines separate.** Each installation has its own instance ID and snapshot history, even when Edge IDs are shared.
 - **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect hooks or ntfy notifications.
@@ -84,7 +84,7 @@ Open `http://<edge-host>:6556/`, sign in as `admin`, and change the initial pass
 
 ### 3. Choose a folder and back it up
 
-In Edge's folder browser, click **Edit** on a folder and **Save Job**. This writes a `.upload_dir` marker. An empty marker made by hand works too, and uses the folder name as the job name.
+In Edge's folder browser, click **Edit** on a folder and **Save Job**. Edge saves the job as a `.upload_dir` file in the folder. Creating or editing that file yourself does the same thing. An empty file uses the folder name as the job name.
 
 Click **Run Backup Cycle Now** to back up immediately. Central keeps the most recent snapshots per job and Edge instance (three by default).
 
