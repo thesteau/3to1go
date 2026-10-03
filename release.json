@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0",
-  "tag": "v1.1.0",
-  "prodSha": "e273f7ac3e2bec054e07407f5460081c79baca94",
-  "previousTag": "v1.0.1",
-  "previousSha": "237f910a19aaf07ac56b55af4f7f3e7f37e85867",
-  "notes": "## [1.1.0](https://github.com/thesteau/3to1go/compare/v1.0.1...v1.1.0) (2026-10-02)\n\n\n### Features\n\n* add anonmaly detection feature, update docs, and basic bug fixes ([#59](https://github.com/thesteau/3to1go/issues/59)) ([8e49a6a](https://github.com/thesteau/3to1go/commit/8e49a6a1251bd8694261bdff11a47f3a1139e826))"
+  "version": "1.1.1",
+  "tag": "v1.1.1",
+  "prodSha": "a3a295da6a783f0a32cda9137810fb245ba6753f",
+  "previousTag": "v1.1.0",
+  "previousSha": "e273f7ac3e2bec054e07407f5460081c79baca94",
+  "notes": "## [1.1.1](https://github.com/thesteau/3to1go/compare/v1.1.0...v1.1.1) (2026-10-03)\n\n\n### Bug Fixes\n\n* Make both apps faster upon first load ([#76](https://github.com/thesteau/3to1go/issues/76)) ([a3a295d](https://github.com/thesteau/3to1go/commit/a3a295da6a783f0a32cda9137810fb245ba6753f))"
 }
