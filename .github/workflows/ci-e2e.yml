@@ -16,7 +16,7 @@ permissions:
 jobs:
   e2e:
     # Not a required PR check, because PRs don't run it.
-    name: Edge to Central backup and recovery
+    name: Scout to Station backup and recovery
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,29 +24,29 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       # Reuses layers cached by earlier runs and by the main-branch image builds.
-      - name: Build Central validation image
+      - name: Build Station validation image
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: central/Dockerfile
-          tags: 3to1go-central-validation
+          file: station/Dockerfile
+          tags: 3to1go-station-validation
           load: true
           cache-from: |
-            type=gha,scope=e2e-central
-            type=gha,scope=central
-          cache-to: type=gha,mode=max,scope=e2e-central
+            type=gha,scope=e2e-station
+            type=gha,scope=station
+          cache-to: type=gha,mode=max,scope=e2e-station
 
-      - name: Build Edge validation image
+      - name: Build Scout validation image
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: edge/Dockerfile
-          tags: 3to1go-edge-validation
+          file: scout/Dockerfile
+          tags: 3to1go-scout-validation
           load: true
           cache-from: |
-            type=gha,scope=e2e-edge
-            type=gha,scope=edge
-          cache-to: type=gha,mode=max,scope=e2e-edge
+            type=gha,scope=e2e-scout
+            type=gha,scope=scout
+          cache-to: type=gha,mode=max,scope=e2e-scout
 
       - name: Run end-to-end test
         env:

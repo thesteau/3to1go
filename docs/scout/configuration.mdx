@@ -1,0 +1,81 @@
+---
+title: "Scout configuration"
+description: "Settings you change in Scout's UI, and the environment variables that override them."
+---
+
+Most Scout settings are changed in **Edit Scout Settings** and saved in Scout's local database. Many can also be set as environment variables in `.env`.
+
+<Warning>
+  A supported environment variable **overrides** the UI value when Scout starts and whenever settings are saved. To change that value through the UI, remove the override from `.env` and recreate the container with `docker compose up -d`.
+</Warning>
+
+## Connection and identity
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Scout ID | `SCOUT_ID` | `scout-01` | Name used to group installations in Station. A unique name per machine is easiest to recognize. Instance IDs keep installations separate either way. |
+| Station URL | `STATION_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
+| Advertised Scout URL | none | empty | Optional URL for this Scout's UI that Scout reports to Station. Station can include it in [notifications](/station/notifications). |
+| Scout Credential | none | empty | Credential minted by Station. See [Scout credentials](/station/scout-credentials). |
+
+## Schedule and scanning
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Cron Schedule | none | `0 2 * * 0` | When backup cycles run, as a 5-field cron expression. The default is Sundays at 02:00. |
+| Max Depth | `MAX_DEPTH` | `10` | How many folder levels below the scan root Scout searches for `.upload_dir` markers. Also how deep **Directories Under Scan Root** lets you browse. |
+| Unusual backups | `ANOMALY_MODE` | `hold` | Hold, alert on, or ignore backups that look very different from a job's history: `hold`, `alert`, or `off`. See [Unusual backups](/scout/unusual-backups). |
+| Pause uploads (skip backup cycles) | none | off | Skip scheduled cycles and Run Backup Cycle Now. Individual Force Upload actions still run. |
+| Keep failed-upload archives for retry | `KEEP_LOCAL_PENDING` | on | Keep an archive that failed to upload so the next cycle retries it instead of rebuilding. |
+| none | `SCAN_ROOT` | `/scan` | Folder Scout scans. Leave at `/scan` in Docker. |
+
+The schedule can't run more often than every **5 minutes**.
+
+Scheduled cycles also wait at least five minutes after startup and after the previous cycle finishes. **Run Backup Cycle Now** bypasses these waits. It queues a cycle and never starts a second one while a cycle is running.
+
+<Note>
+  The scheduler uses the server's local time zone. The supplied Docker image runs in **UTC** by default, so `0 2 * * 0` means 02:00 UTC on Sundays in that deployment.
+</Note>
+
+A few schedules:
+
+| Cron | Runs |
+|---|---|
+| `0 2 * * 0` | Weekly, Sunday 02:00 |
+| `0 3 * * *` | Daily, 03:00 |
+| `0 */6 * * *` | Every 6 hours |
+
+## Uploads
+
+These rarely need changing. They control how Scout talks to Station over slow or unreliable links.
+
+| UI setting | Environment variable | Default |
+|---|---|---|
+| Upload Chunk Size MB | `UPLOAD_CHUNK_SIZE_MB` | `8` |
+| Min Upload Chunk MB | `MIN_UPLOAD_CHUNK_SIZE_MB` | `1` |
+| Max Upload Chunk MB | `MAX_UPLOAD_CHUNK_SIZE_MB` | `16` |
+| Upload Retry Attempts | `UPLOAD_RETRY_MAX_ATTEMPTS` | `5` |
+| Retry Base Delay Seconds | `UPLOAD_RETRY_BASE_DELAY_SECONDS` | `5` |
+| Retry Max Delay Seconds | `UPLOAD_RETRY_MAX_DELAY_SECONDS` | `300` |
+| Connect Timeout Seconds | `UPLOAD_CONNECT_TIMEOUT_SECONDS` | `10` |
+| Read Timeout Padding Seconds | `UPLOAD_READ_TIMEOUT_PADDING_SECONDS` | `30` |
+| Min Throughput Bytes/Second | `UPLOAD_MIN_THROUGHPUT_BYTES_PER_SECOND` | `262144` (256 KiB/s) |
+| Circuit Breaker Failure Threshold | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` |
+| Circuit Breaker Cooldown Seconds | `CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300` |
+
+After the circuit breaker's failure threshold is reached, Scout stops trying Station for the cooldown period instead of retrying endlessly.
+
+## Other
+
+| UI setting | Environment variable | Default | Description |
+|---|---|---|---|
+| Dark Mode | none | on | UI theme. |
+| Log Level | `LOG_LEVEL` | `INFO` | Container log verbosity. |
+| State Directory | `STATE_DIR` | `/data/state` | Per-job state. |
+| Spool Directory | `SPOOL_DIR` | `/data/spool` | Archives waiting to upload. |
+| none | `HTTP_HOST` | `0.0.0.0` in Docker | Address the UI listens on. |
+| none | `HTTP_PORT` | `6556` | UI port. If you change it, update the Compose `ports` mapping too. |
+| none | `INITIAL_ADMIN_PASSWORD` | `admin` | First admin's password, used only when no user accounts exist. A password change is required on first sign-in, even with a custom value. See [Sign-in](/shared/sign-in). |
+| none | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Scout over HTTPS. |
+
+**Trusted Certificates** are also managed in this dialog. See [Trusted certificates](/shared/trusted-certificates).

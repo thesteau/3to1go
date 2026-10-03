@@ -1,6 +1,6 @@
 # Shared Go packages
 
-Central and Edge depend on this local module through their existing `replace`
+Station and Scout depend on this local module through their existing `replace`
 directives and the root `go.work` file.
 
 - `auth`: account types, password verification, account lifecycle, session
@@ -13,15 +13,15 @@ directives and the root `go.work` file.
   event headers, filters, and error handling differ.
 - `keylock`: per-key mutex allocation for blocking and nonblocking callers.
 - `configutil`: common configuration coercion and log-level parsing.
-- `protocol`: Edge–Central wire types and constants.
+- `protocol`: Scout–Station wire types and constants.
 - `webui`: embedded page assembly, caching, and index serving.
 
 Application entry points, database implementations, backup workflows, and
-platform-specific configuration paths remain in Central and Edge. Shared packages
+platform-specific configuration paths remain in Station and Scout. Shared packages
 must not import either application.
 
 After `npm ci` and `npm run build`, run all Go tests from the repository root:
 
 ```sh
-go test -race ./shared/go/... ./central/... ./edge/...
+go test -race ./shared/go/... ./station/... ./scout/...
 ```

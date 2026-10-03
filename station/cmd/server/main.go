@@ -1,0 +1,178 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/3to1go/shared/buildinfo"
+	"github.com/3to1go/shared/certificates"
+	"github.com/3to1go/shared/configutil"
+	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/station/internal/api"
+	"github.com/3to1go/station/internal/config"
+	"github.com/3to1go/station/internal/ingest"
+	"github.com/3to1go/station/internal/services/locks"
+	"github.com/3to1go/station/internal/services/ntfy"
+	"github.com/3to1go/station/internal/services/verify"
+	"github.com/3to1go/station/internal/storage"
+	"github.com/3to1go/station/internal/store"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	if err := run(logger); err != nil {
+		logger.Error("startup failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(logger *slog.Logger) error {
+	ctx := context.Background()
+
+	// Load initial settings (no DB payload yet)
+	settings, err := config.BuildSettings(nil)
+	if err != nil {
+		return fmt.Errorf("build settings: %w", err)
+	}
+
+	// Connect to PostgreSQL
+	pool, err := pgxpool.New(ctx, settings.IndexDatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to postgres: %w", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("ping postgres: %w", err)
+	}
+
+	// Initialize stores
+	userStore := store.NewUserStore(pool)
+	credStore := store.NewCredentialStore(pool)
+	settingsStore := store.NewSettingsStore(pool)
+	snapIndex := store.NewSnapshotIndex(pool)
+	uploadSessionStore := ingest.NewPGSessionStore(pool)
+
+	// Run migrations. Old table and column names are renamed first, so EnsureSchema doesn't
+	// create empty tables next to them.
+	if err := store.MigrateLegacyNames(ctx, pool); err != nil {
+		return fmt.Errorf("rename legacy schema: %w", err)
+	}
+	if err := userStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("user schema: %w", err)
+	}
+	if err := credStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("credential schema: %w", err)
+	}
+	if err := settingsStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("settings schema: %w", err)
+	}
+	if err := snapIndex.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("snapshot index schema: %w", err)
+	}
+	if err := uploadSessionStore.EnsureSchema(ctx); err != nil {
+		return fmt.Errorf("upload session schema: %w", err)
+	}
+	if err := userStore.EnsureDefaultAdmin(ctx, initialAdminPassword()); err != nil {
+		return fmt.Errorf("ensure admin: %w", err)
+	}
+
+	// Load persisted settings from DB and rebuild
+	payload, err := settingsStore.Load(ctx)
+	if err != nil {
+		logger.Warn("failed to load persisted settings, using defaults", "error", err)
+	}
+	if payload != nil {
+		settings, err = config.BuildSettings(payload)
+		if err != nil {
+			logger.Warn("invalid persisted settings, using defaults", "error", err)
+			settings, _ = config.BuildSettings(nil)
+		}
+	}
+
+	// Adjust log level
+	logLevel := configutil.ParseLogLevel(settings.LogLevel)
+	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+
+	// Storage backend
+	backend := storage.NewLocalBackend(settings.BackupRoot)
+	if err := os.MkdirAll(settings.BackupRoot, 0o755); err != nil {
+		return fmt.Errorf("create backup root: %w", err)
+	}
+	if err := os.MkdirAll(settings.StagingDir, 0o755); err != nil {
+		return fmt.Errorf("create staging dir: %w", err)
+	}
+
+	// Services
+	lockMgr := locks.NewNamespaceLockManager()
+	hookMgr := hooks.NewHookManager("station", config.HookScriptsDir(), logger)
+	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
+	ntfyPub := ntfy.NewNtfyPublisher(logger)
+
+	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hookMgr, ntfyPub, uploadSessionStore)
+	if err != nil {
+		return fmt.Errorf("initialize ingest service: %w", err)
+	}
+
+	verifySvc := verify.New(snapIndex, backend)
+
+	app := api.NewApp(
+		settings, userStore, credStore, settingsStore, snapIndex,
+		backend, ingestSvc, hookMgr, certMgr, ntfyPub, verifySvc, logger,
+	)
+
+	if settings.SnapshotVerifyIntervalHours > 0 {
+		go verifySvc.Run(ctx, settings.SnapshotVerifyIntervalHours)
+	}
+	app.RestartCleanupLoop(settings.UploadCleanupIntervalS)
+	app.StartCredentialCleanupLoop()
+
+	addr := net.JoinHostPort(settings.HTTPHost, fmt.Sprint(settings.HTTPPort))
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}
+
+	srv := &http.Server{
+		Handler:      app.Handler(),
+		ReadTimeout:  10 * time.Minute,
+		WriteTimeout: 10 * time.Minute,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	logger.Info("server starting", "addr", addr, "version", buildinfo.Summary(), "commit", buildinfo.Commit)
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-quit
+		logger.Info("shutting down server")
+		app.Shutdown()
+		shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutCtx); err != nil {
+			logger.Error("server shutdown failed", "error", err)
+		}
+	}()
+
+	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server error: %w", err)
+	}
+	return nil
+}
+
+func initialAdminPassword() string {
+	if value := os.Getenv("INITIAL_ADMIN_PASSWORD"); value != "" {
+		return value
+	}
+	return store.DefaultAdminPassword
+}

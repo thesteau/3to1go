@@ -1,11 +1,11 @@
 {
   "name": "3to1go-web",
   "private": true,
-  "description": "TypeScript sources for the Central and Edge web UIs. Compiled to */static/js (not committed), which the Go servers embed.",
+  "description": "TypeScript sources for the Station and Scout web UIs. Compiled to */static/js (not committed), which the Go servers embed.",
   "scripts": {
-    "build": "tsc -p central/static && tsc -p edge/static",
-    "watch": "tsc -p central/static --watch --preserveWatchOutput",
-    "watch:edge": "tsc -p edge/static --watch --preserveWatchOutput",
+    "build": "tsc -p station/static && tsc -p scout/static",
+    "watch": "tsc -p station/static --watch --preserveWatchOutput",
+    "watch:scout": "tsc -p scout/static --watch --preserveWatchOutput",
     "lint": "biome ci .",
     "fix": "biome check --write .",
     "test": "npm run build && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""

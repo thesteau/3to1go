@@ -1,0 +1,248 @@
+package api
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/3to1go/shared/httpx"
+	"github.com/3to1go/station/internal/config"
+	"github.com/3to1go/station/internal/ingest"
+	"github.com/3to1go/station/internal/services/overview"
+	"github.com/3to1go/station/internal/storage"
+)
+
+func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
+	if requireUser(w, r) == nil {
+		return
+	}
+	s := a.Settings()
+	var data map[string]any
+	var err error
+	switch r.URL.Query().Get("section") {
+	case "storage":
+		data = overview.BuildStorageOverview(a.backend)
+	case "settings":
+		// Small and fast, so the settings editor doesn't wait for the snapshot list.
+		data = map[string]any{"settings": config.SettingsToPayload(s)}
+	case "snapshots":
+		data, err = overview.BuildSnapshotOverview(r.Context(), s, a.snapIndex)
+	default:
+		data, err = overview.BuildOverview(r.Context(), s, a.backend, a.snapIndex)
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, data)
+}
+
+func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	var body config.SettingsPayload
+	if err := httpx.ReadJSON(r, &body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	newSettings, err := config.BuildSettings(&body)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	normalized := config.SettingsToPayload(newSettings)
+	if err := a.settingsStore.Save(r.Context(), &normalized); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
+		return
+	}
+	a.ApplySettings(newSettings)
+	a.RestartCleanupLoop(newSettings.UploadCleanupIntervalS)
+
+	data, err := overview.BuildOverview(r.Context(), newSettings, a.backend, a.snapIndex)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"settings": data["settings"],
+	})
+}
+
+func (a *App) handlePauseUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, true)
+}
+
+func (a *App) handleResumeUploads(w http.ResponseWriter, r *http.Request) {
+	a.setUploadsPaused(w, r, false)
+}
+
+func (a *App) setUploadsPaused(w http.ResponseWriter, r *http.Request, paused bool) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	s := a.Settings()
+	payload := config.SettingsToPayload(s)
+	payload.UploadsPaused = paused
+	newSettings, err := config.BuildSettings(&payload)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to build settings")
+		return
+	}
+	if err := a.settingsStore.Save(r.Context(), &payload); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
+		return
+	}
+	a.ApplySettings(newSettings)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
+}
+
+func (a *App) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	scoutID, err := ingest.ValidateNamespaceComponent(r.PathValue("scout_id"), "scout_id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	instID, err := ingest.ValidateNamespaceComponent(r.PathValue("scout_instance_id"), "scout_instance_id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	cleanupMissing := r.URL.Query().Get("cleanup_missing") == "true"
+
+	s := a.Settings()
+	instanceDir := filepath.Join(s.BackupRoot, scoutID, instID)
+
+	info, err := os.Stat(instanceDir)
+	if err != nil || !info.IsDir() {
+		reg, err := a.snapIndex.GetScoutRegistration(r.Context(), scoutID, instID)
+		if err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "failed to inspect instance registration")
+			return
+		}
+		hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), scoutID, instID)
+		if reg == nil && !hasEntries {
+			httpx.WriteError(w, http.StatusNotFound, "instance not found")
+			return
+		}
+		if !cleanupMissing {
+			httpx.WriteError(w, http.StatusConflict, map[string]any{
+				"message":           "instance files not found",
+				"cleanup_available": true,
+			})
+			return
+		}
+		if reg != nil {
+			if err := a.snapIndex.DeleteScoutRegistration(r.Context(), scoutID, instID); err != nil {
+				httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance registration")
+				return
+			}
+		}
+		if hasEntries {
+			if err := a.snapIndex.DeleteInstanceEntries(r.Context(), scoutID, instID); err != nil {
+				httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance index entries")
+				return
+			}
+		}
+		if err := a.snapIndex.DeleteArchiveSizes(r.Context(), scoutID, instID); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "failed to clean instance size history")
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{
+			"status":            "cleaned",
+			"scout_id":          scoutID,
+			"scout_instance_id": instID,
+		})
+		return
+	}
+
+	// Collect job namespaces before deleting
+	entries, _ := os.ReadDir(instanceDir)
+	var namespaces []string
+	for _, e := range entries {
+		if e.IsDir() {
+			namespaces = append(namespaces, scoutID+"/"+instID+"/"+e.Name())
+		}
+	}
+
+	if err := os.RemoveAll(instanceDir); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance files")
+		return
+	}
+
+	for _, ns := range namespaces {
+		a.ingest.ReconcileNamespace(r.Context(), ns)
+	}
+
+	// Check if anything remains
+	if _, err := os.Stat(instanceDir); err == nil {
+		httpx.WriteError(w, http.StatusConflict, map[string]any{
+			"message":           "instance still has backup files or index entries",
+			"cleanup_available": false,
+		})
+		return
+	}
+	hasEntries, _ := a.snapIndex.HasNamespaceEntries(r.Context(), scoutID, instID)
+	if hasEntries {
+		httpx.WriteError(w, http.StatusConflict, map[string]any{
+			"message":           "instance still has backup files or index entries",
+			"cleanup_available": false,
+		})
+		return
+	}
+	if err := a.snapIndex.DeleteScoutRegistration(r.Context(), scoutID, instID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance registration")
+		return
+	}
+	if err := a.snapIndex.DeleteArchiveSizes(r.Context(), scoutID, instID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to delete instance size history")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{
+		"status":            "deleted",
+		"scout_id":          scoutID,
+		"scout_instance_id": instID,
+	})
+}
+
+func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
+	s := a.Settings()
+	if !a.backend.Healthcheck() {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "storage backend unavailable")
+		return
+	}
+
+	stagingUsed := storage.DirSize(s.StagingDir)
+	_, _, stagingFree, _ := storage.DiskUsage(s.StagingDir)
+	backupUsed := storage.DirSize(s.BackupRoot)
+	_, _, backupFree, _ := storage.DiskUsage(s.BackupRoot)
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":                       "ok",
+		"staging_dir":                  s.StagingDir,
+		"staging_used_bytes":           stagingUsed,
+		"staging_free_bytes":           stagingFree,
+		"backup_root":                  s.BackupRoot,
+		"backup_used_bytes":            backupUsed,
+		"backup_free_bytes":            backupFree,
+		"max_upload_size_bytes":        s.MaxUploadSizeBytes(),
+		"recommended_chunk_size_bytes": s.UploadChunkSizeBytes(),
+	})
+}
+
+func (a *App) handleHealthReady(w http.ResponseWriter, r *http.Request) {
+	s := a.Settings()
+	if !a.backend.Healthcheck() {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "storage backend unavailable")
+		return
+	}
+	if err := os.MkdirAll(s.StagingDir, 0o755); err != nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "staging directory unavailable")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

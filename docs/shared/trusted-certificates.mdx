@@ -1,9 +1,9 @@
 ---
 title: "Trusted certificates"
-description: "Let Central and Edge verify internal HTTPS services signed by your own CA."
+description: "Let Station and Scout verify internal HTTPS services signed by your own CA."
 ---
 
-If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Edge needs to trust Central's CA, and each app needs to trust its ntfy server's CA. Each app keeps its own list.
+If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Scout needs to trust Station's CA, and each app needs to trust its ntfy server's CA. Each app keeps its own list.
 
 This configures outbound trust. It doesn't enable HTTPS on either web UI or make your browser trust a private CA. Set those up in your reverse proxy and browser.
 
@@ -11,7 +11,7 @@ This configures outbound trust. It doesn't enable HTTPS on either web UI or make
 
 <Steps>
   <Step title="Open settings">
-    Open **Edit Central Settings** in Central, or **Edit Edge Settings** in Edge.
+    Open **Edit Station Settings** in Station, or **Edit Scout Settings** in Scout.
   </Step>
   <Step title="Add the certificate">
     Under **Trusted Certificates**, upload your CA or root certificate as a PEM `.crt` file. Each app supports up to ten uploaded certificate files.
@@ -25,8 +25,8 @@ The app saves it under `/config/trusted-certs`, installs it into the container's
 For automated deployments, drop `.crt` files into the app's persisted config folder before starting it:
 
 ```text
-3to1go-central/config/trusted-certs/home-ca.crt
-3to1go-edge/config/trusted-certs/home-ca.crt
+3to1go-station/config/trusted-certs/home-ca.crt
+3to1go-scout/config/trusted-certs/home-ca.crt
 ```
 
 <Note>

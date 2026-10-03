@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3to1go Scout</title>
+  <link rel="icon" type="image/png" href="/static/img/favicon-app.png">
+  <!-- app-styles -->
+</head>
+<body>
+  <main class="page-shell">
+    <div id="connection-status" role="status"></div>
+    <section class="hero panel">
+      <div class="hero-top">
+        <div class="hero-text">
+          <h1>3to1go Scout</h1>
+          <p class="eyebrow">Filesystem-driven backup selection</p>
+          <p class="lede">
+            Browse the scan root, inspect current pathing, and create or update
+            <code>.upload_dir</code> markers without touching the terminal. Scout scans
+            from the configured root, aggregates matching job directories, and uploads
+            changed archives to Station.
+          </p>
+        </div>
+        <img src="/static/img/3to1go.png" alt="Go gophers racing" class="hero-gopher" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded')">
+      </div>
+      <div class="meta-grid" id="meta"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+      <div id="meta-load-status"></div>
+      <div class="toolbar">
+        <button type="button" onclick="manualRefresh()">Refresh</button>
+        <button type="button" class="secondary" onclick="runNow()">Run Backup Cycle Now</button>
+        <button type="button" class="danger" onclick="cancelOperation(this)">Cancel operation</button>
+<button type="button" class="secondary" onclick="openNtfyDialog()">Configure ntfy</button>
+        <button type="button" class="secondary" onclick="openHooksDialog()">Custom Scripts</button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="secondary" onclick="openUserManagementDialog()">Admin</button>
+        <button type="button" data-requires="settings" disabled onclick="openSettingsDialog()">Edit Scout Settings</button>
+      </div>
+    </section>
+
+    <section class="panel workspace-panel">
+      <div class="section-head">
+        <h2>Selected Jobs <span id="selected-jobs-count" class="dir-count">-</span></h2>
+        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to review or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the job editor.</p>
+      </div>
+      <div id="selected-jobs" class="job-list"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+
+      <div class="section-head compact">
+        <div class="section-head-row">
+          <h2>Directories Under Scan Root</h2>
+          <button
+            type="button"
+            id="hidden-dirs-toggle"
+            class="toggle-btn"
+            role="switch"
+            aria-checked="false"
+            onclick="toggleHiddenDirs()"
+            title="Show hidden folders (those starting with a dot, using the Linux/macOS convention)"
+          >
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Show hidden</span>
+          </button>
+        </div>
+        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
+      </div>
+      <div id="directory-tree" class="directory-tree"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+    </section>
+  </main>
+
+  <div id="toast-region" class="toast-region" popover="manual" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- app-dialogs -->
+
+  <script defer src="/static/js/shared/ts/utils.js"></script>
+  <script defer src="/static/js/scout/static/ts/utils.js"></script>
+  <script defer src="/static/js/shared/ts/ui.js"></script>
+  <script defer src="/static/js/scout/static/ts/ui.js"></script>
+  <script defer src="/static/js/shared/ts/auth.js"></script>
+  <script defer src="/static/js/scout/static/ts/auth.js"></script>
+  <script defer src="/static/js/shared/ts/users.js"></script>
+  <script defer src="/static/js/shared/ts/admin.js"></script>
+  <script defer src="/static/js/scout/static/ts/admin.js"></script>
+  <script defer src="/static/js/shared/ts/notifications.js"></script>
+  <script defer src="/static/js/scout/static/ts/notifications.js"></script>
+  <script defer src="/static/js/shared/ts/certificates.js"></script>
+  <script defer src="/static/js/scout/static/ts/certificates.js"></script>
+  <script defer src="/static/js/shared/ts/hooks.js"></script>
+  <script defer src="/static/js/scout/static/ts/hooks.js"></script>
+  <script defer src="/static/js/scout/static/ts/meta.js"></script>
+  <script defer src="/static/js/scout/static/ts/refresh.js"></script>
+  <script defer src="/static/js/scout/static/ts/directories.js"></script>
+  <script defer src="/static/js/scout/static/ts/files.js"></script>
+  <script defer src="/static/js/scout/static/ts/jobs.js"></script>
+  <script defer src="/static/js/scout/static/ts/recovery.js"></script>
+  <script defer src="/static/js/scout/static/ts/app.js"></script>
+</body>
+</html>

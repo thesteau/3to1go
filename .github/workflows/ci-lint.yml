@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [shared/go, central, edge]
+        module: [shared/go, station, scout]
     steps:
       - uses: actions/checkout@v7
 
@@ -30,8 +30,8 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: |
-            central/go.sum
-            edge/go.sum
+            station/go.sum
+            scout/go.sum
             shared/go/go.sum
 
       - uses: actions/setup-node@v7
@@ -76,4 +76,4 @@ jobs:
         run: git ls-files -z -- '*.sh' | xargs -0 shellcheck
 
       - name: Lint Dockerfiles
-        run: docker run --rm -v "$PWD:/repo" -w /repo hadolint/hadolint:v2.15.1 hadolint central/Dockerfile edge/Dockerfile
+        run: docker run --rm -v "$PWD:/repo" -w /repo hadolint/hadolint:v2.15.1 hadolint station/Dockerfile scout/Dockerfile

@@ -1,0 +1,46 @@
+---
+title: "Scout overview"
+description: "The app that runs on each machine, finds marked folders, encrypts them, and uploads them to Station."
+---
+
+Scout **makes** backups. Run one on every machine whose files you want to protect. Each Scout works on its own and only needs to reach Station to upload and restore.
+
+## What Scout does
+
+- **Finds backup jobs** by scanning for folders that contain a `.upload_dir` marker.
+- **Detects changes** with a path-and-size fingerprint, so unchanged folders aren't uploaded again.
+- **Builds and encrypts archives** as `tar.zst` files. The key stays on Scout unless you copy it for safekeeping or browser downloads. It is never sent to Station's server.
+- **Uploads to Station** in chunks, resuming and retrying when the connection drops.
+- **Runs on a schedule** you set with a cron expression, weekly by default.
+- **Restores snapshots** from Station back into the original folder.
+- **Sends notifications** to ntfy and runs your own scripts around each job.
+
+## Folders it uses
+
+| Inside the container | Holds |
+|---|---|
+| `/scan` | The folders Scout can see and back up. You choose what's mounted here. |
+| `/config` | Settings database, `encryption.key`, instance ID, trusted certificates |
+| `/data/state` | Per-job backup state |
+| `/data/spool` | Archives waiting to upload |
+| `/hook-scripts` | Scripts you upload for [hooks](/scout/hooks) |
+
+<Warning>
+  Back up Scout's `config` folder, especially `encryption.key`. Without that key, this Scout's snapshots **cannot be decrypted**. See [Encryption key](/scout/encryption-key).
+</Warning>
+
+## The Scout UI
+
+Open `http://<scout-host>:6556/`. The main page shows:
+
+- **Selected Jobs**: each backup job, its last state, the size of its last backup, and buttons to browse files, force an upload, restore, or edit it.
+- **Directories Under Scan Root**: a folder browser for choosing what to back up. Turn on **Show hidden** to see hidden folders.
+
+<Frame caption="A selected job after a successful backup.">
+  <img src="/images/workflows/scout-job.png" alt="A successful documents backup job with Files and exclusions, Force Upload, Restore, and Edit buttons" />
+</Frame>
+
+<CardGroup cols={2}>
+  <Card title="Install Scout" icon="download" href="/scout/install" />
+  <Card title="Backup jobs" icon="folder-open" href="/scout/backup-jobs" />
+</CardGroup>

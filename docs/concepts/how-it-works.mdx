@@ -3,15 +3,15 @@ title: "How it works"
 description: "Follow a folder from its .upload_dir marker to a stored, encrypted snapshot."
 ---
 
-Edge does all the work that needs your plaintext files. Central only receives encrypted archives.
+Scout does all the work that needs your plaintext files. Station only receives encrypted archives. Scout gathers and seals each pack, and Station stores packs without opening them.
 
-<Frame caption="Each Edge uploads to the same Central. The cloud copy is made by an external tool.">
-  <img src="/images/backup-layout.svg" alt="Edge 1 at 192.168.1.21:6556, Edge 2 at 192.168.1.22:6556, and Edge 3 at 192.168.1.23:6556 send backups to Central at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
+<Frame caption="Each Scout uploads to the same Station. The cloud copy is made by an external tool.">
+  <img src="/images/backup-layout.svg" alt="Scout 1 at 192.168.1.21:6556, Scout 2 at 192.168.1.22:6556, and Scout 3 at 192.168.1.23:6556 send backups to Station at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
 </Frame>
 
-The addresses are examples. Each Edge sets its **Central URL** to the same Central, here `http://192.168.1.10:6555`. The numbers count copies of each machine's data. Central doesn't make the third copy itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
+The addresses are examples. Each Scout sets its **Station URL** to the same Station, here `http://192.168.1.10:6555`. The numbers count copies of each machine's data. Station doesn't make the third copy itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
 
-| | Edge | Central |
+| | Scout | Station |
 |---|---|---|
 | Runs on | Each machine with files to back up | One always-on host |
 | Default UI | `http://localhost:6556/` | `http://localhost:6555/` |
@@ -23,54 +23,54 @@ The addresses are examples. Each Edge sets its **Central URL** to the same Centr
 
 <Steps>
   <Step title="You choose a folder">
-    Save the folder as a job in Edge's UI. Edge stores it as a `.upload_dir` file in the folder, and creating or editing that file yourself does the same.
+    Save the folder as a job in Scout's UI. Scout stores it as a `.upload_dir` file in the folder, and creating or editing that file yourself does the same.
   </Step>
-  <Step title="Edge finds it during a scan">
-    On each scheduled cycle, Edge walks its scan root looking for markers. Each marked folder is a **job**.
+  <Step title="Scout finds it during a scan">
+    On each scheduled cycle, Scout walks its scan root looking for markers. Each marked folder is a **job**.
   </Step>
-  <Step title="Edge decides whether anything changed">
-    Edge fingerprints the job's sorted file paths and sizes and compares that with the last backup. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
+  <Step title="Scout decides whether anything changed">
+    Scout fingerprints the job's sorted file paths and sizes and compares that with the last backup. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
   </Step>
-  <Step title="Edge builds and encrypts an archive">
-    If the fingerprint changed, Edge creates a `tar.zst` archive of the folder and encrypts it with its own key.
+  <Step title="Scout builds and encrypts an archive">
+    If the fingerprint changed, Scout creates a `tar.zst` archive of the folder and encrypts it with its own key.
   </Step>
-  <Step title="Edge uploads it to Central">
-    The encrypted archive is uploaded in chunks, with retries and a circuit breaker if Central is unreachable.
+  <Step title="Scout uploads it to Station">
+    The encrypted archive is uploaded in chunks, with retries and a circuit breaker if Station is unreachable.
   </Step>
-  <Step title="Central verifies and stores it">
-    Central checks the upload, stores it under `edge_id/edge_instance_id/job_name`, and prunes older snapshots for that instance.
+  <Step title="Station verifies and stores it">
+    Station checks the upload, stores it under `scout_id/scout_instance_id/job_name`, and prunes older snapshots for that instance.
   </Step>
   <Step title="You browse, download, or restore">
-    Download snapshots from Central's UI (decrypted in your browser) or restore them from Edge.
+    Download snapshots from Station's UI (decrypted in your browser) or restore them from Scout.
   </Step>
 </Steps>
 
 ```mermaid
 sequenceDiagram
-    participant Edge
-    participant Central
+    participant Scout
+    participant Station
 
     loop Every scheduled cycle
-        Edge->>Edge: Scan for .upload_dir markers
-        Edge->>Edge: Compare path-and-size fingerprint
+        Scout->>Scout: Scan for .upload_dir markers
+        Scout->>Scout: Compare path-and-size fingerprint
         alt Something changed
-            Edge->>Edge: Create tar.zst archive
-            Edge->>Edge: Encrypt archive
-            Edge->>Central: Upload encrypted archive
-            Central-->>Edge: OK
-            Central->>Central: Store by edge_id / instance_id / job
-            Central->>Central: Prune old snapshots
+            Scout->>Scout: Create tar.zst archive
+            Scout->>Scout: Encrypt archive
+            Scout->>Station: Upload encrypted archive
+            Station-->>Scout: OK
+            Station->>Station: Store by scout_id / instance_id / job
+            Station->>Station: Prune old snapshots
         end
     end
 ```
 
-## Edge ID and instance ID
+## Scout ID and instance ID
 
-- **`EDGE_ID`** is a name you choose, such as `laptop-alice`. Central's UI groups snapshots by it, so give each Edge its own.
-- **Instance ID** is generated on first run and saved in Edge's config folder. It keeps installations separate even if two share an `EDGE_ID`, so they never overwrite or prune each other's snapshots.
+- **`SCOUT_ID`** is a name you choose, such as `laptop-alice`. Station's UI groups snapshots by it, so give each Scout its own.
+- **Instance ID** is generated on first run and saved in Scout's config folder. It keeps installations separate even if two share a `SCOUT_ID`, so they never overwrite or prune each other's snapshots.
 
 ## Where encryption happens
 
-Each Edge generates its own `encryption.key` on first run and encrypts every archive before upload. Central stores them as-is.
+Each Scout generates its own `encryption.key` on first run and encrypts every archive before upload. Station stores them as-is.
 
-When you download a snapshot in Central's UI, your browser asks for that Edge's key, checks it against the fingerprint Edge reported, and decrypts the file locally. The key is never sent to Central's server. See [Encryption key](/edge/encryption-key).
+When you download a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the file locally. The key is never sent to Station's server. See [Encryption key](/scout/encryption-key).

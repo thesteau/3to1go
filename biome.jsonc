@@ -34,7 +34,7 @@
     {
       // The UI files are classic scripts sharing one global scope: their top-level names are used
       // and reassigned from other files and from inline onclick handlers, which Biome cannot see.
-      "includes": ["central/static/ts/**", "edge/static/ts/**", "shared/ts/**"],
+      "includes": ["station/static/ts/**", "scout/static/ts/**", "shared/ts/**"],
       "linter": {
         "rules": {
           "correctness": {

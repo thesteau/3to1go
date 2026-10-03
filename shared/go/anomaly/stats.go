@@ -9,7 +9,7 @@ import (
 
 // Mode controls what an app does when a backup looks unusual.
 const (
-	ModeHold  = "hold"  // keep the archive staged until an operator approves it (Edge only)
+	ModeHold  = "hold"  // keep the archive staged until an operator approves it (Scout only)
 	ModeAlert = "alert" // notify, but carry on as normal
 	ModeOff   = "off"
 )

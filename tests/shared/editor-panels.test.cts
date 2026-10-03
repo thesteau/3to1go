@@ -3,7 +3,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 
-for (const app of ["edge", "central"]) {
+for (const app of ["scout", "station"]) {
   test(`${app} cannot save unloaded settings and unlocks controls only for ready panels`, async () => {
     const settingsButton = { disabled: true };
     const keyButton = { disabled: true };
@@ -69,11 +69,11 @@ for (const app of ["edge", "central"]) {
   });
 }
 
-test("Edge cannot rotate a key before it has loaded", async () => {
+test("Scout cannot rotate a key before it has loaded", async () => {
   let requests = 0;
   const ctx = vm.createContext({ fetch: () => requests++, document: { querySelectorAll: () => [] } });
-  loadFeature(ctx, "edge", "ui");
-  loadFeature(ctx, "edge", "meta");
+  loadFeature(ctx, "scout", "ui");
+  loadFeature(ctx, "scout", "meta");
   ctx.setActionStatus = () => {};
   await ctx.rotateEncKey();
   assert.equal(requests, 0);
