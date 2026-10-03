@@ -17,6 +17,55 @@ const EDGE_IDLE_REFRESH_MS = 15000;
 const EDGE_ACTIVE_REFRESH_BURST_COUNT = 6;
 const EDGE_PAUSED_REFRESH_CHECK_MS = 2000;
 
+// The last job list and top-level folders, kept for this tab only, so a reload
+// shows them at once while fresh data loads. Settings are never kept here,
+// because they include the Central credential.
+const EDGE_VIEW_CACHE = "3to1go-edge-view";
+
+interface EdgeViewCache {
+  directories?: DirectoryEntry[];
+  discovering?: boolean;
+  topLevel?: DirectoryNode[];
+}
+
+function saveEdgeView(): void {
+  try {
+    const view: EdgeViewCache = {
+      directories: latestData?.directories,
+      discovering: latestData?.jobs_discovering,
+      topLevel: directoryChildren.get("."),
+    };
+    sessionStorage.setItem(EDGE_VIEW_CACHE, JSON.stringify(view));
+  } catch {
+    // Storage can be full or blocked; the page works without it.
+  }
+}
+
+function restoreEdgeView(): void {
+  try {
+    const view: EdgeViewCache = JSON.parse(sessionStorage.getItem(EDGE_VIEW_CACHE) || "null");
+    if (!view) return;
+    if (Array.isArray(view.directories)) {
+      latestData = { ...(latestData || {}), directories: view.directories, jobs_discovering: Boolean(view.discovering) };
+      renderSelectedJobs(view.directories, Boolean(view.discovering));
+    }
+    if (Array.isArray(view.topLevel) && !directoryTreeLoaded()) {
+      directoryChildren.set(".", view.topLevel);
+      renderDirectoryTree();
+    }
+  } catch {
+    // A missing or unreadable copy just means a normal load.
+  }
+}
+
+function clearEdgeView(): void {
+  try {
+    sessionStorage.removeItem(EDGE_VIEW_CACHE);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
 function edgeHasActiveWork(data: EdgeData | null = latestData): boolean {
   // Check back soon while the first search for jobs is still running.
   if (data?.scheduler?.state === "running" || data?.jobs_discovering) return true;
@@ -133,6 +182,7 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
 
   try {
     await Promise.all([statusFetch, dirFetch, treeFetch, keyFetch].filter(Boolean));
+    saveEdgeView();
   } finally {
     isLoadingData = false;
     scheduleEdgeRefresh();

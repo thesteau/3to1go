@@ -16,6 +16,43 @@ function refreshContext(overrides) {
   return ctx;
 }
 
+test('a reload shows the last jobs and folders at once, without settings, until sign-out', async () => {
+  const stored = new Map();
+  const sessionStorage = {
+    getItem: key => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, value),
+    removeItem: key => stored.delete(key),
+  };
+  const jobs = [{ relative_path: 'docs', selected: true, state: {} }];
+  const folders = [{ relative_path: 'docs', child_count: 0 }];
+  const first = refreshContext({
+    sessionStorage, directoryChildren: new Map([['.', folders]]),
+    fetch: async url => ({ ok: true, json: async () => url === '/api/status'
+      ? { settings: { edge_credential: 'secret-jwt' } }
+      : { directories: jobs, discovering: false } }),
+  });
+  await first.loadData({ refreshDirectoryTree: false });
+  const saved = [...stored.values()].join('');
+  assert.match(saved, /docs/);
+  assert.doesNotMatch(saved, /secret-jwt/, 'settings are not stored');
+
+  // The next page load in this tab renders the stored view before any request.
+  const rendered = [];
+  let treeRendered = false;
+  const second = refreshContext({
+    sessionStorage, directoryChildren: new Map(), directoryTreeLoaded: () => false,
+    renderSelectedJobs: (dirs, discovering) => rendered.push([dirs.length, discovering]),
+    renderDirectoryTree: () => { treeRendered = true; },
+  });
+  second.restoreEdgeView();
+  assert.deepEqual(rendered, [[1, false]]);
+  assert.equal(treeRendered, true);
+  assert.equal(second.directoryChildren.get('.').length, 1);
+
+  second.clearEdgeView();
+  assert.equal(stored.size, 0, 'sign-out clears the stored view');
+});
+
 test('Edge keeps polling while idle, accelerates for work, and pauses for dialogs', async () => {
   let timer;
   let dialogOpen = false;

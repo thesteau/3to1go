@@ -271,7 +271,7 @@ func TestUserStoreCreateUpdateDeleteAndSessions(t *testing.T) {
 	if err := s.DeleteSession(ctx, token); err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectExec("DELETE FROM app_sessions WHERE expires_at").WillReturnResult(sqlmock.NewResult(0, 0))
+	// Expired sessions were just cleaned up, so this lookup does not write again.
 	mock.ExpectQuery("FROM app_sessions sess").WithArgs(token, sqlmock.AnyArg()).WillReturnRows(userRows())
 	if got, err := s.UserForSession(ctx, token); err != nil || got != nil {
 		t.Fatalf("deleted session: %+v, %v", got, err)

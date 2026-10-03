@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/3to1go/shared/auth"
@@ -25,7 +26,15 @@ type User = auth.User
 // UserStore manages users and sessions in SQLite.
 type UserStore struct {
 	db *sql.DB
+
+	cleanupMu   sync.Mutex
+	lastCleanup time.Time
 }
+
+// Expired sessions are removed at most this often. Every signed-in request
+// checks its session, and a write each time would queue requests behind each
+// other on the single SQLite connection.
+const sessionCleanupInterval = time.Minute
 
 func NewUserStore(db *sql.DB) *UserStore {
 	return &UserStore{db: db}
@@ -305,7 +314,15 @@ func (s *UserStore) ChangePassword(ctx context.Context, userID int, currentPassw
 	return auth.ChangePassword(s, ctx, userID, currentPassword, newPassword)
 }
 
+// Session lookups already ignore expired rows; this only keeps the table small.
 func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
+	s.cleanupMu.Lock()
+	if time.Since(s.lastCleanup) < sessionCleanupInterval {
+		s.cleanupMu.Unlock()
+		return
+	}
+	s.lastCleanup = time.Now()
+	s.cleanupMu.Unlock()
 	s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE expires_at < ?`,
 		time.Now().UTC().Format(time.RFC3339))
 }

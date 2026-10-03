@@ -9,7 +9,6 @@ import (
 	"github.com/3to1go/edge/internal/config"
 	"github.com/3to1go/edge/internal/services/directories"
 	"github.com/3to1go/edge/internal/store"
-	"github.com/3to1go/edge/static"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
 	"github.com/go-chi/chi/v5"
@@ -110,7 +109,7 @@ func (a *App) Handler() http.Handler {
 	// Send template URLs to the assembled shell.
 	r.Handle("/static/", http.RedirectHandler("/", http.StatusMovedPermanently))
 	r.Handle("/static/index.html", http.RedirectHandler("/", http.StatusMovedPermanently))
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
+	r.Handle("/static/*", http.StripPrefix("/static/", staticFiles))
 
 	// SPA root
 	r.Get("/", a.handleIndex)
