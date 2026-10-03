@@ -18,7 +18,7 @@ function statusBadge(entry: DirectoryEntry): string {
     return `<span class="badge muted" title="The parent job's exclusions skip this folder, so it is not backed up.">excluded from ${escapeHtml(entry.blocked_by_parent === "." ? "scan root job" : entry.blocked_by_parent)}</span>`;
   }
   if (entry.blocked_by_parent) {
-    return `<span class="badge warn" title="Nested folders under an already-selected parent are backed up through that parent job instead of continuing as separate jobs.">managed by ${escapeHtml(entry.blocked_by_parent === "." ? "scan root job" : entry.blocked_by_parent)}</span>`;
+    return `<span class="badge warn" title="Covered by its parent job.">managed by ${escapeHtml(entry.blocked_by_parent === "." ? "scan root job" : entry.blocked_by_parent)}</span>`;
   }
   if (entry.selected) {
     return '<span class="badge">selected</span>';

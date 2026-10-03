@@ -4,7 +4,6 @@
     <div class="modal-head">
       <div>
         <h2 id="hooks-dialog-title">Custom Scripts</h2>
-        <p class="hint">You may be able to upload .sh and .txt files to be executed. Only the first 3 files in the volume are shown here.</p>
       </div>
       <button type="button" class="secondary" onclick="closeDialog('hooks-dialog')">Close</button>
     </div>
@@ -33,8 +32,8 @@
 
     <div class="hook-section">
       <div class="hook-section-head">
-        <h3>Uploaded Items</h3>
-        <span class="hint">3 files max. Supports .sh scripts and .txt helper files. Directory: <code id="hook-script-dir">loading...</code></span>
+        <h3>Uploaded Items <span class="field-help hover-hint" tabindex="0" aria-label="Upload .sh scripts and .txt helper files that your pre and post commands can use." title="Upload .sh scripts and .txt helper files that your pre and post commands can use.">?</span></h3>
+        <span class="hint">Up to 3 files. Folder: <code id="hook-script-dir">loading...</code></span>
       </div>
       <div class="hook-upload-row">
         <input id="hook_file_input" type="file" accept=".sh,.txt" data-requires="hooks" disabled>

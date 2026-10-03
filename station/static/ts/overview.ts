@@ -280,7 +280,7 @@ async function fetchOverview({
     document.getElementById("meta")!.innerHTML = `
       <div><strong>Scouts</strong> ${renderHelpHint("Unique Scout device IDs that have stored at least one snapshot on this Station.")}<br>${totalScouts}</div>
       <div><strong>Instances</strong> ${renderHelpHint("Each reinstall or unique Scout setup shows as a separate instance under the same Scout ID.")}<br>${totalInstances}</div>
-      <div><strong>Jobs</strong> ${renderHelpHint("Named backup jobs across all instances. Each job backs up one source directory on a Scout device.")}<br>${totalJobs}</div>
+      <div><strong>Jobs</strong> ${renderHelpHint("Backup jobs across all instances.")}<br>${totalJobs}</div>
       <div><strong>Snapshots</strong> ${renderHelpHint("Total backup snapshots stored on Station, across all scouts, instances, and jobs.")}<br>${totalSnapshots}</div>
       <div><strong>Backup Root</strong><br>${escapeHtml(data.backup_dir)}</div>
       <div><strong>Retention</strong><br>keep last ${escapeHtml(String(data.retention_keep_last))} snapshots</div>

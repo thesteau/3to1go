@@ -93,7 +93,7 @@ async function revokeInstanceCredential(
   if (
     !(await confirmApp({
       title: "Revoke Token",
-      message: `Revoke the Scout credential used by "${label}"? Any other instances using the same token will stop authenticating too.`,
+      message: `Revoke the credential used by "${label}"? Other Scouts using it stop working too.`,
       confirmLabel: "Revoke Token",
       danger: true,
     }))
@@ -131,7 +131,7 @@ async function deleteInstance(scoutId: string, scoutInstanceId: string, btn: HTM
   if (
     !(await confirmApp({
       title: "Delete Instance",
-      message: `Delete all snapshots for instance "${label}" under scout "${scoutId}"? This permanently removes all backup files for this instance and cannot be undone.`,
+      message: `Permanently delete all snapshots for "${label}" on Scout "${scoutId}"? This can't be undone.`,
       confirmLabel: "Delete Instance",
       danger: true,
     }))
@@ -149,7 +149,7 @@ async function deleteInstance(scoutId: string, scoutInstanceId: string, btn: HTM
         if (
           !(await confirmApp({
             title: "Remove Stale Instance",
-            message: `Station could not find backup files for instance "${label}". Remove this stale instance entry from the UI?`,
+            message: `No backup files found for "${label}". Remove it from the list?`,
             confirmLabel: "Remove Entry",
             danger: true,
           }))

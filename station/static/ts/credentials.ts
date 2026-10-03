@@ -19,8 +19,7 @@ async function handleCredentialSharedToggle(): Promise<void> {
   }
   const confirmed = await confirmApp({
     title: "Shared Credential",
-    message:
-      "A shared credential can authenticate multiple Scout instances until its limit is reached. Only use this when you intentionally want those instances to share revocation.",
+    message: "Lets several Scouts use one credential. Revoking it stops all of them.",
     confirmLabel: "Use Shared",
     danger: true,
   });

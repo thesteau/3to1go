@@ -37,7 +37,7 @@ Keep the copied key somewhere that survives losing this machine, such as a passw
 
 <Steps>
   <Step title="Pause backup cycles">
-    Wait for any backup or restore to finish. In **Edit Scout Settings**, turn on **Pause uploads (skip backup cycles)** and save. If the save is rejected because a cycle started, wait for it to finish and save again.
+    Wait for any backup or restore to finish. In **Edit Scout Settings**, turn on **Pause backups** and save. If the save is rejected because a cycle started, wait for it to finish and save again.
   </Step>
   <Step title="Download old snapshots you need">
     [Download](/station/snapshots#download-a-snapshot) them from Station's UI while it still accepts the current key.
@@ -52,7 +52,7 @@ Keep the copied key somewhere that survives losing this machine, such as a passw
     Refresh Scout and clear any staged backup again, since **Force Upload** reuses staged archives that may use the old key. Then click **Force Upload** on every job, including unchanged ones, and wait for each to succeed. Force Upload works while cycles are paused.
   </Step>
   <Step title="Resume backup cycles">
-    Turn off **Pause uploads (skip backup cycles)** and save.
+    Turn off **Pause backups** and save.
   </Step>
 </Steps>
 

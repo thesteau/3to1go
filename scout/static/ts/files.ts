@@ -6,8 +6,10 @@ interface FileBrowserRow {
 
 let fileBrowserPath = ".";
 let fileBrowserRequest = 0;
-// Rows of the folder on screen, so an exclusion can update its row in place.
+// Rows on screen, including those of expanded folders, so an exclusion can update its row in place.
 let fileBrowserRows = new Map<string, FileBrowserRow>();
+// Folders currently expanded, so a second click collapses them.
+let fileBrowserExpanded = new Set<string>();
 
 async function cancelOperation(btn: HTMLButtonElement): Promise<void> {
   btn.disabled = true;
@@ -17,7 +19,7 @@ async function cancelOperation(btn: HTMLButtonElement): Promise<void> {
     if (!response.ok) throw new Error(body.detail || "Cancellation failed.");
     setActionStatus(
       body.status === "cancelling"
-        ? "Cancellation requested. Active backup work is stopping; completed staged archives are kept until you clear them."
+        ? "Stopping. Finished archives stay staged until cleared."
         : "No active backup operation to cancel.",
       "info",
     );
@@ -37,13 +39,18 @@ function browseFilesFromEvent(event: Event, path: string): false {
   return false;
 }
 
+async function fetchFolderEntries(path: string): Promise<BrowseEntry[]> {
+  const response = await fetch(`/api/directories/browse?relative_path=${encodeURIComponent(path)}`);
+  const body: BrowseResponse = await response.json();
+  if (!response.ok) throw new Error(body.detail || "Unable to browse this folder.");
+  return body.entries;
+}
+
+// Shows the job's folder. Folders inside it expand in place instead of replacing the list.
 async function browseFiles(path: string): Promise<void> {
   const request = ++fileBrowserRequest;
   fileBrowserPath = path;
   document.getElementById("files-path")!.textContent = path;
-  const up = document.getElementById("files-up") as HTMLButtonElement;
-  up.disabled = path === ".";
-  up.onclick = () => browseFiles(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ".");
   const size = document.getElementById("files-size") as HTMLButtonElement;
   size.disabled = false;
   size.textContent = "Calculate folder size";
@@ -51,56 +58,98 @@ async function browseFiles(path: string): Promise<void> {
   const list = document.getElementById("files-list")!;
   list.replaceChildren();
   fileBrowserRows = new Map();
+  fileBrowserExpanded = new Set();
   setStatus("files-status", "Loading files…", "info");
   try {
-    const response = await fetch(`/api/directories/browse?relative_path=${encodeURIComponent(path)}`);
-    const body: BrowseResponse = await response.json();
+    const entries = await fetchFolderEntries(path);
     if (request !== fileBrowserRequest) return;
-    if (!response.ok) throw new Error(body.detail || "Unable to browse this folder.");
-    for (const entry of body.entries) {
-      const row = document.createElement("tr");
-      const cell = (text = "") => {
-        const element = document.createElement("td");
-        element.textContent = text;
-        row.appendChild(element);
-        return element;
-      };
-      const button = (parent: HTMLElement, label: string, action: (element: HTMLButtonElement) => unknown) => {
-        const element = document.createElement("button");
-        element.type = "button";
-        element.className = "secondary";
-        element.textContent = label;
-        element.onclick = () => action(element);
-        parent.appendChild(element);
-        return element;
-      };
-      const name = cell();
-      if (entry.kind === "directory" && entry.reason !== "Scout runtime data") {
-        button(name, entry.name, () => browseFiles(entry.relative_path));
-      } else {
-        name.textContent = entry.name;
-      }
-      cell(entry.kind);
-      const sizeCell = cell();
-      if (entry.kind === "directory" && entry.reason !== "Scout runtime data") {
-        button(sizeCell, "Calculate size", (btn) => calculateFolderSize(entry.relative_path, btn));
-      } else if (entry.kind === "file") {
-        sizeCell.textContent = formatBytes(entry.size);
-        sizeCell.title = `${entry.size.toLocaleString()} bytes`;
-      } else {
-        sizeCell.textContent = "—";
-      }
-      const reason = cell(entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"));
-      const actions = cell();
-      if (entry.job_path && !entry.excluded && currentUser?.is_admin) {
-        button(actions, "Exclude", (btn) => excludeFilePath(entry.relative_path, btn));
-      }
-      fileBrowserRows.set(entry.relative_path, { row, reason, actions });
-      list.appendChild(row);
-    }
-    setStatus("files-status", body.entries.length ? `${body.entries.length} items` : "This folder is empty.", "info");
+    for (const entry of entries) list.appendChild(fileBrowserRow(entry, 0));
+    setStatus("files-status", entries.length ? `${entries.length} items` : "This folder is empty.", "info");
   } catch (error) {
     if (request === fileBrowserRequest) setStatus("files-status", (error as Error).message, "error");
+  }
+}
+
+function fileBrowserRow(entry: BrowseEntry, depth: number): HTMLTableRowElement {
+  const row = document.createElement("tr");
+  const cell = (text = "") => {
+    const element = document.createElement("td");
+    element.textContent = text;
+    row.appendChild(element);
+    return element;
+  };
+  const button = (parent: HTMLElement, label: string, action: (element: HTMLButtonElement) => unknown) => {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = "secondary";
+    element.textContent = label;
+    element.onclick = () => action(element);
+    parent.appendChild(element);
+    return element;
+  };
+  const expandable = entry.kind === "directory" && entry.reason !== "Scout runtime data";
+  const name = cell();
+  if (depth > 0) name.style.paddingLeft = `${depth * 1.25 + 0.75}rem`;
+  if (expandable) {
+    const toggle = button(name, `▸ ${entry.name}`, () => toggleFolder(entry, depth, row, toggle));
+    toggle.setAttribute("aria-expanded", "false");
+  } else {
+    name.textContent = entry.name;
+  }
+  cell(entry.kind);
+  const sizeCell = cell();
+  if (expandable) {
+    button(sizeCell, "Calculate size", (btn) => calculateFolderSize(entry.relative_path, btn));
+  } else if (entry.kind === "file") {
+    sizeCell.textContent = formatBytes(entry.size);
+    sizeCell.title = `${entry.size.toLocaleString()} bytes`;
+  } else {
+    sizeCell.textContent = "—";
+  }
+  const reason = cell(entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"));
+  const actions = cell();
+  if (entry.job_path && !entry.excluded && currentUser?.is_admin) {
+    button(actions, "Exclude", (btn) => excludeFilePath(entry.relative_path, btn));
+  }
+  fileBrowserRows.set(entry.relative_path, { row, reason, actions });
+  return row;
+}
+
+// Expands a folder's contents as indented rows below it, or collapses them again.
+async function toggleFolder(
+  entry: BrowseEntry,
+  depth: number,
+  row: HTMLTableRowElement,
+  toggle: HTMLButtonElement,
+): Promise<void> {
+  const path = entry.relative_path;
+  if (fileBrowserExpanded.has(path)) {
+    fileBrowserExpanded.delete(path);
+    for (const [rowPath, child] of fileBrowserRows) {
+      if (!rowPath.startsWith(`${path}/`)) continue;
+      child.row.remove();
+      fileBrowserRows.delete(rowPath);
+      fileBrowserExpanded.delete(rowPath);
+    }
+    toggle.textContent = `▸ ${entry.name}`;
+    toggle.setAttribute("aria-expanded", "false");
+    return;
+  }
+  const request = fileBrowserRequest;
+  toggle.disabled = true;
+  try {
+    const entries = await fetchFolderEntries(path);
+    // The dialog moved on to another job, or the row was collapsed with its parent.
+    if (request !== fileBrowserRequest || !fileBrowserRows.has(path)) return;
+    fileBrowserExpanded.add(path);
+    row.after(...entries.map((child) => fileBrowserRow(child, depth + 1)));
+    toggle.textContent = `▾ ${entry.name}`;
+    toggle.setAttribute("aria-expanded", "true");
+    if (!entries.length) setStatus("files-status", `${entry.name} is empty.`, "info");
+  } catch (error) {
+    if (request === fileBrowserRequest) setStatus("files-status", (error as Error).message, "error");
+  } finally {
+    toggle.disabled = false;
   }
 }
 
@@ -170,7 +219,7 @@ async function clearStagedBackup(path: string, btn: HTMLButtonElement): Promise<
   if (
     !(await confirmApp({
       title: "Clear staged backup",
-      message: `Discard the local staged backup for ${path} and reset its retry state? Source files and backups stored in Station are kept. The next backup can build a fresh archive.`,
+      message: `Discard the staged backup for ${path}? Your files and Station's backups are kept.`,
       confirmLabel: "Clear staged backup",
       danger: true,
     }))

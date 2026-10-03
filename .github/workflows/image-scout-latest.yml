@@ -72,11 +72,8 @@ jobs:
           push: true
           build-args: |
             REVISION=${{ github.event.workflow_run.head_sha }}
-          # The -edge name is Scout's name before the rename, kept so existing deployments still update.
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-scout:latest
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-scout:${{ env.SHORT_SHA }}
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-edge:latest
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-edge:${{ env.SHORT_SHA }}
           cache-from: type=gha,scope=scout
           cache-to: type=gha,mode=max,scope=scout

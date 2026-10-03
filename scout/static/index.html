@@ -14,12 +14,9 @@
       <div class="hero-top">
         <div class="hero-text">
           <h1>3to1go Scout</h1>
-          <p class="eyebrow">Filesystem-driven backup selection</p>
+          <p class="eyebrow">Backs up this machine</p>
           <p class="lede">
-            Browse the scan root, inspect current pathing, and create or update
-            <code>.upload_dir</code> markers without touching the terminal. Scout scans
-            from the configured root, aggregates matching job directories, and uploads
-            changed archives to Station.
+            Choose folders to back up. Scout encrypts them and sends changes to Station.
           </p>
         </div>
         <img src="/static/img/3to1go.png" alt="Go gophers racing" class="hero-gopher" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded')">
@@ -41,7 +38,7 @@
     <section class="panel workspace-panel">
       <div class="section-head">
         <h2>Selected Jobs <span id="selected-jobs-count" class="dir-count">-</span></h2>
-        <p class="hint">Existing <code>.upload_dir</code> markers already appear here automatically. Use Edit to review or change upload settings for a folder. If you need to stop backing up that folder, do it from inside the job editor.</p>
+        <p class="hint">Folders with an <code>.upload_dir</code> file. Click Edit to change or stop a job.</p>
       </div>
       <div id="selected-jobs" class="job-list"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
 
@@ -61,7 +58,7 @@
             <span class="toggle-label">Show hidden</span>
           </button>
         </div>
-        <p class="hint">Click Edit on an available directory to create or update its <code>.upload_dir</code> settings. Nested folders under an already-selected parent are covered by that parent job and do not open their own job editor here.</p>
+        <p class="hint">Click Edit on a folder to back it up. Folders inside a job are covered by it.</p>
       </div>
       <div id="directory-tree" class="directory-tree"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
     </section>

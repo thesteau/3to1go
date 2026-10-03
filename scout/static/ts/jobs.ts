@@ -39,7 +39,7 @@ async function deleteByPath(relativePath: string): Promise<void> {
   if (
     !(await confirmApp({
       title: "Stop Backing Up Folder",
-      message: `Stop backing up ${relativePath}? This only removes the .upload_dir settings file for this folder. It does not delete the folder itself or remove backups already stored in Station.`,
+      message: `Stop backing up ${relativePath}? This removes its .upload_dir file. The folder and its backups on Station are kept.`,
       confirmLabel: "Stop Backup",
       danger: true,
     }))
@@ -79,7 +79,7 @@ async function forceUpload(relativePath: string, jobName: string, btn: HTMLButto
   if (
     !(await confirmApp({
       title: "Force Upload",
-      message: `Force an upload for ${label}? This bypasses the unchanged check. Station may still reject it as a duplicate if that snapshot already exists.`,
+      message: `Upload ${label} even if unchanged? Station skips it if it's a duplicate.`,
       confirmLabel: "Force Upload",
     }))
   ) {

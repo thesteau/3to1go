@@ -12,11 +12,7 @@ function startScoutApp(): void {
   }
   _appStarted = true;
   if (window.location.protocol === "http:") {
-    showToast(
-      "Scout is running over plain HTTP. Credentials sent to Station are not encrypted in transit. Consider setting up HTTPS.",
-      "warning",
-      { duration: 12000 },
-    );
+    showToast("Scout is on plain HTTP, so credentials aren't encrypted in transit.", "warning", { duration: 12000 });
   }
   resetForm();
   initializeFieldHelp(SCOUT_SETTINGS_HELP);

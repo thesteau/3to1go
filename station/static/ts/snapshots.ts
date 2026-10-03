@@ -79,7 +79,7 @@ async function downloadSnapshot(
       const expectedFingerprint = getExpectedKeyFingerprint(scoutId, scoutInstanceId);
       setActionStatus(
         expectedFingerprint
-          ? "Decryption failed after fingerprint verification. The archive may be corrupted, or the Scout key changed after this snapshot was uploaded."
+          ? "Decryption failed. The archive may be damaged, or the key changed after this upload."
           : "Decryption failed - wrong key or corrupted archive.",
         "error",
       );

@@ -40,12 +40,12 @@ function describeUploadCircuit(uploadCircuit: UploadCircuit | null | undefined):
   if (uploadCircuit?.state === "open") {
     return {
       label: `Paused after upload failures (${cooldown}s left)`,
-      help: "Scout temporarily pauses uploads after repeated failures, then retries automatically after the cooldown.",
+      help: "Uploads pause after repeated failures, then retry.",
     };
   }
   return {
     label: failures > 0 ? `Healthy, with ${failures} recent failure${failures === 1 ? "" : "s"}` : "Healthy",
-    help: "Uploads are allowed. Scout only pauses this circuit after repeated failures talking to Station.",
+    help: "Uploads are running normally.",
   };
 }
 
@@ -103,10 +103,7 @@ function fillMetaFromDir(data: ScoutData): void {
   set("meta-val-upload-circuit", escapeHtml(uploadCircuitDetails.label));
   set("meta-val-scout-credential", escapeHtml(settingsStatus.scout_credential_configured ? "configured" : "missing"));
   if (data.encryption_key_fingerprint) {
-    set(
-      "meta-val-enc-fingerprint",
-      `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}. Station uses this to confirm you pasted the right key for this Scout before decrypting.`,
-    );
+    set("meta-val-enc-fingerprint", `Fingerprint ${escapeHtml(shortFingerprint(data.encryption_key_fingerprint))}.`);
   }
 }
 
@@ -119,8 +116,7 @@ function fillMetaEncKey(key: string, fingerprint: string): void {
   }
   if (fingerprint) {
     const fpEl = document.getElementById("meta-val-enc-fingerprint");
-    if (fpEl)
-      fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}. Station uses this to confirm you pasted the right key for this Scout before decrypting.`;
+    if (fpEl) fpEl.textContent = `Fingerprint ${shortFingerprint(fingerprint)}.`;
   }
 }
 
@@ -152,8 +148,7 @@ async function rotateEncKey(): Promise<void> {
   if (!requirePanelReady("encryption-key")) return;
   const confirmed = await confirmApp({
     title: "Rotate Encryption Key",
-    message:
-      "This generates a new key for future backups. Existing snapshots on Station remain encrypted with the old key — you will need the old key to decrypt them.\n\nAre you sure?",
+    message: "Future backups use a new key. Keep the old key: older snapshots still need it.\n\nRotate the key?",
     confirmLabel: "Rotate Key",
     danger: true,
   });
@@ -169,10 +164,7 @@ async function rotateEncKey(): Promise<void> {
       return;
     }
     fillMetaEncKey(body.key_base64 || "", body.new_fingerprint || "");
-    setActionStatus(
-      "Encryption key rotated. Copy the new key and update Station before downloading future snapshots.",
-      "success",
-    );
+    setActionStatus("Key rotated. Copy and save the new key.", "success");
   } catch {
     setActionStatus("Key rotation failed.", "error");
   } finally {

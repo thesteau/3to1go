@@ -909,7 +909,7 @@ func TestSessionLock_ReturnsMutex(t *testing.T) {
 	}
 }
 
-// --- SourceAddress edge cases ---
+// --- SourceAddress corner cases ---
 
 func TestSourceAddress_EmptyRemoteAddr(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)

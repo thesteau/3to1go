@@ -205,8 +205,8 @@ async function resolveEncKey(scoutId: string, scoutInstanceId: string | null | u
   const expectedFingerprint = getExpectedKeyFingerprint(scoutId, scoutInstanceId);
   const instanceLabel = scoutInstanceId || "legacy";
   const promptMessage = expectedFingerprint
-    ? `Snapshot is encrypted. Enter the encryption key for scout "${scoutId}" instance "${instanceLabel}". Expected fingerprint: ${shortFingerprint(expectedFingerprint)}.`
-    : `Snapshot is encrypted. Enter the encryption key for scout "${scoutId}" instance "${instanceLabel}".`;
+    ? `Enter the encryption key for Scout "${scoutId}" (${instanceLabel}). Expected fingerprint: ${shortFingerprint(expectedFingerprint)}.`
+    : `Enter the encryption key for Scout "${scoutId}" (${instanceLabel}).`;
   const prompted = await appDialog({
     title: "Encryption Key Required",
     message: promptMessage,

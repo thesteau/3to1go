@@ -67,11 +67,8 @@ jobs:
           push: true
           build-args: |
             REVISION=${{ github.event.workflow_run.head_sha }}
-          # The -central name is Station's name before the rename, kept so existing deployments still update.
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-station:latest
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-station:${{ env.SHORT_SHA }}
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-central:latest
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-central:${{ env.SHORT_SHA }}
           cache-from: type=gha,scope=station
           cache-to: type=gha,mode=max,scope=station
