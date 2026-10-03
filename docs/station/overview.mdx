@@ -8,7 +8,7 @@ Station **receives and keeps** backups. Run it on one always-on host, such as a 
 ## What Station does
 
 - **Receives uploads** from Scouts in chunks, and verifies each one before storing it.
-- **Stores snapshots** as encrypted archive files under `edge_id/edge_instance_id/job_name` in its backup folder.
+- **Stores snapshots** as encrypted archive files under `scout_id/scout_instance_id/job_name` in its backup folder.
 - **Applies retention**, keeping the most recent snapshots per job and instance.
 - **Mints and revokes Scout credentials**, so only Scouts you've authorized can upload.
 - **Checks integrity** on a schedule, if enabled.
@@ -21,7 +21,7 @@ Station never sees your plaintext files, only archives Scout has already encrypt
 
 | Component | Purpose |
 |---|---|
-| `ghcr.io/thesteau/3to1go-central` | The Station app and web UI, on port `6555` |
+| `ghcr.io/thesteau/3to1go-station` | The Station app and web UI, on port `6555` |
 | `postgres:17-alpine` | Stores snapshot metadata, users, settings, Scout registrations, and credential records |
 
 The example Compose file runs both. See [Install Station](/station/install).

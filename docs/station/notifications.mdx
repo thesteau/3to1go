@@ -32,7 +32,7 @@ Leave these empty to be notified about every upload. Fill any of them to only no
 
 | Field | Matches |
 |---|---|
-| Match Scout ID | The sending Scout's `EDGE_ID` |
+| Match Scout ID | The sending Scout's `SCOUT_ID` |
 | Match Instance ID | The sending Scout's instance ID |
 | Match Source Address | The IP address the upload came from |
 
@@ -41,15 +41,15 @@ Leave these empty to be notified about every upload. Fill any of them to only no
 The default message is:
 
 ```text
-Central received {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} from {{ advertised_url }} as {{ stored_as }}.
+Station received {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} from {{ advertised_url }} as {{ stored_as }}.
 ```
 
 Write your own in **Message Template** using these placeholders. **Defaults** restores the default.
 
 | Placeholder | Value |
 |---|---|
-| `{{ edge_id }}` | Name of the Scout that sent the upload |
-| `{{ edge_instance_id }}` | Instance ID of the sending Scout |
+| `{{ scout_id }}` | Name of the Scout that sent the upload |
+| `{{ scout_instance_id }}` | Instance ID of the sending Scout |
 | `{{ job_name }}` | Name of the backup job |
 | `{{ advertised_url }}` | URL the Scout advertises to Station, if set |
 | `{{ source_address }}` | IP address of the sending Scout |

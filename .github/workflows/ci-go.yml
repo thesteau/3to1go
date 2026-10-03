@@ -24,10 +24,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - app: central
-            title: Central
-          - app: edge
-            title: Edge
+          - app: station
+            title: Station
+          - app: scout
+            title: Scout
 
     defaults:
       run:

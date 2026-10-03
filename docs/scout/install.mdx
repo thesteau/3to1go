@@ -3,7 +3,7 @@ title: "Install Scout"
 description: "Run Scout with Docker Compose on a machine you want to back up."
 ---
 
-Scout ships as a Docker image, `ghcr.io/thesteau/3to1go-edge`. You need a running [Station](/station/install) and a [credential](/station/scout-credentials) minted from it.
+Scout ships as a Docker image, `ghcr.io/thesteau/3to1go-scout`. You need a running [Station](/station/install) and a [credential](/station/scout-credentials) minted from it.
 
 The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including Raspberry Pi.
 
@@ -12,26 +12,26 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
 <Steps>
   <Step title="Get the example files">
     ```sh
-    mkdir 3to1go-edge && cd 3to1go-edge
-    curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
-    curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+    mkdir 3to1go-scout && cd 3to1go-scout
+    curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/docker-compose.yml
+    curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/.env.example -o .env
     ```
 
-    Or copy [`deploy-example/edge/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/edge) from GitHub.
+    Or copy [`deploy-example/scout/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/scout) from GitHub.
   </Step>
   <Step title="Edit .env">
     ```sh .env
-    # Unique per Edge installation.
-    EDGE_ID=laptop-alice
-    # Must be reachable from inside the Edge container.
-    CENTRAL_URL=http://central.example.lan:6555
-    # Only used when Edge creates the first admin user.
+    # Unique per Scout installation.
+    SCOUT_ID=laptop-alice
+    # Must be reachable from inside the Scout container.
+    STATION_URL=http://station.example.lan:6555
+    # Only used when Scout creates the first admin user.
     INITIAL_ADMIN_PASSWORD=admin
-    # The folder on this machine that Edge sees at /scan.
+    # The folder on this machine that Scout sees at /scan.
     SCAN_DIR=/home/alice
     ```
 
-    If Station runs on the same Docker Desktop host, use `CENTRAL_URL=http://host.docker.internal:6555`.
+    If Station runs on the same Docker Desktop host, use `STATION_URL=http://host.docker.internal:6555`.
 
     To back up more than one folder or drive, see [Multiple folders and drives](/scout/multiple-folders).
   </Step>
@@ -41,7 +41,7 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
     ```
   </Step>
   <Step title="Sign in and add the credential">
-    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Edge Settings**, paste the credential from Station into **Edge Credential**, and save.
+    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Scout Settings**, paste the credential from Station into **Scout Credential**, and save.
   </Step>
   <Step title="Save your encryption key">
     Copy the **Encryption Key** from Scout's UI and store it somewhere safe, such as a password manager. See [Encryption key](/scout/encryption-key).
@@ -58,7 +58,7 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
 ## What gets created
 
 ```text
-3to1go-edge/
+3to1go-scout/
 ├── docker-compose.yml
 ├── .env
 ├── config/          # settings database, encryption.key, installation.id, trusted-certs/
@@ -78,4 +78,4 @@ docker compose up -d
 
 ## Build from source
 
-To build the image yourself, use the Compose file in [`edge/`](https://github.com/thesteau/3to1go/tree/main/edge) instead. It builds from the repository root so the shared code is included.
+To build the image yourself, use the Compose file in [`scout/`](https://github.com/thesteau/3to1go/tree/main/scout) instead. It builds from the repository root so the shared code is included.

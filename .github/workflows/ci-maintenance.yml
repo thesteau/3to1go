@@ -47,8 +47,8 @@ jobs:
           go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: |
-            central/go.sum
-            edge/go.sum
+            station/go.sum
+            scout/go.sum
             shared/go/go.sum
       - uses: actions/setup-node@v7
         with:
@@ -60,7 +60,7 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
       - name: Scan all workspace modules
         run: |
-          for module in shared/go central edge; do
+          for module in shared/go station scout; do
             (cd "$module" && govulncheck ./...)
           done
 

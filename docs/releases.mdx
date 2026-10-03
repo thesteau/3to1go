@@ -36,13 +36,13 @@ Because PRs into `main` are squash-merged, **the PR title becomes the commit mes
 <type>[(scope)][!]: <summary>
 ```
 
-Use a lowercase type and an optional scope such as `edge`, `central`, or `docs`.
+Use a lowercase type and an optional scope such as `scout`, `station`, or `docs`.
 
 | Title | Example | Release effect |
 |---|---|---|
-| `feat:` | `feat(edge): add restore preview` | Minor: `1.2.3` → `1.3.0` |
-| `fix:`, `perf:`, `revert:` | `fix(central): keep retention count after restart` | Patch: `1.2.3` → `1.2.4` |
-| Any type with `!` | `feat(central)!: remove legacy upload API` | Major: `1.2.3` → `2.0.0` |
+| `feat:` | `feat(scout): add restore preview` | Minor: `1.2.3` → `1.3.0` |
+| `fix:`, `perf:`, `revert:` | `fix(station): keep retention count after restart` | Patch: `1.2.3` → `1.2.4` |
+| Any type with `!` | `feat(station)!: remove legacy upload API` | Major: `1.2.3` → `2.0.0` |
 | `docs:`, `chore:`, `refactor:`, `test:`, `build:`, `ci:`, `style:`, `deps:` | `docs: explain Kubernetes paths` | None on its own. Ships with the next release |
 
 A release takes the largest bump among the commits since the previous release. Use `!` for changes that need action on upgrade, such as removed configuration, an incompatible Scout ↔ Station protocol change, or a migration that cannot be rolled back.

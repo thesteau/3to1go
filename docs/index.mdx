@@ -31,7 +31,7 @@ Your original files and Station's snapshots are two copies. For a third, sync St
     A home server, NAS, or VPS.
   </Step>
   <Step title="Run Scout on each machine you want to back up">
-    Give each a unique `EDGE_ID` and a credential minted by Station.
+    Give each a unique `SCOUT_ID` and a credential minted by Station.
   </Step>
   <Step title="Choose folders in Scout">
     Each folder you save in Scout's Job Editor becomes a backup job. The editor stores it as a `.upload_dir` file in the folder, which you can also write yourself.
@@ -48,9 +48,9 @@ It references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Stora
 ## Why use 3to1go
 
 - **Encrypted before upload.** Station never sees your plaintext files.
-- **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `EDGE_ID`.
+- **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `SCOUT_ID`.
 - **Revocable credentials.** Mint and revoke Scout credentials from Station's UI without deleting snapshots.
-- **No central manifest.** Mark folders with a small file instead of maintaining a backup config.
+- **No station manifest.** Mark folders with a small file instead of maintaining a backup config.
 
 ## Next steps
 

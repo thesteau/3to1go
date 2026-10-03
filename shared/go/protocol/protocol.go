@@ -1,6 +1,6 @@
 package protocol
 
-// Shared values used by the Edge↔Central HTTP protocol.
+// Shared values used by the Scout↔Station HTTP protocol.
 const (
 	ArchiveFormatTarZst = "tar.zst"
 
@@ -10,11 +10,11 @@ const (
 	StatusChecksumMismatch = "checksum_mismatch"
 )
 
-// UploadInitRequest is the metadata exchanged when Edge creates or resumes an
-// upload session at Central.
+// UploadInitRequest is the metadata exchanged when Scout creates or resumes an
+// upload session at Station.
 type UploadInitRequest struct {
-	EdgeID                   string  `json:"edge_id"`
-	EdgeInstanceID           string  `json:"edge_instance_id,omitempty"`
+	ScoutID                  string  `json:"scout_id"`
+	ScoutInstanceID          string  `json:"scout_instance_id,omitempty"`
 	JobName                  string  `json:"job_name"`
 	Fingerprint              string  `json:"fingerprint"`
 	Timestamp                string  `json:"timestamp"`

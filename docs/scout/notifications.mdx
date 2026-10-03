@@ -31,15 +31,15 @@ If your ntfy server uses a private CA, add it under [Trusted certificates](/shar
 The default message is:
 
 ```text
-Edge uploaded {{ edge_id }}/{{ edge_instance_id }} job {{ job_name }} to Central as {{ stored_as }}.
+Scout uploaded {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} to Station as {{ stored_as }}.
 ```
 
 Write your own in **Message Template**. **Defaults** restores the default.
 
 | Placeholder | Value |
 |---|---|
-| `{{ edge_id }}` | This Scout's ID |
-| `{{ edge_instance_id }}` | This Scout installation's instance ID |
+| `{{ scout_id }}` | This Scout's ID |
+| `{{ scout_instance_id }}` | This Scout installation's instance ID |
 | `{{ job_name }}` | Name of the backup job |
 | `{{ stored_as }}` | Filename as stored on Station |
 

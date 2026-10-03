@@ -16,9 +16,9 @@ The examples use the `latest` images. For production, pin a stable version. See 
 On the machine that will store backups:
 
 ```sh
-mkdir 3to1go-central && cd 3to1go-central
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+mkdir 3to1go-station && cd 3to1go-station
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/.env.example -o .env
 ```
 
 Edit `.env` and set a real `POSTGRES_PASSWORD` (and optionally `INITIAL_ADMIN_PASSWORD`), then start it:
@@ -38,20 +38,20 @@ In Station's UI, mint a new Scout credential and copy it. You'll paste it into S
 On the machine that has the files:
 
 ```sh
-mkdir 3to1go-edge && cd 3to1go-edge
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+mkdir 3to1go-scout && cd 3to1go-scout
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/.env.example -o .env
 ```
 
 Edit `.env`:
 
 ```sh .env
-EDGE_ID=laptop-alice                          # unique per Edge installation
-CENTRAL_URL=http://central.example.lan:6555   # must be reachable from the Edge container
-SCAN_DIR=/home/alice                          # folder on this machine that Edge can see
+SCOUT_ID=laptop-alice                          # unique per Scout installation
+STATION_URL=http://station.example.lan:6555   # must be reachable from the Scout container
+SCAN_DIR=/home/alice                          # folder on this machine that Scout can see
 ```
 
-If Station runs on the same Docker Desktop host, `CENTRAL_URL` is usually `http://host.docker.internal:6555`.
+If Station runs on the same Docker Desktop host, `STATION_URL` is usually `http://host.docker.internal:6555`.
 
 ```sh
 docker compose up -d
@@ -89,26 +89,26 @@ Scout backs up on its schedule (weekly by default). To back up now, click **Run 
 
 Find versions on the [releases page](https://github.com/thesteau/3to1go/releases). Run the same version of Station and Scout. In steps 1 and 3, download the files from that release's tag instead of `main`, so the configuration matches the image:
 
-```sh Central
+```sh Station
 VERSION=v1.0.0
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/central/.env.example -o .env
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/station/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/station/.env.example -o .env
 ```
 
-```sh Edge
+```sh Scout
 VERSION=v1.0.0
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/edge/.env.example -o .env
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/scout/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/$VERSION/deploy-example/scout/.env.example -o .env
 ```
 
 Then set the same tag as the image in each `docker-compose.yml`:
 
 ```yaml
-image: ghcr.io/thesteau/3to1go-central:v1.0.0
+image: ghcr.io/thesteau/3to1go-station:v1.0.0
 ```
 
 ```yaml
-image: ghcr.io/thesteau/3to1go-edge:v1.0.0
+image: ghcr.io/thesteau/3to1go-scout:v1.0.0
 ```
 
 For the [Kubernetes example](/scout/kubernetes), set the Scout image the same way. To upgrade, read the release notes, change the tag to the newer release, and run `docker compose up -d`. If the notes mention configuration changes, compare your `.env` with that release's `.env.example`.

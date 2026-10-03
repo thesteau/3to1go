@@ -1,6 +1,6 @@
 # Shared browser scripts
 
-These classic TypeScript scripts are compiled separately into Central and Edge.
+These classic TypeScript scripts are compiled separately into Station and Scout.
 They share each application's global scope, so do not add `import` or `export`.
 Each application's compiler checks them against that application's remaining
 types and functions.
@@ -18,8 +18,8 @@ The compiler uses the repository as its source root and preserves source paths
 under each application's generated `static/js` directory:
 
 - `shared/ts/users.ts` becomes `static/js/shared/ts/users.js`.
-- `central/static/ts/app.ts` becomes `central/static/js/central/static/ts/app.js`.
-- Edge follows the same layout under `edge/static/js`.
+- `station/static/ts/app.ts` becomes `station/static/js/station/static/ts/app.js`.
+- Scout follows the same layout under `scout/static/js`.
 
 Each `index.html` lists shared scripts before its local scripts for that feature,
 with application startup last. All scripts are deferred. Generated JavaScript

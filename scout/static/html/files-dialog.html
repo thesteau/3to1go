@@ -1,0 +1,24 @@
+<dialog id="files-dialog" class="modal" aria-labelledby="files-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="files-dialog-title">Files and exclusions</h2>
+        <p class="hint">Exclusions are saved immediately to the parent backup job. They apply to the next archive; clear an existing staged backup to rebuild it with the new exclusions.</p>
+      </div>
+      <button type="button" class="secondary" onclick="closeDialog('files-dialog')">Close</button>
+    </div>
+    <div class="toolbar">
+      <button id="files-up" type="button" class="secondary">Up</button>
+      <code id="files-path"></code>
+      <button id="files-size" type="button" class="secondary">Calculate folder size</button>
+    </div>
+    <p class="hint">Sizes are source sizes before compression. Folder totals include excluded files, but skip symlinks and Scout runtime data.</p>
+    <p id="files-status" role="status"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Backup</th><th>Action</th></tr></thead>
+        <tbody id="files-list"></tbody>
+      </table>
+    </div>
+  </div>
+</dialog>

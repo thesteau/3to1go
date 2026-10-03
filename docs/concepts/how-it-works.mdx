@@ -9,7 +9,7 @@ Scout does all the work that needs your plaintext files. Station only receives e
   <img src="/images/backup-layout.svg" alt="Scout 1 at 192.168.1.21:6556, Scout 2 at 192.168.1.22:6556, and Scout 3 at 192.168.1.23:6556 send backups to Station at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
 </Frame>
 
-The addresses are examples. Each Scout sets its **Central URL** to the same Station, here `http://192.168.1.10:6555`. The numbers count copies of each machine's data. Station doesn't make the third copy itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
+The addresses are examples. Each Scout sets its **Station URL** to the same Station, here `http://192.168.1.10:6555`. The numbers count copies of each machine's data. Station doesn't make the third copy itself. See [Storage and the 3-2-1 rule](/concepts/storage-and-3-2-1).
 
 | | Scout | Station |
 |---|---|---|
@@ -38,7 +38,7 @@ The addresses are examples. Each Scout sets its **Central URL** to the same Stat
     The encrypted archive is uploaded in chunks, with retries and a circuit breaker if Station is unreachable.
   </Step>
   <Step title="Station verifies and stores it">
-    Station checks the upload, stores it under `edge_id/edge_instance_id/job_name`, and prunes older snapshots for that instance.
+    Station checks the upload, stores it under `scout_id/scout_instance_id/job_name`, and prunes older snapshots for that instance.
   </Step>
   <Step title="You browse, download, or restore">
     Download snapshots from Station's UI (decrypted in your browser) or restore them from Scout.
@@ -58,7 +58,7 @@ sequenceDiagram
             Scout->>Scout: Encrypt archive
             Scout->>Station: Upload encrypted archive
             Station-->>Scout: OK
-            Station->>Station: Store by edge_id / instance_id / job
+            Station->>Station: Store by scout_id / instance_id / job
             Station->>Station: Prune old snapshots
         end
     end
@@ -66,8 +66,8 @@ sequenceDiagram
 
 ## Scout ID and instance ID
 
-- **`EDGE_ID`** is a name you choose, such as `laptop-alice`. Station's UI groups snapshots by it, so give each Scout its own.
-- **Instance ID** is generated on first run and saved in Scout's config folder. It keeps installations separate even if two share an `EDGE_ID`, so they never overwrite or prune each other's snapshots.
+- **`SCOUT_ID`** is a name you choose, such as `laptop-alice`. Station's UI groups snapshots by it, so give each Scout its own.
+- **Instance ID** is generated on first run and saved in Scout's config folder. It keeps installations separate even if two share a `SCOUT_ID`, so they never overwrite or prune each other's snapshots.
 
 ## Where encryption happens
 

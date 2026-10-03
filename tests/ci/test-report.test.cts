@@ -70,7 +70,7 @@ test("Go packages that fail without a failing test are reported with their build
 
 test("the HTML report escapes names and output and lists failing suites first, opened", () => {
   const html = renderHtml({
-    title: "Edge <tests>",
+    title: "Scout <tests>",
     durationMs: 1500,
     cases: [
       { suite: "a/passing", name: "works", status: "pass", durationMs: 3, output: "" },
@@ -86,7 +86,7 @@ test("the HTML report escapes names and output and lists failing suites first, o
   assert.doesNotMatch(html, /<script>alert/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(html, /expected &quot;a&quot; &amp; got &lt;b&gt;/);
-  assert.match(html, /<title>Edge &lt;tests&gt;<\/title>/);
+  assert.match(html, /<title>Scout &lt;tests&gt;<\/title>/);
   assert.ok(html.indexOf("z/failing") < html.indexOf("a/passing"), "failing suites come first");
   assert.match(html, /<details class="suite has-failures" open>/);
   assert.match(html, /<body class="failures-only">/);
@@ -101,11 +101,11 @@ test("the job summary lists failures and caps a long list", () => {
     output: "",
   }));
   const summary = renderSummary({
-    title: "Central Go tests",
+    title: "Station Go tests",
     durationMs: 2000,
     cases: [{ suite: "pkg", name: "TestOK", status: "pass", durationMs: 0, output: "" }, ...failures],
   });
-  assert.match(summary, /^### ❌ Central Go tests/);
+  assert.match(summary, /^### ❌ Station Go tests/);
   assert.match(summary, /1 passed, 55 failed, 0 skipped in 2\.0s/);
   assert.match(summary, /\| pkg&#124;one \| Test0 \|/, "pipes cannot break the table");
   assert.doesNotMatch(summary, /Test50/);

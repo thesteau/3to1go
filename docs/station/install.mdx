@@ -3,7 +3,7 @@ title: "Install Station"
 description: "Run Station and its PostgreSQL database with Docker Compose."
 ---
 
-Station ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs PostgreSQL. The example deployment in the repository runs both.
+Station ships as a Docker image, `ghcr.io/thesteau/3to1go-station`, and needs PostgreSQL. The example deployment in the repository runs both.
 
 ## Requirements
 
@@ -17,21 +17,21 @@ Station ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
 <Steps>
   <Step title="Get the example files">
     ```sh
-    mkdir 3to1go-central && cd 3to1go-central
-    curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-    curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+    mkdir 3to1go-station && cd 3to1go-station
+    curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/docker-compose.yml
+    curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/.env.example -o .env
     ```
 
-    Or copy [`deploy-example/central/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/central) from GitHub.
+    Or copy [`deploy-example/station/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/station) from GitHub.
   </Step>
   <Step title="Edit .env">
     ```sh .env
-    # Host folder mounted into Central at /backups.
+    # Host folder mounted into Station at /backups.
     BACKUP_DIR=./data/backups
     POSTGRES_DB=three_to_one_go
     POSTGRES_USER=three_to_one_go
     POSTGRES_PASSWORD=change-this-password
-    # Only used when Central creates the first admin user.
+    # Only used when Station creates the first admin user.
     INITIAL_ADMIN_PASSWORD=admin
     ```
 
@@ -45,10 +45,10 @@ Station ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
     Station waits for PostgreSQL to be healthy before starting.
   </Step>
   <Step title="Sign in">
-    Open `http://<central-host>:6555/` and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
+    Open `http://<station-host>:6555/` and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
   </Step>
   <Step title="Connect your first Scout">
-    Click **Mint Edge Credential** and paste the result into Scout. See [Scout credentials](/station/scout-credentials).
+    Click **Mint Scout Credential** and paste the result into Scout. See [Scout credentials](/station/scout-credentials).
   </Step>
 </Steps>
 
@@ -57,7 +57,7 @@ Station ships as a Docker image, `ghcr.io/thesteau/3to1go-central`, and needs Po
 The example Compose file keeps everything next to it:
 
 ```text
-3to1go-central/
+3to1go-station/
 ├── docker-compose.yml
 ├── .env
 ├── config/          # issuer.key, trusted-certs/
@@ -86,4 +86,4 @@ docker compose up -d
 
 ## Build from source
 
-To build the image yourself, use the Compose file in [`central/`](https://github.com/thesteau/3to1go/tree/main/central) instead. It builds from the repository root so the shared code is included.
+To build the image yourself, use the Compose file in [`station/`](https://github.com/thesteau/3to1go/tree/main/station) instead. It builds from the repository root so the shared code is included.

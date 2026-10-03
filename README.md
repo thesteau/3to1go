@@ -45,9 +45,9 @@ You need Docker with Compose on the machines running Station and Scout.
 On the machine that will store backups, download the published-image Compose setup:
 
 ```sh
-mkdir 3to1go-central && cd 3to1go-central
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/central/.env.example -o .env
+mkdir 3to1go-station && cd 3to1go-station
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/station/.env.example -o .env
 ```
 
 Edit `.env`: set a real `POSTGRES_PASSWORD`, choose `BACKUP_DIR` for snapshot storage, and optionally set `INITIAL_ADMIN_PASSWORD`. Then start Station and its database:
@@ -56,33 +56,33 @@ Edit `.env`: set a real `POSTGRES_PASSWORD`, choose `BACKUP_DIR` for snapshot st
 docker compose up -d
 ```
 
-Open `http://<central-host>:6555/`. Sign in as `admin` with your initial password (default `admin`) and choose a new password when prompted. Click **Mint Edge Credential** and copy the token for Scout.
+Open `http://<station-host>:6555/`. Sign in as `admin` with your initial password (default `admin`) and choose a new password when prompted. Click **Mint Scout Credential** and copy the token for Scout.
 
 ### 2. Deploy Scout
 
 On each machine with files to back up:
 
 ```sh
-mkdir 3to1go-edge && cd 3to1go-edge
-curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/edge/.env.example -o .env
+mkdir 3to1go-scout && cd 3to1go-scout
+curl -fsSLO https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thesteau/3to1go/main/deploy-example/scout/.env.example -o .env
 ```
 
 Edit `.env` with your own values:
 
 ```dotenv
-EDGE_ID=laptop-alice
-CENTRAL_URL=http://192.168.1.10:6555
+SCOUT_ID=laptop-alice
+STATION_URL=http://192.168.1.10:6555
 SCAN_DIR=/home/alice
 ```
 
-`SCAN_DIR` is the host folder mounted at `/scan` inside Scout. Use a distinct `EDGE_ID` for each machine. `CENTRAL_URL` must be reachable from inside Scout's container. On the same Docker Desktop host, it's usually `http://host.docker.internal:6555`. Use HTTPS for both web UIs and Station's URL when the network is untrusted.
+`SCAN_DIR` is the host folder mounted at `/scan` inside Scout. Use a distinct `SCOUT_ID` for each machine. `STATION_URL` must be reachable from inside Scout's container. On the same Docker Desktop host, it's usually `http://host.docker.internal:6555`. Use HTTPS for both web UIs and Station's URL when the network is untrusted.
 
 ```sh
 docker compose up -d
 ```
 
-Open `http://<edge-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Edge Settings**, paste the token into **Edge Credential** and save. Save a copy of the **Encryption Key** somewhere off this machine.
+Open `http://<scout-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Scout Settings**, paste the token into **Scout Credential** and save. Save a copy of the **Encryption Key** somewhere off this machine.
 
 ### 3. Choose a folder and back it up
 

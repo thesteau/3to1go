@@ -1,0 +1,114 @@
+# Edit first: SCOUT_ID, STATION_URL, the node hostname, and the folder paths.
+# Scout reads folders straight from the node, so it runs on one chosen node and
+# keeps its data in host folders. For another machine, copy this file and
+# change the name, SCOUT_ID, node and paths.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: backup-scout
+  labels:
+    app.kubernetes.io/name: backup-scout
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backup-scout
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backup-scout
+    spec:
+      automountServiceAccountToken: false
+      # The node that holds the folders to back up (kubectl get nodes).
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/hostname: my-node
+
+      containers:
+        - name: backup-scout
+          image: ghcr.io/thesteau/3to1go-scout:latest
+          imagePullPolicy: IfNotPresent
+
+          env:
+            # Station tracks backups by SCOUT_ID; keep it unique and unchanged.
+            - name: SCOUT_ID
+              value: scout-01
+            # Must be reachable from the pod.
+            - name: STATION_URL
+              value: http://station.example.lan:6555
+            # Host folder mounted at /scan; Scout shows it in its UI.
+            - name: SCAN_DIR
+              value: /srv/data
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backup-scout
+                  key: INITIAL_ADMIN_PASSWORD
+
+          # Scout's UI is served at http://<node-ip>:6556.
+          ports:
+            - name: web
+              containerPort: 6556
+              hostPort: 6556
+              protocol: TCP
+
+          startupProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: web
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: hook-scripts
+              mountPath: /hook-scripts
+            - name: scan
+              mountPath: /scan
+            - name: state
+              mountPath: /data/state
+            - name: spool
+              mountPath: /data/spool
+
+      # Folders on the node; missing ones are created empty.
+      volumes:
+        - name: config
+          hostPath:
+            path: /opt/backup-scout/config
+            type: DirectoryOrCreate
+        - name: hook-scripts
+          hostPath:
+            path: /opt/backup-scout/hook-scripts
+            type: DirectoryOrCreate
+        # ONE FOLDER: same path as SCAN_DIR above.
+        # MULTIPLE FOLDERS: add one hostPath volume per folder, mount each at
+        # its own /scan/<name>, then select them in Scout's UI.
+        # See https://3to1go.docs.thesteau.com/scout/multiple-folders
+        - name: scan
+          hostPath:
+            path: /srv/data
+            type: DirectoryOrCreate
+        - name: state
+          hostPath:
+            path: /opt/backup-scout/state
+            type: DirectoryOrCreate
+        - name: spool
+          hostPath:
+            path: /opt/backup-scout/spool
+            type: DirectoryOrCreate

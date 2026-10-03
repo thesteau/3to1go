@@ -6,7 +6,7 @@ description: "Environment variables for deployment, and settings you change from
 Station is configured in two places:
 
 - **Environment variables** in `.env` for deployment details: database, ports, and folders. Apply changes with `docker compose up -d` to recreate the affected containers. `docker compose restart` alone does not reload `.env`.
-- **Edit Central Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
+- **Edit Station Settings** in the UI for day-to-day behavior. These are saved in PostgreSQL.
 
 ## Environment variables
 
@@ -53,7 +53,7 @@ When using an external database, also remove the bundled `postgres` service and 
 
 ## Settings in the UI
 
-Open **Edit Central Settings**.
+Open **Edit Station Settings**.
 
 | Setting | Default | Description |
 |---|---|---|

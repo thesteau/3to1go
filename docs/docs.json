@@ -94,28 +94,6 @@
       }
     ]
   },
-  "redirects": [
-    { "source": "/central/configuration", "destination": "/station/configuration" },
-    { "source": "/central/disaster-recovery", "destination": "/station/disaster-recovery" },
-    { "source": "/central/edge-credentials", "destination": "/station/scout-credentials" },
-    { "source": "/central/hooks", "destination": "/station/hooks" },
-    { "source": "/central/install", "destination": "/station/install" },
-    { "source": "/central/notifications", "destination": "/station/notifications" },
-    { "source": "/central/overview", "destination": "/station/overview" },
-    { "source": "/central/reset-admin-password", "destination": "/station/reset-admin-password" },
-    { "source": "/central/snapshots", "destination": "/station/snapshots" },
-    { "source": "/edge/backup-jobs", "destination": "/scout/backup-jobs" },
-    { "source": "/edge/configuration", "destination": "/scout/configuration" },
-    { "source": "/edge/encryption-key", "destination": "/scout/encryption-key" },
-    { "source": "/edge/hooks", "destination": "/scout/hooks" },
-    { "source": "/edge/install", "destination": "/scout/install" },
-    { "source": "/edge/kubernetes", "destination": "/scout/kubernetes" },
-    { "source": "/edge/multiple-folders", "destination": "/scout/multiple-folders" },
-    { "source": "/edge/notifications", "destination": "/scout/notifications" },
-    { "source": "/edge/overview", "destination": "/scout/overview" },
-    { "source": "/edge/restore", "destination": "/scout/restore" },
-    { "source": "/edge/unusual-backups", "destination": "/scout/unusual-backups" }
-  ],
   "footer": {
     "socials": {
       "github": "https://github.com/thesteau/3to1go"

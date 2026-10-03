@@ -4,7 +4,7 @@
 // As a Node test reporter (writes reports/frontend-tests.html, or $TEST_REPORT_HTML):
 //   node --test --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout ...
 // From `go test -json` output:
-//   node scripts/test-report.cts go "Edge Go tests" go-tests.json go-tests.html
+//   node scripts/test-report.cts go "Scout Go tests" go-tests.json go-tests.html
 const { appendFileSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
 const { dirname, relative, resolve } = require("node:path");
 const { inspect } = require("node:util");

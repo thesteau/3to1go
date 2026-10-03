@@ -8,12 +8,12 @@ Station and Scout each have their **own** web UI and their own accounts. Signing
 <Tabs>
   <Tab title="Station">
     <Frame caption="Station's sign-in dialog.">
-      <img src="/images/sign-in/central-sign-in.png" alt="Station Sign In dialog with username and password fields" />
+      <img src="/images/sign-in/station-sign-in.png" alt="Station Sign In dialog with username and password fields" />
     </Frame>
   </Tab>
   <Tab title="Scout">
     <Frame caption="Scout's separate sign-in dialog.">
-      <img src="/images/sign-in/edge-sign-in.png" alt="Scout Sign In dialog with username and password fields" />
+      <img src="/images/sign-in/scout-sign-in.png" alt="Scout Sign In dialog with username and password fields" />
     </Frame>
   </Tab>
 </Tabs>
@@ -48,12 +48,12 @@ An admin reset signs the target account out of its existing sessions and require
 <Tabs>
   <Tab title="Station">
     <Frame caption="Users & Access in Station, with an example additional account.">
-      <img src="/images/sign-in/central-users.png" alt="Station Users and Access dialog showing admin and operator accounts, password reset, admin access, and Add User controls" />
+      <img src="/images/sign-in/station-users.png" alt="Station Users and Access dialog showing admin and operator accounts, password reset, admin access, and Add User controls" />
     </Frame>
   </Tab>
   <Tab title="Scout">
     <Frame caption="Users & Access in Scout. These accounts belong to this Scout only.">
-      <img src="/images/sign-in/edge-users.png" alt="Scout Users and Access dialog showing local admin and operator accounts and account management controls" />
+      <img src="/images/sign-in/scout-users.png" alt="Scout Users and Access dialog showing local admin and operator accounts and account management controls" />
     </Frame>
   </Tab>
 </Tabs>
@@ -65,7 +65,7 @@ Open **Admin**, then **Change My Password**. Enter your current password and the
 The same dialog appears when a password change is required. Changing your own password keeps your existing sessions signed in.
 
 <Frame caption="Change My Password in Station. Scout has the same fields.">
-  <img src="/images/sign-in/central-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
+  <img src="/images/sign-in/station-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
 </Frame>
 
 ## Sessions and sign-out
@@ -83,5 +83,5 @@ SESSION_COOKIE_SECURE=true
 Accepted "on" values are `1`, `true`, `yes`, and `on`. Anything else, or leaving it unset, keeps the cookie usable over plain HTTP.
 
 <Note>
-  Scout's settings dialog warns when its UI is served over plain HTTP. The UI and Scout's connection to Station are separate, so use HTTPS for both the Scout UI and `CENTRAL_URL` to protect credentials.
+  Scout's settings dialog warns when its UI is served over plain HTTP. The UI and Scout's connection to Station are separate, so use HTTPS for both the Scout UI and `STATION_URL` to protect credentials.
 </Note>

@@ -16,7 +16,7 @@ Scout backs up files on a specific machine, so the pod runs on the node that hol
 | Compose | Kubernetes example |
 |---|---|
 | One Scout per machine | One `DaemonSet` pinned to a node with `nodeSelector` |
-| `./config`, `./hook-scripts`, `./state`, `./spool` volumes | `hostPath` volumes under `/opt/backup-edge` on that node |
+| `./config`, `./hook-scripts`, `./state`, `./spool` volumes | `hostPath` volumes under `/opt/backup-scout` on that node |
 | `${SCAN_DIR}:/scan` | A `hostPath` volume mounted at `/scan` |
 | `.env` values | Container `env`, with `INITIAL_ADMIN_PASSWORD` from a Secret |
 | `ports: "6556:6556"` | `hostPort: 6556` |
@@ -25,21 +25,21 @@ Scout backs up files on a specific machine, so the pod runs on the node that hol
 
 <Steps>
   <Step title="Get the example">
-    Copy the three files from [`deploy-example/kubernetes/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/kubernetes): `kustomization.yaml`, `namespace.yaml`, and `backup-edge.yaml`.
+    Copy the three files from [`deploy-example/kubernetes/`](https://github.com/thesteau/3to1go/tree/main/deploy-example/kubernetes): `kustomization.yaml`, `namespace.yaml`, and `backup-scout.yaml`.
   </Step>
-  <Step title="Edit backup-edge.yaml">
-    Set the node's hostname (replacing `my-node`), `EDGE_ID`, `CENTRAL_URL`, and the folder to back up. `SCAN_DIR` and the `scan` volume's `path` must be the same host folder:
+  <Step title="Edit backup-scout.yaml">
+    Set the node's hostname (replacing `my-node`), `SCOUT_ID`, `STATION_URL`, and the folder to back up. `SCAN_DIR` and the `scan` volume's `path` must be the same host folder:
 
-    ```yaml backup-edge.yaml
+    ```yaml backup-scout.yaml
     nodeSelector:
       kubernetes.io/os: linux
       kubernetes.io/hostname: my-node   # kubectl get nodes
     # ...
     env:
-      - name: EDGE_ID
-        value: edge-01                   # unique per Edge
-      - name: CENTRAL_URL
-        value: http://central.example.lan:6555
+      - name: SCOUT_ID
+        value: scout-01                   # unique per Scout
+      - name: STATION_URL
+        value: http://station.example.lan:6555
       - name: SCAN_DIR
         value: /srv/data
     # ...
@@ -78,29 +78,29 @@ Scout backs up files on a specific machine, so the pod runs on the node that hol
 - **Mounts need write access.** Scout writes `.upload_dir` markers and restores files into `/scan`. The image runs as root, so files it creates are root-owned.
 - **Reaching the UI.** `hostPort` matches the Compose setup. If you use a Service or Ingress instead, keep it private or use HTTPS. See [Sign-in](/shared/sign-in).
 - **Credentials.** Paste the Scout credential in Scout's UI, as with Compose. It's saved in `/config`.
-- **Moving from Compose.** Stop the Compose container (`docker compose down`, without `-v`), point the `hostPath` volumes at the old Compose folders, and keep the same `EDGE_ID`. Scout keeps its key, settings, and instance ID.
+- **Moving from Compose.** Stop the Compose container (`docker compose down`, without `-v`), point the `hostPath` volumes at the old Compose folders, and keep the same `SCOUT_ID`. Scout keeps its key, settings, and instance ID.
 - **Updating.** Change the image tag or digest and re-apply, or let a tool such as Renovate or Flux do it.
 
 ## Several machines
 
-Copy `backup-edge.yaml` once per node, changing its name, `nodeSelector`, `EDGE_ID`, and paths, or generate the copies from one template.
+Copy `backup-scout.yaml` once per node, changing its name, `nodeSelector`, `SCOUT_ID`, and paths, or generate the copies from one template.
 
 ### Sample: one template per device with Flux
 
-This keeps one Scout template in Git and builds a copy per device. Flux fills in the `${...}` values from each device's entry. Create a `backup-edge` Secret with an `INITIAL_ADMIN_PASSWORD` key in the namespace first.
+This keeps one Scout template in Git and builds a copy per device. Flux fills in the `${...}` values from each device's entry. Create a `backup-scout` Secret with an `INITIAL_ADMIN_PASSWORD` key in the namespace first.
 
-```yaml device-template/backup-edge.yaml
+```yaml device-template/backup-scout.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: backup-edge-${DEVICE_ID}
+  name: backup-scout-${DEVICE_ID}
   namespace: backup
   labels:
-    app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+    app.kubernetes.io/name: backup-scout-${DEVICE_ID}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+      app.kubernetes.io/name: backup-scout-${DEVICE_ID}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -109,26 +109,26 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: backup-edge-${DEVICE_ID}
+        app.kubernetes.io/name: backup-scout-${DEVICE_ID}
     spec:
       automountServiceAccountToken: false
       nodeSelector:
         kubernetes.io/os: linux
         kubernetes.io/hostname: ${NODE_HOSTNAME}
       containers:
-        - name: backup-edge
-          image: ghcr.io/thesteau/3to1go-edge:latest
+        - name: backup-scout
+          image: ghcr.io/thesteau/3to1go-scout:latest
           env:
-            - name: EDGE_ID
-              value: ${EDGE_ID}
-            - name: CENTRAL_URL
-              value: http://<central-host>:6555
+            - name: SCOUT_ID
+              value: ${SCOUT_ID}
+            - name: STATION_URL
+              value: http://<station-host>:6555
             - name: SCAN_DIR
               value: ${HOME_DIR}
             - name: INITIAL_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: backup-edge
+                  name: backup-scout
                   key: INITIAL_ADMIN_PASSWORD
           ports:
             - name: web
@@ -142,22 +142,22 @@ spec:
             - { name: spool, mountPath: /data/spool }
       volumes:
         - name: config
-          hostPath: { path: "${HOME_DIR}/backup-edge/config", type: DirectoryOrCreate }
+          hostPath: { path: "${HOME_DIR}/backup-scout/config", type: DirectoryOrCreate }
         - name: hook-scripts
-          hostPath: { path: "${HOME_DIR}/backup-edge/hook-scripts", type: DirectoryOrCreate }
+          hostPath: { path: "${HOME_DIR}/backup-scout/hook-scripts", type: DirectoryOrCreate }
         - name: scan
           hostPath: { path: "${HOME_DIR}", type: DirectoryOrCreate }
         - name: state
-          hostPath: { path: "${HOME_DIR}/backup-edge/state", type: DirectoryOrCreate }
+          hostPath: { path: "${HOME_DIR}/backup-scout/state", type: DirectoryOrCreate }
         - name: spool
-          hostPath: { path: "${HOME_DIR}/backup-edge/spool", type: DirectoryOrCreate }
+          hostPath: { path: "${HOME_DIR}/backup-scout/spool", type: DirectoryOrCreate }
 ```
 
 ```yaml device-template/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - backup-edge.yaml
+  - backup-scout.yaml
 ```
 
 Add one Flux `Kustomization` per device:
@@ -172,16 +172,16 @@ spec:
   interval: 5m
   path: ./device-template
   prune: true
-  deletionPolicy: Orphan   # removing the entry leaves the running Edge alone
+  deletionPolicy: Orphan   # removing the entry leaves the running Scout alone
   sourceRef:
     kind: GitRepository
     name: flux-system
   postBuild:
     substitute:
       DEVICE_ID: <id>
-      EDGE_ID: <edge-id>
+      SCOUT_ID: <scout-id>
       NODE_HOSTNAME: <node-name>
       HOME_DIR: /home/<user>
 ```
 
-The `nodeSelector` pins each copy to its device, so its pod only runs once that node joins the cluster. If the device previously ran Scout with Compose in `<home>/backup-edge`, these folders pick up its existing config, key, and state.
+The `nodeSelector` pins each copy to its device, so its pod only runs once that node joins the cluster. If the device previously ran Scout with Compose in `<home>/backup-scout`, these folders pick up its existing config, key, and state.
