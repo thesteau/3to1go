@@ -27,7 +27,7 @@ type jobStateStore interface {
 // The walk runs in the background, and requests use the last list it found.
 // Jobs saved or deleted in the UI update that list at once, so the walk only
 // needs to repeat now and then, to pick up markers changed outside the UI.
-const jobDiscoveryTTL = 5 * time.Minute
+const jobDiscoveryTTL = 30 * time.Second
 
 // How long after the first walk starts requests may wait for it, so small trees
 // load in one go. Counted from the start of the walk, so reloading during a long
