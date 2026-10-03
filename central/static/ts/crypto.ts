@@ -69,7 +69,8 @@ class SnapshotReader {
       const used = Math.min(chunk.length, out.length - filled);
       out.set(chunk.subarray(0, used), filled);
       filled += used;
-      if (used === chunk.length) this.chunks.shift(); else this.chunks[0] = chunk.subarray(used);
+      if (used === chunk.length) this.chunks.shift();
+      else this.chunks[0] = chunk.subarray(used);
     }
     this.buffered -= out.length;
     return out;
@@ -82,7 +83,8 @@ class SnapshotReader {
     this.buffered = 0;
     while (!this.done) {
       const chunk = await this.next();
-      if (chunk === null) this.done = true; else if (chunk.length) onChunk(chunk);
+      if (chunk === null) this.done = true;
+      else if (chunk.length) onChunk(chunk);
     }
   }
 
@@ -118,14 +120,19 @@ class SnapshotBlobBuilder {
 function snapshotReaderFromResponse(response: Response): SnapshotReader {
   const body = response.body?.getReader();
   if (!body) return new SnapshotReader(async () => null);
-  return new SnapshotReader(async () => {
-    try {
-      const { done, value } = await body.read();
-      return done ? null : value;
-    } catch (error) {
-      throw new SnapshotReadError("The download was interrupted.", { cause: error });
-    }
-  }, () => { body.cancel().catch(() => {}); });
+  return new SnapshotReader(
+    async () => {
+      try {
+        const { done, value } = await body.read();
+        return done ? null : value;
+      } catch (error) {
+        throw new SnapshotReadError("The download was interrupted.", { cause: error });
+      }
+    },
+    () => {
+      body.cancel().catch(() => {});
+    },
+  );
 }
 
 function snapshotReaderFromBuffer(buffer: ArrayBuffer): SnapshotReader {
@@ -138,7 +145,8 @@ function snapshotReaderFromBuffer(buffer: ArrayBuffer): SnapshotReader {
 }
 
 function snapshotEncryption(head: Uint8Array): SnapshotEncryption {
-  if (head.length > DARE_HEADER_LEN + DARE_TAG_LEN && head[0] === DARE_VERSION_20 && head[1] === DARE_AES_GCM) return "dare";
+  if (head.length > DARE_HEADER_LEN + DARE_TAG_LEN && head[0] === DARE_VERSION_20 && head[1] === DARE_AES_GCM)
+    return "dare";
   if (head.length >= ENC_MAGIC_LEN + ENC_IV_LEN && ENC_MAGIC.every((b, i) => b === head[i])) return "legacy";
   return null;
 }
@@ -173,7 +181,8 @@ async function decryptDare(reader: SnapshotReader, key: CryptoKey, output: Snaps
   for (let sequence = 0; ; sequence += 1) {
     const header = await reader.take(DARE_HEADER_LEN);
     if (header.length < DARE_HEADER_LEN) throw new Error("Encrypted snapshot is truncated.");
-    if (header[0] !== DARE_VERSION_20 || header[1] !== DARE_AES_GCM) throw new Error("Unsupported snapshot encryption format.");
+    if (header[0] !== DARE_VERSION_20 || header[1] !== DARE_AES_GCM)
+      throw new Error("Unsupported snapshot encryption format.");
     const length = (header[2] | (header[3] << 8)) + 1;
     const final = (header[4] & 0x80) !== 0;
     if (!final && length !== DARE_MAX_PAYLOAD) throw new Error("Encrypted snapshot has an invalid package size.");
@@ -184,12 +193,15 @@ async function decryptDare(reader: SnapshotReader, key: CryptoKey, output: Snaps
     firstNonce ??= headerNonce.slice();
     const expected = firstNonce.slice();
     expected[0] = (expected[0] & 0x7f) | (final ? 0x80 : 0);
-    if (!expected.every((value, index) => value === headerNonce[index])) throw new Error("Encrypted snapshot packages do not belong together.");
+    if (!expected.every((value, index) => value === headerNonce[index]))
+      throw new Error("Encrypted snapshot packages do not belong together.");
 
     const nonce = headerNonce.slice();
     const view = new DataView(nonce.buffer);
     view.setUint32(8, (view.getUint32(8, true) ^ sequence) >>> 0, true);
-    output.add(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: header.subarray(0, 4) }, key, sealed));
+    output.add(
+      await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: header.subarray(0, 4) }, key, sealed),
+    );
     if (final) break;
   }
   if ((await reader.take(1)).length) throw new Error("Encrypted snapshot has data after its final package.");

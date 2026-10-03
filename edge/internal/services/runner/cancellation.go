@@ -50,5 +50,5 @@ func (r *EdgeRunner) markCancelled(job *backup.JobDefinition, s *state.JobState)
 	s.LastErrorDetail = ""
 	s.ManualInterventionRequired = false
 	s.LastUploadUpdatedAt = utcNow()
-	r.StateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 }

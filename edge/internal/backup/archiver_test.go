@@ -147,7 +147,7 @@ func writeTestArchive(path string, headers []*tar.Header, bodies [][]byte) error
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	enc, err := zstd.NewWriter(f)
 	if err != nil {
 		return err
@@ -166,5 +166,8 @@ func writeTestArchive(path string, headers []*tar.Header, bodies [][]byte) error
 	if err := tw.Close(); err != nil {
 		return err
 	}
-	return enc.Close()
+	if err := enc.Close(); err != nil {
+		return err
+	}
+	return f.Close()
 }

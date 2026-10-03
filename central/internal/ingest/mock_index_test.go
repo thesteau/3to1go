@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"errors"
 
 	"github.com/3to1go/central/internal/store"
 )
@@ -63,15 +62,4 @@ func (m *mockIndex) GetEdgeRegistration(_ context.Context, _, _ string) (*store.
 
 func (m *mockIndex) UpsertEdgeRegistration(_ context.Context, _ *store.EdgeRegistration) error {
 	return m.upsertEdgeRegistrationErr
-}
-
-// errIndex returns an error for every call.
-func errIndex() *mockIndex {
-	return &mockIndex{
-		findDuplicateErr:          errors.New("db error"),
-		upsertSnapshotErr:         errors.New("db error"),
-		reconcileErr:              errors.New("db error"),
-		getEdgeRegistrationErr:    errors.New("db error"),
-		upsertEdgeRegistrationErr: errors.New("db error"),
-	}
 }

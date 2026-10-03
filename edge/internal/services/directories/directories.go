@@ -447,7 +447,10 @@ func (d *DirectoryService) DeleteJob(relativePath string) error {
 		return err
 	}
 	d.jobChanged(dir, false)
-	d.stateStore.Delete(dir)
+	// The job is already removed; stale state is unused and replaced if the job is recreated.
+	if err := d.stateStore.Delete(dir); err != nil {
+		d.logger.Warn("state_delete_failed", "path", dir, "error", err)
+	}
 	d.logger.Info("ui_job_deleted", "path", dir)
 	return nil
 }

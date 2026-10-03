@@ -28,7 +28,11 @@ function applyTheme(theme: string | undefined): void {
   }
 }
 
-function showToast(message: unknown, kind: StatusKind = "info", { duration = TOAST_DURATION_MS, title = "" } = {}): void {
+function showToast(
+  message: unknown,
+  kind: StatusKind = "info",
+  { duration = TOAST_DURATION_MS, title = "" } = {},
+): void {
   const text = formatMessage(message);
   if (!text) return;
   const region = document.getElementById("toast-region");
@@ -56,12 +60,12 @@ function setActionStatus(message: unknown, kind: StatusKind = "info"): void {
   showToast(message, kind);
 }
 
-function setStatus(id: string, message: unknown, kind: StatusKind = "info"): void {
+function setStatus(_id: string, message: unknown, kind: StatusKind = "info"): void {
   const text = formatMessage(message);
   if (text) showToast(text, kind);
 }
 
-function clearStatus(id: string): void {}
+function clearStatus(_id: string): void {}
 
 function closeDialog(id: string): void {
   const dialog = document.getElementById(id) as HTMLDialogElement | null;
@@ -83,8 +87,9 @@ function confirmApp(options: AppDialogOptions): Promise<boolean> {
 // Editing controls remain locked until their own data has loaded successfully.
 const readyPanels = new Set<string>();
 function setPanelReady(name: string, ready: boolean): void {
-  if (ready) readyPanels.add(name); else readyPanels.delete(name);
-  document.querySelectorAll<HTMLButtonElement>(`[data-requires="${name}"]`).forEach(control => {
+  if (ready) readyPanels.add(name);
+  else readyPanels.delete(name);
+  document.querySelectorAll<HTMLButtonElement>(`[data-requires="${name}"]`).forEach((control) => {
     control.disabled = !ready;
     control.title = ready ? "" : "Waiting for this panel to load successfully";
   });
@@ -100,7 +105,9 @@ function loadEditorPanel<T>(name: string, task: () => Promise<T>): Promise<T> {
   if (editorLoads.has(name)) return editorLoads.get(name) as Promise<T>;
   setPanelReady(name, false);
   const status = document.getElementById(`${name}-load-status`);
-  if (status) status.innerHTML = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span>Loading...</div>';
+  if (status)
+    status.innerHTML =
+      '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span>Loading...</div>';
   const pending = (async () => {
     try {
       const result = await task();
@@ -111,10 +118,10 @@ function loadEditorPanel<T>(name: string, task: () => Promise<T>): Promise<T> {
       setPanelReady(name, false);
       if (status) {
         status.replaceChildren();
-        status.textContent = 'Could not load this panel. Your saved settings have not been changed. ';
-        const retry = document.createElement('button');
-        retry.type = 'button';
-        retry.textContent = 'Retry';
+        status.textContent = "Could not load this panel. Your saved settings have not been changed. ";
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = "Retry";
         retry.onclick = () => loadEditorPanel(name, task).catch(() => {});
         status.appendChild(retry);
       }
@@ -130,11 +137,12 @@ function loadEditorPanel<T>(name: string, task: () => Promise<T>): Promise<T> {
 // Last-resort guard: an unexpected failure (e.g. network loss mid-save) is reported
 // instead of silently leaving an action looking stuck. Dialogs stay closable.
 globalThis.addEventListener?.("unhandledrejection", (event) => {
-  const message = event.reason?.name === "TimeoutError"
-    ? "The server took too long to respond. Please retry."
-    : event.reason instanceof TypeError
-      ? "Could not reach the server. Check the connection and retry."
-      : (event.reason?.message || "Something went wrong. Please retry.");
+  const message =
+    event.reason?.name === "TimeoutError"
+      ? "The server took too long to respond. Please retry."
+      : event.reason instanceof TypeError
+        ? "Could not reach the server. Check the connection and retry."
+        : event.reason?.message || "Something went wrong. Please retry.";
   setActionStatus(message, "error");
   event.preventDefault();
 });
@@ -167,7 +175,7 @@ function fadeInNewContent(mutations: MutationRecord[]): void {
     for (const node of removedNodes) {
       if (node.nodeType !== 1) continue;
       const element = node as Element;
-      keyedElements(element).forEach((keyed) => shownKeys.add(fadeKey(keyed)));
+      for (const keyed of keyedElements(element)) shownKeys.add(fadeKey(keyed));
       if (element.matches(LOADING_PLACEHOLDER)) placeholderTargets.add(target as Element);
     }
   }

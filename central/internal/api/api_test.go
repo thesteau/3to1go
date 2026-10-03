@@ -231,7 +231,9 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 func jsonReq(method, path string, body any) *http.Request {
 	var buf bytes.Buffer
 	if body != nil {
-		json.NewEncoder(&buf).Encode(body)
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			panic(err)
+		}
 	}
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
@@ -396,7 +398,9 @@ func TestHandleHealth(t *testing.T) {
 		t.Errorf("handleHealth code = %d, want 200", rr.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["status"] != "ok" {
 		t.Errorf("health status = %v, want ok", resp["status"])
 	}
@@ -423,7 +427,9 @@ func TestHandleSessionMe_NotAuthenticated(t *testing.T) {
 		t.Errorf("code = %d", rr.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["authenticated"] != false {
 		t.Errorf("authenticated = %v, want false", resp["authenticated"])
 	}
@@ -439,7 +445,9 @@ func TestHandleSessionMe_Authenticated(t *testing.T) {
 		t.Errorf("code = %d", rr.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["authenticated"] != true {
 		t.Errorf("authenticated = %v, want true", resp["authenticated"])
 	}
@@ -573,7 +581,9 @@ func TestHandleListUsers_Admin(t *testing.T) {
 		t.Errorf("code = %d, want 200", rr.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if usersArr, ok := resp["users"].([]any); !ok || len(usersArr) != 2 {
 		t.Errorf("expected 2 users, got %v", resp["users"])
 	}
@@ -952,7 +962,9 @@ func TestHandleDeleteInstance_CleanupMissingForgetsSizeHistory(t *testing.T) {
 func TestHandleDeleteInstance_ReportsSizeHistoryFailure(t *testing.T) {
 	index := &mockSnapIndex{deleteSizesErr: errors.New("db down")}
 	app := newTestApp(t, nil, nil, nil, index)
-	os.MkdirAll(filepath.Join(app.Settings().BackupRoot, "edge1", "inst1"), 0o755)
+	if err := os.MkdirAll(filepath.Join(app.Settings().BackupRoot, "edge1", "inst1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	rr := httptest.NewRecorder()
 	app.handleDeleteInstance(rr, deleteInstanceRequest(""))
 	if rr.Code != http.StatusInternalServerError || !strings.Contains(rr.Body.String(), "size history") {

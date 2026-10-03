@@ -59,7 +59,8 @@ func CreateArchiveContext(ctx context.Context, archivePath string, files []*Disc
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	// Error paths only; the success path checks Close below.
+	defer func() { _ = f.Close() }()
 
 	enc, err := zstd.NewWriter(cancelio.Writer{Context: ctx, Writer: f}, zstd.WithEncoderLevel(zstd.SpeedDefault))
 	if err != nil {
@@ -69,12 +70,12 @@ func CreateArchiveContext(ctx context.Context, archivePath string, files []*Disc
 	tw := tar.NewWriter(enc)
 	for _, file := range sorted {
 		if err := addFileToTarContext(ctx, tw, file); err != nil {
-			enc.Close()
+			_ = enc.Close()
 			return err
 		}
 	}
 	if err := tw.Close(); err != nil {
-		enc.Close()
+		_ = enc.Close()
 		return err
 	}
 	if err := enc.Close(); err != nil {
@@ -83,11 +84,7 @@ func CreateArchiveContext(ctx context.Context, archivePath string, files []*Disc
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	return nil
-}
-
-func addFileToTar(tw *tar.Writer, file *DiscoveredFile) error {
-	return addFileToTarContext(context.Background(), tw, file)
+	return f.Close()
 }
 
 func addFileToTarContext(ctx context.Context, tw *tar.Writer, file *DiscoveredFile) error {
@@ -98,7 +95,7 @@ func addFileToTarContext(ctx context.Context, tw *tar.Writer, file *DiscoveredFi
 	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// Re-stat after open to get the actual current size; the size recorded at
 	// scan time may be stale if the file changed (e.g. an active SQLite DB).
@@ -143,7 +140,7 @@ func ListArchiveEntries(archivePath, targetRoot string) (map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	dec, err := zstd.NewReader(f)
 	if err != nil {
@@ -223,7 +220,7 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	dec, err := zstd.NewReader(f)
 	if err != nil {
@@ -258,7 +255,7 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 
 		tmp := dest + ".restore.tmp"
 		if err := writeAtomic(tmp, dest, hdr.ModTime, tr, os.FileMode(hdr.Mode).Perm()); err != nil {
-			os.Remove(tmp)
+			_ = os.Remove(tmp)
 			return extractedCount, err
 		}
 		extractedCount++
@@ -272,18 +269,20 @@ func writeAtomic(tmp, dest string, mtime time.Time, r io.Reader, mode os.FileMod
 		return err
 	}
 	if _, err := io.Copy(f, r); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Chmod(mode); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		return err
+	}
 	if err := os.Rename(tmp, dest); err != nil {
 		return err
 	}

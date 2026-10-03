@@ -55,7 +55,7 @@ func (a *App) serveSnapshot(w http.ResponseWriter, r *http.Request, namespace, f
 		httpx.WriteError(w, http.StatusBadRequest, "invalid path")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
 	if err != nil || info.IsDir() {
@@ -75,7 +75,7 @@ func (a *App) removeSnapshot(namespace, filename string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	return root.Remove(snapshotPath(namespace, filename))
 }
 

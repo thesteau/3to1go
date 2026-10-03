@@ -93,8 +93,11 @@ func (r *EdgeRunner) DeleteJob(relativePath string) error {
 	if err := r.DirService.DeleteJob(relativePath); err != nil {
 		return err
 	}
+	// The job is already gone, so leftover anomaly history is only logged.
 	if job != nil {
-		r.Anomalies.Delete(job.RootPath)
+		if err := r.Anomalies.Delete(job.RootPath); err != nil {
+			r.logger.Warn("anomaly_history_failed", "job_name", job.JobName, "error", err)
+		}
 	}
 	return nil
 }

@@ -46,7 +46,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Initialise stores.
 	userStore := store.NewUserStore(db)
@@ -132,7 +132,9 @@ func run(logger *slog.Logger) error {
 		sched.Stop()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		srv.Shutdown(shutCtx)
+		if err := srv.Shutdown(shutCtx); err != nil {
+			logger.Error("server shutdown failed", "error", err)
+		}
 	}()
 
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {

@@ -19,7 +19,8 @@ async function handleCredentialSharedToggle(): Promise<void> {
   }
   const confirmed = await confirmApp({
     title: "Shared Credential",
-    message: "A shared credential can authenticate multiple Edge instances until its limit is reached. Only use this when you intentionally want those instances to share revocation.",
+    message:
+      "A shared credential can authenticate multiple Edge instances until its limit is reached. Only use this when you intentionally want those instances to share revocation.",
     confirmLabel: "Use Shared",
     danger: true,
   });
@@ -35,7 +36,9 @@ async function handleCredentialSharedToggle(): Promise<void> {
 async function mintCredential(): Promise<void> {
   const ttlDays = Number((document.getElementById("credential_ttl_days") as HTMLInputElement).value || 365);
   const shared = (document.getElementById("credential_shared") as HTMLInputElement).checked;
-  const maxRegistrations = shared ? Number((document.getElementById("credential_max_registrations") as HTMLInputElement).value || 1) : 1;
+  const maxRegistrations = shared
+    ? Number((document.getElementById("credential_max_registrations") as HTMLInputElement).value || 1)
+    : 1;
   if (shared && (maxRegistrations < 2 || maxRegistrations > 10000)) {
     setStatus("credential-status", "Shared instance limit must be between 2 and 10000.", "error");
     return;

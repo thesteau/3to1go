@@ -11,7 +11,15 @@ let _edgeRefreshTimer: number | null = null;
 let _edgeAutoRefreshStarted = false;
 let _edgeRefreshBurstRemaining = 0;
 
-const ACTIVE_JOB_STATUSES = new Set(["scanning", "compressing", "encrypting", "archive_created", "uploading", "force_send_requested", "manual_retry_requested"]);
+const ACTIVE_JOB_STATUSES = new Set([
+  "scanning",
+  "compressing",
+  "encrypting",
+  "archive_created",
+  "uploading",
+  "force_send_requested",
+  "manual_retry_requested",
+]);
 const EDGE_ACTIVE_REFRESH_MS = 2500;
 const EDGE_IDLE_REFRESH_MS = 15000;
 const EDGE_ACTIVE_REFRESH_BURST_COUNT = 6;
@@ -46,7 +54,11 @@ function restoreEdgeView(): void {
     const view: EdgeViewCache = JSON.parse(sessionStorage.getItem(EDGE_VIEW_CACHE) || "null");
     if (!view) return;
     if (Array.isArray(view.directories)) {
-      latestData = { ...(latestData || {}), directories: view.directories, jobs_discovering: Boolean(view.discovering) };
+      latestData = {
+        ...(latestData || {}),
+        directories: view.directories,
+        jobs_discovering: Boolean(view.discovering),
+      };
       renderSelectedJobs(view.directories, Boolean(view.discovering));
     }
     if (Array.isArray(view.topLevel) && !directoryTreeLoaded()) {
@@ -69,7 +81,9 @@ function clearEdgeView(): void {
 function edgeHasActiveWork(data: EdgeData | null = latestData): boolean {
   // Check back soon while the first search for jobs is still running.
   if (data?.scheduler?.state === "running" || data?.jobs_discovering) return true;
-  return (data?.directories || []).some((entry) => ACTIVE_JOB_STATUSES.has(String(entry.state?.last_status || "").trim()));
+  return (data?.directories || []).some((entry) =>
+    ACTIVE_JOB_STATUSES.has(String(entry.state?.last_status || "").trim()),
+  );
 }
 
 function edgeAutoRefreshPaused(): boolean {
@@ -114,8 +128,13 @@ async function loadData(options: LoadDataOptions = {}): Promise<void> {
   return _loadDataInFlight;
 }
 
-async function fetchEdgeData({ silent = false, includeKey = true, refreshDirectoryTree = !silent }: LoadDataOptions = {}): Promise<void> {
-  const spinner = '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
+async function fetchEdgeData({
+  silent = false,
+  includeKey = true,
+  refreshDirectoryTree = !silent,
+}: LoadDataOptions = {}): Promise<void> {
+  const spinner =
+    '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
   if (!latestData?.directories) {
     setHtmlIfChanged("selected-jobs", spinner);
     setHtmlIfChanged("selected-jobs-count", "-");
@@ -127,16 +146,19 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
     if (!res.ok) throw new Error("Status unavailable");
     const statusData: StatusResponse = await res.json();
     latestData = { ...(latestData || {}), ...statusData };
-      if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
-        applyTheme(latestData.settings?.theme || "dark");
-      }
+    if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
+      applyTheme(latestData.settings?.theme || "dark");
+    }
     fillMetaFromDir(latestData);
     setPanelReady("settings", Boolean(statusData.settings && Object.keys(statusData.settings).length));
     setHtmlIfChanged("meta-load-status", "");
   })().catch(() => {
     // Settings loaded earlier stay editable; one failed poll must not lock an open editor.
     if (!latestData?.settings) setPanelReady("settings", false);
-    setHtmlIfChanged("meta-load-status", '<p role="status">Status could not load. <button type="button" onclick="loadData()">Retry</button></p>');
+    setHtmlIfChanged(
+      "meta-load-status",
+      '<p role="status">Status could not load. <button type="button" onclick="loadData()">Retry</button></p>',
+    );
   });
 
   const dirFetch = (async () => {
@@ -145,39 +167,53 @@ async function fetchEdgeData({ silent = false, includeKey = true, refreshDirecto
       throw new Error("Jobs could not load.");
     }
     const dirData: DirectoriesResponse = await res.json();
-    latestData = { ...(latestData || {}), directories: dirData.directories, jobs_discovering: Boolean(dirData.discovering) };
+    latestData = {
+      ...(latestData || {}),
+      directories: dirData.directories,
+      jobs_discovering: Boolean(dirData.discovering),
+    };
     renderSelectedJobs(dirData.directories, Boolean(dirData.discovering));
     // Keeps "contains selected job" current; unchanged markup leaves the DOM alone.
     renderDirectoryTree();
   })().catch((error) => {
     if (!latestData?.directories) {
-      setHtmlIfChanged("selected-jobs", '<p role="status">Jobs could not load. <button type="button" onclick="loadData()">Retry</button></p>');
+      setHtmlIfChanged(
+        "selected-jobs",
+        '<p role="status">Jobs could not load. <button type="button" onclick="loadData()">Retry</button></p>',
+      );
     }
     if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
   });
 
   // Polls fetch only the job list; the folder tree reloads on first load and after changes.
-  const treeFetch = refreshDirectoryTree || !directoryTreeLoaded()
-    ? reloadDirectoryTree().catch((error) => {
-      if (!directoryTreeLoaded()) {
-        setHtmlIfChanged("directory-tree", '<p role="status">Folders could not load. <button type="button" onclick="loadData()">Retry</button></p>');
-      }
-      if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
-    })
-    : null;
+  const treeFetch =
+    refreshDirectoryTree || !directoryTreeLoaded()
+      ? reloadDirectoryTree().catch((error) => {
+          if (!directoryTreeLoaded()) {
+            setHtmlIfChanged(
+              "directory-tree",
+              '<p role="status">Folders could not load. <button type="button" onclick="loadData()">Retry</button></p>',
+            );
+          }
+          if (!silent) setActionStatus(error.message || "Refresh failed.", "error");
+        })
+      : null;
 
   const keyFetch = includeKey
     ? (async () => {
-      setPanelReady("encryption-key", false);
-      const keyRes = await fetch("/api/encryption-key", { signal: globalThis.AbortSignal?.timeout?.(30000) });
-      if (!keyRes.ok) throw new Error("Key unavailable");
-      const keyData: EncryptionKeyResponse = await keyRes.json();
-      fillMetaEncKey(keyData.key_base64 || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
-    })().catch(() => {
-      if (!document.getElementById("enc-key-value")?.dataset?.key) {
-        setHtmlIfChanged("enc-key-value", 'Unavailable <button type="button" class="secondary" onclick="loadData()">Retry</button>');
-      }
-    })
+        setPanelReady("encryption-key", false);
+        const keyRes = await fetch("/api/encryption-key", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+        if (!keyRes.ok) throw new Error("Key unavailable");
+        const keyData: EncryptionKeyResponse = await keyRes.json();
+        fillMetaEncKey(keyData.key_base64 || "", keyData.fingerprint || latestData?.encryption_key_fingerprint || "");
+      })().catch(() => {
+        if (!document.getElementById("enc-key-value")?.dataset?.key) {
+          setHtmlIfChanged(
+            "enc-key-value",
+            'Unavailable <button type="button" class="secondary" onclick="loadData()">Retry</button>',
+          );
+        }
+      })
     : null;
 
   try {

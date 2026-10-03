@@ -209,12 +209,13 @@ type UploadResult struct {
 	UploadID  string `json:"upload_id"`
 }
 
-// UploadArchive sends the archive at archivePath to central, resuming if uploadID/offset are set.
+// UploadArchive sends the archive at archivePath to central. Central matches an unfinished
+// session by idempotency key, so the upload resumes from the later of uploadOffset and
+// central's next offset.
 func (c *UploadClient) UploadArchive(
 	ctx context.Context,
 	edgeID, jobName, fingerprint, timestamp, archivePath string,
 	archiveSHA256 string,
-	uploadID string,
 	uploadOffset int64,
 	preferredChunkSize int64,
 	progress ProgressCallback,
@@ -242,7 +243,7 @@ func (c *UploadClient) UploadArchive(
 		return nil, err
 	}
 
-	uploadID = stringField(sessionInfo, "upload_id")
+	uploadID := stringField(sessionInfo, "upload_id")
 	offset := max(uploadOffset, int64Field(sessionInfo, "next_offset"))
 
 	if stringField(sessionInfo, "status") == "completed" {
@@ -264,7 +265,7 @@ func (c *UploadClient) UploadArchive(
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	successStreak := 0
 	attempt := 0
@@ -383,7 +384,7 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	filename := resp.Header.Get("X-Relay-Snapshot-Filename")
 	if filename == "" {
@@ -397,8 +398,11 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 	if _, err := io.Copy(f, resp.Body); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err := f.Close(); err != nil {
 		return "", err
 	}
 	return filename, nil
@@ -465,7 +469,7 @@ func (c *UploadClient) sendChunk(ctx context.Context, uploadID string, offset in
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return decodeJSON(resp.Body)
 }
 
@@ -486,7 +490,7 @@ func (c *UploadClient) finalizeSession(ctx context.Context, uploadID string) (ma
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return decodeJSON(resp.Body)
 }
 
@@ -509,7 +513,7 @@ func (c *UploadClient) jsonPost(ctx context.Context, path string, body any, phas
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return decodeJSON(resp.Body)
 }
 
@@ -547,7 +551,7 @@ func (c *UploadClient) doRequest(req *http.Request, phase string) (*http.Respons
 	} else {
 		c.CircuitBreaker.RecordSuccess()
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return nil, uf
 }
 
@@ -672,7 +676,7 @@ func sha256File(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

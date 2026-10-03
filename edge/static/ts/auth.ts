@@ -9,11 +9,15 @@ window.fetch = async (...args: Parameters<typeof fetch>) => {
     openLoginDialog();
   }
   if (!url.includes("/api/session/") && response.status === 403) {
-    response.clone().json().then((body: ApiBody) => {
-      if (body.detail === "password change required") {
-        openPasswordDialog(true);
-      }
-    }).catch(() => {});
+    response
+      .clone()
+      .json()
+      .then((body: ApiBody) => {
+        if (body.detail === "password change required") {
+          openPasswordDialog(true);
+        }
+      })
+      .catch(() => {});
   }
   return response;
 };

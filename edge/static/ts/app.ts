@@ -12,7 +12,11 @@ function startEdgeApp(): void {
   }
   _appStarted = true;
   if (window.location.protocol === "http:") {
-    showToast("Edge is running over plain HTTP. Credentials sent to Central are not encrypted in transit. Consider setting up HTTPS.", "warning", { duration: 12000 });
+    showToast(
+      "Edge is running over plain HTTP. Credentials sent to Central are not encrypted in transit. Consider setting up HTTPS.",
+      "warning",
+      { duration: 12000 },
+    );
   }
   resetForm();
   initializeFieldHelp(EDGE_SETTINGS_HELP);
@@ -30,16 +34,13 @@ function startEdgeApp(): void {
 
 applyTheme("dark");
 initMeta();
-{
-  document.getElementById("hook_pre_command")?.addEventListener("input", () => {
-    hookDraftDirty.pre = true;
-  });
-  document.getElementById("hook_post_command")?.addEventListener("input", () => {
-    hookDraftDirty.post = true;
-  });
-  document.getElementById("recover-fingerprint")?.addEventListener("input", resetRecoverPreview);
-
-}
+document.getElementById("hook_pre_command")?.addEventListener("input", () => {
+  hookDraftDirty.pre = true;
+});
+document.getElementById("hook_post_command")?.addEventListener("input", () => {
+  hookDraftDirty.post = true;
+});
+document.getElementById("recover-fingerprint")?.addEventListener("input", resetRecoverPreview);
 
 let connecting = false;
 async function connectApp(): Promise<void> {
@@ -50,8 +51,14 @@ async function connectApp(): Promise<void> {
   try {
     const user = await refreshSession();
     status.textContent = "";
-    if (!user) { openLoginDialog(); return; }
-    if (user.must_change_password) { openPasswordDialog(true); return; }
+    if (!user) {
+      openLoginDialog();
+      return;
+    }
+    if (user.must_change_password) {
+      openPasswordDialog(true);
+      return;
+    }
     startEdgeApp();
   } catch {
     status.innerHTML = 'Could not connect. <button type="button" onclick="connectApp()">Retry connection</button>';

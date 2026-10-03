@@ -40,7 +40,8 @@ func NewCertManager(storageDir string) *CertManager {
 	if updateCmd == "" {
 		updateCmd = "update-ca-certificates"
 	}
-	os.MkdirAll(storageDir, 0o755)
+	// Best effort: saving a certificate reports the error if the directory is still missing.
+	_ = os.MkdirAll(storageDir, 0o755)
 	return &CertManager{
 		StorageDir:     storageDir,
 		TrustTargetDir: trustTarget,
@@ -57,7 +58,7 @@ func (c *CertManager) Snapshot() map[string]any {
 }
 
 func (c *CertManager) ListFiles() []CertFileInfo {
-	os.MkdirAll(c.StorageDir, 0o755)
+	_ = os.MkdirAll(c.StorageDir, 0o755)
 	entries, _ := os.ReadDir(c.StorageDir)
 	var files []CertFileInfo
 	for _, e := range entries {
@@ -121,7 +122,10 @@ func (c *CertManager) DeleteFile(filename string) error {
 		}
 		return err
 	}
-	os.Remove(filepath.Join(c.TrustTargetDir, safeName))
+	// A leftover trust-store copy would keep the certificate trusted.
+	if err := os.Remove(filepath.Join(c.TrustTargetDir, safeName)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	return c.updateTrustStore()
 }
 
@@ -154,7 +158,9 @@ func (c *CertManager) TLSConfig() *tls.Config {
 }
 
 func (c *CertManager) installTrustFile(src string) error {
-	os.MkdirAll(c.TrustTargetDir, 0o755)
+	if err := os.MkdirAll(c.TrustTargetDir, 0o755); err != nil {
+		return err
+	}
 	content, err := os.ReadFile(src)
 	if err != nil {
 		return err

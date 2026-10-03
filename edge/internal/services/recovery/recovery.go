@@ -76,8 +76,8 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 
 	downloadPath := r.tempPath(".download.tar.zst")
 	decryptedPath := r.tempPath(".decrypted.tar.zst")
-	defer os.Remove(downloadPath)
-	defer os.Remove(decryptedPath)
+	defer func() { _ = os.Remove(downloadPath) }()
+	defer func() { _ = os.Remove(decryptedPath) }()
 
 	filename, err := r.downloadSnapshot(ctx, job, fingerprint, downloadPath)
 	if err != nil {
@@ -97,7 +97,7 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 	jobState.LastStatus = "recovered"
 	jobState.LastErrorCategory = ""
 	jobState.LastErrorDetail = ""
-	r.stateStore.Set(job.RootPath, jobState)
+	r.saveState(job, jobState)
 
 	r.logger.Info("recovery_success",
 		"job_name", job.JobName,
@@ -117,8 +117,8 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 func (r *RecoveryService) Preview(ctx context.Context, job *backup.JobDefinition, fingerprint string) (*RecoveryResult, error) {
 	downloadPath := r.tempPath(".download.tar.zst")
 	decryptedPath := r.tempPath(".decrypted.tar.zst")
-	defer os.Remove(downloadPath)
-	defer os.Remove(decryptedPath)
+	defer func() { _ = os.Remove(downloadPath) }()
+	defer func() { _ = os.Remove(decryptedPath) }()
 
 	filename, err := r.downloadSnapshot(ctx, job, fingerprint, downloadPath)
 	if err != nil {
@@ -169,8 +169,15 @@ func (r *RecoveryService) beginRecovery(job *backup.JobDefinition) state.JobStat
 	s.LastStatus = "recovering"
 	s.LastErrorCategory = ""
 	s.LastErrorDetail = ""
-	r.stateStore.Set(job.RootPath, s)
+	r.saveState(job, s)
 	return s
+}
+
+// saveState persists a job's recovery status; a failed write is logged and does not fail recovery.
+func (r *RecoveryService) saveState(job *backup.JobDefinition, s state.JobState) {
+	if err := r.stateStore.Set(job.RootPath, s); err != nil {
+		r.logger.Error("state_save_failed", "job_name", job.JobName, "error", err)
+	}
 }
 
 func (r *RecoveryService) handleError(job *backup.JobDefinition, s *state.JobState, err error) error {
@@ -179,7 +186,7 @@ func (r *RecoveryService) handleError(job *backup.JobDefinition, s *state.JobSta
 	s.LastStatus = "recovery_failed"
 	s.LastErrorCategory = "recovery"
 	s.LastErrorDetail = re.Message
-	r.stateStore.Set(job.RootPath, *s)
+	r.saveState(job, *s)
 	r.logger.Error("recovery_failed", "job_name", job.JobName, "path", job.RootPath, "detail", re.Message)
 	return re
 }
@@ -214,10 +221,11 @@ func wrapRecoveryError(err error, isPreview bool) *RecoveryError {
 }
 
 func (r *RecoveryService) tempPath(suffix string) string {
-	os.MkdirAll(r.settings.SpoolDir, 0o755)
+	// A missing spool directory surfaces when the download writes to the returned path.
+	_ = os.MkdirAll(r.settings.SpoolDir, 0o755)
 	f, _ := os.CreateTemp(r.settings.SpoolDir, "recovery-*"+suffix)
 	if f != nil {
-		f.Close()
+		_ = f.Close()
 		return f.Name()
 	}
 	return filepath.Join(r.settings.SpoolDir, fmt.Sprintf("recovery-%d%s", os.Getpid(), suffix))

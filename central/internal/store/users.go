@@ -305,8 +305,9 @@ func (s *UserStore) ChangePassword(ctx context.Context, userID int, currentPassw
 	return auth.ChangePassword(s, ctx, userID, currentPassword, newPassword)
 }
 
+// Session lookups already ignore expired rows; this only keeps the table small.
 func (s *UserStore) deleteExpiredSessions(ctx context.Context) {
-	s.pool.Exec(ctx, `DELETE FROM app_sessions WHERE expires_at < CURRENT_TIMESTAMP`)
+	_, _ = s.pool.Exec(ctx, `DELETE FROM app_sessions WHERE expires_at < CURRENT_TIMESTAMP`)
 }
 
 func (s *UserStore) withDefaultPasswordChangeRequired(ctx context.Context, user *User) (*User, error) {
@@ -323,6 +324,3 @@ func scanUser(row pgx.Row) (*User, error) {
 	u.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	return u, nil
 }
-
-//go:fix inline
-func boolPtr(b bool) *bool { return new(b) }

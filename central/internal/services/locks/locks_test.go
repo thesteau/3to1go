@@ -33,12 +33,17 @@ func TestNamespaceLockManager_DifferentKeysReturnDifferentMutexes(t *testing.T) 
 func TestNamespaceLockManager_ConcurrentAccess(t *testing.T) {
 	m := NewNamespaceLockManager()
 	var wg sync.WaitGroup
+	count := 0
 	for range 100 {
 		wg.Go(func() {
 			l := m.Lock("shared-ns")
 			l.Lock()
+			count++
 			l.Unlock()
 		})
 	}
 	wg.Wait()
+	if count != 100 {
+		t.Errorf("count = %d, want 100", count)
+	}
 }

@@ -20,7 +20,10 @@ func MockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("database expectations: %v", err)
 		}
-		db.Close()
+		mock.ExpectClose()
+		if err := db.Close(); err != nil {
+			t.Errorf("close mock database: %v", err)
+		}
 	})
 	return db, mock
 }

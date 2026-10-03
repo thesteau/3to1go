@@ -51,9 +51,12 @@ func (c *assetCache) get(name string) (*asset, error) {
 	if compressible(a.contentType) {
 		var buf bytes.Buffer
 		zw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-		zw.Write(content)
-		zw.Close()
-		if buf.Len() < len(content) {
+		_, err := zw.Write(content)
+		if err == nil {
+			err = zw.Close()
+		}
+		// Serve uncompressed content if compression failed or did not help.
+		if err == nil && buf.Len() < len(content) {
 			a.gzipped = buf.Bytes()
 		}
 	}

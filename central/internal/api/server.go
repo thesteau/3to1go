@@ -294,8 +294,6 @@ func isPublicPath(path string) bool {
 		strings.HasPrefix(path, "/backup/recovery/")
 }
 
-type contextKey = auth.ContextKey
-
 const contextKeyUser = auth.ContextKeyUser
 
 func currentUser(r *http.Request) *store.User { return auth.CurrentUser(r) }

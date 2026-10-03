@@ -17,7 +17,9 @@ func newTestBackend(t *testing.T) (*storage.LocalBackend, string) {
 
 func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
-	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writeFile %s: %v", path, err)
 	}
@@ -34,7 +36,9 @@ func TestPruneOldSnapshots_NothingToDelete(t *testing.T) {
 	backend, root := newTestBackend(t)
 	ns := "edge/inst/job"
 	nsDir := filepath.Join(root, ns)
-	os.MkdirAll(nsDir, 0o755)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(nsDir, "a.tar.zst"), "data")
 	writeFile(t, filepath.Join(nsDir, "b.tar.zst"), "data")
 
@@ -51,7 +55,9 @@ func TestPruneOldSnapshots_DeletesOldest(t *testing.T) {
 	backend, root := newTestBackend(t)
 	ns := "edge/inst/job"
 	nsDir := filepath.Join(root, ns)
-	os.MkdirAll(nsDir, 0o755)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	now := time.Now()
 	files := []struct {
@@ -88,7 +94,9 @@ func TestPruneOldSnapshots_DeleteAll(t *testing.T) {
 	backend, root := newTestBackend(t)
 	ns := "edge/inst/job"
 	nsDir := filepath.Join(root, ns)
-	os.MkdirAll(nsDir, 0o755)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	now := time.Now()
 	for i := range 5 {
@@ -121,7 +129,9 @@ func TestPruneOldSnapshots_SameMtimeSortsByName(t *testing.T) {
 	backend, root := newTestBackend(t)
 	ns := "edge/inst/job"
 	nsDir := filepath.Join(root, ns)
-	os.MkdirAll(nsDir, 0o755)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	mtime := time.Now()
 	for _, name := range []string{"aaa.tar.zst", "bbb.tar.zst", "ccc.tar.zst"} {

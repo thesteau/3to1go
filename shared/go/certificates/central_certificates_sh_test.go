@@ -21,7 +21,9 @@ func newCertManagerWithShell(t *testing.T) *CertManager {
 	hasSh(t)
 	storageDir := t.TempDir()
 	trustDir := filepath.Join(t.TempDir(), "trust")
-	os.MkdirAll(trustDir, 0o755)
+	if err := os.MkdirAll(trustDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	return &CertManager{
 		StorageDir:     storageDir,
 		TrustTargetDir: trustDir,
@@ -78,7 +80,9 @@ func TestCertSave_CRLFNormalized(t *testing.T) {
 
 func TestCertDelete_Success(t *testing.T) {
 	cm := newCertManagerWithShell(t)
-	cm.SaveUploadedFile("del.crt", []byte(validPEM))
+	if _, err := cm.SaveUploadedFile("del.crt", []byte(validPEM)); err != nil {
+		t.Fatal(err)
+	}
 	if err := cm.DeleteFile("del.crt"); err != nil {
 		t.Fatalf("DeleteFile: %v", err)
 	}
@@ -117,7 +121,9 @@ func TestUpdateTrustStore_Failure(t *testing.T) {
 	hasSh(t)
 	storageDir := t.TempDir()
 	trustDir := filepath.Join(t.TempDir(), "trust")
-	os.MkdirAll(trustDir, 0o755)
+	if err := os.MkdirAll(trustDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	cm := &CertManager{
 		StorageDir:     storageDir,
 		TrustTargetDir: trustDir,

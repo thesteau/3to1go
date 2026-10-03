@@ -51,14 +51,16 @@ function directoryTreeLoaded(): boolean {
 async function reloadDirectoryTree(): Promise<void> {
   const generation = ++directoryTreeGeneration;
   const paths = [".", ...directoryExpansionState];
-  const results = await Promise.all(paths.map(async (path) => {
-    try {
-      return [path, await fetchDirectoryChildren(path)] as const;
-    } catch (error) {
-      if (path === ".") throw error;
-      return [path, null] as const;
-    }
-  }));
+  const results = await Promise.all(
+    paths.map(async (path) => {
+      try {
+        return [path, await fetchDirectoryChildren(path)] as const;
+      } catch (error) {
+        if (path === ".") throw error;
+        return [path, null] as const;
+      }
+    }),
+  );
   if (generation !== directoryTreeGeneration) return;
   // Folders opened while this reload ran were fetched after it began; keep them.
   for (const path of [...directoryChildren.keys()]) {
@@ -88,8 +90,9 @@ async function loadDirectoryChildren(relativePath: string): Promise<void> {
   } catch (error) {
     if (generation !== directoryTreeGeneration) return;
     directoryExpansionState.delete(relativePath);
-    const element = Array.from(document.querySelectorAll<HTMLDetailsElement>("#directory-tree details[data-path]"))
-      .find((item) => item.dataset.path === relativePath);
+    const element = Array.from(
+      document.querySelectorAll<HTMLDetailsElement>("#directory-tree details[data-path]"),
+    ).find((item) => item.dataset.path === relativePath);
     if (element) element.open = false;
     setActionStatus((error as Error).message, "error");
   } finally {
@@ -117,7 +120,8 @@ function formatLastState(entry: DirectoryEntry): string {
 function lastStateClass(entry: DirectoryEntry): string {
   const status = String(entry.state?.last_status || "").trim();
   if (["success", "recovered", "skipped_unchanged", "skipped_empty"].includes(status)) return "state-ok";
-  if (["manual_intervention_required", "unexpected_exception", "recovery_failed", "held_for_review"].includes(status)) return "state-error";
+  if (["manual_intervention_required", "unexpected_exception", "recovery_failed", "held_for_review"].includes(status))
+    return "state-error";
   if (["retry_scheduled", "waiting_retry", "circuit_open", "skipped_missing"].includes(status)) return "state-warn";
   return "";
 }
@@ -133,7 +137,14 @@ function recentJobEvent(state: JobState | undefined, maxAgeMs = JOB_EVENT_LINGER
 function jobActivityDetails(entry: DirectoryEntry): string {
   const state = entry.state || {};
   const status = String(state.last_status || "").trim();
-  const terminalStatuses = new Set(["success", "retry_scheduled", "manual_intervention_required", "circuit_open", "unexpected_exception", "skipped_missing"]);
+  const terminalStatuses = new Set([
+    "success",
+    "retry_scheduled",
+    "manual_intervention_required",
+    "circuit_open",
+    "unexpected_exception",
+    "skipped_missing",
+  ]);
   const isActive = ACTIVE_JOB_STATUSES.has(status);
   const isTerminal = terminalStatuses.has(status) && recentJobEvent(state);
   if (!isActive && !isTerminal) return "";
@@ -142,46 +153,55 @@ function jobActivityDetails(entry: DirectoryEntry): string {
   const uploaded = Math.max(0, Number(state.upload_offset || 0));
   const uploadPercent = total > 0 ? Math.round((uploaded / total) * 100) : 0;
   const phasePercent = Number(state.active_phase_percent || 0);
-  const percent = status === "success"
-    ? 100
-    : status === "uploading"
-      ? Math.min(99, Math.max(50, phasePercent || (50 + Math.round(uploadPercent / 2))))
-      : phasePercent
-        ? Math.min(100, Math.max(2, phasePercent))
-        : status === "archive_created"
-          ? 50
-          : status === "scanning"
-            ? 5
-            : Math.max(8, Math.min(100, uploadPercent || 8));
-  const kind = status === "success" ? "success" : isTerminal ? "warn" : "active";
-  const label = status === "scanning"
-    ? "Scanning files"
-    : status === "compressing"
-      ? "Compressing snapshot"
-      : status === "encrypting"
-        ? "Encrypting snapshot"
-    : status === "archive_created"
-      ? "Compression complete"
+  const percent =
+    status === "success"
+      ? 100
       : status === "uploading"
-        ? "Uploading snapshot"
-        : status === "success"
-          ? "Snapshot sent"
-          : formatStatusLabel(status);
-  const detail = status === "success"
-    ? (state.last_duplicate ? "Already stored" : "Completed")
-    : status === "compressing" || status === "encrypting"
-      ? (phasePercent > 0 ? `${phasePercent}%` : "In progress")
-    : status === "archive_created"
-      ? "Compressed, awaiting upload"
-    : status === "retry_scheduled"
-      ? (state.next_retry_at ? `Retry at ${formatLocalDateTime(state.next_retry_at)}` : "Retry scheduled")
-      : status === "manual_intervention_required"
-        ? "Needs manual retry"
-        : status === "circuit_open"
-          ? "Upload paused"
-          : total > 0
-            ? `${formatBytes(Math.min(uploaded, total))} / ${formatBytes(total)}`
-            : "Preparing snapshot";
+        ? Math.min(99, Math.max(50, phasePercent || 50 + Math.round(uploadPercent / 2)))
+        : phasePercent
+          ? Math.min(100, Math.max(2, phasePercent))
+          : status === "archive_created"
+            ? 50
+            : status === "scanning"
+              ? 5
+              : Math.max(8, Math.min(100, uploadPercent || 8));
+  const kind = status === "success" ? "success" : isTerminal ? "warn" : "active";
+  const label =
+    status === "scanning"
+      ? "Scanning files"
+      : status === "compressing"
+        ? "Compressing snapshot"
+        : status === "encrypting"
+          ? "Encrypting snapshot"
+          : status === "archive_created"
+            ? "Compression complete"
+            : status === "uploading"
+              ? "Uploading snapshot"
+              : status === "success"
+                ? "Snapshot sent"
+                : formatStatusLabel(status);
+  const detail =
+    status === "success"
+      ? state.last_duplicate
+        ? "Already stored"
+        : "Completed"
+      : status === "compressing" || status === "encrypting"
+        ? phasePercent > 0
+          ? `${phasePercent}%`
+          : "In progress"
+        : status === "archive_created"
+          ? "Compressed, awaiting upload"
+          : status === "retry_scheduled"
+            ? state.next_retry_at
+              ? `Retry at ${formatLocalDateTime(state.next_retry_at)}`
+              : "Retry scheduled"
+            : status === "manual_intervention_required"
+              ? "Needs manual retry"
+              : status === "circuit_open"
+                ? "Upload paused"
+                : total > 0
+                  ? `${formatBytes(Math.min(uploaded, total))} / ${formatBytes(total)}`
+                  : "Preparing snapshot";
 
   return `
     <div class="job-activity ${kind}" aria-label="${escapeHtml(`${label}: ${detail}`)}">
@@ -233,7 +253,7 @@ function renderDirectoryHeader(entry: DirectoryEntry, childCount: number, hasSel
 }
 
 function isHiddenPath(relativePath: string): boolean {
-  const name = relativePath === "." ? "" : (relativePath.split("/").pop() || "");
+  const name = relativePath === "." ? "" : relativePath.split("/").pop() || "";
   return name.startsWith(".");
 }
 
@@ -271,7 +291,9 @@ function renderDirectoryNode(node: DirectoryNode, jobPaths: string[]): string {
   const loaded = directoryChildren.get(relativePath);
   const shouldOpen = directoryExpansionState.has(relativePath);
   const children = loaded
-    ? visibleChildren(loaded).map((child) => renderDirectoryNode(child, jobPaths)).join("")
+    ? visibleChildren(loaded)
+        .map((child) => renderDirectoryNode(child, jobPaths))
+        .join("")
     : '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div>';
   return `
     <details class="dir-branch${excludedClass}" data-path="${escapeHtml(relativePath)}"${shouldOpen ? " open" : ""}>
@@ -306,18 +328,21 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
   const searching = discovering
     ? '<div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Looking for backup jobs in the scan folder…</span></div>'
     : "";
-  const html = searching + (selected.length
-    ? selected.map((entry) => {
-      const jobName = entry.config?.job_name || entry.relative_path;
-      const lastStateLabel = formatLastState(entry);
-      const activity = jobActivityDetails(entry);
-      // A held backup waits for the operator, so Force Upload becomes the approval.
-      const held = entry.state?.last_status === "held_for_review";
-      const uploadLabel = held ? "Upload anyway" : "Force Upload";
-      const uploadHint = held
-        ? "This backup looks very different from earlier ones. Upload it if the change is expected, or clear it."
-        : "Upload even if unchanged. Central may reject as duplicate.";
-      return `
+  const html =
+    searching +
+    (selected.length
+      ? selected
+          .map((entry) => {
+            const jobName = entry.config?.job_name || entry.relative_path;
+            const lastStateLabel = formatLastState(entry);
+            const activity = jobActivityDetails(entry);
+            // A held backup waits for the operator, so Force Upload becomes the approval.
+            const held = entry.state?.last_status === "held_for_review";
+            const uploadLabel = held ? "Upload anyway" : "Force Upload";
+            const uploadHint = held
+              ? "This backup looks very different from earlier ones. Upload it if the change is expected, or clear it."
+              : "Upload even if unchanged. Central may reject as duplicate.";
+            return `
       <div class="job-card" data-path="${escapeHtml(entry.relative_path)}">
         <div class="job-card-body">
           <div class="job-card-info">
@@ -348,8 +373,11 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
         </div>
       </div>
       `;
-    }).join("")
-    : discovering ? "" : '<p class="hint">No directories are selected yet.</p>');
+          })
+          .join("")
+      : discovering
+        ? ""
+        : '<p class="hint">No directories are selected yet.</p>');
   setHtmlIfChanged("selected-jobs", html);
   setHtmlIfChanged("selected-jobs-count", discovering && !selected.length ? "-" : String(selected.length));
 }
@@ -358,9 +386,15 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
 function renderDirectoryTree(): void {
   const topLevel = directoryChildren.get(".");
   if (!topLevel) return;
-  const jobPaths = (latestData?.directories || []).filter((entry) => entry.selected).map((entry) => entry.relative_path);
-  const html = visibleChildren(topLevel).map((node) => renderDirectoryNode(node, jobPaths)).join("");
-  if (setHtmlIfChanged("directory-tree", html || '<p class="hint">No directories were found under the scan root.</p>')) {
+  const jobPaths = (latestData?.directories || [])
+    .filter((entry) => entry.selected)
+    .map((entry) => entry.relative_path);
+  const html = visibleChildren(topLevel)
+    .map((node) => renderDirectoryNode(node, jobPaths))
+    .join("");
+  if (
+    setHtmlIfChanged("directory-tree", html || '<p class="hint">No directories were found under the scan root.</p>')
+  ) {
     bindDirectoryTreeEvents();
   }
 }
@@ -378,7 +412,8 @@ function findEntry(relativePath: string): DirectoryEntry | undefined {
 function editPath(relativePath: string): void {
   const entry = findEntry(relativePath);
   (document.getElementById("relative_path") as HTMLInputElement).value = relativePath;
-  (document.getElementById("job_name") as HTMLInputElement).value = entry?.config?.job_name || (relativePath === "." ? "" : relativePath.split("/").pop() || "");
+  (document.getElementById("job_name") as HTMLInputElement).value =
+    entry?.config?.job_name || (relativePath === "." ? "" : relativePath.split("/").pop() || "");
   (document.getElementById("exclude") as HTMLTextAreaElement).value = (entry?.config?.exclude || []).join("\n");
   (document.getElementById("include_hidden") as HTMLInputElement).checked = entry?.config?.include_hidden ?? true;
   (document.getElementById("follow_symlinks") as HTMLInputElement).checked = entry?.config?.follow_symlinks ?? false;
@@ -400,5 +435,9 @@ function resetForm(): void {
   (document.getElementById("exclude") as HTMLTextAreaElement).value = "";
   (document.getElementById("include_hidden") as HTMLInputElement).checked = true;
   (document.getElementById("follow_symlinks") as HTMLInputElement).checked = false;
-  setStatus("form-status", "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.", "info");
+  setStatus(
+    "form-status",
+    "Choose a directory, then click Save Job to create or update its .upload_dir backup settings.",
+    "info",
+  );
 }

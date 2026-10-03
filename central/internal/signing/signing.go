@@ -39,10 +39,6 @@ func b64url(data []byte) string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-func b64urlDecode(s string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(s)
-}
-
 // LoadOrCreateIssuerKeypair reads a 32-byte Ed25519 seed from path, or generates one.
 func LoadOrCreateIssuerKeypair(path string) (ed25519.PrivateKey, ed25519.PublicKey, error) {
 	info, err := os.Stat(path)
@@ -81,10 +77,12 @@ func LoadOrCreateIssuerKeypair(path string) (ed25519.PrivateKey, ed25519.PublicK
 		return nil, nil, fmt.Errorf("creating issuer key file: %w", err)
 	}
 	if _, err := f.Write(seed); err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, nil, fmt.Errorf("writing issuer key: %w", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		return nil, nil, fmt.Errorf("writing issuer key: %w", err)
+	}
 
 	priv := ed25519.NewKeyFromSeed(seed)
 	return priv, priv.Public().(ed25519.PublicKey), nil

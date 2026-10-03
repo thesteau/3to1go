@@ -4,8 +4,5 @@
     "rootDir": "../..",
     "outDir": "js"
   },
-  "include": [
-    "ts",
-    "../../shared/ts"
-  ]
+  "include": ["ts", "../../shared/ts"]
 }

@@ -114,8 +114,12 @@ func TestMatchesExclude_MultiplePatterns(t *testing.T) {
 
 func TestBuildFileList_ReturnsFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello"), 0o644)
-	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("world"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.txt"), []byte("world"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: true}
 	files, err := BuildFileList(job, nil)
 	if err != nil {
@@ -128,8 +132,12 @@ func TestBuildFileList_ReturnsFiles(t *testing.T) {
 
 func TestBuildFileList_ExcludesUploadDirMarker(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, UploadDirFilename), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "data.txt"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, UploadDirFilename), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "data.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: true}
 	files, err := BuildFileList(job, nil)
 	if err != nil {
@@ -144,8 +152,12 @@ func TestBuildFileList_ExcludesUploadDirMarker(t *testing.T) {
 
 func TestBuildFileList_ExcludesHiddenWhenDisabled(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "visible.txt"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(dir, ".hidden"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "visible.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".hidden"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: false}
 	files, err := BuildFileList(job, nil)
 	if err != nil {
@@ -158,8 +170,12 @@ func TestBuildFileList_ExcludesHiddenWhenDisabled(t *testing.T) {
 
 func TestBuildFileList_IncludesHiddenWhenEnabled(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "visible.txt"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(dir, ".hidden"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "visible.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".hidden"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: true}
 	files, err := BuildFileList(job, nil)
 	if err != nil {
@@ -173,7 +189,9 @@ func TestBuildFileList_IncludesHiddenWhenEnabled(t *testing.T) {
 func TestBuildFileList_SortedByArchivePath(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"c.txt", "a.txt", "b.txt"} {
-		os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: false}
 	files, err := BuildFileList(job, nil)
@@ -192,8 +210,12 @@ func TestBuildFileList_SortedByArchivePath(t *testing.T) {
 
 func TestBuildFileList_AppliesExcludePatterns(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(dir, "temp.log"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "temp.log"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{
 		RootPath:        dir,
 		JobName:         "test",
@@ -212,9 +234,15 @@ func TestBuildFileList_AppliesExcludePatterns(t *testing.T) {
 func TestBuildFileList_RecursesSubdirectories(t *testing.T) {
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
-	os.Mkdir(sub, 0o755)
-	os.WriteFile(filepath.Join(dir, "root.txt"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(sub, "child.txt"), []byte("x"), 0o644)
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "root.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "child.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{RootPath: dir, JobName: "test", IncludeHidden: false}
 	files, err := BuildFileList(job, nil)
 	if err != nil {
@@ -235,9 +263,15 @@ func TestBuildFileList_RecursesSubdirectories(t *testing.T) {
 func TestBuildFileList_ExcludesSubdirectoryByPattern(t *testing.T) {
 	dir := t.TempDir()
 	buildDir := filepath.Join(dir, "build")
-	os.Mkdir(buildDir, 0o755)
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(buildDir, "output"), []byte("x"), 0o644)
+	if err := os.Mkdir(buildDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(buildDir, "output"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	job := &JobDefinition{
 		RootPath:        dir,
 		JobName:         "test",
