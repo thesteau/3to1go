@@ -216,8 +216,12 @@ async function fetchScoutData({
       })
     : null;
 
+  // Station holds restore requests; check for new ones with each refresh. Wait for
+  // the job list so each request's destination can default to its job's folder.
+  const restoreFetch = dirFetch.then(() => loadRestoreRequests({ silent }));
+
   try {
-    await Promise.all([statusFetch, dirFetch, treeFetch, keyFetch].filter(Boolean));
+    await Promise.all([statusFetch, dirFetch, treeFetch, keyFetch, restoreFetch].filter(Boolean));
     saveScoutView();
   } finally {
     isLoadingData = false;

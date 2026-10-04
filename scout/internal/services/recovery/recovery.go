@@ -28,6 +28,7 @@ type jobStateStore interface {
 type snapshotDownloader interface {
 	DownloadLatestSnapshot(ctx context.Context, scoutID, jobName, destPath string) (string, error)
 	DownloadSnapshotByFingerprint(ctx context.Context, scoutID, jobName, fingerprint, destPath string) (string, error)
+	DownloadSnapshotByFilename(ctx context.Context, scoutID, jobName, filename, destPath string) (string, error)
 }
 
 // RecoveryError is a user-visible error from the recovery process.
@@ -100,6 +101,52 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 	r.saveState(job, jobState)
 
 	r.logger.Info("recovery_success",
+		"job_name", job.JobName,
+		"path", job.RootPath,
+		"snapshot", filename,
+		"restored_files", restored)
+
+	return &RecoveryResult{
+		Status:              "recovered",
+		JobName:             job.JobName,
+		SnapshotFilename:    filename,
+		SnapshotFingerprint: fingerprintFromFilename(filename),
+		RestoredFiles:       restored,
+	}, nil
+}
+
+// RecoverFilename restores one exact archive that Station asked for. The
+// destination may not be a job folder, so no job state is recorded for it.
+func (r *RecoveryService) RecoverFilename(ctx context.Context, job *backup.JobDefinition, filename string) (*RecoveryResult, error) {
+	return r.RecoverRequest(ctx, job, filename, r.encKey, func(path string) (string, error) {
+		return r.downloader.DownloadSnapshotByFilename(ctx, r.settings.ScoutID, job.JobName, filename, path)
+	})
+}
+
+func (r *RecoveryService) RecoverRequest(ctx context.Context, job *backup.JobDefinition, filename string, key []byte, download func(string) (string, error)) (*RecoveryResult, error) {
+	downloadPath := r.tempPath(".download.tar.zst")
+	decryptedPath := r.tempPath(".decrypted.tar.zst")
+	defer func() { _ = os.Remove(downloadPath) }()
+	defer func() { _ = os.Remove(decryptedPath) }()
+
+	got, err := download(downloadPath)
+	if err != nil {
+		return nil, r.handleRequestError(job, err)
+	}
+	if got != filename {
+		return nil, r.handleRequestError(job, &RecoveryError{Message: "Station returned a different snapshot than requested", StatusCode: 502})
+	}
+
+	if err := encryption.DecryptFile(key, downloadPath, decryptedPath); err != nil {
+		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with the provided encryption key", StatusCode: 409})
+	}
+
+	restored, err := backup.ExtractArchive(decryptedPath, job.RootPath)
+	if err != nil {
+		return nil, r.handleRequestError(job, &RecoveryError{Message: err.Error(), StatusCode: 500})
+	}
+
+	r.logger.Info("restore_request_success",
 		"job_name", job.JobName,
 		"path", job.RootPath,
 		"snapshot", filename,
@@ -194,6 +241,12 @@ func (r *RecoveryService) handleError(job *backup.JobDefinition, s *state.JobSta
 func (r *RecoveryService) handlePreviewError(job *backup.JobDefinition, err error) error {
 	re := wrapRecoveryError(err, true)
 	r.logger.Warn("recovery_preview_failed", "job_name", job.JobName, "path", job.RootPath, "detail", re.Message)
+	return re
+}
+
+func (r *RecoveryService) handleRequestError(job *backup.JobDefinition, err error) error {
+	re := wrapRecoveryError(err, false)
+	r.logger.Error("restore_request_failed", "job_name", job.JobName, "path", job.RootPath, "detail", re.Message)
 	return re
 }
 

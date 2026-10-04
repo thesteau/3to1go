@@ -36,6 +36,20 @@
     </section>
 
     <section class="panel workspace-panel">
+      <div class="workspace-tabs" role="tablist" aria-label="Scout workspace" onkeydown="handleScoutWorkspaceKey(event)">
+        <button type="button" class="workspace-tab" role="tab" id="jobs-tab" aria-controls="jobs-workspace" aria-selected="true" tabindex="0" onclick="showScoutWorkspace('jobs')">Jobs</button>
+        <button type="button" class="workspace-tab" role="tab" id="restore-requests-tab" aria-controls="restore-requests-workspace" aria-selected="false" tabindex="-1" hidden onclick="showScoutWorkspace('restore-requests')">Restore Requests</button>
+      </div>
+
+      <div id="restore-requests-workspace" role="tabpanel" aria-labelledby="restore-requests-tab" hidden>
+        <div class="section-head">
+          <h2>Restore Requests</h2>
+          <p class="hint">Snapshots Station asked to restore here. Nothing is restored until you accept. Requests expire after 1 hour.</p>
+        </div>
+        <div id="restore-requests-list" class="job-list"></div>
+      </div>
+
+      <div id="jobs-workspace" role="tabpanel" aria-labelledby="jobs-tab">
       <div class="section-head">
         <h2>Selected Jobs <span id="selected-jobs-count" class="dir-count">-</span></h2>
         <p class="hint">Folders with an <code>.upload_dir</code> file. Click Edit to change or stop a job.</p>
@@ -61,6 +75,7 @@
         <p class="hint">Click Edit on a folder to back it up. Folders inside a job are covered by it.</p>
       </div>
       <div id="directory-tree" class="directory-tree"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
+      </div>
     </section>
   </main>
 
@@ -89,6 +104,7 @@
   <script defer src="/static/js/scout/static/ts/files.js"></script>
   <script defer src="/static/js/scout/static/ts/jobs.js"></script>
   <script defer src="/static/js/scout/static/ts/recovery.js"></script>
+  <script defer src="/static/js/scout/static/ts/restore-requests.js"></script>
   <script defer src="/static/js/scout/static/ts/app.js"></script>
 </body>
 </html>

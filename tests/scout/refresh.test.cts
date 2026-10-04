@@ -18,6 +18,7 @@ function refreshContext(overrides) {
     renderDirectoryTree() {},
     directoryTreeLoaded: () => true,
     reloadDirectoryTree: async () => {},
+    loadRestoreRequests: async () => {},
     ...overrides,
   });
   loadFeature(ctx, "scout", "refresh");
@@ -197,6 +198,22 @@ test("Scout polls skip the folder tree once it has loaded", async () => {
   assert.deepEqual(requests, ["/api/status", "/api/directories"]);
   await ctx.loadData({ silent: true, includeKey: false, refreshDirectoryTree: true });
   assert.equal(reloads, 1);
+});
+
+test("each refresh checks restore requests after the job list, quietly when polling", async () => {
+  const order = [];
+  const ctx = refreshContext({
+    fetch: async (url) => {
+      order.push(url);
+      return { ok: true, json: async () => ({ directories: [] }) };
+    },
+    renderSelectedJobs: () => order.push("jobs"),
+    loadRestoreRequests: async (options) => order.push(["restore", options.silent]),
+  });
+  await ctx.loadData({ silent: true, includeKey: false });
+  assert.deepEqual(order.slice(-2), ["jobs", ["restore", true]]);
+  await ctx.loadData({ includeKey: false, refreshDirectoryTree: false });
+  assert.deepEqual(order.at(-1), ["restore", false]);
 });
 
 test("Scout keeps loaded settings editable when a later poll fails", async () => {

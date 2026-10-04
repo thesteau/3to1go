@@ -94,6 +94,14 @@
 
 .btn-dl:hover { background: var(--success-soft-hover); }
 
+.btn-restore {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.btn-restore:hover { background: var(--accent-soft-hover); }
+.btn-restore:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .btn-del {
   background: var(--danger-soft);
   color: var(--red);

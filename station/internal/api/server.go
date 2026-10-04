@@ -56,6 +56,7 @@ type snapIndexer interface {
 	UpsertScoutRegistration(ctx context.Context, r *store.ScoutRegistration) error
 	ListScoutRegistrations(ctx context.Context, scoutIDFilter *string) ([]store.ScoutRegistration, error)
 	ListNamespaces(ctx context.Context) ([]store.NamespaceEntry, error)
+	restoreRequestStore
 }
 
 type ingestSvc interface {
@@ -259,6 +260,7 @@ func (a *App) Handler() http.Handler {
 	r.Delete("/api/snapshots/{scout_id}/{scout_instance_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDeleteSnapshotForInstance, "scout_id", "scout_instance_id", "job_name", "filename"))
 	r.Get("/api/snapshots/{scout_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDownloadSnapshot, "scout_id", "job_name", "filename"))
 	r.Delete("/api/snapshots/{scout_id}/{job_name}/{filename}", httpx.WithPathValues(a.handleDeleteSnapshot, "scout_id", "job_name", "filename"))
+	r.Post("/api/snapshots/{scout_id}/{scout_instance_id}/{job_name}/{filename}/restore", httpx.WithPathValues(a.handleRequestRestore, "scout_id", "scout_instance_id", "job_name", "filename"))
 
 	// Backup uploads (Bearer JWT auth, no session)
 	r.Post("/backup/uploads/initiate", a.handleInitiateUpload)
@@ -268,6 +270,10 @@ func (a *App) Handler() http.Handler {
 	// Recovery (Bearer JWT auth)
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/latest", httpx.WithPathValues(a.handleDownloadLatest, "scout_id", "scout_instance_id", "job_name"))
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/by-fingerprint", httpx.WithPathValues(a.handleDownloadByFingerprint, "scout_id", "scout_instance_id", "job_name"))
+	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/archive/{filename}", httpx.WithPathValues(a.handleDownloadExactSnapshot, "scout_id", "scout_instance_id", "job_name", "filename"))
+	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/requests/{request_id}/archive", httpx.WithPathValues(a.handleDownloadRestoreArchive, "scout_id", "scout_instance_id", "request_id"))
+	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/requests", httpx.WithPathValues(a.handleListRestoreRequests, "scout_id", "scout_instance_id"))
+	r.Post("/backup/recovery/{scout_id}/{scout_instance_id}/requests/{request_id}", httpx.WithPathValues(a.handleDecideRestoreRequest, "scout_id", "scout_instance_id", "request_id"))
 
 	return a.requestLogger(httpx.NewRateLimiter(specsForPath).Middleware(a.sessionMiddleware(r)))
 }

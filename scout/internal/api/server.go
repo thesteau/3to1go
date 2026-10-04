@@ -63,6 +63,7 @@ type scoutRunner interface {
 	StartForceSendAsync(relativePath string) (map[string]any, error)
 	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
+	restoreRunner
 }
 
 type schedulerFacade interface {
@@ -149,6 +150,11 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/recovery/preview", a.handleRecoveryPreview)
 	r.Post("/api/recovery/restore", a.handleRecoveryRestore)
 
+	// Restore requests from Station
+	r.Get("/api/restore-requests", a.handleRestoreRequests)
+	r.Post("/api/restore-requests/decision", a.handleRestoreDecision)
+	r.Post("/backup/restore-notifications", a.handleRestoreNotification)
+
 	// Settings
 	r.Get("/api/settings", a.handleGetSettings)
 	r.Post("/api/settings", a.handleSaveSettings)
@@ -188,6 +194,9 @@ func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 func isPublicPath(path string) bool {
 	switch path {
 	case "/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/change-password":
+		return true
+	case "/backup/restore-notifications":
+		// Station has no Scout session; the handler checks the ID against Station itself.
 		return true
 	}
 	return path == "/" ||
