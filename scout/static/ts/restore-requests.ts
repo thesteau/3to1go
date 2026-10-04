@@ -37,7 +37,7 @@ function handleScoutWorkspaceKey(event: KeyboardEvent): void {
   document.getElementById(`${next}-tab`)?.focus();
 }
 
-async function loadRestoreRequests(): Promise<void> {
+async function loadRestoreRequests({ silent = false } = {}): Promise<void> {
   if (restoreDecisionBusy) return;
   try {
     const response = await fetch("/api/restore-requests", { signal: globalThis.AbortSignal?.timeout?.(15000) });
@@ -46,7 +46,10 @@ async function loadRestoreRequests(): Promise<void> {
     if (restoreDecisionBusy) return;
     renderRestoreRequests(requests);
   } catch {
-    setStatus("restore-requests-status", "Restore requests could not load from Station. Refresh to retry.", "error");
+    // Background polls stay quiet so an unreachable Station doesn't repeat the message.
+    if (!silent) {
+      setStatus("restore-requests-status", "Restore requests could not load from Station. Refresh to retry.", "error");
+    }
   }
 }
 
@@ -67,8 +70,10 @@ function renderRestoreRequests(requests: StationRestoreRequest[]): void {
       <label>Destination folder under scan root
         <input type="text" id="restore-destination-${escapeHtml(request.id)}" placeholder="e.g. projects/my-folder" autocomplete="off">
       </label>
-      <button type="button" onclick="decideStationRestore(${inlineString(request.id)},'accept',this)">${request.status === "accepted" ? "Retry Restore" : "Accept"}</button>
-      <button type="button" class="secondary" onclick="decideStationRestore(${inlineString(request.id)},'reject',this)">Reject</button>
+      <div class="restore-request-actions">
+        <button type="button" onclick="decideStationRestore(${inlineString(request.id)},'accept',this)">${request.status === "accepted" ? "Retry Restore" : "Accept"}</button>
+        <button type="button" class="secondary" onclick="decideStationRestore(${inlineString(request.id)},'reject',this)">Reject</button>
+      </div>
     </article>`,
       )
       .join("") || '<p class="hint">No pending restore requests.</p>';

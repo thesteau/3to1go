@@ -77,6 +77,10 @@ func (m *mockDownloader) DownloadSnapshotByFingerprint(_ context.Context, _, _, 
 	return m.DownloadLatestSnapshot(context.Background(), "", "", destPath)
 }
 
+func (m *mockDownloader) DownloadSnapshotByFilename(_ context.Context, _, _, _, destPath string) (string, error) {
+	return m.DownloadLatestSnapshot(context.Background(), "", "", destPath)
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -103,6 +107,25 @@ func testJob(root string) *backup.JobDefinition {
 // fakeEncryptedContent returns invalid encrypted content, causing DecryptFile to fail.
 func fakeEncryptedContent() []byte {
 	return []byte("not a valid DARE stream")
+}
+
+// ---------------------------------------------------------------------------
+// RecoverFilename
+// ---------------------------------------------------------------------------
+
+func TestRecoverFilename_RejectsDifferentSnapshot(t *testing.T) {
+	ms := newMockStateStore()
+	dl := &mockDownloader{filename: "photos__2026-09-02T00-00-00Z__bbbbbbbb.tar.zst", content: fakeEncryptedContent()}
+	svc := newTestRecoveryService(t, ms, dl)
+	root := t.TempDir()
+	_, err := svc.RecoverFilename(context.Background(), testJob(root), "photos__2026-09-01T00-00-00Z__aaaaaaaa.tar.zst")
+	re, ok := err.(*RecoveryError)
+	if !ok || re.StatusCode != 502 {
+		t.Fatalf("err = %v, want 502 RecoveryError", err)
+	}
+	if len(ms.states) != 0 {
+		t.Fatal("restore request must not record job state")
+	}
 }
 
 // ---------------------------------------------------------------------------

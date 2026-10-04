@@ -106,6 +106,17 @@ func (s *SnapshotIndex) EnsureSchema(ctx context.Context) error {
 			ON scout_registration (scout_id, scout_instance_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_scout_registration_credential_hash
 			ON scout_registration (credential_hash)`,
+		`CREATE TABLE IF NOT EXISTS restore_requests (
+			id TEXT PRIMARY KEY,
+			scout_id TEXT NOT NULL,
+			scout_instance_id TEXT NOT NULL,
+			job_name TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			status TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_restore_requests_instance
+			ON restore_requests (scout_id, scout_instance_id, status)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.pool.Exec(ctx, stmt); err != nil {

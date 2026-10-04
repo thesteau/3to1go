@@ -206,3 +206,27 @@ button.toggle-btn.toggle-on .toggle-thumb {
   background: var(--button-secondary-bg);
   color: var(--button-secondary-ink);
 }
+
+.workspace-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+button.workspace-tab {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-ink);
+}
+
+button.workspace-tab[aria-selected="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.restore-request-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
