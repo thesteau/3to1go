@@ -2,7 +2,9 @@ package encryption
 
 import (
 	"bytes"
+	"encoding/base64"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -50,6 +52,33 @@ func TestKeyAsBase64_DifferentForDifferentKeys(t *testing.T) {
 	key2[31] = 1
 	if KeyAsBase64(key1) == KeyAsBase64(key2) {
 		t.Error("different keys should produce different base64 strings")
+	}
+}
+
+func TestKeyFromBase64_AcceptsShownAndStandardForms(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(0xF8 + i) // encodes to '-' and '_' in URL-safe base64
+	}
+	shown := KeyAsBase64(key)
+	for _, input := range []string{
+		shown,
+		" " + shown + "\n",
+		strings.TrimRight(shown, "="),
+		base64.StdEncoding.EncodeToString(key),
+	} {
+		got, err := KeyFromBase64(input)
+		if err != nil || !bytes.Equal(got, key) {
+			t.Errorf("KeyFromBase64(%q) = %x, %v", input, got, err)
+		}
+	}
+}
+
+func TestKeyFromBase64_RejectsInvalidKeys(t *testing.T) {
+	for _, input := range []string{"", "not base64!", base64.URLEncoding.EncodeToString(make([]byte, 16))} {
+		if _, err := KeyFromBase64(input); err == nil {
+			t.Errorf("KeyFromBase64(%q) succeeded, want error", input)
+		}
 	}
 }
 

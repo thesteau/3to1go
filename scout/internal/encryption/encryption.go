@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/3to1go/scout/internal/cancelio"
 	"github.com/minio/sio"
@@ -82,6 +83,18 @@ func loadOrCreate(path string, create func(string) (keyFile, error)) (key []byte
 // KeyAsBase64 returns the URL-safe base64 encoding of key.
 func KeyAsBase64(key []byte) string {
 	return base64.URLEncoding.EncodeToString(key)
+}
+
+// KeyFromBase64 parses a 32-byte key in the URL-safe form KeyAsBase64 shows,
+// also accepting standard base64 and omitted padding.
+func KeyFromBase64(s string) ([]byte, error) {
+	s = strings.TrimRight(strings.TrimSpace(s), "=")
+	for _, enc := range []*base64.Encoding{base64.RawURLEncoding, base64.RawStdEncoding} {
+		if key, err := enc.DecodeString(s); err == nil && len(key) == 32 {
+			return key, nil
+		}
+	}
+	return nil, errors.New("encryption key must be a base64 encoded 32-byte key")
 }
 
 // KeyFingerprint returns the SHA-256 hex digest of key.
