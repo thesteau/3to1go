@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/3to1go/scout/internal/backup"
+	"github.com/3to1go/scout/internal/encryption"
 	"github.com/3to1go/scout/internal/services/recovery"
 	"github.com/3to1go/scout/internal/services/upload"
 	"github.com/3to1go/shared/protocol"
@@ -127,9 +127,9 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		if len(providedKey) == 0 || providedKey[0] == "" {
 			return nil, fmt.Errorf("provide the original snapshot's encryption key")
 		}
-		key, err = base64.StdEncoding.DecodeString(strings.TrimSpace(providedKey[0]))
-		if err != nil || len(key) != 32 {
-			return nil, fmt.Errorf("encryption key must be a base64 encoded 32-byte key")
+		key, err = encryption.KeyFromBase64(providedKey[0])
+		if err != nil {
+			return nil, err
 		}
 	}
 	destination, err := restoreDestination(settings.ScanRoot, relativePath)
