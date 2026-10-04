@@ -30,8 +30,21 @@ func TestRestoreDestinationAllowsDeletedFolder(t *testing.T) {
 }
 
 func TestRestoreRequestDecision(t *testing.T) {
-	for _, decision := range []string{"accept", "reject"} {
-		t.Run(decision, func(t *testing.T) {
+	for _, test := range []struct {
+		name, decision, folder, key string
+		cross, fails                bool
+	}{
+		{name: "default folder", decision: "accept"},
+		{name: "renamed folder", decision: "accept", folder: "renamed"},
+		{name: "reject", decision: "reject"},
+		{name: "cross device requires key", decision: "accept", cross: true, fails: true},
+		{name: "cross device wrong key", decision: "accept", cross: true, key: "YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk=", fails: true},
+		{name: "cross device valid key", decision: "accept", cross: true, key: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="},
+		{name: "nested folder refused", decision: "accept", folder: "nested/photos", fails: true},
+		{name: "scan root refused", decision: "accept", folder: ".", fails: true},
+	} {
+		decision := test.decision
+		t.Run(test.name, func(t *testing.T) {
 			settings := testRunnerSettings(t)
 			if err := os.MkdirAll(settings.ScanRoot, 0o755); err != nil {
 				t.Fatal(err)
@@ -62,14 +75,19 @@ func TestRestoreRequestDecision(t *testing.T) {
 				}
 				switch r.URL.Path {
 				case "/backup/recovery/scout-1/instance-1/requests":
-					_ = json.NewEncoder(w).Encode([]protocol.RestoreRequest{{ID: "request", JobName: "photos", Filename: filename, Status: status}})
+					request := protocol.RestoreRequest{ID: "request", ScoutID: "scout-1", ScoutInstanceID: "instance-1", JobName: "photos", Filename: filename, Status: status}
+					if test.cross {
+						request.SourceScoutID = "source"
+						request.SourceInstanceID = "old-instance"
+					}
+					_ = json.NewEncoder(w).Encode([]protocol.RestoreRequest{request})
 				case "/backup/recovery/scout-1/instance-1/requests/request":
 					var body map[string]string
 					_ = json.NewDecoder(r.Body).Decode(&body)
 					status = body["status"]
 					decisions = append(decisions, status)
 					writeTestJSON(t, w, map[string]any{"status": status})
-				case "/backup/recovery/scout-1/instance-1/photos/archive/" + filename:
+				case "/backup/recovery/scout-1/instance-1/requests/request/archive":
 					downloads++
 					if status != "accepted" {
 						t.Error("download before acceptance")
@@ -86,11 +104,24 @@ func TestRestoreRequestDecision(t *testing.T) {
 			client := testUploadClient(station.URL)
 			runner := testRunner(t, settings, client)
 			runner.Recovery = recovery.NewRecoveryService(settings, runner.logger, runner.StateStore, client, key)
-			result, err := runner.DecideRestoreRequest(context.Background(), "request", decision, "deleted/photos")
+			result, err := runner.DecideRestoreRequest(context.Background(), "request", decision, test.folder, test.key)
+			folder := test.folder
+			if folder == "" {
+				folder = "photos"
+			}
+			if test.fails {
+				if err == nil {
+					t.Fatal("expected restore failure")
+				}
+				if _, statErr := os.Stat(filepath.Join(settings.ScanRoot, folder, "file.txt")); !os.IsNotExist(statErr) {
+					t.Fatal("failed restore wrote files")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			destination := filepath.Join(settings.ScanRoot, "deleted", "photos", "file.txt")
+			destination := filepath.Join(settings.ScanRoot, folder, "file.txt")
 			if decision == "reject" {
 				if downloads != 0 || status != "rejected" {
 					t.Fatalf("rejection downloaded %d archives, status %s", downloads, status)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -44,6 +45,31 @@ func (a *App) handleRequestRestore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 409, "Scout must have an encryption key configured")
 		return
 	}
+	var body struct {
+		TargetScoutID    string `json:"target_scout_id"`
+		TargetInstanceID string `json:"target_instance_id"`
+	}
+	if err := httpx.ReadJSON(r, &body); err != nil && err != io.EOF {
+		httpx.WriteError(w, 400, "invalid restore target")
+		return
+	}
+	targetScout, targetInstance := scoutID, instanceID
+	if body.TargetScoutID != "" || body.TargetInstanceID != "" {
+		targetScout, targetInstance = body.TargetScoutID, body.TargetInstanceID
+		if _, err := validatedNamespace(targetScout, targetInstance, jobName); err != nil {
+			httpx.WriteError(w, 400, "invalid restore target")
+			return
+		}
+		registration, err = a.snapIndex.GetScoutRegistration(r.Context(), targetScout, targetInstance)
+		if err != nil {
+			httpx.WriteError(w, 500, "unable to inspect target Scout")
+			return
+		}
+		if registration == nil || registration.CredentialHash == nil {
+			httpx.WriteError(w, 409, "target Scout must have a bound credential")
+			return
+		}
+	}
 	file, err := os.OpenInRoot(a.Settings().BackupRoot, snapshotPath(namespace, filename))
 	if err != nil {
 		httpx.WriteError(w, 404, "snapshot not found")
@@ -56,7 +82,7 @@ func (a *App) handleRequestRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	store := a.snapIndex
-	request := protocol.RestoreRequest{ID: rand.Text(), ScoutID: scoutID, ScoutInstanceID: instanceID, JobName: jobName, Filename: filename, Status: "pending", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	request := protocol.RestoreRequest{ID: rand.Text(), ScoutID: targetScout, ScoutInstanceID: targetInstance, SourceScoutID: scoutID, SourceInstanceID: instanceID, JobName: jobName, Filename: filename, Status: "pending", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	if err := store.CreateRestoreRequest(r.Context(), request); err != nil {
 		httpx.WriteError(w, 500, "unable to save restore request")
 		return
@@ -150,4 +176,32 @@ func (a *App) handleDownloadExactSnapshot(w http.ResponseWriter, r *http.Request
 		return
 	}
 	a.serveSnapshot(w, r, namespace, filename, true)
+}
+
+// Only the receiving instance can download the archive attached to a live accepted request.
+func (a *App) handleDownloadRestoreArchive(w http.ResponseWriter, r *http.Request) {
+	if !a.authorizeRestoreRequests(w, r) {
+		return
+	}
+	requests, err := a.snapIndex.ListRestoreRequests(r.Context(), r.PathValue("scout_id"), r.PathValue("scout_instance_id"))
+	if err != nil {
+		httpx.WriteError(w, 500, "unable to load restore request")
+		return
+	}
+	for _, request := range requests {
+		if request.ID != r.PathValue("request_id") || request.Status != "accepted" {
+			continue
+		}
+		source, instance := request.SourceScoutID, request.SourceInstanceID
+		if source == "" {
+			source, instance = request.ScoutID, request.ScoutInstanceID
+		}
+		namespace, err := validatedNamespace(source, instance, request.JobName)
+		if err != nil || !validRestoreFilename(request.Filename) {
+			break
+		}
+		a.serveSnapshot(w, r, namespace, request.Filename, true)
+		return
+	}
+	httpx.WriteError(w, 404, "accepted restore request not found")
 }

@@ -10,7 +10,7 @@ import (
 func (m *mockRunner) RestoreRequests(context.Context) ([]protocol.RestoreRequest, error) {
 	return []protocol.RestoreRequest{}, nil
 }
-func (m *mockRunner) DecideRestoreRequest(context.Context, string, string, string) (any, error) {
+func (m *mockRunner) DecideRestoreRequest(context.Context, string, string, string, ...string) (any, error) {
 	return map[string]string{"status": "rejected"}, nil
 }
 
@@ -23,7 +23,7 @@ type restoreMockRunner struct {
 func (m *restoreMockRunner) RestoreRequests(context.Context) ([]protocol.RestoreRequest, error) {
 	return m.requests, nil
 }
-func (m *restoreMockRunner) DecideRestoreRequest(context.Context, string, string, string) (any, error) {
+func (m *restoreMockRunner) DecideRestoreRequest(context.Context, string, string, string, ...string) (any, error) {
 	m.decided = true
 	return map[string]string{"status": "rejected"}, nil
 }

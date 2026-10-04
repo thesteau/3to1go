@@ -19,7 +19,7 @@ func (s *SnapshotIndex) CreateRestoreRequest(ctx context.Context, r protocol.Res
 	if err := s.pruneRestoreRequests(ctx); err != nil {
 		return err
 	}
-	_, err := s.pool.Exec(ctx, `INSERT INTO restore_requests (id, scout_id, scout_instance_id, job_name, filename, status, created_at) VALUES ($1,$2,$3,$4,$5,'pending',$6)`, r.ID, r.ScoutID, r.ScoutInstanceID, r.JobName, r.Filename, r.CreatedAt)
+	_, err := s.pool.Exec(ctx, `INSERT INTO restore_requests (id, scout_id, scout_instance_id, job_name, filename, status, created_at, source_scout_id, source_instance_id) VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8)`, r.ID, r.ScoutID, r.ScoutInstanceID, r.JobName, r.Filename, r.CreatedAt, r.SourceScoutID, r.SourceInstanceID)
 	return err
 }
 
@@ -27,7 +27,7 @@ func (s *SnapshotIndex) ListRestoreRequests(ctx context.Context, scoutID, instan
 	if err := s.pruneRestoreRequests(ctx); err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id, scout_id, scout_instance_id, job_name, filename, status, created_at FROM restore_requests WHERE scout_id=$1 AND scout_instance_id=$2 AND status IN ('pending','accepted') AND `+restoreRequestLive+` ORDER BY created_at DESC`, scoutID, instanceID)
+	rows, err := s.pool.Query(ctx, `SELECT id, scout_id, scout_instance_id, job_name, filename, status, created_at, source_scout_id, source_instance_id FROM restore_requests WHERE scout_id=$1 AND scout_instance_id=$2 AND status IN ('pending','accepted') AND `+restoreRequestLive+` ORDER BY created_at DESC`, scoutID, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (s *SnapshotIndex) ListRestoreRequests(ctx context.Context, scoutID, instan
 	result := []protocol.RestoreRequest{}
 	for rows.Next() {
 		var r protocol.RestoreRequest
-		if err := rows.Scan(&r.ID, &r.ScoutID, &r.ScoutInstanceID, &r.JobName, &r.Filename, &r.Status, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.ScoutID, &r.ScoutInstanceID, &r.JobName, &r.Filename, &r.Status, &r.CreatedAt, &r.SourceScoutID, &r.SourceInstanceID); err != nil {
 			return nil, err
 		}
 		result = append(result, r)

@@ -118,12 +118,18 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 // RecoverFilename restores one exact archive that Station asked for. The
 // destination may not be a job folder, so no job state is recorded for it.
 func (r *RecoveryService) RecoverFilename(ctx context.Context, job *backup.JobDefinition, filename string) (*RecoveryResult, error) {
+	return r.RecoverRequest(ctx, job, filename, r.encKey, func(path string) (string, error) {
+		return r.downloader.DownloadSnapshotByFilename(ctx, r.settings.ScoutID, job.JobName, filename, path)
+	})
+}
+
+func (r *RecoveryService) RecoverRequest(ctx context.Context, job *backup.JobDefinition, filename string, key []byte, download func(string) (string, error)) (*RecoveryResult, error) {
 	downloadPath := r.tempPath(".download.tar.zst")
 	decryptedPath := r.tempPath(".decrypted.tar.zst")
 	defer func() { _ = os.Remove(downloadPath) }()
 	defer func() { _ = os.Remove(decryptedPath) }()
 
-	got, err := r.downloader.DownloadSnapshotByFilename(ctx, r.settings.ScoutID, job.JobName, filename, downloadPath)
+	got, err := download(downloadPath)
 	if err != nil {
 		return nil, r.handleRequestError(job, err)
 	}
@@ -131,8 +137,8 @@ func (r *RecoveryService) RecoverFilename(ctx context.Context, job *backup.JobDe
 		return nil, r.handleRequestError(job, &RecoveryError{Message: "Station returned a different snapshot than requested", StatusCode: 502})
 	}
 
-	if err := encryption.DecryptFile(r.encKey, downloadPath, decryptedPath); err != nil {
-		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with this Scout key", StatusCode: 409})
+	if err := encryption.DecryptFile(key, downloadPath, decryptedPath); err != nil {
+		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with the provided encryption key", StatusCode: 409})
 	}
 
 	restored, err := backup.ExtractArchive(decryptedPath, job.RootPath)
