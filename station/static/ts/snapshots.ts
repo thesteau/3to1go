@@ -128,6 +128,45 @@ async function deleteSnapshot(
   }
 }
 
+function openSnapshotRestoreDialog(scoutId: string, scoutInstanceId: string, jobName: string, filename: string): void {
+  const dialog = document.getElementById("restore-dialog") as HTMLDialogElement;
+  if (dialog.open) return;
+  document.getElementById("restore-snapshot")!.textContent = `${jobName}: ${filename}`;
+  const select = document.getElementById("restore-target") as HTMLSelectElement;
+  const targets = typeof restoreTargets === "undefined" ? [] : restoreTargets;
+  select.innerHTML = targets
+    .map(
+      (target) =>
+        `<option value="${escapeHtml(JSON.stringify([target.scoutId, target.instanceId]))}">${escapeHtml(target.scoutId)} / ${escapeHtml(target.instanceId)}</option>`,
+    )
+    .join("");
+  const original = JSON.stringify([scoutId, scoutInstanceId]);
+  if (targets.some((target) => target.scoutId === scoutId && target.instanceId === scoutInstanceId)) {
+    select.value = original;
+  }
+  const submit = document.getElementById("restore-submit") as HTMLButtonElement;
+  submit.disabled = !targets.length;
+  submit.onclick = async () => {
+    const [targetScout, targetInstance] = JSON.parse(select.value);
+    const cancel = document.getElementById("restore-cancel") as HTMLButtonElement;
+    cancel.disabled = true;
+    select.disabled = true;
+    dialog.oncancel = (event) => event.preventDefault();
+    try {
+      if (
+        await requestSnapshotRestore(scoutId, scoutInstanceId, jobName, filename, submit, targetScout, targetInstance)
+      ) {
+        closeDialog("restore-dialog");
+      }
+    } finally {
+      cancel.disabled = false;
+      select.disabled = false;
+      dialog.oncancel = null;
+    }
+  };
+  openDialog("restore-dialog");
+}
+
 // Asks Scout to restore this exact snapshot. Scout's operator accepts or rejects it there,
 // and supplies the source key there when restoring to another device.
 async function requestSnapshotRestore(
@@ -136,12 +175,12 @@ async function requestSnapshotRestore(
   jobName: string,
   filename: string,
   btn: HTMLButtonElement,
-): Promise<void> {
-  const target = btn.parentElement?.querySelector<HTMLSelectElement>(".restore-target")?.value;
-  const [targetScout, targetInstance] = target ? JSON.parse(target) : [scoutId, scoutInstanceId];
+  targetScout = scoutId,
+  targetInstance = scoutInstanceId,
+): Promise<boolean> {
   if (targetScout === scoutId && targetInstance === scoutInstanceId && !getEncKey(scoutId, scoutInstanceId)) {
     setActionStatus("Save this Scout's encryption key first, then request the restore.", "warning");
-    return;
+    return false;
   }
   const restore = setButtonBusy(btn, "Requesting…");
   try {
@@ -156,7 +195,7 @@ async function requestSnapshotRestore(
     const result = await res.json().catch(() => ({}));
     if (!res.ok) {
       setActionStatus(result.detail || "Restore request failed.", "error");
-      return;
+      return false;
     }
     setActionStatus(
       targetScout !== scoutId || targetInstance !== scoutInstanceId
@@ -166,8 +205,10 @@ async function requestSnapshotRestore(
           : "Restore requested. Scout shows it under Restore Requests on its next refresh.",
       "success",
     );
+    return true;
   } catch {
     setActionStatus("Restore request failed. Check the connection and retry.", "error");
+    return false;
   } finally {
     restore();
   }
@@ -201,8 +242,8 @@ function renderSnapshots(
             onclick="downloadSnapshot(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Download</button>
           ${
             scoutInstanceId
-              ? `<select class="restore-target" aria-label="Restore target device">${(typeof restoreTargets === "undefined" ? [] : restoreTargets).map((target) => `<option value="${escapeHtml(JSON.stringify([target.scoutId, target.instanceId]))}" ${target.scoutId === scoutId && target.instanceId === scoutInstanceId ? "selected" : ""}>${escapeHtml(target.scoutId)} / ${escapeHtml(target.instanceId)}</option>`).join("")}</select><button class="btn btn-restore"
-            onclick="requestSnapshotRestore(${inlineString(scoutId)},${inlineString(scoutInstanceId)},${inlineString(jobName)},${inlineString(name)},this)">Restore</button>`
+              ? `<button class="btn btn-restore"
+            onclick="openSnapshotRestoreDialog(${inlineString(scoutId)},${inlineString(scoutInstanceId)},${inlineString(jobName)},${inlineString(name)})">Restore</button>`
               : ""
           }
           <button class="btn btn-del"

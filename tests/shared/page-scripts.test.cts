@@ -77,7 +77,7 @@ test("Station snapshot and instance actions preserve quoted identifiers", () => 
   const job = "job');throw new Error('unexpected');//";
   const name = "snapshot's.tar.zst";
   const calls = [];
-  const snapshotActions = new Set(["downloadSnapshot", "deleteSnapshot", "requestSnapshotRestore"]);
+  const snapshotActions = new Set(["downloadSnapshot", "deleteSnapshot", "openSnapshotRestoreDialog"]);
   for (const action of [
     ...snapshotActions,
     "deleteInstance",

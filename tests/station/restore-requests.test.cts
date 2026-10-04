@@ -42,8 +42,6 @@ test("Station sends another target without sending an encryption key", async () 
     },
   });
   loadFeature(ctx, "station", "snapshots");
-  await ctx.requestSnapshotRestore("source", "old", "photos", "exact.tar.zst", {
-    parentElement: { querySelector: () => ({ value: JSON.stringify(["target", "new"]) }) },
-  });
+  await ctx.requestSnapshotRestore("source", "old", "photos", "exact.tar.zst", {}, "target", "new");
   assert.deepEqual(JSON.parse(calls[0][1].body), { target_scout_id: "target", target_instance_id: "new" });
 });
