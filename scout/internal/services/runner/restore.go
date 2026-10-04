@@ -1,0 +1,117 @@
+package runner
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/3to1go/scout/internal/backup"
+	"github.com/3to1go/scout/internal/services/recovery"
+	"github.com/3to1go/shared/protocol"
+)
+
+func (r *ScoutRunner) RestoreRequests(ctx context.Context) ([]protocol.RestoreRequest, error) {
+	r.mu.Lock()
+	client, scoutID, hasKey := r.UploadClient, r.Settings.ScoutID, len(r.encKey) == 32
+	configured := r.Settings.StationURL != "" && r.Settings.ScoutCredential != ""
+	r.mu.Unlock()
+	if !hasKey || !configured {
+		return []protocol.RestoreRequest{}, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return client.ListRestoreRequests(ctx, scoutID)
+}
+
+// RestoreDestination allows a deleted folder to be recreated while rejecting
+// absolute paths, traversal, symlinks and Scout runtime folders.
+func restoreDestination(scanRoot, relativePath string) (string, error) {
+	if relativePath == "" || filepath.IsAbs(relativePath) || filepath.VolumeName(relativePath) != "" {
+		return "", fmt.Errorf("choose a destination relative to the scan root")
+	}
+	root, err := filepath.Abs(scanRoot)
+	if err != nil {
+		return "", err
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	relativePath = filepath.Clean(filepath.FromSlash(relativePath))
+	if relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("destination must remain within scan root")
+	}
+	current := root
+	if backup.IsRuntimePath(current) {
+		return "", fmt.Errorf("cannot restore into a runtime directory")
+	}
+	if relativePath != "." {
+		for _, part := range strings.Split(relativePath, string(filepath.Separator)) {
+			current = filepath.Join(current, part)
+			info, err := os.Lstat(current)
+			if err != nil && !os.IsNotExist(err) {
+				return "", err
+			}
+			if err == nil && (info.Mode()&os.ModeSymlink != 0 || !info.IsDir()) {
+				return "", fmt.Errorf("destination must contain only directories, without symlinks")
+			}
+			if backup.IsRuntimePath(current) {
+				return "", fmt.Errorf("cannot restore into a runtime directory")
+			}
+		}
+	}
+	return current, nil
+}
+
+func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, relativePath string) (any, error) {
+	if decision != "accept" && decision != "reject" {
+		return nil, fmt.Errorf("invalid decision")
+	}
+	if !r.cycleLock.TryLock() {
+		return nil, &recovery.RecoveryError{Message: "another operation is running; retry when it finishes", StatusCode: 409}
+	}
+	defer r.cycleLock.Unlock()
+	requests, err := r.RestoreRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var selected *protocol.RestoreRequest
+	for i := range requests {
+		if requests[i].ID == id {
+			selected = &requests[i]
+			break
+		}
+	}
+	if selected == nil {
+		return nil, fmt.Errorf("restore request is no longer available")
+	}
+	r.mu.Lock()
+	client, settings := r.UploadClient, r.Settings
+	r.mu.Unlock()
+	if decision == "reject" {
+		if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "rejected"); err != nil {
+			return nil, err
+		}
+		return map[string]string{"status": "rejected"}, nil
+	}
+	destination, err := restoreDestination(settings.ScanRoot, relativePath)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "accepted"); err != nil {
+		return nil, err
+	}
+	job := &backup.JobDefinition{RootPath: destination, JobName: selected.JobName}
+	result, err := r.Recovery.RecoverFilename(ctx, job, selected.Filename)
+	if err != nil {
+		return nil, err
+	}
+	result.RelativePath = relativePath
+	if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "completed"); err != nil {
+		return nil, &recovery.RecoveryError{Message: "files restored, but Station could not record completion; reject the request to dismiss it", StatusCode: 502}
+	}
+	return result, nil
+}
