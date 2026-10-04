@@ -78,8 +78,8 @@ sequenceDiagram
     alt Accept
         Operator->>Scout: Accept, with a destination folder
         Scout->>Station: Mark accepted
-        Scout->>Station: Download that exact snapshot
-        Station-->>Scout: Encrypted archive
+        Scout->>Station: Ask for that exact snapshot
+        Station-->>Scout: Send the encrypted archive
         Scout->>Scout: Decrypt and write files into the folder
         Scout->>Station: Mark completed
     else Reject
@@ -103,6 +103,7 @@ sequenceDiagram
 - The destination is a folder under the scan root. It may be a folder that no longer exists, and Scout creates it.
 - Scout only acts on requests it reads from Station itself. It never trusts the notification.
 - If the restore fails, the request stays accepted and Scout shows **Retry Restore**. **Reject** dismisses it.
+- A request lasts 1 hour, whether it's pending, accepted, or rejected. After that Station deletes it. **Accept** on an expired request fails and nothing is restored, so click **Restore** in Station again. **Reject** still works and dismisses it.
 
 ## Requirements
 

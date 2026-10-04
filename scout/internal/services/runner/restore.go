@@ -2,7 +2,9 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/3to1go/scout/internal/backup"
 	"github.com/3to1go/scout/internal/services/recovery"
+	"github.com/3to1go/scout/internal/services/upload"
 	"github.com/3to1go/shared/protocol"
 )
 
@@ -66,6 +69,13 @@ func restoreDestination(scanRoot, relativePath string) (string, error) {
 	return current, nil
 }
 
+// restoreRequestGone reports Station's answer for a request that expired or
+// was already decided between listing it and recording the decision.
+func restoreRequestGone(err error) bool {
+	var failure *upload.UploadFailure
+	return errors.As(err, &failure) && failure.StatusCode == http.StatusConflict
+}
+
 func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, relativePath string) (any, error) {
 	if decision != "accept" && decision != "reject" {
 		return nil, fmt.Errorf("invalid decision")
@@ -85,14 +95,19 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 			break
 		}
 	}
+	// Station drops requests after one hour. Rejecting one that is gone only
+	// dismisses it; accepting one is refused before anything is downloaded.
 	if selected == nil {
-		return nil, fmt.Errorf("restore request is no longer available")
+		if decision == "reject" {
+			return map[string]string{"status": "rejected"}, nil
+		}
+		return nil, &recovery.RecoveryError{Message: "this restore request expired; click Restore in Station again", StatusCode: 409}
 	}
 	r.mu.Lock()
 	client, settings := r.UploadClient, r.Settings
 	r.mu.Unlock()
 	if decision == "reject" {
-		if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "rejected"); err != nil {
+		if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "rejected"); err != nil && !restoreRequestGone(err) {
 			return nil, err
 		}
 		return map[string]string{"status": "rejected"}, nil
@@ -102,6 +117,9 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		return nil, err
 	}
 	if err := client.DecideRestoreRequest(ctx, settings.ScoutID, id, "accepted"); err != nil {
+		if restoreRequestGone(err) {
+			return nil, &recovery.RecoveryError{Message: "this restore request expired; click Restore in Station again", StatusCode: 409}
+		}
 		return nil, err
 	}
 	job := &backup.JobDefinition{RootPath: destination, JobName: selected.JobName}

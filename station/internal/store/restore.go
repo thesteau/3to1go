@@ -6,13 +6,28 @@ import (
 	"github.com/3to1go/shared/protocol"
 )
 
+// Restore requests last one hour from creation, whatever their status.
+const restoreRequestLive = `created_at::timestamptz > now() - interval '1 hour'`
+
+// pruneRestoreRequests deletes requests older than one hour.
+func (s *SnapshotIndex) pruneRestoreRequests(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM restore_requests WHERE NOT (`+restoreRequestLive+`)`)
+	return err
+}
+
 func (s *SnapshotIndex) CreateRestoreRequest(ctx context.Context, r protocol.RestoreRequest) error {
+	if err := s.pruneRestoreRequests(ctx); err != nil {
+		return err
+	}
 	_, err := s.pool.Exec(ctx, `INSERT INTO restore_requests (id, scout_id, scout_instance_id, job_name, filename, status, created_at) VALUES ($1,$2,$3,$4,$5,'pending',$6)`, r.ID, r.ScoutID, r.ScoutInstanceID, r.JobName, r.Filename, r.CreatedAt)
 	return err
 }
 
 func (s *SnapshotIndex) ListRestoreRequests(ctx context.Context, scoutID, instanceID string) ([]protocol.RestoreRequest, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, scout_id, scout_instance_id, job_name, filename, status, created_at FROM restore_requests WHERE scout_id=$1 AND scout_instance_id=$2 AND status IN ('pending','accepted') ORDER BY created_at DESC`, scoutID, instanceID)
+	if err := s.pruneRestoreRequests(ctx); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT id, scout_id, scout_instance_id, job_name, filename, status, created_at FROM restore_requests WHERE scout_id=$1 AND scout_instance_id=$2 AND status IN ('pending','accepted') AND `+restoreRequestLive+` ORDER BY created_at DESC`, scoutID, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -29,6 +44,6 @@ func (s *SnapshotIndex) ListRestoreRequests(ctx context.Context, scoutID, instan
 }
 
 func (s *SnapshotIndex) DecideRestoreRequest(ctx context.Context, scoutID, instanceID, id, status string) (bool, error) {
-	tag, err := s.pool.Exec(ctx, `UPDATE restore_requests SET status=$4 WHERE scout_id=$1 AND scout_instance_id=$2 AND id=$3 AND ((status='pending' AND $4 IN ('accepted','rejected')) OR (status='accepted' AND $4 IN ('accepted','completed','rejected')))`, scoutID, instanceID, id, status)
+	tag, err := s.pool.Exec(ctx, `UPDATE restore_requests SET status=$4 WHERE scout_id=$1 AND scout_instance_id=$2 AND id=$3 AND `+restoreRequestLive+` AND ((status='pending' AND $4 IN ('accepted','rejected')) OR (status='accepted' AND $4 IN ('accepted','completed','rejected')))`, scoutID, instanceID, id, status)
 	return tag.RowsAffected() == 1, err
 }

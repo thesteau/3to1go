@@ -114,6 +114,58 @@ func TestRestoreRequestDecision(t *testing.T) {
 	}
 }
 
+func TestExpiredRestoreRequestCanBeRejectedButNotAccepted(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		listed   bool // Station still lists it, but it expires before the decision is saved.
+		decision string
+		wantErr  bool
+	}{
+		{"gone, accept", false, "accept", true},
+		{"gone, reject", false, "reject", false},
+		{"expires while deciding, accept", true, "accept", true},
+		{"expires while deciding, reject", true, "reject", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			settings := testRunnerSettings(t)
+			if err := os.MkdirAll(settings.ScanRoot, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			station := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/backup/recovery/scout-1/instance-1/requests":
+					requests := []protocol.RestoreRequest{}
+					if test.listed {
+						requests = append(requests, protocol.RestoreRequest{ID: "request", JobName: "photos", Filename: "photos__2026-09-01T00-00-00Z__abcdef12.tar.zst", Status: "pending"})
+					}
+					_ = json.NewEncoder(w).Encode(requests)
+				case "/backup/recovery/scout-1/instance-1/requests/request":
+					w.WriteHeader(http.StatusConflict)
+					writeTestJSON(t, w, map[string]any{"detail": "request is no longer available"})
+				default:
+					t.Errorf("expired request reached %s", r.URL.Path)
+					w.WriteHeader(404)
+				}
+			}))
+			defer station.Close()
+			settings.StationURL = station.URL
+			runner := testRunner(t, settings, testUploadClient(station.URL))
+			_, err := runner.DecideRestoreRequest(context.Background(), "request", test.decision, "photos")
+			if test.wantErr {
+				re, ok := err.(*recovery.RecoveryError)
+				if !ok || re.StatusCode != 409 {
+					t.Fatalf("err = %v, want expired 409", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(settings.ScanRoot, "photos")); !os.IsNotExist(err) {
+				t.Fatal("expired request changed the destination")
+			}
+		})
+	}
+}
+
 func TestRestoreDestinationRejectsTraversalAndRuntime(t *testing.T) {
 	root := t.TempDir()
 	if err := backup.MarkRuntimeDir(filepath.Join(root, "state")); err != nil {
