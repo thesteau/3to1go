@@ -77,15 +77,15 @@ test("Station snapshot and instance actions preserve quoted identifiers", () => 
   const job = "job');throw new Error('unexpected');//";
   const name = "snapshot's.tar.zst";
   const calls = [];
+  const snapshotActions = new Set(["downloadSnapshot", "deleteSnapshot", "requestSnapshotRestore"]);
   for (const action of [
-    "downloadSnapshot",
-    "deleteSnapshot",
+    ...snapshotActions,
     "deleteInstance",
     "revokeInstanceCredential",
     "rememberEncKey",
     "clearEncKey",
   ]) {
-    ctx[action] = (...args) => calls.push([action, ...args.slice(0, action.endsWith("Snapshot") ? 4 : 2)]);
+    ctx[action] = (...args) => calls.push([action, ...args.slice(0, snapshotActions.has(action) ? 4 : 2)]);
   }
   const html = ctx.renderInstanceCard(scout, {
     scout_instance_id: instance,
@@ -93,8 +93,8 @@ test("Station snapshot and instance actions preserve quoted identifiers", () => 
     jobs: [{ job_name: job, snapshots: [{ name }] }],
   });
   for (const handler of handlers(html)) vm.runInContext(handler, ctx);
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, 7);
   for (const [action, ...args] of calls) {
-    assert.deepEqual(args, action.endsWith("Snapshot") ? [scout, instance, job, name] : [scout, instance]);
+    assert.deepEqual(args, snapshotActions.has(action) ? [scout, instance, job, name] : [scout, instance]);
   }
 });

@@ -128,6 +128,43 @@ async function deleteSnapshot(
   }
 }
 
+// Asks Scout to restore this exact snapshot. Scout's operator accepts or rejects it there,
+// so the request only needs a key saved here; the key itself never leaves the browser.
+async function requestSnapshotRestore(
+  scoutId: string,
+  scoutInstanceId: string,
+  jobName: string,
+  filename: string,
+  btn: HTMLButtonElement,
+): Promise<void> {
+  if (!getEncKey(scoutId, scoutInstanceId)) {
+    setActionStatus("Save this Scout's encryption key first, then request the restore.", "warning");
+    return;
+  }
+  const restore = setButtonBusy(btn, "Requesting…");
+  try {
+    const res = await fetch(
+      `/api/snapshots/${encodeURIComponent(scoutId)}/${encodeURIComponent(scoutInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}/restore`,
+      { method: "POST" },
+    );
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setActionStatus(result.detail || "Restore request failed.", "error");
+      return;
+    }
+    setActionStatus(
+      result.notified
+        ? "Restore requested. Accept it under Restore Requests in Scout."
+        : "Restore requested. Scout shows it under Restore Requests on its next refresh.",
+      "success",
+    );
+  } catch {
+    setActionStatus("Restore request failed. Check the connection and retry.", "error");
+  } finally {
+    restore();
+  }
+}
+
 function renderSnapshots(
   scoutId: string,
   scoutInstanceId: string | null | undefined,
@@ -154,6 +191,12 @@ function renderSnapshots(
         <div class="snapshot-actions">
           <button class="btn btn-dl"
             onclick="downloadSnapshot(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Download</button>
+          ${
+            scoutInstanceId
+              ? `<button class="btn btn-restore"
+            onclick="requestSnapshotRestore(${inlineString(scoutId)},${inlineString(scoutInstanceId)},${inlineString(jobName)},${inlineString(name)},this)">Restore</button>`
+              : ""
+          }
           <button class="btn btn-del"
             onclick="deleteSnapshot(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Delete</button>
         </div>

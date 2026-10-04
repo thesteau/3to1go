@@ -60,6 +60,51 @@ Forced backups can share a fingerprint. When several snapshots match, Scout rest
 
 A job can only restore its **own** snapshots. You can't restore one job's snapshot into another job's folder.
 
+## Restore requests from Station
+
+Use this when Station still has a snapshot but the folder is gone from Scout. An admin clicks **Restore** on a snapshot in Station. Station only saves the request. Scout lists it under **Restore Requests**, and nothing is restored until someone accepts it in Scout.
+
+```mermaid
+sequenceDiagram
+    actor Admin as You (Station)
+    participant Station
+    participant Scout
+    actor Operator as You (Scout)
+    Admin->>Station: Click Restore on a snapshot
+    Station->>Station: Save request as pending
+    Station-)Scout: Notify (a hint only)
+    Scout->>Station: Get this Scout's requests with its credential
+    Scout-->>Operator: Restore Requests tab
+    alt Accept
+        Operator->>Scout: Accept, with a destination folder
+        Scout->>Station: Mark accepted
+        Scout->>Station: Ask for that exact snapshot
+        Station-->>Scout: Send the encrypted archive
+        Scout->>Scout: Decrypt and write files into the folder
+        Scout->>Station: Mark completed
+    else Reject
+        Operator->>Scout: Reject
+        Scout->>Station: Mark rejected
+    end
+```
+
+<Steps>
+  <Step title="Request it in Station">
+    Save that Scout's encryption key in Station, then click **Restore** on the snapshot. The key stays in your browser.
+  </Step>
+  <Step title="Open Restore Requests in Scout">
+    The **Restore Requests** tab appears next to **Jobs** when Station has a request for this Scout.
+  </Step>
+  <Step title="Accept or reject">
+    Enter the destination folder and click **Accept**, or click **Reject**.
+  </Step>
+</Steps>
+
+- The destination is a folder under the scan root. It may be a folder that no longer exists, and Scout creates it.
+- Scout only acts on requests it reads from Station itself. It never trusts the notification.
+- If the restore fails, the request stays accepted and Scout shows **Retry Restore**. **Reject** dismisses it.
+- A request lasts 1 hour, whether it's pending, accepted, or rejected. After that Station deletes it. **Accept** on an expired request fails and nothing is restored, so click **Restore** in Station again. **Reject** still works and dismisses it.
+
 ## Requirements
 
 - Scout must be able to reach Station, with a valid credential.
