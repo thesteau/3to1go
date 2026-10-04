@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/thesteau/3to1go/compare/v1.2.0...v1.3.0) (2026-10-04)
+
+
+### Features
+
+* Add cross restore ([#91](https://github.com/thesteau/3to1go/issues/91)) ([f00f6e7](https://github.com/thesteau/3to1go/commit/f00f6e79ee5652315f336ad84a50073901a1a849))
+* Add restore button to station ([#89](https://github.com/thesteau/3to1go/issues/89)) ([343cb7e](https://github.com/thesteau/3to1go/commit/343cb7e03775d9fbe58241deb6b5ef614e686c8c))
+
+
+### Bug Fixes
+
+* **station:** Add menu for restore ([#92](https://github.com/thesteau/3to1go/issues/92)) ([d7bc56a](https://github.com/thesteau/3to1go/commit/d7bc56a5f177a3fc1eca0d0d0638126fc210057e))
+
 ## [1.2.0](https://github.com/thesteau/3to1go/compare/v1.1.2...v1.2.0) (2026-10-03)
 
 
