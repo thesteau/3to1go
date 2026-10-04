@@ -7,7 +7,7 @@ function restoreContext(overrides = {}) {
   const elements = {
     "restore-requests-tab": { hidden: true, textContent: "" },
     "restore-requests-list": { innerHTML: "", querySelectorAll: () => [] },
-    "restore-destination-request": { value: "deleted/photos" },
+    "restore-destination-request": { value: "photos" },
   };
   const messages = [];
   const calls = [];
@@ -64,7 +64,7 @@ test("reject sends the decision without requiring a destination or confirming re
   assert.deepEqual(JSON.parse(options.body), { id: "request", decision: "reject", relative_path: "" });
 });
 
-test("accept requires a destination and confirmation before contacting Station", async () => {
+test("accept allows the default folder and requires confirmation before contacting Station", async () => {
   const { ctx, elements, calls } = restoreContext({ confirmApp: async () => false });
   await ctx.decideStationRestore("request", "accept", {});
   assert.equal(calls.length, 0);
@@ -73,11 +73,24 @@ test("accept requires a destination and confirmation before contacting Station",
   assert.deepEqual(JSON.parse(calls[0][1].body), {
     id: "request",
     decision: "accept",
-    relative_path: "deleted/photos",
+    relative_path: "photos",
   });
   elements["restore-destination-request"].value = "";
   elements["restore-destination-request"].focus = () => {};
   calls.length = 0;
   await ctx.decideStationRestore("request", "accept", {});
+  assert.equal(calls.length, 2);
+  assert.equal(JSON.parse(calls[0][1].body).relative_path, "");
+});
+
+test("cross device acceptance requires a key and clears it after submission", async () => {
+  const { ctx, elements, calls, messages } = restoreContext();
+  elements["restore-key-request"] = { value: "", focus() {} };
+  await ctx.decideStationRestore("request", "accept", {});
   assert.equal(calls.length, 0);
+  assert.match(messages.at(-1)[1], /encryption key/);
+  elements["restore-key-request"].value = "source-key";
+  await ctx.decideStationRestore("request", "accept", {});
+  assert.equal(JSON.parse(calls[0][1].body).encryption_key, "source-key");
+  assert.equal(elements["restore-key-request"].value, "");
 });

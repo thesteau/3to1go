@@ -1,3 +1,5 @@
+let restoreTargets: { scoutId: string; instanceId: string }[] = [];
+
 interface OverviewOptions {
   silent?: boolean;
   force?: boolean;
@@ -262,6 +264,11 @@ async function fetchOverview({
     );
 
     const totalScouts = scouts.length;
+    restoreTargets = scouts.flatMap((scout) =>
+      (scout.instances || [])
+        .filter((instance) => instance.scout_instance_id)
+        .map((instance) => ({ scoutId: scout.scout_id, instanceId: instance.scout_instance_id! })),
+    );
     const totalInstances = scouts.reduce((t, e) => t + (e.instances || []).length, 0);
     const totalJobs = scouts.reduce(
       (t, e) => t + (e.instances || []).reduce((tt, i) => tt + (i.jobs || []).length, 0),

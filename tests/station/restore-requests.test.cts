@@ -25,5 +25,25 @@ test("Station Restore requires a saved key and sends the exact filename without 
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], `/api/snapshots/scout/instance/photos/${filename}/restore`);
   assert.equal(calls[0][1].method, "POST");
-  assert.equal(calls[0][1].body, undefined, "the key stays in the browser");
+  assert.deepEqual(JSON.parse(calls[0][1].body), { target_scout_id: "scout", target_instance_id: "instance" });
+});
+
+test("Station sends another target without sending an encryption key", async () => {
+  const calls = [];
+  const ctx = vm.createContext({
+    setActionStatus() {},
+    setButtonBusy: () => () => {},
+    getEncKey: () => {
+      throw new Error("target restore should request the key on Scout");
+    },
+    fetch: async (url, options) => {
+      calls.push([url, options]);
+      return { ok: true, json: async () => ({}) };
+    },
+  });
+  loadFeature(ctx, "station", "snapshots");
+  await ctx.requestSnapshotRestore("source", "old", "photos", "exact.tar.zst", {
+    parentElement: { querySelector: () => ({ value: JSON.stringify(["target", "new"]) }) },
+  });
+  assert.deepEqual(JSON.parse(calls[0][1].body), { target_scout_id: "target", target_instance_id: "new" });
 });

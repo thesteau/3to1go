@@ -1,5 +1,9 @@
 interface StationRestoreRequest {
   id: string;
+  source_scout_id?: string;
+  source_instance_id?: string;
+  scout_id?: string;
+  scout_instance_id?: string;
   job_name: string;
   filename: string;
   status: string;
@@ -66,10 +70,12 @@ function renderRestoreRequests(requests: StationRestoreRequest[]): void {
     <article class="job-card">
       <h3>${escapeHtml(request.job_name)}</h3>
       <p>${escapeHtml(request.filename)}</p>
+      ${request.source_scout_id ? `<p class="hint">Source: ${escapeHtml(request.source_scout_id)} / ${escapeHtml(request.source_instance_id || "")}</p>` : ""}
       <p class="hint">Requested ${escapeHtml(new Date(request.created_at).toLocaleString())}${request.status === "accepted" ? " · Accepted; retry restoration or reject to dismiss" : ""}</p>
-      <label>Destination folder under scan root
-        <input type="text" id="restore-destination-${escapeHtml(request.id)}" placeholder="e.g. projects/my-folder" autocomplete="off">
+      <label>Folder name (optional rename)
+        <input type="text" id="restore-destination-${escapeHtml(request.id)}" placeholder="${escapeHtml(request.job_name)}" autocomplete="off">
       </label>
+      ${request.source_scout_id && (request.source_scout_id !== request.scout_id || request.source_instance_id !== request.scout_instance_id) ? `<label>Original snapshot encryption key (required)<input type="password" id="restore-key-${escapeHtml(request.id)}" autocomplete="off"></label>` : ""}
       <div class="restore-request-actions">
         <button type="button" onclick="decideStationRestore(${inlineString(request.id)},'accept',this)">${request.status === "accepted" ? "Retry Restore" : "Accept"}</button>
         <button type="button" class="secondary" onclick="decideStationRestore(${inlineString(request.id)},'reject',this)">Reject</button>
@@ -86,8 +92,7 @@ function renderRestoreRequests(requests: StationRestoreRequest[]): void {
   for (const request of requests) {
     const input = document.getElementById(`restore-destination-${request.id}`) as HTMLInputElement | null;
     if (!input) continue;
-    const matches = (latestData?.directories || []).filter((entry) => entry.config?.job_name === request.job_name);
-    input.value = destinations.get(input.id) ?? (matches.length === 1 ? matches[0].relative_path : "");
+    input.value = destinations.get(input.id) ?? request.job_name;
   }
 }
 
@@ -99,16 +104,17 @@ async function decideStationRestore(
   if (restoreDecisionBusy) return;
   const input = document.getElementById(`restore-destination-${id}`) as HTMLInputElement | null;
   const destination = input?.value.trim() || "";
-  if (decision === "accept" && !destination) {
-    setStatus("restore-requests-status", "Enter a destination folder relative to the scan root.", "error");
-    input?.focus();
+  const keyInput = document.getElementById(`restore-key-${id}`) as HTMLInputElement | null;
+  if (decision === "accept" && keyInput && !keyInput.value.trim()) {
+    setStatus("restore-requests-status", "Provide the original snapshot's encryption key.", "error");
+    keyInput.focus();
     return;
   }
   if (
     decision === "accept" &&
     !(await confirmApp({
       title: "Accept Restore",
-      message: `Restore this archive into ${destination}? Existing files will be replaced.`,
+      message: `Restore this archive into the scan root folder ${destination || input?.placeholder || "named in the request"}? Existing files will be replaced.`,
       confirmLabel: "Accept and Restore",
       danger: true,
     }))
@@ -120,8 +126,14 @@ async function decideStationRestore(
     const response = await fetch("/api/restore-requests/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, decision, relative_path: destination }),
+      body: JSON.stringify({
+        id,
+        decision,
+        relative_path: destination,
+        ...(keyInput ? { encryption_key: keyInput.value.trim() } : {}),
+      }),
     });
+    if (keyInput) keyInput.value = "";
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Restore decision failed.");
     setStatus(
@@ -134,6 +146,7 @@ async function decideStationRestore(
   } catch (error) {
     setStatus("restore-requests-status", error instanceof Error ? error.message : "Restore decision failed.", "error");
   } finally {
+    if (keyInput) keyInput.value = "";
     restoreDecisionBusy = false;
     done();
     await loadRestoreRequests();

@@ -115,6 +115,8 @@ func (s *SnapshotIndex) EnsureSchema(ctx context.Context) error {
 			status TEXT NOT NULL,
 			created_at TEXT NOT NULL
 		)`,
+		`ALTER TABLE restore_requests ADD COLUMN IF NOT EXISTS source_scout_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE restore_requests ADD COLUMN IF NOT EXISTS source_instance_id TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_restore_requests_instance
 			ON restore_requests (scout_id, scout_instance_id, status)`,
 	}

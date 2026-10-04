@@ -271,6 +271,7 @@ func (a *App) Handler() http.Handler {
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/latest", httpx.WithPathValues(a.handleDownloadLatest, "scout_id", "scout_instance_id", "job_name"))
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/by-fingerprint", httpx.WithPathValues(a.handleDownloadByFingerprint, "scout_id", "scout_instance_id", "job_name"))
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/{job_name}/archive/{filename}", httpx.WithPathValues(a.handleDownloadExactSnapshot, "scout_id", "scout_instance_id", "job_name", "filename"))
+	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/requests/{request_id}/archive", httpx.WithPathValues(a.handleDownloadRestoreArchive, "scout_id", "scout_instance_id", "request_id"))
 	r.Get("/backup/recovery/{scout_id}/{scout_instance_id}/requests", httpx.WithPathValues(a.handleListRestoreRequests, "scout_id", "scout_instance_id"))
 	r.Post("/backup/recovery/{scout_id}/{scout_instance_id}/requests/{request_id}", httpx.WithPathValues(a.handleDecideRestoreRequest, "scout_id", "scout_instance_id", "request_id"))
 

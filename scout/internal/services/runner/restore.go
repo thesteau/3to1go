@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -76,7 +77,7 @@ func restoreRequestGone(err error) bool {
 	return errors.As(err, &failure) && failure.StatusCode == http.StatusConflict
 }
 
-func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, relativePath string) (any, error) {
+func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, relativePath string, providedKey ...string) (any, error) {
 	if decision != "accept" && decision != "reject" {
 		return nil, fmt.Errorf("invalid decision")
 	}
@@ -112,6 +113,25 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		}
 		return map[string]string{"status": "rejected"}, nil
 	}
+	if relativePath == "" {
+		relativePath = selected.JobName
+	}
+	if relativePath == "." || relativePath == ".." || strings.ContainsAny(relativePath, `/\`) {
+		return nil, fmt.Errorf("choose a folder name directly under the scan root")
+	}
+	r.mu.Lock()
+	key := append([]byte(nil), r.encKey...)
+	r.mu.Unlock()
+	crossDevice := selected.SourceScoutID != "" && (selected.SourceScoutID != settings.ScoutID || selected.SourceInstanceID != selected.ScoutInstanceID)
+	if crossDevice {
+		if len(providedKey) == 0 || providedKey[0] == "" {
+			return nil, fmt.Errorf("provide the original snapshot's encryption key")
+		}
+		key, err = base64.StdEncoding.DecodeString(strings.TrimSpace(providedKey[0]))
+		if err != nil || len(key) != 32 {
+			return nil, fmt.Errorf("encryption key must be a base64 encoded 32-byte key")
+		}
+	}
 	destination, err := restoreDestination(settings.ScanRoot, relativePath)
 	if err != nil {
 		return nil, err
@@ -123,7 +143,9 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		return nil, err
 	}
 	job := &backup.JobDefinition{RootPath: destination, JobName: selected.JobName}
-	result, err := r.Recovery.RecoverFilename(ctx, job, selected.Filename)
+	result, err := r.Recovery.RecoverRequest(ctx, job, selected.Filename, key, func(path string) (string, error) {
+		return client.DownloadRestoreRequest(ctx, settings.ScoutID, id, path)
+	})
 	if err != nil {
 		return nil, err
 	}

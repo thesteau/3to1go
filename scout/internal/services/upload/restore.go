@@ -40,3 +40,7 @@ func (c *UploadClient) DownloadSnapshotByFilename(ctx context.Context, scoutID, 
 	path := fmt.Sprintf("/backup/recovery/%s/%s/%s/archive/%s", url.PathEscape(scoutID), url.PathEscape(c.scoutInstanceID), url.PathEscape(jobName), url.PathEscape(filename))
 	return c.downloadSnapshot(ctx, path, destPath, nil)
 }
+
+func (c *UploadClient) DownloadRestoreRequest(ctx context.Context, scoutID, id, destPath string) (string, error) {
+	return c.downloadSnapshot(ctx, c.restoreRequestsPath(scoutID)+"/"+url.PathEscape(id)+"/archive", destPath, nil)
+}

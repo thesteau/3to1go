@@ -11,7 +11,7 @@ import (
 
 type restoreRunner interface {
 	RestoreRequests(context.Context) ([]protocol.RestoreRequest, error)
-	DecideRestoreRequest(context.Context, string, string, string) (any, error)
+	DecideRestoreRequest(context.Context, string, string, string, ...string) (any, error)
 }
 
 func (a *App) handleRestoreRequests(w http.ResponseWriter, r *http.Request) {
@@ -32,16 +32,17 @@ func (a *App) handleRestoreDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		ID           string `json:"id"`
-		Decision     string `json:"decision"`
-		RelativePath string `json:"relative_path"`
+		EncryptionKey string `json:"encryption_key"`
+		ID            string `json:"id"`
+		Decision      string `json:"decision"`
+		RelativePath  string `json:"relative_path"`
 	}
 	if httpx.ReadJSON(r, &body) != nil || body.ID == "" {
 		httpx.WriteError(w, 400, "invalid decision")
 		return
 	}
 	runner := a.runner
-	result, err := runner.DecideRestoreRequest(r.Context(), body.ID, body.Decision, body.RelativePath)
+	result, err := runner.DecideRestoreRequest(r.Context(), body.ID, body.Decision, body.RelativePath, body.EncryptionKey)
 	if err != nil {
 		if re, ok := err.(*recovery.RecoveryError); ok {
 			httpx.WriteError(w, re.StatusCode, re.Message)

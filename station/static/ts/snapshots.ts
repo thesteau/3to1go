@@ -129,7 +129,7 @@ async function deleteSnapshot(
 }
 
 // Asks Scout to restore this exact snapshot. Scout's operator accepts or rejects it there,
-// so the request only needs a key saved here; the key itself never leaves the browser.
+// and supplies the source key there when restoring to another device.
 async function requestSnapshotRestore(
   scoutId: string,
   scoutInstanceId: string,
@@ -137,7 +137,9 @@ async function requestSnapshotRestore(
   filename: string,
   btn: HTMLButtonElement,
 ): Promise<void> {
-  if (!getEncKey(scoutId, scoutInstanceId)) {
+  const target = btn.parentElement?.querySelector<HTMLSelectElement>(".restore-target")?.value;
+  const [targetScout, targetInstance] = target ? JSON.parse(target) : [scoutId, scoutInstanceId];
+  if (targetScout === scoutId && targetInstance === scoutInstanceId && !getEncKey(scoutId, scoutInstanceId)) {
     setActionStatus("Save this Scout's encryption key first, then request the restore.", "warning");
     return;
   }
@@ -145,7 +147,11 @@ async function requestSnapshotRestore(
   try {
     const res = await fetch(
       `/api/snapshots/${encodeURIComponent(scoutId)}/${encodeURIComponent(scoutInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}/restore`,
-      { method: "POST" },
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_scout_id: targetScout, target_instance_id: targetInstance }),
+      },
     );
     const result = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -153,9 +159,11 @@ async function requestSnapshotRestore(
       return;
     }
     setActionStatus(
-      result.notified
-        ? "Restore requested. Accept it under Restore Requests in Scout."
-        : "Restore requested. Scout shows it under Restore Requests on its next refresh.",
+      targetScout !== scoutId || targetInstance !== scoutInstanceId
+        ? "Restore requested on the target device. Accept it in Scout with the original snapshot’s encryption key."
+        : result.notified
+          ? "Restore requested. Accept it under Restore Requests in Scout."
+          : "Restore requested. Scout shows it under Restore Requests on its next refresh.",
       "success",
     );
   } catch {
@@ -193,7 +201,7 @@ function renderSnapshots(
             onclick="downloadSnapshot(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Download</button>
           ${
             scoutInstanceId
-              ? `<button class="btn btn-restore"
+              ? `<select class="restore-target" aria-label="Restore target device">${(typeof restoreTargets === "undefined" ? [] : restoreTargets).map((target) => `<option value="${escapeHtml(JSON.stringify([target.scoutId, target.instanceId]))}" ${target.scoutId === scoutId && target.instanceId === scoutInstanceId ? "selected" : ""}>${escapeHtml(target.scoutId)} / ${escapeHtml(target.instanceId)}</option>`).join("")}</select><button class="btn btn-restore"
             onclick="requestSnapshotRestore(${inlineString(scoutId)},${inlineString(scoutInstanceId)},${inlineString(jobName)},${inlineString(name)},this)">Restore</button>`
               : ""
           }
