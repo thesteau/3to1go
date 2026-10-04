@@ -1,0 +1,17 @@
+<dialog id="restore-dialog" class="modal" aria-labelledby="restore-dialog-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="restore-dialog-title">Restore Snapshot</h2>
+        <p class="hint" id="restore-snapshot" style="overflow-wrap: anywhere"></p>
+      </div>
+    </div>
+    <label for="restore-target">Target Scout device</label>
+    <select id="restore-target"></select>
+    <p class="hint">Accept the request and select the destination in Scout. Restore replaces files at the destination. For another device, supply the original snapshot's encryption key in Scout.</p>
+    <div class="toolbar modal-actions">
+      <button id="restore-submit" type="button">Request Restore</button>
+      <button id="restore-cancel" type="button" class="secondary" onclick="closeDialog('restore-dialog')">Cancel</button>
+    </div>
+  </div>
+</dialog>
