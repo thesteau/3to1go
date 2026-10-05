@@ -105,7 +105,7 @@ async function storeEncKey(
   } catch {
     if (generation !== _keySessionGeneration) return null;
     clearStoredEncKey(scoutId, scoutInstanceId);
-    const message = "Encryption key was not valid base64url text.";
+    const message = "Scout key was not valid base64url text.";
     setKeyStatus(scoutId, scoutInstanceId, message, "error");
     if (alertOnError) setActionStatus(message, "error");
     return null;
@@ -205,13 +205,13 @@ async function resolveEncKey(scoutId: string, scoutInstanceId: string | null | u
   const expectedFingerprint = getExpectedKeyFingerprint(scoutId, scoutInstanceId);
   const instanceLabel = scoutInstanceId || "legacy";
   const promptMessage = expectedFingerprint
-    ? `Enter the encryption key for Scout "${scoutId}" (${instanceLabel}). Expected fingerprint: ${shortFingerprint(expectedFingerprint)}.`
-    : `Enter the encryption key for Scout "${scoutId}" (${instanceLabel}).`;
+    ? `Enter the Scout key for Scout "${scoutId}" (${instanceLabel}). Expected fingerprint: ${shortFingerprint(expectedFingerprint)}.`
+    : `Enter the Scout key for Scout "${scoutId}" (${instanceLabel}).`;
   const prompted = await appDialog({
-    title: "Encryption Key Required",
+    title: "Scout Key Required",
     message: promptMessage,
     input: true,
-    inputLabel: "Encryption key",
+    inputLabel: "Scout key",
     inputType: "secret",
     confirmLabel: "Use Key",
   });

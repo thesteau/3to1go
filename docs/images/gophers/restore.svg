@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="300" viewBox="0 0 620 300" role="img" aria-labelledby="title description">
+  <title id="title">A Scout gopher unpacks a snapshot at home</title>
+  <desc id="description">Station sends a sealed snapshot to a Scout gopher, who opens the box with its Scout key. Files fly out and go back into the house, your folder.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
+    </marker>
+    <g id="gopher">
+      <g fill="#8ed1f0" stroke="#2b3240" stroke-width="3">
+        <circle cx="20" cy="22" r="10"/>
+        <circle cx="80" cy="22" r="10"/>
+        <path d="M50 8 C82 8 92 32 92 62 V96 C92 114 76 122 50 122 C24 122 8 114 8 96 V62 C8 32 18 8 50 8 Z"/>
+      </g>
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="32" cy="122" rx="12" ry="5"/>
+        <ellipse cx="68" cy="122" rx="12" ry="5"/>
+      </g>
+      <g fill="#fff" stroke="#2b3240" stroke-width="2.5">
+        <circle cx="33" cy="40" r="14"/>
+        <circle cx="67" cy="40" r="14"/>
+      </g>
+      <g fill="#2b3240">
+        <circle cx="37" cy="42" r="5.5"/>
+        <circle cx="71" cy="42" r="5.5"/>
+      </g>
+      <g fill="#fff">
+        <circle cx="39" cy="40" r="1.8"/>
+        <circle cx="73" cy="40" r="1.8"/>
+      </g>
+      <rect x="45.5" y="66" width="9" height="9" rx="1.5" fill="#fff" stroke="#2b3240" stroke-width="2"/>
+      <ellipse cx="50" cy="61" rx="13" ry="8.5" fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5"/>
+      <ellipse cx="50" cy="55.5" rx="6" ry="4" fill="#2b3240"/>
+      <path d="M50 69.5 V75" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="scout-hat">
+      <path d="M26 16 C28 -4 72 -4 74 16 Z" fill="#c9a36b" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M29 11 H71" stroke="#7a5a2e" stroke-width="3"/>
+      <ellipse cx="50" cy="16" rx="38" ry="5.5" fill="#b88d52" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="hard-hat">
+      <path d="M24 18 C24 -6 76 -6 76 18 Z" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M50 2 V16" stroke="#d9a520" stroke-width="3"/>
+      <rect x="16" y="15" width="68" height="7" rx="3.5" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="box">
+      <rect width="40" height="32" rx="3" fill="#d9a86c" stroke="#2b3240" stroke-width="2.5"/>
+      <rect x="17" y="1.5" width="6" height="29" fill="#f3dcb5"/>
+      <path d="M17.5 13 V10 A2.5 2.5 0 0 1 22.5 10 V13" fill="none" stroke="#2b3240" stroke-width="1.8"/>
+      <rect x="15" y="13" width="10" height="8" rx="1.5" fill="#c73346" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="arms">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="9" cy="76" rx="6" ry="9"/>
+        <ellipse cx="91" cy="76" rx="6" ry="9"/>
+      </g>
+    </g>
+    <g id="hands">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="28" cy="92" rx="6" ry="8"/>
+        <ellipse cx="72" cy="92" rx="6" ry="8"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="620" height="300" rx="18" fill="#faf8f5"/>
+  <path d="M20 240 H600" stroke="#e3ddd3" stroke-width="3"/>
+
+  <!-- Small Station -->
+  <rect x="30" y="170" width="110" height="70" fill="#fff0f2" stroke="#a52b3d" stroke-width="2.5"/>
+  <path d="M30 170 V150 L65 170 V150 L100 170 V150 L140 170 Z" fill="#f3d7dc" stroke="#a52b3d" stroke-width="2.5" stroke-linejoin="round"/>
+  <rect x="45" y="188" width="80" height="18" rx="4" fill="#a52b3d"/>
+  <text x="85" y="201" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5" fill="#fff" text-anchor="middle">STATION</text>
+  <path d="M150 212 H218" fill="none" stroke="#a52b3d" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+
+  <!-- Scout opening the box -->
+  <g transform="translate(225 100) scale(1.1)">
+    <use href="#gopher"/>
+    <g stroke="#2b3240" stroke-width="2.5" stroke-linejoin="round">
+      <path d="M24 88 L8 76 L30 72 L42 88 Z" fill="#e6bd85"/>
+      <path d="M76 88 L92 76 L70 72 L58 88 Z" fill="#e6bd85"/>
+      <rect x="24" y="88" width="52" height="30" rx="3" fill="#d9a86c"/>
+    </g>
+    <path d="M44 88 V117 M56 88 V117" stroke="#f3dcb5" stroke-width="4"/>
+    <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+      <ellipse cx="22" cy="102" rx="6" ry="8"/>
+      <ellipse cx="78" cy="102" rx="6" ry="8"/>
+    </g>
+    <use href="#scout-hat"/>
+  </g>
+
+  <!-- Files flying home -->
+  <g fill="#fff" stroke="#2b3240" stroke-width="2">
+    <g transform="rotate(12 356 132)"><rect x="345" y="118" width="22" height="28" rx="2"/><path d="M350 127 H362 M350 133 H362 M350 139 H358" stroke="#7890af"/></g>
+    <g transform="rotate(-10 383 104)"><rect x="372" y="90" width="22" height="28" rx="2"/><path d="M377 99 H389 M377 105 H389 M377 111 H385" stroke="#7890af"/></g>
+    <g transform="rotate(18 409 137)"><rect x="398" y="123" width="22" height="28" rx="2"/><path d="M403 132 H415 M403 138 H415 M403 144 H411" stroke="#7890af"/></g>
+  </g>
+  <path d="M424 112 Q444 120 452 150" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+
+  <!-- Home -->
+  <rect x="450" y="160" width="120" height="80" fill="#fff" stroke="#2b3240" stroke-width="2.5"/>
+  <path d="M438 165 L510 108 L582 165 Z" fill="#c9e6f5" stroke="#2b3240" stroke-width="2.5" stroke-linejoin="round"/>
+  <rect x="498" y="200" width="24" height="40" fill="#d9a86c" stroke="#2b3240" stroke-width="2"/>
+  <rect x="463" y="178" width="24" height="20" fill="#eaf6fb" stroke="#2b3240" stroke-width="2"/>
+  <rect x="533" y="178" width="24" height="20" fill="#eaf6fb" stroke="#2b3240" stroke-width="2"/>
+
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="85" y="268" font-size="15" font-weight="700" fill="#242a35">Station</text>
+    <text x="85" y="286" font-size="13" fill="#586273">Sends the snapshot</text>
+    <text x="280" y="268" font-size="15" font-weight="700" fill="#242a35">Scout</text>
+    <text x="280" y="286" font-size="13" fill="#586273">Opens it with the Scout key</text>
+    <text x="510" y="268" font-size="15" font-weight="700" fill="#242a35">Your folder</text>
+    <text x="510" y="286" font-size="13" fill="#586273">Files go back in place</text>
+  </g>
+</svg>

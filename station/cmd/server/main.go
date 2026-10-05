@@ -66,7 +66,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("user schema: %w", err)
 	}
 	if err := credStore.EnsureSchema(ctx); err != nil {
-		return fmt.Errorf("credential schema: %w", err)
+		return fmt.Errorf("token schema: %w", err)
 	}
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)

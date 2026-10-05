@@ -1,0 +1,72 @@
+---
+title: "Station tokens"
+description: "Authorize Scouts to upload to Station, share a token between machines, and revoke access."
+---
+
+Scouts authenticate to Station with a signed Station token that Station mints. Station keeps a record of each token but never stores the raw token.
+
+<Frame caption="Station mints a token, and Scout saves it in its settings.">
+  <img src="/images/gophers/station-token.svg" alt="A Station gopher runs a stamping press that mints a gold Station token, which flies to a Scout gopher." />
+</Frame>
+
+## Mint a token
+
+<Steps>
+  <Step title="Open the dialog">
+    In Station, click **Mint Station Token**.
+  </Step>
+  <Step title="Choose options">
+    - **TTL Days**: how long the token is valid, from 1 to 3650 days (default 365).
+    - **Shared token**: leave off for one Scout. See [Shared tokens](#shared-tokens).
+  </Step>
+  <Step title="Mint and copy">
+    Click **Mint Token**, then **Copy**.
+  </Step>
+  <Step title="Paste it into Scout">
+    In Scout, open **Edit Scout Settings** and paste it into **Station Token**, then save.
+  </Step>
+</Steps>
+
+<Warning>
+  The token is shown **once**. Paste it into Scout before closing the dialog. If you lose it, mint another.
+</Warning>
+
+## How binding works
+
+A normal token is **single-instance**: it binds to the first Scout installation that uploads with it, and Station rejects it from any other installation.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Minted
+    Minted --> Bound: First upload from a Scout
+    Minted --> Expired: TTL ends unused
+    Bound --> Bound: Uploads and restores
+    Bound --> Revoked: Revoke Station Token
+    Bound --> Expired: TTL ends
+    Revoked --> [*]
+    Expired --> [*]
+```
+
+## Shared tokens
+
+To use one token on several machines, turn on **Shared token** and set **Shared Instance Limit** to the number of Scout installations allowed to use it (2 to 10000).
+
+Each machine still gets its own instance ID, so their snapshots stay separate on Station.
+
+## Revoke a token
+
+Click **Revoke Station Token** on the Scout instance in Station's snapshot view. That Scout can no longer upload or restore. Snapshots already stored are **kept**, and you can still download them from Station's UI. Revoking a shared token stops **every** Scout using it.
+
+<Note>
+  A token can only be revoked after a Scout has reported in with it. An unused token just expires at the end of its TTL.
+</Note>
+
+## Replace a token
+
+Revoke the old token first, because Station rejects a new one while the instance is still bound to the old one. The replacement binds on Scout's next upload, not when you save it.
+
+## Delete a Scout instance
+
+**Delete Instance** permanently deletes **all snapshots** for that instance and removes it from Station, along with the archive size history used for [unusual sizes](/station/snapshots#unusual-sizes). It can't be undone. If Station finds no backup files for an instance, it offers to remove the stale entry instead.
+
+Deleting an instance doesn't revoke its token. Stop the Scout or revoke the token first if it must stop uploading.

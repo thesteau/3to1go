@@ -48,7 +48,7 @@ When using an external database, also remove the bundled `postgres` service and 
 | `HTTP_PORT` | `6555` | Port Station listens on. If you change it, update the Compose `ports` mapping too. |
 | `BACKUP_ROOT` | `/backups` | Snapshot folder inside the container. |
 | `STAGING_DIR` | `/staging` | Folder for uploads in progress. |
-| `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Scout credentials. Created on first start if missing. |
+| `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Station tokens. Created on first start if missing. |
 | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Station over HTTPS. See [Sign-in](/shared/sign-in#session-cookies-over-https). |
 
 ## Settings in the UI

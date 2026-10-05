@@ -5,6 +5,10 @@ description: "Bring a snapshot from Station back into a job's folder on Scout."
 
 Scout can download a snapshot from Station, decrypt it with its own key, and extract it back into the job's folder.
 
+<Frame caption="Station sends the sealed snapshot, and Scout opens it with its Scout key.">
+  <img src="/images/gophers/restore.svg" alt="Station sends a sealed box to a Scout gopher, who opens it. Files fly out and go back into a house." />
+</Frame>
+
 ```mermaid
 sequenceDiagram
     actor You
@@ -73,7 +77,7 @@ sequenceDiagram
     Admin->>Station: Click Restore on a snapshot
     Station->>Station: Save request as pending
     Station-)Scout: Notify (a hint only)
-    Scout->>Station: Get this Scout's requests with its credential
+    Scout->>Station: Get this Scout's requests with its Station token
     Scout-->>Operator: Restore Requests tab
     alt Accept
         Operator->>Scout: Accept, with a destination folder
@@ -90,13 +94,13 @@ sequenceDiagram
 
 <Steps>
   <Step title="Request it in Station">
-    Save that Scout's encryption key in Station, then click **Restore** on the snapshot. The key stays in your browser.
+    Save that Scout's key in Station, then click **Restore** on the snapshot. The key stays in your browser.
   </Step>
   <Step title="Open Restore Requests in Scout">
     The **Restore Requests** tab appears next to **Jobs** when Station has a request for this Scout.
   </Step>
   <Step title="Accept or reject">
-    The folder name defaults to the job name in the request. Optionally rename it, then click **Accept**, or click **Reject**. For another device, enter the original snapshot’s encryption key before accepting.
+    The folder name defaults to the job name in the request. Optionally rename it, then click **Accept**, or click **Reject**. For another device, enter the original snapshot’s Scout key before accepting.
   </Step>
 </Steps>
 
@@ -107,18 +111,18 @@ sequenceDiagram
 
 ## Requirements
 
-- Scout must be able to reach Station, with a valid credential.
-- Local job restores use Scout’s current encryption key. For a Station request targeting another device, provide the **original snapshot’s encryption key** on the receiving Scout. A missing or incorrect key prevents restoration.
+- Scout must be able to reach Station, with a valid Station token.
+- Local job restores use the current Scout key. For a Station request targeting another device, provide the **original snapshot’s Scout key** on the receiving Scout. A missing or incorrect key prevents restoration.
 
 <Note>
-  After you [rotate the key](/scout/encryption-key#rotate-the-key), Scout can no longer restore snapshots made with the old key, and Station's UI stops accepting the old key after Scout's next upload. Download any older snapshots you need **before** rotating.
+  After you [rotate the key](/scout/scout-key#rotate-the-key), Scout can no longer restore snapshots made with the old key, and Station's UI stops accepting the old key after Scout's next upload. Download any older snapshots you need **before** rotating.
 </Note>
 
 ## Rebuilding a lost machine
 
-Local job restores use Scout’s own **instance ID**, stored in `config/installation.id`. To restore onto a fresh installation, select that Scout as the target device in Station and provide the original snapshot’s encryption key when accepting on the receiving Scout. The key is used for that restore only; it does not replace the receiving Scout’s backup key or get saved in Station.
+Local job restores use Scout’s own **instance ID**, stored in `config/installation.id`. To restore onto a fresh installation, select that Scout as the target device in Station and provide the original snapshot’s Scout key when accepting on the receiving Scout. The key is used for that restore only; it does not replace the receiving Scout’s own key or get saved in Station.
 
-**If you have the old Scout's whole `config` folder** (it includes `installation.id`, `encryption.key`, and the saved settings and credential):
+**If you have the old Scout's whole `config` folder** (it includes `installation.id`, `encryption.key`, and the saved settings and Station token):
 
 <Steps>
   <Step title="Put the config folder back">

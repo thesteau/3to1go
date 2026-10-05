@@ -18,8 +18,8 @@ async function handleCredentialSharedToggle(): Promise<void> {
     return;
   }
   const confirmed = await confirmApp({
-    title: "Shared Credential",
-    message: "Lets several Scouts use one credential. Revoking it stops all of them.",
+    title: "Shared Token",
+    message: "Lets several Scouts use one Station token. Revoking it stops all of them.",
     confirmLabel: "Use Shared",
     danger: true,
   });
@@ -59,14 +59,14 @@ async function mintCredential(): Promise<void> {
     return;
   }
   (document.getElementById("credential_output") as HTMLTextAreaElement).value = body.credential || "";
-  setStatus("credential-status", body.message || "Credential minted. Copy it before closing.", "success");
-  setActionStatus("Scout credential minted.", "success");
+  setStatus("credential-status", body.message || "Station token minted. Copy it before closing.", "success");
+  setActionStatus("Station token minted.", "success");
 }
 
 async function copyMintedCredential(): Promise<void> {
   const value = (document.getElementById("credential_output") as HTMLTextAreaElement).value.trim();
   if (!value) {
-    setStatus("credential-status", "Mint a credential first.", "error");
+    setStatus("credential-status", "Mint a token first.", "error");
     return;
   }
   try {

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300" role="img" aria-labelledby="title description">
+  <title id="title">Station mints a Station token for a Scout</title>
+  <desc id="description">A Station gopher in a hard hat runs a stamping press that mints a gold Station token. The token flies across to a Scout gopher in an explorer hat.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
+    </marker>
+    <g id="gopher">
+      <g fill="#8ed1f0" stroke="#2b3240" stroke-width="3">
+        <circle cx="20" cy="22" r="10"/>
+        <circle cx="80" cy="22" r="10"/>
+        <path d="M50 8 C82 8 92 32 92 62 V96 C92 114 76 122 50 122 C24 122 8 114 8 96 V62 C8 32 18 8 50 8 Z"/>
+      </g>
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="32" cy="122" rx="12" ry="5"/>
+        <ellipse cx="68" cy="122" rx="12" ry="5"/>
+      </g>
+      <g fill="#fff" stroke="#2b3240" stroke-width="2.5">
+        <circle cx="33" cy="40" r="14"/>
+        <circle cx="67" cy="40" r="14"/>
+      </g>
+      <g fill="#2b3240">
+        <circle cx="37" cy="42" r="5.5"/>
+        <circle cx="71" cy="42" r="5.5"/>
+      </g>
+      <g fill="#fff">
+        <circle cx="39" cy="40" r="1.8"/>
+        <circle cx="73" cy="40" r="1.8"/>
+      </g>
+      <rect x="45.5" y="66" width="9" height="9" rx="1.5" fill="#fff" stroke="#2b3240" stroke-width="2"/>
+      <ellipse cx="50" cy="61" rx="13" ry="8.5" fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5"/>
+      <ellipse cx="50" cy="55.5" rx="6" ry="4" fill="#2b3240"/>
+      <path d="M50 69.5 V75" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="scout-hat">
+      <path d="M26 16 C28 -4 72 -4 74 16 Z" fill="#c9a36b" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M29 11 H71" stroke="#7a5a2e" stroke-width="3"/>
+      <ellipse cx="50" cy="16" rx="38" ry="5.5" fill="#b88d52" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="hard-hat">
+      <path d="M24 18 C24 -6 76 -6 76 18 Z" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M50 2 V16" stroke="#d9a520" stroke-width="3"/>
+      <rect x="16" y="15" width="68" height="7" rx="3.5" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="box">
+      <rect width="40" height="32" rx="3" fill="#d9a86c" stroke="#2b3240" stroke-width="2.5"/>
+      <rect x="17" y="1.5" width="6" height="29" fill="#f3dcb5"/>
+      <path d="M17.5 13 V10 A2.5 2.5 0 0 1 22.5 10 V13" fill="none" stroke="#2b3240" stroke-width="1.8"/>
+      <rect x="15" y="13" width="10" height="8" rx="1.5" fill="#c73346" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="arms">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="9" cy="76" rx="6" ry="9"/>
+        <ellipse cx="91" cy="76" rx="6" ry="9"/>
+      </g>
+    </g>
+    <g id="hands">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="28" cy="92" rx="6" ry="8"/>
+        <ellipse cx="72" cy="92" rx="6" ry="8"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="600" height="300" rx="18" fill="#faf8f5"/>
+  <path d="M20 240 H580" stroke="#e3ddd3" stroke-width="3"/>
+
+  <g transform="translate(40 113)">
+    <use href="#gopher"/>
+    <use href="#arms"/>
+    <use href="#hard-hat"/>
+  </g>
+
+  <!-- Stamping press -->
+  <g stroke="#2b3240" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M182 96 L150 72" stroke-width="4" fill="none"/>
+    <circle cx="148" cy="70" r="6" fill="#a52b3d"/>
+    <rect x="258" y="90" width="16" height="115" fill="#aab4c2"/>
+    <rect x="175" y="88" width="99" height="16" rx="3" fill="#aab4c2"/>
+    <rect x="206" y="104" width="14" height="22" fill="#aab4c2"/>
+    <rect x="192" y="126" width="42" height="20" rx="3" fill="#a52b3d"/>
+    <rect x="150" y="205" width="130" height="35" rx="4" fill="#cdd3dc"/>
+    <ellipse cx="213" cy="199" rx="18" ry="6" fill="#f4c542"/>
+  </g>
+  <path d="M244 132 H256 M244 142 H252 M182 132 H170 M182 142 H174" stroke="#7890af" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Flying token -->
+  <path d="M238 186 Q290 80 338 96" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="5 5"/>
+  <circle cx="360" cy="104" r="20" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+  <circle cx="360" cy="104" r="14" fill="none" stroke="#d9a520" stroke-width="2"/>
+  <text x="360" y="109" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#7a5a10" text-anchor="middle">ST</text>
+  <g fill="#f4c542" stroke="#d9a520" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M392 78 L394 84 L400 86 L394 88 L392 94 L390 88 L384 86 L390 84 Z"/>
+    <path d="M332 70 L334 75 L339 77 L334 79 L332 84 L330 79 L325 77 L330 75 Z"/>
+  </g>
+  <path d="M384 114 Q430 126 452 160" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+  <text x="360" y="60" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#242a35" text-anchor="middle">Station token</text>
+
+  <g transform="translate(460 113)">
+    <use href="#gopher"/>
+    <use href="#arms"/>
+    <use href="#scout-hat"/>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="160" y="268" font-size="15" font-weight="700" fill="#242a35">Station mints it</text>
+    <text x="160" y="286" font-size="13" fill="#586273">Shown once, so copy it</text>
+    <text x="510" y="268" font-size="15" font-weight="700" fill="#242a35">Scout saves it</text>
+    <text x="510" y="286" font-size="13" fill="#586273">Used for every upload</text>
+  </g>
+</svg>

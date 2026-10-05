@@ -138,7 +138,7 @@ func (r *RecoveryService) RecoverRequest(ctx context.Context, job *backup.JobDef
 	}
 
 	if err := encryption.DecryptFile(key, downloadPath, decryptedPath); err != nil {
-		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with the provided encryption key", StatusCode: 409})
+		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with the provided Scout key", StatusCode: 409})
 	}
 
 	restored, err := backup.ExtractArchive(decryptedPath, job.RootPath)
@@ -263,7 +263,7 @@ func wrapRecoveryError(err error, isPreview bool) *RecoveryError {
 			if !isPreview {
 				code = 502
 			}
-			return &RecoveryError{Message: "Station rejected the recovery request; check the Scout credential", StatusCode: code}
+			return &RecoveryError{Message: "Station rejected the recovery request; check the Station token", StatusCode: code}
 		case uf.Category == "network" || uf.Category == "server" || uf.Category == "rate_limited" || uf.Category == "circuit_open":
 			return &RecoveryError{Message: uf.Error(), StatusCode: 502}
 		default:

@@ -60,7 +60,7 @@
           {
             "group": "Using Station",
             "pages": [
-              "station/scout-credentials",
+              "station/station-tokens",
               "station/snapshots",
               "station/notifications",
               "station/hooks",
@@ -85,7 +85,7 @@
               "scout/unusual-backups",
               "scout/multiple-folders",
               "scout/restore",
-              "scout/encryption-key",
+              "scout/scout-key",
               "scout/notifications",
               "scout/hooks"
             ]
@@ -94,6 +94,16 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/scout/encryption-key",
+      "destination": "/scout/scout-key"
+    },
+    {
+      "source": "/station/scout-credentials",
+      "destination": "/station/station-tokens"
+    }
+  ],
   "footer": {
     "socials": {
       "github": "https://github.com/thesteau/3to1go"

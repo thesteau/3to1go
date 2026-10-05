@@ -179,7 +179,7 @@ async function requestSnapshotRestore(
   targetInstance = scoutInstanceId,
 ): Promise<boolean> {
   if (targetScout === scoutId && targetInstance === scoutInstanceId && !getEncKey(scoutId, scoutInstanceId)) {
-    setActionStatus("Save this Scout's encryption key first, then request the restore.", "warning");
+    setActionStatus("Save this Scout's key first, then request the restore.", "warning");
     return false;
   }
   const restore = setButtonBusy(btn, "Requesting…");
@@ -199,7 +199,7 @@ async function requestSnapshotRestore(
     }
     setActionStatus(
       targetScout !== scoutId || targetInstance !== scoutInstanceId
-        ? "Restore requested on the target device. Accept it in Scout with the original snapshot’s encryption key."
+        ? "Restore requested on the target device. Accept it in Scout with the original snapshot’s Scout key."
         : result.notified
           ? "Restore requested. Accept it under Restore Requests in Scout."
           : "Restore requested. Scout shows it under Restore Requests on its next refresh.",

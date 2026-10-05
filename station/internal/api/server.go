@@ -177,9 +177,9 @@ func (a *App) StartCredentialCleanupLoop() {
 			case <-ticker.C:
 				removed, err := a.credStore.CleanupExpired(context.Background())
 				if err != nil {
-					a.logger.Error("credential_cleanup_failed", "error", err)
+					a.logger.Error("station_token_cleanup_failed", "error", err)
 				} else if removed > 0 {
-					a.logger.Info("credential_cleanup", "removed", removed)
+					a.logger.Info("station_token_cleanup", "removed", removed)
 				}
 			}
 		}

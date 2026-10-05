@@ -48,7 +48,7 @@ Station ships as a Docker image, `ghcr.io/thesteau/3to1go-station`, and needs Po
     Open `http://<station-host>:6555/` and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
   </Step>
   <Step title="Connect your first Scout">
-    Click **Mint Scout Credential** and paste the result into Scout. See [Scout credentials](/station/scout-credentials).
+    Click **Mint Station Token** and paste the result into Scout. See [Station tokens](/station/station-tokens).
   </Step>
 </Steps>
 
@@ -70,7 +70,7 @@ The example Compose file keeps everything next to it:
 ```
 
 <Warning>
-  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and credential records. Losing `issuer.key` invalidates every Scout credential.
+  Preserve `config/` (it holds `issuer.key`) and a consistent backup of PostgreSQL, as well as the snapshot folder. Stop PostgreSQL before copying its data directory, or use PostgreSQL's backup tools. Losing the database loses snapshot metadata, users, and Station token records. Losing `issuer.key` invalidates every Station token.
 </Warning>
 
 See [Recover Station](/station/disaster-recovery) for backup commands and steps to restore it on a replacement host.

@@ -21,14 +21,14 @@ The fingerprint in the filename is the first eight characters of Scout's path-an
 
 ## Download a snapshot
 
-Click **Download** on a snapshot. The first time, Station asks for that Scout's **encryption key**.
+Click **Download** on a snapshot. The first time, Station asks for that Scout's **Scout key**.
 
 ```mermaid
 sequenceDiagram
     actor You
     participant Browser
     participant Station
-    You->>Browser: Paste Scout's encryption key
+    You->>Browser: Paste the Scout key
     Browser->>Browser: Check key against Scout's reported fingerprint
     Browser->>Station: Download encrypted snapshot
     Station-->>Browser: Encrypted tar.zst
@@ -43,7 +43,7 @@ sequenceDiagram
 
 <Steps>
   <Step title="Copy the key from Scout">
-    In Scout's UI, find **Encryption Key** and click **Copy**. See [Encryption key](/scout/encryption-key).
+    In Scout's UI, find **Scout Key** and click **Copy**. See [Scout key](/scout/scout-key).
   </Step>
   <Step title="Paste it into Station">
     Paste it when Station prompts. Station checks it against the key fingerprint that Scout reported, so a wrong key is caught before decryption starts.
@@ -67,7 +67,7 @@ tar --zstd -xf photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 
 ## Restore a snapshot to Scout
 
-Choose a target device next to **Restore**, then click **Restore** on a snapshot. The original Scout is selected by default. Save that Scout’s key first for a same-device restore. For another device, supply the original snapshot’s encryption key on the receiving Scout when accepting the request. Scout's operator accepts or rejects the request in Scout. See [Restore requests from Station](/scout/restore#restore-requests-from-station).
+Choose a target device next to **Restore**, then click **Restore** on a snapshot. The original Scout is selected by default. Save that Scout’s key first for a same-device restore. For another device, supply the original snapshot’s Scout key on the receiving Scout when accepting the request. Scout's operator accepts or rejects the request in Scout. See [Restore requests from Station](/scout/restore#restore-requests-from-station).
 
 ## Delete a snapshot
 

@@ -15,6 +15,10 @@ The [3-2-1 rule](https://en.wikipedia.org/wiki/Backup#Storage) says to keep **3*
 
 Copy Station's backup folder somewhere independent of Station. Where Station runs decides which copy is your offsite one:
 
+<Frame caption="A sync tool copies Station's encrypted snapshots to the cloud. Station doesn't do this itself.">
+  <img src="/images/gophers/cloud-copy.svg" alt="A gopher on the Station roof sends sealed boxes up on red balloons to a cloud, where another gopher keeps them stacked." />
+</Frame>
+
 <CardGroup cols={2}>
   <Card title="Station is local" icon="house">
     Station runs on a home NAS or server for fast access. Sync its backup folder to offsite storage. That synced copy is both your **third** copy and your **offsite** one.
@@ -39,4 +43,4 @@ Station writes ordinary files into its backup folder (`/backups` in the containe
 - **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The provider only sees encrypted archives.
 - **Object storage.** There's no native backend. Copy the backup folder with an external tool. If you use a filesystem mount over object storage instead, check that it supports writes, listing, renames, and deletion first.
 
-Keep Scout's encryption keys separately from these copies. To recover Station itself, not just the archives, also keep its signing key and PostgreSQL database. See [Install Station](/station/install#what-gets-created). A mirror may also copy retention deletions, depending on the sync tool's settings.
+Keep the Scout keys separately from these copies. To recover Station itself, not just the archives, also keep its signing key and PostgreSQL database. See [Install Station](/station/install#what-gets-created). A mirror may also copy retention deletions, depending on the sync tool's settings.

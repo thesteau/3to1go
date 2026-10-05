@@ -33,21 +33,21 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 	}
 	reg, err := a.snapIndex.GetScoutRegistration(r.Context(), scoutID, instID)
 	if err != nil {
-		return http.StatusInternalServerError, "failed to inspect credential scope"
+		return http.StatusInternalServerError, "failed to inspect Station token scope"
 	}
 	if reg != nil && reg.CredentialHash != nil && *reg.CredentialHash != "" {
 		if *reg.CredentialHash == cred.TokenHash {
 			return 0, ""
 		}
-		return http.StatusForbidden, "credential is not bound to this scout instance"
+		return http.StatusForbidden, "Station token is not bound to this scout instance"
 	}
 	if !allowBinding {
-		return http.StatusForbidden, "credential has not been bound to this scout instance"
+		return http.StatusForbidden, "Station token has not been bound to this scout instance"
 	}
 
 	allRegs, err := a.snapIndex.ListScoutRegistrations(r.Context(), nil)
 	if err != nil {
-		return http.StatusInternalServerError, "failed to inspect credential users"
+		return http.StatusInternalServerError, "failed to inspect Station token users"
 	}
 	used := 0
 	for _, r2 := range allRegs {
@@ -61,9 +61,9 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 	}
 	if used >= limit {
 		if cred.Shared {
-			return http.StatusForbidden, "shared credential registration limit reached"
+			return http.StatusForbidden, "shared Station token registration limit reached"
 		}
-		return http.StatusForbidden, "single-use credential is already bound to another scout instance"
+		return http.StatusForbidden, "single-use Station token is already bound to another scout instance"
 	}
 	return 0, ""
 }
