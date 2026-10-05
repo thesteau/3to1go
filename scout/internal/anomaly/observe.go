@@ -50,7 +50,6 @@ func (o Observation) CompressionRatio() float64 {
 func Observe(files []*backup.DiscoveredFile, archiveBytes int64, now time.Time) Observation {
 	obs := Observation{
 		ObservedAt:   now.UTC().Format(time.RFC3339),
-		FileCount:    len(files),
 		ArchiveBytes: archiveBytes,
 		Signature:    make([]uint64, signatureSize),
 	}
@@ -59,6 +58,11 @@ func Observe(files []*backup.DiscoveredFile, archiveBytes int64, now time.Time) 
 	}
 	extensions := map[string]int{}
 	for _, f := range files {
+		// Empty folders are archived but say nothing about how the data changed.
+		if f.IsDir {
+			continue
+		}
+		obs.FileCount++
 		obs.SourceBytes += f.Size
 		extensions[extensionOf(f.ArchivePath)]++
 		// A file counts as unchanged only if both its path and size match.

@@ -18,6 +18,11 @@ func ComputeFingerprint(files []*DiscoveredFile) string {
 
 	var lines []string
 	for _, f := range sorted {
+		if f.IsDir {
+			// The trailing slash keeps an empty folder distinct from a same-named empty file.
+			lines = append(lines, f.ArchivePath+"/")
+			continue
+		}
 		lines = append(lines, fmt.Sprintf("%s\t%d", f.ArchivePath, f.Size))
 	}
 	manifest := strings.Join(lines, "\n")

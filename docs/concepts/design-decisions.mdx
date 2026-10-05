@@ -7,11 +7,11 @@ These behaviors are intentional.
 
 ## Full snapshots
 
-Each backup is a complete `tar.zst` archive of the job's included regular files. Empty directories, special files, and the root `.upload_dir` marker are omitted. There are no incremental backups or delta chains, so every snapshot can be restored on its own with its encryption key.
+Each backup is a complete `tar.zst` archive of the job's included regular files and empty folders. Special files and the root `.upload_dir` marker are omitted. There are no incremental backups or delta chains, so every snapshot can be restored on its own with its encryption key.
 
 ## Path-and-size fingerprinting
 
-Scout decides whether a new snapshot is needed from a fingerprint of the folder's **sorted file paths and sizes**. It doesn't hash contents or check modification times, so an edit that keeps every path and size the same does **not** trigger a backup.
+Scout decides whether a new snapshot is needed from a fingerprint of the folder's **sorted file paths and sizes**, plus the paths of its empty folders. It doesn't hash contents or check modification times, so an edit that keeps every path and size the same does **not** trigger a backup.
 
 <Tip>
   To capture that kind of edit, use **Force Upload** on the job in Scout. If the job has an older staged archive, use **Clear staged backup** first so Force Upload builds a fresh one.
