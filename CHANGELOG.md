@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/thesteau/3to1go/compare/v1.3.0...v1.3.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* Restore folders ([#96](https://github.com/thesteau/3to1go/issues/96)) ([bad7fbe](https://github.com/thesteau/3to1go/commit/bad7fbe0adc4b5aa749bed1fc6769d2a6cfc0bab))
+* **scout:** Fix x restoration bug ([#94](https://github.com/thesteau/3to1go/issues/94)) ([6405a86](https://github.com/thesteau/3to1go/commit/6405a86d675ba2ca4d66708bca902f3fde1de1da))
+
 ## [1.3.0](https://github.com/thesteau/3to1go/compare/v1.2.0...v1.3.0) (2026-10-04)
 
 
