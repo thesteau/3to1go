@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/thesteau/3to1go/compare/v1.3.1...v1.3.2) (2026-10-05)
+
+
+### Bug Fixes
+
+* use Scout key and Station token names, update gopher docs art ([#98](https://github.com/thesteau/3to1go/issues/98)) ([ced2c19](https://github.com/thesteau/3to1go/commit/ced2c19368182079d347acce757893795afb812a))
+
 ## [1.3.1](https://github.com/thesteau/3to1go/compare/v1.3.0...v1.3.1) (2026-10-05)
 
 
