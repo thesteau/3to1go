@@ -93,7 +93,7 @@ func MintCredential(priv ed25519.PrivateKey, ttlDays int, scopes ...CredentialSc
 	now := time.Now().Unix()
 	jti, err := uuid.NewRandom()
 	if err != nil {
-		return "", fmt.Errorf("generate credential id: %w", err)
+		return "", fmt.Errorf("generate Station token id: %w", err)
 	}
 	scope := normalizeCredentialScope(scopes...)
 
@@ -110,7 +110,7 @@ func MintCredential(priv ed25519.PrivateKey, ttlDays int, scopes ...CredentialSc
 	token.Header["typ"] = "JWT"
 	signed, err := token.SignedString(priv)
 	if err != nil {
-		return "", fmt.Errorf("sign credential: %w", err)
+		return "", fmt.Errorf("sign Station token: %w", err)
 	}
 	return signed, nil
 }
@@ -140,7 +140,7 @@ func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPay
 	)
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, errors.New("credential expired")
+			return nil, errors.New("expired Station token")
 		}
 		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
 			return nil, errors.New("invalid signature")
@@ -153,7 +153,7 @@ func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPay
 
 	payload := payloadFromClaims(claims)
 	if strings.TrimSpace(payload.JTI) == "" {
-		return nil, errors.New("credential missing jti")
+		return nil, errors.New("missing jti in Station token")
 	}
 
 	return payload, nil

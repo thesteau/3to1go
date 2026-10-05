@@ -7,7 +7,7 @@ These behaviors are intentional.
 
 ## Full snapshots
 
-Each backup is a complete `tar.zst` archive of the job's included regular files and empty folders. Special files and the root `.upload_dir` marker are omitted. There are no incremental backups or delta chains, so every snapshot can be restored on its own with its encryption key.
+Each backup is a complete `tar.zst` archive of the job's included regular files and empty folders. Special files and the root `.upload_dir` marker are omitted. There are no incremental backups or delta chains, so every snapshot can be restored on its own with its Scout key.
 
 ## Path-and-size fingerprinting
 
@@ -31,7 +31,7 @@ Snapshots keep regular files' permission bits, such as executable and private-fi
 
 ## Scout skips its own runtime data
 
-On startup, Scout marks its spool and state folders with a hidden `.3to1go-runtime` file and never backs them up, even through another mount path. Its configuration and encryption key are still included.
+On startup, Scout marks its spool and state folders with a hidden `.3to1go-runtime` file and never backs them up, even through another mount path. Its configuration and Scout key are still included.
 
 ## One operator per app
 

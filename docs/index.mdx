@@ -9,6 +9,10 @@ description: "Self-hosted, encrypted backups: Scout backs up your machines, Stat
 
 Like the gophers racing above, each Scout heads out on one of your machines, gathers the folders you chose, seals them, and carries them back to the Station. The Station keeps every pack safe but never opens one, because only the Scout has the key. To get files back, the Scout fetches a pack from the Station and unpacks it at home.
 
+<Frame caption="Scouts bring sealed packs to Station. A sync tool can float a copy to the cloud.">
+  <img src="/images/gophers/station-overview.svg" alt="A Scout gopher carries a locked box to the Station factory, where gophers in hard hats stack boxes. A gopher outside sends a box on a balloon to a cloud, where another gopher keeps a stack of boxes." />
+</Frame>
+
 <CardGroup cols={2}>
   <Card title="Scout" icon="laptop" href="/scout/overview">
     Finds the folders you marked, packs and **encrypts** them, and uploads them to Station on a schedule.
@@ -31,7 +35,7 @@ Your original files and Station's snapshots are two copies. For a third, sync St
     A home server, NAS, or VPS.
   </Step>
   <Step title="Run Scout on each machine you want to back up">
-    Give each a unique `SCOUT_ID` and a credential minted by Station.
+    Give each a unique `SCOUT_ID` and a Station token minted by Station.
   </Step>
   <Step title="Choose folders in Scout">
     Each folder you save in Scout's Job Editor becomes a backup job. The editor stores it as a `.upload_dir` file in the folder, which you can also write yourself.
@@ -49,7 +53,7 @@ It references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Stora
 
 - **Encrypted before upload.** Station never sees your plaintext files.
 - **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `SCOUT_ID`.
-- **Revocable credentials.** Mint and revoke Scout credentials from Station's UI without deleting snapshots.
+- **Revocable Station tokens.** Mint and revoke Station tokens from Station's UI without deleting snapshots.
 - **No station manifest.** Mark folders with a small file instead of maintaining a backup config.
 
 ## Next steps
@@ -65,4 +69,8 @@ It references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Stora
 
 <Note>
   3to1go is open source under the MIT License. Source, issues, and example deployments are on [GitHub](https://github.com/thesteau/3to1go).
+</Note>
+
+<Note>
+  The gopher artwork is based on the Go Gopher, designed by [Renée French](https://reneefrench.blogspot.com/) and licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 </Note>

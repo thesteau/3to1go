@@ -33,7 +33,7 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := httpx.ReadJSON(r, &body); err == nil {
 			if err := httpx.ValidateStruct(&body); err != nil {
-				httpx.WriteError(w, http.StatusBadRequest, "invalid credential options")
+				httpx.WriteError(w, http.StatusBadRequest, "invalid Station token options")
 				return
 			}
 			if body.TTLDays != 0 {
@@ -50,7 +50,7 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	if shared {
 		if maxRegistrations < 2 || maxRegistrations > 10000 {
-			httpx.WriteError(w, http.StatusBadRequest, "max_registrations must be between 2 and 10000 for shared credentials")
+			httpx.WriteError(w, http.StatusBadRequest, "max_registrations must be between 2 and 10000 for shared Station tokens")
 			return
 		}
 	} else {
@@ -66,7 +66,7 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 	scope := signing.CredentialScope{Shared: shared, MaxRegistrations: maxRegistrations}
 	credential, err := a.credStore.Mint(r.Context(), priv, ttlDays, scope)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to mint credential")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to mint Station token")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -74,7 +74,7 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		"ttl_days":          ttlDays,
 		"shared":            shared,
 		"max_registrations": maxRegistrations,
-		"message":           "This token can be revoked from Station after a Scout instance reports in with it, or it can expire naturally.",
+		"message":           "This Station token can be revoked from Station after a Scout instance reports in with it, or it can expire naturally.",
 	})
 }
 
@@ -99,7 +99,7 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if reg.CredentialHash == nil || *reg.CredentialHash == "" {
-		httpx.WriteError(w, http.StatusConflict, "instance has not used a database-backed credential yet")
+		httpx.WriteError(w, http.StatusConflict, "instance has not used a database-backed Station token yet")
 		return
 	}
 	tokenHash := *reg.CredentialHash
@@ -107,7 +107,7 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 	// Find all instances using this credential
 	allRegs, err := a.snapIndex.ListScoutRegistrations(r.Context(), nil)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to list credential users")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to list Station token users")
 		return
 	}
 	var affected []map[string]string
@@ -122,7 +122,7 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 
 	revoked, err := a.credStore.Revoke(r.Context(), tokenHash)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to revoke credential")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to revoke Station token")
 		return
 	}
 
@@ -132,7 +132,7 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 			copy := r2
 			copy.CredentialHash = nil
 			if err := a.snapIndex.UpsertScoutRegistration(r.Context(), &copy); err != nil {
-				httpx.WriteError(w, http.StatusInternalServerError, "failed to update credential registrations")
+				httpx.WriteError(w, http.StatusInternalServerError, "failed to update Station token registrations")
 				return
 			}
 		}

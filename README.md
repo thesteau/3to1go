@@ -34,7 +34,7 @@ Each Scout has its own address and web UI on port **6556**. They all upload to S
 - **Encrypt before upload.** Station only stores encrypted archives. Downloads are decrypted in your browser, and restores on Scout itself.
 - **Keep machines separate.** Each installation has its own instance ID and snapshot history, even when Scout IDs are shared.
 - **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect hooks or ntfy notifications.
-- **Control access.** Mint and revoke Scout credentials from Station's UI.
+- **Control access.** Mint and revoke Station tokens from Station's UI.
 
 ## Get Started
 
@@ -56,7 +56,7 @@ Edit `.env`: set a real `POSTGRES_PASSWORD`, choose `BACKUP_DIR` for snapshot st
 docker compose up -d
 ```
 
-Open `http://<station-host>:6555/`. Sign in as `admin` with your initial password (default `admin`) and choose a new password when prompted. Click **Mint Scout Credential** and copy the token for Scout.
+Open `http://<station-host>:6555/`. Sign in as `admin` with your initial password (default `admin`) and choose a new password when prompted. Click **Mint Station Token** and copy the token for Scout.
 
 ### 2. Deploy Scout
 
@@ -82,7 +82,7 @@ SCAN_DIR=/home/alice
 docker compose up -d
 ```
 
-Open `http://<scout-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Scout Settings**, paste the token into **Scout Credential** and save. Save a copy of the **Encryption Key** somewhere off this machine.
+Open `http://<scout-host>:6556/`, sign in as `admin`, and change the initial password. In **Edit Scout Settings**, paste the token into **Station Token** and save. Save a copy of the **Scout Key** somewhere off this machine.
 
 ### 3. Choose a folder and back it up
 
@@ -96,7 +96,7 @@ For more detail, see the [quickstart](https://3to1go.docs.thesteau.com/quickstar
 
 ## Before You Rely on It
 
-- **Keep your encryption key safe.** Losing it means losing access to the snapshots it encrypted. Practice a [restore](https://3to1go.docs.thesteau.com/scout/restore).
+- **Keep your Scout key safe.** Losing it means losing access to the snapshots it encrypted. Practice a [restore](https://3to1go.docs.thesteau.com/scout/restore).
 - **Backups are full snapshots.** Change detection uses sorted file paths and sizes. Same-size edits need **Force Upload**. Clear an older staged backup first so Force Upload builds a fresh archive.
 - **Restore replaces matching files.** Local files absent from the snapshot stay untouched. Review the preview before confirming.
 - **Plan a third copy.** Your original files and Station's snapshots are two copies, even when Station is offsite. See [Storage and the 3-2-1 rule](https://3to1go.docs.thesteau.com/concepts/storage-and-3-2-1).
@@ -127,7 +127,7 @@ If this project is useful to you, consider buying me a coffee. It keeps the proj
 
 ## Attribution
 
-<a id="attr-1"></a>**[1] Go Gopher artwork.** The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community.
+<a id="attr-1"></a>**[1] Go Gopher artwork.** The Go Gopher mascot was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under the [Creative Commons Attribution 4.0 License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The "3, 2, 1, Go!" racing artwork used in this project is a derivative of that original character created by the Go community. The gopher illustrations in the docs are also derivatives of that character.
 
 <a id="attr-2"></a>**[2] 3-2-1 backup rule.** The backup strategy referenced by this project's name is a widely documented industry practice. See the [Wikipedia article on backup storage](https://en.wikipedia.org/wiki/Backup#Storage) for background.
 
@@ -139,7 +139,7 @@ If this project is useful to you, consider buying me a coffee. It keeps the proj
 
 - Verifying that your backups are complete and recoverable.
 - Securing the machine running Station and the network path between Scout and Station.
-- Keeping your `encryption.key` safe. Losing it means losing access to encrypted snapshots permanently.
+- Keeping your Scout key (`encryption.key`) safe. Losing it means losing access to encrypted snapshots permanently.
 - Complying with any applicable laws or regulations regarding the storage of your data.
 
 ## License

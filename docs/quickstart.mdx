@@ -29,9 +29,9 @@ docker compose up -d
 
 Open **http://localhost:6555/** and sign in as `admin`. See [Sign-in and accounts](/shared/sign-in).
 
-## 2. Mint a Scout credential
+## 2. Mint a Station token
 
-In Station's UI, mint a new Scout credential and copy it. You'll paste it into Scout in the next step. See [Scout credentials](/station/scout-credentials).
+In Station's UI, mint a new Station token and copy it. You'll paste it into Scout in the next step. See [Station tokens](/station/station-tokens).
 
 ## 3. Start Scout
 
@@ -57,7 +57,7 @@ If Station runs on the same Docker Desktop host, `STATION_URL` is usually `http:
 docker compose up -d
 ```
 
-Open **http://localhost:6556/**, sign in, and paste the credential from step 2 into Scout's settings.
+Open **http://localhost:6556/**, sign in, and paste the Station token from step 2 into Scout's settings.
 
 ## 4. Choose a folder to back up
 
@@ -76,7 +76,7 @@ See [Backup jobs](/scout/backup-jobs).
 Scout backs up on its schedule (weekly by default). To back up now, click **Run Backup Cycle Now** in Scout's UI. When it finishes, the snapshot appears in Station's UI.
 
 <Warning>
-  Back up Scout's `encryption.key` right away. Without it, that Scout's snapshots cannot be decrypted. See [Encryption key](/scout/encryption-key).
+  Back up Scout's `encryption.key` right away. Without it, that Scout's snapshots cannot be decrypted. See [Scout key](/scout/scout-key).
 </Warning>
 
 ## Choose an image version

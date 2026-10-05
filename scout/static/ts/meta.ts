@@ -59,9 +59,9 @@ function initMeta(): void {
     <div><strong>Advertised URL</strong><br><span id="meta-val-advertised-url">${pending}</span></div>
     <div><strong>Cron Schedule</strong> <span id="meta-hint-cron"></span><br><span id="meta-val-cron">${pending}</span></div>
     <div><strong>Upload Circuit</strong> <span id="meta-hint-upload-circuit"></span><br><span id="meta-val-upload-circuit">${pending}</span></div>
-    <div><strong>Scout Credential</strong><br><span id="meta-val-scout-credential">${pending}</span></div>
+    <div><strong>Station Token</strong><br><span id="meta-val-scout-credential">${pending}</span></div>
     <div class="enc-key-cell">
-      <strong>Encryption Key</strong>
+      <strong>Scout Key</strong>
       <div class="enc-key-row">
         <code id="enc-key-value">…</code>
         <button type="button" class="secondary enc-key-copy" data-requires="encryption-key" disabled onclick="copyEncKey()">Copy</button>
@@ -147,7 +147,7 @@ async function copyEncKey(): Promise<void> {
 async function rotateEncKey(): Promise<void> {
   if (!requirePanelReady("encryption-key")) return;
   const confirmed = await confirmApp({
-    title: "Rotate Encryption Key",
+    title: "Rotate Scout Key",
     message: "Future backups use a new key. Keep the old key: older snapshots still need it.\n\nRotate the key?",
     confirmLabel: "Rotate Key",
     danger: true,

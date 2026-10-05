@@ -66,18 +66,18 @@ Scout backs up files on a specific machine, so the pod runs on the node that hol
     This creates the `3to1go` namespace and the Scout pod.
   </Step>
   <Step title="Finish in the UI">
-    Open `http://<node>:6556/` and continue from **Sign in and add the credential** in the [Compose install](/scout/install#set-up).
+    Open `http://<node>:6556/` and continue from **Sign in and add the Station token** in the [Compose install](/scout/install#set-up).
   </Step>
 </Steps>
 
 ## Things to keep in mind
 
-- **Keep `/config` on persistent storage.** It holds the settings, `encryption.key`, and `installation.id`. Losing it means a new instance on Station, and losing the key means losing access to existing snapshots. See [Encryption key](/scout/encryption-key).
+- **Keep `/config` on persistent storage.** It holds the settings, `encryption.key`, and `installation.id`. Losing it means a new instance on Station, and losing the key means losing access to existing snapshots. See [Scout key](/scout/scout-key).
 - **One pod per set of folders.** Don't share `/config`, `/data/state`, or `/data/spool` between Scouts. The update strategy (`maxSurge: 0`) stops the old pod before starting a new one.
 - **Scout always scans `/scan`.** `SCAN_DIR` only sets the host path shown in Scout's UI. To back up several folders, mount each at `/scan/<name>` as in [Multiple folders and drives](/scout/multiple-folders).
 - **Mounts need write access.** Scout writes `.upload_dir` markers and restores files into `/scan`. The image runs as root, so files it creates are root-owned.
 - **Reaching the UI.** `hostPort` matches the Compose setup. If you use a Service or Ingress instead, keep it private or use HTTPS. See [Sign-in](/shared/sign-in).
-- **Credentials.** Paste the Scout credential in Scout's UI, as with Compose. It's saved in `/config`.
+- **Station token.** Paste the Station token in Scout's UI, as with Compose. It's saved in `/config`.
 - **Moving from Compose.** Stop the Compose container (`docker compose down`, without `-v`), point the `hostPath` volumes at the old Compose folders, and keep the same `SCOUT_ID`. Scout keeps its key, settings, and instance ID.
 - **Updating.** Change the image tag or digest and re-apply, or let a tool such as Renovate or Flux do it.
 

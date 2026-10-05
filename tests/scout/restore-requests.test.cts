@@ -88,7 +88,7 @@ test("cross device acceptance requires a key and clears it after submission", as
   elements["restore-key-request"] = { value: "", focus() {} };
   await ctx.decideStationRestore("request", "accept", {});
   assert.equal(calls.length, 0);
-  assert.match(messages.at(-1)[1], /encryption key/);
+  assert.match(messages.at(-1)[1], /Scout key/);
   elements["restore-key-request"].value = "source-key";
   await ctx.decideStationRestore("request", "accept", {});
   assert.equal(JSON.parse(calls[0][1].body).encryption_key, "source-key");

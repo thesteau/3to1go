@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 960 450" role="img" aria-labelledby="title description">
+  <title id="title">Scout gophers bring sealed packs to the Station factory</title>
+  <desc id="description">A Scout gopher in an explorer hat carries a sealed, locked box to the Station factory. Gophers in hard hats work inside, stacking boxes. A gopher outside sends a box up on a red balloon to a cloud, where another gopher keeps a stack of boxes as an optional offsite copy.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a52b3d"/>
+    </marker>
+    <g id="gopher">
+      <g fill="#8ed1f0" stroke="#2b3240" stroke-width="3">
+        <circle cx="20" cy="22" r="10"/>
+        <circle cx="80" cy="22" r="10"/>
+        <path d="M50 8 C82 8 92 32 92 62 V96 C92 114 76 122 50 122 C24 122 8 114 8 96 V62 C8 32 18 8 50 8 Z"/>
+      </g>
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="32" cy="122" rx="12" ry="5"/>
+        <ellipse cx="68" cy="122" rx="12" ry="5"/>
+      </g>
+      <g fill="#fff" stroke="#2b3240" stroke-width="2.5">
+        <circle cx="33" cy="40" r="14"/>
+        <circle cx="67" cy="40" r="14"/>
+      </g>
+      <g fill="#2b3240">
+        <circle cx="37" cy="42" r="5.5"/>
+        <circle cx="71" cy="42" r="5.5"/>
+      </g>
+      <g fill="#fff">
+        <circle cx="39" cy="40" r="1.8"/>
+        <circle cx="73" cy="40" r="1.8"/>
+      </g>
+      <rect x="45.5" y="66" width="9" height="9" rx="1.5" fill="#fff" stroke="#2b3240" stroke-width="2"/>
+      <ellipse cx="50" cy="61" rx="13" ry="8.5" fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5"/>
+      <ellipse cx="50" cy="55.5" rx="6" ry="4" fill="#2b3240"/>
+      <path d="M50 69.5 V75" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="scout-hat">
+      <path d="M26 16 C28 -4 72 -4 74 16 Z" fill="#c9a36b" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M29 11 H71" stroke="#7a5a2e" stroke-width="3"/>
+      <ellipse cx="50" cy="16" rx="38" ry="5.5" fill="#b88d52" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="hard-hat">
+      <path d="M24 18 C24 -6 76 -6 76 18 Z" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M50 2 V16" stroke="#d9a520" stroke-width="3"/>
+      <rect x="16" y="15" width="68" height="7" rx="3.5" fill="#f4c542" stroke="#2b3240" stroke-width="2.5"/>
+    </g>
+    <g id="box">
+      <rect width="40" height="32" rx="3" fill="#d9a86c" stroke="#2b3240" stroke-width="2.5"/>
+      <rect x="17" y="1.5" width="6" height="29" fill="#f3dcb5"/>
+      <path d="M17.5 13 V10 A2.5 2.5 0 0 1 22.5 10 V13" fill="none" stroke="#2b3240" stroke-width="1.8"/>
+      <rect x="15" y="13" width="10" height="8" rx="1.5" fill="#c73346" stroke="#2b3240" stroke-width="1.5"/>
+    </g>
+    <g id="arms">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="9" cy="76" rx="6" ry="9"/>
+        <ellipse cx="91" cy="76" rx="6" ry="9"/>
+      </g>
+    </g>
+    <g id="hands">
+      <g fill="#f2d3b3" stroke="#2b3240" stroke-width="2.5">
+        <ellipse cx="28" cy="92" rx="6" ry="8"/>
+        <ellipse cx="72" cy="92" rx="6" ry="8"/>
+      </g>
+    </g>
+    <clipPath id="window-1"><rect x="420" y="282" width="70" height="70"/></clipPath>
+    <clipPath id="window-2"><rect x="500" y="282" width="70" height="70"/></clipPath>
+  </defs>
+
+  <rect width="960" height="450" rx="18" fill="#faf8f5"/>
+  <path d="M20 380 H940" stroke="#e3ddd3" stroke-width="3"/>
+
+  <!-- Scout carrying a sealed box -->
+  <g transform="translate(70 251)">
+    <use href="#gopher"/>
+    <use href="#box" transform="translate(30 78)"/>
+    <use href="#hands"/>
+    <use href="#scout-hat"/>
+  </g>
+  <path d="M172 345 H338" fill="none" stroke="#a52b3d" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <text x="255" y="333" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6a3440" text-anchor="middle">Upload</text>
+
+  <!-- Station factory -->
+  <rect x="356" y="140" width="24" height="70" fill="#e9c6cc" stroke="#a52b3d" stroke-width="2.5"/>
+  <g fill="#e8ebf0">
+    <circle cx="368" cy="126" r="7"/>
+    <circle cx="380" cy="110" r="9"/>
+    <circle cx="398" cy="95" r="11"/>
+  </g>
+  <rect x="340" y="220" width="300" height="160" fill="#fff0f2" stroke="#a52b3d" stroke-width="2.5"/>
+  <path d="M340 220 V182 L400 220 V182 L460 220 V182 L520 220 V182 L580 220 V182 L640 220 Z" fill="#f3d7dc" stroke="#a52b3d" stroke-width="2.5" stroke-linejoin="round"/>
+  <rect x="420" y="234" width="140" height="30" rx="6" fill="#a52b3d"/>
+  <text x="490" y="255" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" letter-spacing="2" fill="#fff" text-anchor="middle">STATION</text>
+
+  <rect x="348" y="296" width="54" height="84" fill="#f7e3e6" stroke="#a52b3d" stroke-width="2"/>
+  <use href="#box" transform="translate(359 353) scale(0.8)"/>
+
+  <rect x="420" y="282" width="70" height="70" fill="#eaf6fb"/>
+  <rect x="500" y="282" width="70" height="70" fill="#eaf6fb"/>
+  <g clip-path="url(#window-1)">
+    <g transform="translate(430 293) scale(0.5)">
+      <use href="#gopher"/>
+      <use href="#box" transform="translate(30 78)"/>
+      <use href="#hands"/>
+      <use href="#hard-hat"/>
+    </g>
+  </g>
+  <g clip-path="url(#window-2)">
+    <g transform="translate(510 293) scale(0.5)">
+      <use href="#gopher"/>
+      <use href="#arms"/>
+      <rect x="58" y="62" width="30" height="40" rx="3" fill="#fff" stroke="#2b3240" stroke-width="2.5"/>
+      <path d="M64 74 H82 M64 82 H82 M64 90 H76" stroke="#7890af" stroke-width="2.5"/>
+      <use href="#hard-hat"/>
+    </g>
+  </g>
+  <g fill="none" stroke="#a52b3d" stroke-width="2">
+    <rect x="420" y="282" width="70" height="70"/>
+    <rect x="500" y="282" width="70" height="70"/>
+  </g>
+
+  <rect x="584" y="296" width="48" height="84" fill="#f7e3e6" stroke="#a52b3d" stroke-width="2"/>
+  <use href="#box" transform="translate(597 361) scale(0.55)"/>
+  <use href="#box" transform="translate(597 343) scale(0.55)"/>
+  <use href="#box" transform="translate(597 325) scale(0.55)"/>
+
+  <!-- Balloon launcher -->
+  <g transform="translate(650 257) scale(0.95)">
+    <use href="#gopher"/>
+    <use href="#arms"/>
+    <use href="#hard-hat"/>
+  </g>
+  <path d="M740 322 C770 302 764 274 728 264" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="5 5"/>
+  <path d="M712 232 L706 245 M720 232 L726 245" stroke="#2b3240" stroke-width="1.5"/>
+  <use href="#box" transform="translate(704 245) scale(0.6)"/>
+  <ellipse cx="716" cy="200" rx="22" ry="27" fill="#e05263" stroke="#2b3240" stroke-width="2.5"/>
+  <ellipse cx="708" cy="190" rx="5" ry="8" fill="#fff" opacity="0.5"/>
+  <path d="M712 227 L716 233 L720 227 Z" fill="#e05263" stroke="#2b3240" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M735 178 Q745 166 752 154" fill="none" stroke="#a52b3d" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+
+  <!-- Cloud storage -->
+  <path d="M765 150 C730 150 730 100 763 92 C759 52 807 32 835 58 C853 24 915 32 917 76 C953 76 957 150 923 150 Z" fill="#edf3fb" stroke="#7890af" stroke-width="2"/>
+  <use href="#box" transform="translate(800 120) scale(0.65)"/>
+  <use href="#box" transform="translate(828 120) scale(0.65)"/>
+  <use href="#box" transform="translate(814 99) scale(0.65)"/>
+  <g transform="translate(860 88) scale(0.42)">
+    <use href="#gopher"/>
+    <use href="#arms"/>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="845" y="176" font-size="15" font-weight="700" fill="#242a35">Cloud storage</text>
+    <text x="845" y="195" font-size="13" fill="#586273">Optional synced copy</text>
+    <text x="120" y="410" font-size="15" font-weight="700" fill="#242a35">Scout</text>
+    <text x="120" y="430" font-size="13" fill="#586273">Packs and seals on your machine</text>
+    <text x="490" y="410" font-size="15" font-weight="700" fill="#242a35">Station</text>
+    <text x="490" y="430" font-size="13" fill="#586273">Receives, checks, and keeps snapshots</text>
+    <text x="745" y="410" font-size="15" font-weight="700" fill="#242a35">Sync</text>
+    <text x="745" y="430" font-size="13" fill="#586273">Floats a copy offsite</text>
+  </g>
+</svg>

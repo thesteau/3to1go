@@ -152,7 +152,7 @@ test("Station downloads with a saved key in one request, and re-fetches after pr
     const { ctx, requests, downloads, prompts } = downloadContext({ savedKey });
     await ctx.downloadSnapshot("scout-a", "inst-1", "photos", "photos.tar.zst", null);
     assert.equal(requests.length, savedKey ? 1 : 2);
-    assert.deepEqual(prompts, savedKey ? [] : ["Encryption Key Required"]);
+    assert.deepEqual(prompts, savedKey ? [] : ["Scout Key Required"]);
     assert.equal(downloads.length, 1);
     assert.deepEqual(Buffer.from(await downloads[0].arrayBuffer()), plaintext);
   }

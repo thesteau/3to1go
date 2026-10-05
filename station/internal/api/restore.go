@@ -42,7 +42,7 @@ func (a *App) handleRequestRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if registration == nil || registration.EncryptionKeyFingerprint == nil || *registration.EncryptionKeyFingerprint == "" {
-		httpx.WriteError(w, 409, "Scout must have an encryption key configured")
+		httpx.WriteError(w, 409, "Scout must have a Scout key configured")
 		return
 	}
 	var body struct {
@@ -66,7 +66,7 @@ func (a *App) handleRequestRestore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if registration == nil || registration.CredentialHash == nil {
-			httpx.WriteError(w, 409, "target Scout must have a bound credential")
+			httpx.WriteError(w, 409, "target Scout must have a bound Station token")
 			return
 		}
 	}

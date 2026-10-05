@@ -1,9 +1,13 @@
 ---
-title: "Encryption key"
+title: "Scout key"
 description: "Find, back up, and rotate the key Scout uses to encrypt every snapshot."
 ---
 
-Each Scout creates its own encryption key on first start and encrypts every archive with it before upload. Station's server never receives the key. To download a snapshot, you paste the key into Station's UI and your browser decrypts it.
+Each Scout creates its own Scout key on first start and encrypts every archive with it before upload. Station's server never receives the key. To download a snapshot, you paste the key into Station's UI and your browser decrypts it.
+
+<Frame caption="Only the Scout holds the key. Station keeps the boxes sealed.">
+  <img src="/images/gophers/scout-key.svg" alt="A Scout gopher holds a gold key next to a sealed, locked box." />
+</Frame>
 
 <Warning>
   If you lose the key, that Scout's snapshots are **permanently unrecoverable**. Nobody, including Station, can decrypt them. Back it up now.
@@ -11,7 +15,7 @@ Each Scout creates its own encryption key on first start and encrypts every arch
 
 ## Where it is
 
-- In the UI: **Encryption Key** on Scout's main page. It's masked, so click **Copy** to copy it.
+- In the UI: **Scout Key** on Scout's main page. It's masked, so click **Copy** to copy it.
 - On disk: `config/encryption.key` next to Scout's `docker-compose.yml` (`/config/encryption.key` inside the container).
 
 The file holds 32 raw bytes. **Copy** gives you a text (base64url) version to paste into Station. When restoring Scout's config, keep the original file. Don't replace it with the copied text.

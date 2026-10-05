@@ -3,7 +3,7 @@ title: "Recover Station"
 description: "Back up Station's database, keys, and files, then restore them on a replacement host."
 ---
 
-Recovering Station requires its PostgreSQL database, signing key, and encrypted snapshots from the same backup window. The database holds snapshot metadata, accounts, credentials, settings, and upload sessions. Snapshots can't be decrypted without the matching Scout encryption keys, so keep those separately as described in [Encryption key](/scout/encryption-key).
+Recovering Station requires its PostgreSQL database, signing key, and encrypted snapshots from the same backup window. The database holds snapshot metadata, accounts, Station token records, settings, and upload sessions. Snapshots can't be decrypted without the matching Scout keys, so keep those separately as described in [Scout key](/scout/scout-key).
 
 ## Back up Station
 
@@ -74,20 +74,20 @@ In the example deployment, PostgreSQL creates the database owner from `.env`. Th
 
 - Check `docker compose logs station postgres` and `curl -fsS http://localhost:6555/health/ready`.
 - Sign in with the restored account password. Changing `INITIAL_ADMIN_PASSWORD` does not reset an existing account.
-- Check settings, credentials, Scout instances, and snapshot listings against your backup records.
+- Check settings, Station tokens, Scout instances, and snapshot listings against your backup records.
 - Click **Run Now** in the snapshot integrity bar. It checks the latest snapshot per job with a recorded checksum, not the entire history or decryption keys.
 - Download and decrypt a known snapshot, then [restore it](/scout/restore) into a disposable folder and compare the files with known originals. Restore replaces matching destination files.
-- Reconnect one Scout using its existing credential and check that a new backup succeeds. Then reconnect the others. Keep the original Station URL, or update Scout settings and certificate trust for the new address.
+- Reconnect one Scout using its existing Station token and check that a new backup succeeds. Then reconnect the others. Keep the original Station URL, or update Scout settings and certificate trust for the new address.
 
-Keep the backup until these checks pass. The repository's Docker end-to-end test restores the database and files, then checks that the original credential can download the same encrypted snapshot. Try a full recovery on your own setup too, including storage mounts and decrypting files.
+Keep the backup until these checks pass. The repository's Docker end-to-end test restores the database and files, then checks that the original Station token can download the same encrypted snapshot. Try a full recovery on your own setup too, including storage mounts and decrypting files.
 
 ## If something is missing
 
 | Missing item | Consequence |
 |---|---|
-| PostgreSQL backup | Snapshot metadata, settings, accounts, and credential records are lost. Station has no supported automatic rebuild of its index from archive files. |
-| Signing key | Existing Scout credentials stop working. Mint replacement credentials and update each Scout after restoring Station. |
+| PostgreSQL backup | Snapshot metadata, settings, accounts, and Station token records are lost. Station has no supported automatic rebuild of its index from archive files. |
+| Signing key | Existing Station tokens stop working. Mint replacement tokens and update each Scout after restoring Station. |
 | Snapshot files | The database cannot recreate the files. Recover them from another copy. |
-| Scout encryption key | Snapshots encrypted with that key cannot be decrypted. Restoring Station does not recover the key. |
+| Scout key | Snapshots encrypted with that key cannot be decrypted. Restoring Station does not recover the key. |
 
 If the database dump and snapshot files were copied at different times, their records may not match. Keep the files for manual recovery and check the differences before accepting uploads or letting retention run.

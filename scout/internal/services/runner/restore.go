@@ -125,7 +125,7 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 	crossDevice := selected.SourceScoutID != "" && (selected.SourceScoutID != settings.ScoutID || selected.SourceInstanceID != selected.ScoutInstanceID)
 	if crossDevice {
 		if len(providedKey) == 0 || providedKey[0] == "" {
-			return nil, fmt.Errorf("provide the original snapshot's encryption key")
+			return nil, fmt.Errorf("provide the original snapshot's Scout key")
 		}
 		key, err = encryption.KeyFromBase64(providedKey[0])
 		if err != nil {
