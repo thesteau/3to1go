@@ -10,8 +10,8 @@
     <div class="hook-section admin-only" id="add-user-section" hidden>
       <h3>Add User</h3>
       <div class="user-form">
-        <input id="new_user_username" placeholder="username">
-        <input id="new_user_password" type="password" placeholder="temporary password" minlength="5">
+        <input id="new_user_username" type="text" placeholder="username" autocomplete="off" spellcheck="false" autocapitalize="none">
+        <input id="new_user_password" type="text" class="secret-value" placeholder="temporary password" minlength="5" autocomplete="off" spellcheck="false" autocapitalize="none">
         <label class="checkbox">
           <input type="checkbox" id="new_user_admin">
           <span>Admin</span>
