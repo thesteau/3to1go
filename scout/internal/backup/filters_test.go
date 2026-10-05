@@ -3,6 +3,7 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -257,6 +258,40 @@ func TestBuildFileList_RecursesSubdirectories(t *testing.T) {
 	}
 	if !paths["root.txt"] || !paths["sub/child.txt"] {
 		t.Errorf("unexpected file paths: %v", paths)
+	}
+}
+
+func TestBuildFileList_KeepsEmptyFolders(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"empty/deeper", "full", "logs", ".hidden-empty", "build"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "full", "a.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "logs", "run.log"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	job := &JobDefinition{RootPath: dir, JobName: "test", ExcludePatterns: []string{"*.log", "build/"}}
+	files, err := BuildFileList(job, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var got []string
+	for _, f := range files {
+		name := f.ArchivePath
+		if f.IsDir {
+			name += "/"
+		}
+		got = append(got, name)
+	}
+	// Only leaf folders need entries; a folder whose files are all excluded is
+	// kept empty, while excluded and hidden folders stay out.
+	want := []string{"empty/deeper/", "full/a.txt", "logs/"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
