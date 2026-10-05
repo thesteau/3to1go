@@ -158,6 +158,17 @@ Go embeds the generated `station/static/js` and `scout/static/js`, so generate t
 
 For continuous compilation, use `npm run watch` (Station) or `npm run watch:scout` (Scout), then rebuild and restart the Go server to serve the new assets.
 
+## Names in code
+
+The UI, docs, and messages say **Scout key** and **Station token**. The code uses older names for the same things:
+
+| In the UI | In the code |
+|---|---|
+| Scout key | encryption key: the `encryption` package, `encryption.key`, `/api/encryption-key`, `encryption_key`, `encryption_key_fingerprint` |
+| Station token | Scout credential: `ScoutCredential`, `scout_credential`, `/api/credentials/...`, `credential`, `credential_hash`, the `scout_credentials` table |
+
+Keep these code names. File names, API routes, JSON fields, database names, and the `3to1go_enc_*` browser storage keys are used by existing installs, so renaming them breaks saved settings, stored data, or connections between Scout and Station. Use **Scout key** and **Station token** in anything people read: UI text, docs, and error and log messages.
+
 ## Build with Docker Compose
 
 `station/docker-compose.yml` and `scout/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Station installation](/station/install) or [Scout installation](/scout/install), then from that app's folder:

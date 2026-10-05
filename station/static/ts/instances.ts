@@ -10,13 +10,13 @@ function renderKeyManager(ns: {
   return `
     <div class="scout-key-panel" data-key-panel="${escapeHtml(scoutKeyId)}">
       <div class="scout-key-head">
-        <strong>Decryption Key</strong>
+        <strong>Scout Key</strong>
         ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "scout-detail", clipLength: 24 })}
       </div>
       <div class="scout-key-controls">
         <input
           type="text" class="secret-value" autocomplete="off" spellcheck="false" autocapitalize="none"
-          placeholder="Paste the Scout encryption key"
+          placeholder="Paste the Scout key"
           data-scout-key-input="${escapeHtml(scoutKeyId)}">
         <button class="btn btn-key" type="button" onclick="rememberEncKey(${inlineString(scoutId)},${inlineString(scoutInstanceId)})">Save Key</button>
         <button class="btn btn-clear" type="button" onclick="clearEncKey(${inlineString(scoutId)},${inlineString(scoutInstanceId)})">Clear</button>
@@ -44,7 +44,7 @@ function renderInstanceCard(scoutId: string, instance: ScoutInstance): string {
     : "";
   const revokeBtn =
     instanceId && instance.credential_configured
-      ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential(${inlineString(scoutId)},${inlineString(instanceId)},this)">Revoke Token</button>`
+      ? `<button class="btn btn-del btn-del-instance" type="button" onclick="revokeInstanceCredential(${inlineString(scoutId)},${inlineString(instanceId)},this)">Revoke Station Token</button>`
       : "";
   return `
     <section class="instance-card" data-instance-id="${escapeHtml(instanceId || "_legacy")}">
@@ -59,7 +59,7 @@ function renderInstanceCard(scoutId: string, instance: ScoutInstance): string {
           ${deleteBtn}
         </div>
       </div>
-      ${instance.last_upload_tls === false ? '<p class="instance-http-warning">Last upload from this Scout arrived over plain HTTP. Credentials were not encrypted in transit.</p>' : ""}
+      ${instance.last_upload_tls === false ? '<p class="instance-http-warning">Last upload from this Scout arrived over plain HTTP. Its Station token was not encrypted in transit.</p>' : ""}
       ${instance.scout_instance_id ? renderKeyManager({ scout_id: scoutId, scout_instance_id: instance.scout_instance_id, encryption_key_fingerprint: instance.encryption_key_fingerprint }) : ""}
       ${
         jobs
@@ -92,8 +92,8 @@ async function revokeInstanceCredential(
   const label = scoutInstanceId || "this instance";
   if (
     !(await confirmApp({
-      title: "Revoke Token",
-      message: `Revoke the credential used by "${label}"? Other Scouts using it stop working too.`,
+      title: "Revoke Station Token",
+      message: `Revoke the Station token used by "${label}"? Other Scouts using it stop working too.`,
       confirmLabel: "Revoke Token",
       danger: true,
     }))
@@ -115,7 +115,7 @@ async function revokeInstanceCredential(
     }
     const affected = body.affected_instances || [];
     setActionStatus(
-      `Revoked token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`,
+      `Revoked Station token for ${affected.length || 1} instance${affected.length === 1 ? "" : "s"}.`,
       "success",
     );
     await loadOverview({ silent: true, force: true });

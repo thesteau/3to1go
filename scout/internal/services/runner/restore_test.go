@@ -71,7 +71,7 @@ func TestRestoreRequestDecision(t *testing.T) {
 			downloads := 0
 			station := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Header.Get("Authorization") != "Bearer scout-secret" {
-					t.Error("missing Scout credential")
+					t.Error("missing Station token")
 				}
 				switch r.URL.Path {
 				case "/backup/recovery/scout-1/instance-1/requests":

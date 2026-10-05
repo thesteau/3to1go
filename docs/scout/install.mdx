@@ -3,7 +3,7 @@ title: "Install Scout"
 description: "Run Scout with Docker Compose on a machine you want to back up."
 ---
 
-Scout ships as a Docker image, `ghcr.io/thesteau/3to1go-scout`. You need a running [Station](/station/install) and a [credential](/station/scout-credentials) minted from it.
+Scout ships as a Docker image, `ghcr.io/thesteau/3to1go-scout`. You need a running [Station](/station/install) and a [Station token](/station/station-tokens) minted from it.
 
 The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including Raspberry Pi.
 
@@ -40,11 +40,11 @@ The image supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`, including R
     docker compose up -d
     ```
   </Step>
-  <Step title="Sign in and add the credential">
-    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Scout Settings**, paste the credential from Station into **Scout Credential**, and save.
+  <Step title="Sign in and add the Station token">
+    Open `http://localhost:6556/`, sign in as `admin` (see [Sign-in](/shared/sign-in)), open **Edit Scout Settings**, paste the token from Station into **Station Token**, and save.
   </Step>
-  <Step title="Save your encryption key">
-    Copy the **Encryption Key** from Scout's UI and store it somewhere safe, such as a password manager. See [Encryption key](/scout/encryption-key).
+  <Step title="Save your Scout key">
+    Copy the **Scout Key** from Scout's UI and store it somewhere safe, such as a password manager. See [Scout key](/scout/scout-key).
   </Step>
   <Step title="Choose what to back up">
     See [Backup jobs](/scout/backup-jobs).

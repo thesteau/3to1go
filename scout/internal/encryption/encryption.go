@@ -33,16 +33,16 @@ func loadOrCreate(path string, create func(string) (keyFile, error)) (key []byte
 	data, err := os.ReadFile(path)
 	if err == nil {
 		if len(data) != 32 {
-			return nil, fmt.Errorf("invalid encryption key: expected 32 bytes, got %d", len(data))
+			return nil, fmt.Errorf("invalid Scout key: expected 32 bytes, got %d", len(data))
 		}
 		return data, nil
 	}
 	if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("read encryption key: %w", err)
+		return nil, fmt.Errorf("read Scout key: %w", err)
 	}
 	key = make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("generate encryption key: %w", err)
+		return nil, fmt.Errorf("generate Scout key: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func loadOrCreate(path string, create func(string) (keyFile, error)) (key []byte
 		// cleanup also works on Windows. Existing invalid keys are untouched.
 		if err != nil {
 			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-				err = errors.Join(err, fmt.Errorf("remove incomplete encryption key: %w", removeErr))
+				err = errors.Join(err, fmt.Errorf("remove incomplete Scout key: %w", removeErr))
 			}
 		}
 	}()
@@ -94,7 +94,7 @@ func KeyFromBase64(s string) ([]byte, error) {
 			return key, nil
 		}
 	}
-	return nil, errors.New("encryption key must be a base64 encoded 32-byte key")
+	return nil, errors.New("invalid Scout key: must be a base64 encoded 32-byte key")
 }
 
 // KeyFingerprint returns the SHA-256 hex digest of key.

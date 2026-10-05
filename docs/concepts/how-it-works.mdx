@@ -15,7 +15,7 @@ The addresses are examples. Each Scout sets its **Station URL** to the same Stat
 |---|---|---|
 | Runs on | Each machine with files to back up | One always-on host |
 | Default UI | `http://localhost:6556/` | `http://localhost:6555/` |
-| Owns | Scanning, fingerprinting, archiving, encryption, scheduling, upload retries, restore | Receiving uploads, storage, retention, credentials, integrity checks, snapshot browsing |
+| Owns | Scanning, fingerprinting, archiving, encryption, scheduling, upload retries, restore | Receiving uploads, storage, retention, Station tokens, integrity checks, snapshot browsing |
 | Stores its settings in | A local SQLite database | PostgreSQL |
 | Sees plaintext files | Yes | No |
 
@@ -73,4 +73,4 @@ sequenceDiagram
 
 Each Scout generates its own `encryption.key` on first run and encrypts every archive before upload. Station stores them as-is.
 
-When you download a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the file locally. The key is never sent to Station's server. See [Encryption key](/scout/encryption-key).
+When you download a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the file locally. The key is never sent to Station's server. See [Scout key](/scout/scout-key).

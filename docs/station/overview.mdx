@@ -5,12 +5,16 @@ description: "The always-on receiver that stores encrypted snapshots from your S
 
 Station **receives and keeps** backups. Run it on one always-on host, such as a home server, NAS, or VPS. Every Scout uploads to it.
 
+<Frame caption="Scouts bring sealed packs in. Station checks and keeps them.">
+  <img src="/images/gophers/station-overview.svg" alt="A Scout gopher carries a locked box to the Station factory, where gophers in hard hats stack boxes. A gopher outside sends a box on a balloon to a cloud, where another gopher keeps a stack of boxes." />
+</Frame>
+
 ## What Station does
 
 - **Receives uploads** from Scouts in chunks, and verifies each one before storing it.
 - **Stores snapshots** as encrypted archive files under `scout_id/scout_instance_id/job_name` in its backup folder.
 - **Applies retention**, keeping the most recent snapshots per job and instance.
-- **Mints and revokes Scout credentials**, so only Scouts you've authorized can upload.
+- **Mints and revokes Station tokens**, so only Scouts you've authorized can upload.
 - **Checks integrity** on a schedule, if enabled.
 - **Lets you browse, download, and delete snapshots** in its web UI, decrypting downloads in your browser.
 - **Sends notifications** to ntfy and runs your own scripts when uploads arrive.
@@ -22,7 +26,7 @@ Station never sees your plaintext files, only archives Scout has already encrypt
 | Component | Purpose |
 |---|---|
 | `ghcr.io/thesteau/3to1go-station` | The Station app and web UI, on port `6555` |
-| `postgres:17-alpine` | Stores snapshot metadata, users, settings, Scout registrations, and credential records |
+| `postgres:17-alpine` | Stores snapshot metadata, users, settings, Scout registrations, and Station token records |
 
 The example Compose file runs both. See [Install Station](/station/install).
 
@@ -36,7 +40,7 @@ The example Compose file runs both. See [Install Station](/station/install).
 | `/hook-scripts` | Scripts you upload for [hooks](/station/hooks) |
 
 <Warning>
-  Back up Station's `config` folder. `issuer.key` signs Scout credentials. If it's lost, every existing credential stops working and each Scout needs a new one.
+  Back up Station's `config` folder. `issuer.key` signs Station tokens. If it's lost, every existing token stops working and each Scout needs a new one.
 </Warning>
 
 <CardGroup cols={2}>

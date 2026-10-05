@@ -51,7 +51,7 @@ func (s *CredentialStore) Mint(ctx context.Context, priv ed25519.PrivateKey, ttl
 	scope := normalizeCredentialScope(scopes...)
 	token, err := signing.MintCredential(priv, ttlDays, scope)
 	if err != nil {
-		return "", fmt.Errorf("mint credential: %w", err)
+		return "", fmt.Errorf("mint Station token: %w", err)
 	}
 	payload, err := signing.DecodeCredentialPayload(token)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *CredentialStore) Verify(ctx context.Context, token string, pub ed25519.
 		WHERE token_hash = $1 AND jti = $2 AND expires_at >= CURRENT_TIMESTAMP`,
 		hash, payload.JTI).Scan(&rec.TokenHash, &rec.JTI, &expiresAt, &rec.Shared, &rec.MaxRegistrations)
 	if err != nil {
-		return nil, errors.New("credential revoked")
+		return nil, errors.New("revoked Station token")
 	}
 	if rec.MaxRegistrations < 1 {
 		rec.MaxRegistrations = 1

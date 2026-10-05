@@ -91,7 +91,7 @@ func NewScoutRunner(settings *config.Settings, logger *slog.Logger, certMgr *cer
 
 	encKey, err := encryption.LoadOrCreate(config.EncryptionKeyPath())
 	if err != nil {
-		return nil, fmt.Errorf("encryption key: %w", err)
+		return nil, fmt.Errorf("load Scout key: %w", err)
 	}
 	anomalies := anomaly.NewStore(stateStore.DB())
 	if err := anomalies.EnsureSchema(context.Background()); err != nil {
@@ -148,7 +148,7 @@ func (r *ScoutRunner) RunCycle() bool {
 	r.mu.Unlock()
 
 	if strings.TrimSpace(settings.ScoutCredential) == "" {
-		r.logger.Warn("cycle_skipped", "reason", "scout_credential_missing")
+		r.logger.Warn("cycle_skipped", "reason", "station_token_missing")
 		return false
 	}
 	if settings.UploadsPaused {

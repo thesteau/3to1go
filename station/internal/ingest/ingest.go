@@ -514,7 +514,7 @@ func (s *Service) registerScout(ctx context.Context, meta UploadMetadata, credHa
 	if existing != nil {
 		reg = existing
 		if credHash != nil && *credHash != "" && reg.CredentialHash != nil && *reg.CredentialHash != "" && *reg.CredentialHash != *credHash {
-			return httpError(http.StatusForbidden, "credential is not bound to this scout instance")
+			return httpError(http.StatusForbidden, "Station token is not bound to this scout instance")
 		}
 	} else {
 		reg = &store.ScoutRegistration{
