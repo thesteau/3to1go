@@ -53,8 +53,8 @@ function renderUsers(users: CurrentUser[]): void {
           ${user.must_change_password ? '<span class="hint">Password change pending</span>' : ""}
         </div>
         <div>
-          ${canEditUsername ? `<input id="user_username_${user.id}" value="${escapeHtml(user.username)}">` : ""}
-          ${canResetPassword ? `<input id="user_password_${user.id}" type="password" placeholder="reset password" minlength="5">` : ""}
+          ${canEditUsername ? `<input id="user_username_${user.id}" type="text" value="${escapeHtml(user.username)}" autocomplete="off" spellcheck="false" autocapitalize="none">` : ""}
+          ${canResetPassword ? `<input id="user_password_${user.id}" type="text" class="secret-value" placeholder="reset password" minlength="5" autocomplete="off" spellcheck="false" autocapitalize="none">` : ""}
           ${canToggleAdmin ? `<label class="checkbox"><input id="user_admin_${user.id}" type="checkbox" ${user.is_admin ? "checked" : ""}><span>Admin</span></label>` : ""}
         </div>
         <div class="user-actions">

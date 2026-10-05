@@ -78,7 +78,7 @@ flowchart TD
 
 📌 = folder with a `.upload_dir` marker.
 
-Archives contain regular files. Empty directories and special files are not archived, and the job root's `.upload_dir` is excluded. A job with no included files is skipped. With **Follow symlinks** enabled, Scout stores the target's files rather than preserving the links themselves.
+Archives contain regular files and empty folders, and restore recreates both. A folder whose files are all excluded is kept as an empty folder. Special files are not archived, and the job root's `.upload_dir` is excluded. A job with no included files or folders is skipped. With **Follow symlinks** enabled, Scout stores the target's files rather than preserving the links themselves.
 
 ## Exclusions
 

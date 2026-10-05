@@ -99,6 +99,19 @@ func TestComputeFingerprint_ExtraFileChangesResult(t *testing.T) {
 	}
 }
 
+func TestComputeFingerprint_EmptyFolders(t *testing.T) {
+	files := []*DiscoveredFile{{ArchivePath: "a.txt", Size: 100}}
+	withFolder := append([]*DiscoveredFile{{ArchivePath: "empty", IsDir: true}}, files...)
+	if ComputeFingerprint(files) == ComputeFingerprint(withFolder) {
+		t.Error("adding an empty folder should change the fingerprint")
+	}
+	emptyFile := []*DiscoveredFile{{ArchivePath: "empty", Size: 0}}
+	emptyFolder := []*DiscoveredFile{{ArchivePath: "empty", IsDir: true}}
+	if ComputeFingerprint(emptyFile) == ComputeFingerprint(emptyFolder) {
+		t.Error("an empty folder and an empty file with the same name should differ")
+	}
+}
+
 func TestComputeFingerprint_IsHex(t *testing.T) {
 	fp := ComputeFingerprint([]*DiscoveredFile{{ArchivePath: "x", Size: 1}})
 	if len(fp) != 64 {

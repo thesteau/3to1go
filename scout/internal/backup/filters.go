@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,16 +16,19 @@ type DiscoveredFile struct {
 	ArchivePath string // slash-separated path relative to job root
 	Size        int64
 	MtimeNs     int64
+	IsDir       bool // an included folder with nothing else archived inside it
 }
 
 // BuildFileList walks the job's root directory and returns regular files, applying
-// exclude patterns and hidden-file filtering as configured in the job.
+// exclude patterns and hidden-file filtering as configured in the job. Folders
+// that would otherwise be lost because nothing inside them is archived are
+// returned as IsDir entries so restore can recreate them.
 func BuildFileList(job *JobDefinition, warnf func(string, ...any)) ([]*DiscoveredFile, error) {
 	return BuildFileListContext(context.Background(), job, warnf)
 }
 
 func BuildFileListContext(ctx context.Context, job *JobDefinition, warnf func(string, ...any)) ([]*DiscoveredFile, error) {
-	var files []*DiscoveredFile
+	var files, dirs []*DiscoveredFile
 	stack := []string{job.RootPath}
 	visited := make(map[string]bool)
 
@@ -55,6 +59,15 @@ func BuildFileListContext(ctx context.Context, job *JobDefinition, warnf func(st
 				warnf("skipped_missing path=%s detail=%s", curDir, err)
 			}
 			continue
+		}
+		if curDir != job.RootPath {
+			if rel, err := filepath.Rel(job.RootPath, curDir); err == nil {
+				var mtime int64
+				if info, err := os.Stat(curDir); err == nil {
+					mtime = info.ModTime().UnixNano()
+				}
+				dirs = append(dirs, &DiscoveredFile{SourcePath: curDir, ArchivePath: filepath.ToSlash(rel), MtimeNs: mtime, IsDir: true})
+			}
 		}
 
 		for _, entry := range entries {
@@ -127,6 +140,20 @@ func BuildFileListContext(ctx context.Context, job *JobDefinition, warnf func(st
 				Size:        info.Size(),
 				MtimeNs:     info.ModTime().UnixNano(),
 			})
+		}
+	}
+
+	// Only folders with no archived descendants need their own entry; the rest
+	// are recreated by the files and folders beneath them.
+	covered := make(map[string]bool)
+	for _, entry := range slices.Concat(files, dirs) {
+		for parent := path.Dir(entry.ArchivePath); parent != "."; parent = path.Dir(parent) {
+			covered[parent] = true
+		}
+	}
+	for _, dir := range dirs {
+		if !covered[dir.ArchivePath] {
+			files = append(files, dir)
 		}
 	}
 

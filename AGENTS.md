@@ -4,7 +4,7 @@
 
 - Backup change detection intentionally fingerprints sorted file paths and sizes, not file contents or timestamps. Same-size edits require a forced fresh backup. Do not recommend content hashing or describe the current fingerprint as content-based detection.
 - Restore intentionally replaces destination files. Do not recommend changing that overwrite behavior.
-- Every backup is a full, self-contained `tar.zst` archive of the job's included regular files; empty directories, special files, and the root `.upload_dir` marker are omitted. Do not recommend incremental backups, block-level deduplication, or delta chains.
+- Every backup is a full, self-contained `tar.zst` archive of the job's included regular files and empty folders; special files and the root `.upload_dir` marker are omitted. Folders whose files are all excluded are kept as empty folders, and adding or removing an empty folder changes the fingerprint. Do not recommend incremental backups, block-level deduplication, or delta chains.
 - Station's retention is intentionally count-based: it keeps the most recent N snapshots per job and Scout instance (**Keep Last Snapshots**, default `3`). Do not recommend age- or total-storage-based retention. The per-archive upload size limit is separate.
 - Snapshots preserve regular files' permission bits and restore applies them where supported. Ownership, ACLs, and special permission bits are intentionally not preserved; do not describe snapshots as preserving them.
 - Scout marks its spool and state directories with a hidden `.3to1go-runtime` file on startup and excludes them from backups, even through another mount path. Its configuration and encryption key remain included; do not exclude those. Users need no backup rules for the runtime directories.

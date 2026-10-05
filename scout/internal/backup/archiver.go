@@ -91,6 +91,15 @@ func addFileToTarContext(ctx context.Context, tw *tar.Writer, file *DiscoveredFi
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if file.IsDir {
+		return tw.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeDir,
+			Name:     file.ArchivePath + "/",
+			ModTime:  time.Unix(0, file.MtimeNs),
+			Mode:     0o755,
+			Format:   tar.FormatPAX,
+		})
+	}
 	src, err := os.Open(file.SourcePath)
 	if err != nil {
 		return err
@@ -238,16 +247,19 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 		if err != nil {
 			return extractedCount, err
 		}
-		if hdr.Typeflag == tar.TypeDir {
-			continue
-		}
-		if hdr.Typeflag != tar.TypeReg {
+		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeDir {
 			return extractedCount, fmt.Errorf("unsupported archive entry: %s", hdr.Name)
 		}
 
 		dest, err := archiveDestination(absTarget, hdr.Name)
 		if err != nil {
 			return extractedCount, err
+		}
+		if hdr.Typeflag == tar.TypeDir {
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return extractedCount, err
+			}
+			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return extractedCount, err

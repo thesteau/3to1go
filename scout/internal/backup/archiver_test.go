@@ -78,6 +78,37 @@ func TestCreateListAndExtractArchive(t *testing.T) {
 	}
 }
 
+func TestArchiveRestoresEmptyFolders(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(filepath.Join(src, "empty", "deeper"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "a.txt"), []byte("alpha"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := BuildFileList(&JobDefinition{RootPath: src, JobName: "test", IncludeHidden: true}, nil)
+	if err != nil {
+		t.Fatalf("BuildFileList: %v", err)
+	}
+	archivePath := filepath.Join(root, "archive.tar.zst")
+	if err := CreateArchive(archivePath, files); err != nil {
+		t.Fatalf("CreateArchive: %v", err)
+	}
+
+	target := filepath.Join(root, "target")
+	count, err := ExtractArchive(archivePath, target)
+	if err != nil || count != 1 {
+		t.Fatalf("ExtractArchive = %d, %v", count, err)
+	}
+	if info, err := os.Stat(filepath.Join(target, "empty", "deeper")); err != nil || !info.IsDir() {
+		t.Fatalf("empty folder was not restored: %v", err)
+	}
+	if preview, err := ListArchiveEntries(archivePath, target); err != nil || preview["total_files"] != 1 {
+		t.Fatalf("preview = %+v, %v", preview, err)
+	}
+}
+
 func TestCreateArchiveMissingSourceFails(t *testing.T) {
 	err := CreateArchive(filepath.Join(t.TempDir(), "archive.tar.zst"), []*DiscoveredFile{
 		{SourcePath: filepath.Join(t.TempDir(), "missing"), ArchivePath: "missing.txt"},
@@ -109,6 +140,17 @@ func TestArchiveRejectsUnsafeOrUnsupportedEntries(t *testing.T) {
 	}
 	if count, err := ExtractArchive(dirOnlyArchive, root); err != nil || count != 0 {
 		t.Fatalf("dir extract = %d, %v", count, err)
+	}
+	if info, err := os.Stat(filepath.Join(root, "dir")); err != nil || !info.IsDir() {
+		t.Fatalf("dir entry was not recreated: %v", err)
+	}
+
+	unsafeDirArchive := filepath.Join(root, "unsafe-dir.tar.zst")
+	if err := writeTestArchive(unsafeDirArchive, []*tar.Header{{Name: "../escape/", Typeflag: tar.TypeDir}}, nil); err != nil {
+		t.Fatalf("write unsafe dir archive: %v", err)
+	}
+	if _, err := ExtractArchive(unsafeDirArchive, filepath.Join(root, "inner")); err == nil {
+		t.Fatal("expected unsafe dir extract error")
 	}
 
 	linkArchive := filepath.Join(root, "link.tar.zst")
