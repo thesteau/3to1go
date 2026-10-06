@@ -298,16 +298,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          # Generated static/js is build output; CodeQL analyzes the TypeScript sources.
-          config: |
-            paths-ignore:
-              - app/*/static/js
-              - "**/node_modules"
-
+      # Go must be installed before init, which puts CodeQL's go wrapper first on PATH.
       - uses: actions/setup-go@v7
         if: matrix.language == 'go'
         with:
@@ -324,12 +315,26 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
-      # The servers embed static/js, so it must exist before the Go build CodeQL observes.
-      - name: Build Go modules
+      # The servers embed static/js, so generate it before the Go build.
+      - name: Generate web UI
         if: matrix.language == 'go'
         run: |
           npm --prefix app ci
           npm --prefix app run build
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Generated static/js is build output; CodeQL analyzes the TypeScript sources.
+          config: |
+            paths-ignore:
+              - app/*/static/js
+              - "**/node_modules"
+
+      - name: Build Go modules
+        if: matrix.language == 'go'
+        run: |
           for module in app/shared/go app/station app/scout; do
             (cd "$module" && go build ./...)
           done
