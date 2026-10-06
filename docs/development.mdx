@@ -121,7 +121,7 @@ In CI, each test job writes a summary on its run page and uploads its reports as
 
 ## Linting and formatting
 
-The lint workflow runs on PRs and pushes to `main` and `prod`:
+The CI workflow runs these checks on PRs and pushes to `main` and `prod`:
 
 | Check | Tool | Config |
 |---|---|---|
@@ -145,7 +145,18 @@ To run the same checks before each commit, install [pre-commit](https://pre-comm
 
 ## Repository maintenance
 
-The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm --prefix app audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed.
+The CI workflow also checks Go formatting with `gofmt`, and runs these security checks:
+
+| Check | Tool | Config |
+|---|---|---|
+| Committed secrets | [gitleaks](https://github.com/gitleaks/gitleaks) on the full git history | `.gitleaks.toml` |
+| Code analysis | [CodeQL](https://codeql.github.com/) for Go, TypeScript, and workflows. Results appear under **Security** → **Code scanning** | |
+| Go dependencies | `govulncheck` on all three Go modules | |
+| npm dependencies | `npm --prefix app audit --audit-level=high`, including the frontend build tools | |
+
+The security checks also run once a week, to catch newly reported vulnerabilities even when the code hasn't changed.
+
+If gitleaks flags a fake value in a test, add it to the allowlist in `.gitleaks.toml`. If it flags a real secret, revoke it. Removing it from the code doesn't remove it from the git history.
 
 Dependabot opens weekly update PRs for Go dependencies, npm tools, GitHub Actions, and Dockerfile base images. These PRs use Conventional Commit titles and go through the usual CI and review. Dependabot isn't set up to merge them automatically. See [Dependabot configuration](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference) and [Go vulnerability management](https://go.dev/doc/security/vuln/) for details.
 

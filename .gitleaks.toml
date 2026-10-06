@@ -1,0 +1,14 @@
+# gitleaks configuration: the default rules plus fixed fake values used by tests.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake keys and idempotency keys in test files"
+condition = "AND"
+paths = ['''(^|/)tests?/''', '''_test\.go$''']
+regexes = [
+  # Base64 test keys, and the hex strings gitleaks decodes from them.
+  '''^(YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk=|MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=)$''',
+  '''^(abcdef0123456789|0123456789abcdef)+$''',
+  '''^idem-[a-z]?\d+$''',
+]

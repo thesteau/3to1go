@@ -1,4 +1,4 @@
-name: "Image: Scout latest"
+name: "Image: Latest"
 
 # Publishes only main commits that passed the end-to-end test, so an untested
 # or failing commit never becomes `latest`.
@@ -12,16 +12,28 @@ permissions:
   contents: read
   packages: write
 
-# Only the newest tested commit matters for `latest`, so a newer run may
-# replace a pending one.
-concurrency:
-  group: image-scout-latest
-  cancel-in-progress: false
-
 jobs:
-  build-scout:
+  publish:
+    name: Publish ${{ matrix.app }} latest image
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each app also rebuilds when the other app's go.mod changes, since go.work reads both.
+          - app: station
+            other: scout
+            platforms: linux/amd64
+          - app: scout
+            other: station
+            platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+    # Only the newest tested commit matters for `latest`, so a newer run may
+    # replace a pending one.
+    concurrency:
+      group: image-latest-${{ matrix.app }}
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v7
@@ -30,11 +42,14 @@ jobs:
           fetch-depth: 2
 
       # workflow_run has no path filter, so compare the tested commit with its parent.
-      - name: Check for Scout changes
+      - name: Check for app changes
         id: changes
+        env:
+          APP: ${{ matrix.app }}
+          OTHER: ${{ matrix.other }}
         run: |
-          if git diff --quiet HEAD^ HEAD -- app/scout app/station/go.mod app/shared app/go.work app/.dockerignore \
-              app/package.json app/package-lock.json app/tsconfig.base.json .github/workflows/image-scout-latest.yml; then
+          if git diff --quiet HEAD^ HEAD -- "app/$APP" "app/$OTHER/go.mod" app/shared app/go.work app/.dockerignore \
+              app/package.json app/package-lock.json app/tsconfig.base.json .github/workflows/image-latest.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -47,7 +62,7 @@ jobs:
         run: echo "SHORT_SHA=${HEAD_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Set up QEMU
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true' && matrix.app == 'scout'
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
@@ -67,13 +82,13 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: app
-          file: app/scout/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          file: app/${{ matrix.app }}/Dockerfile
+          platforms: ${{ matrix.platforms }}
           push: true
           build-args: |
             REVISION=${{ github.event.workflow_run.head_sha }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-scout:latest
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-scout:${{ env.SHORT_SHA }}
-          cache-from: type=gha,scope=scout
-          cache-to: type=gha,mode=max,scope=scout
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-${{ matrix.app }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-${{ matrix.app }}:${{ env.SHORT_SHA }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

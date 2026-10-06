@@ -1,0 +1,344 @@
+name: "CI"
+
+on:
+  push:
+    branches: ["main", "prod"]
+  pull_request:
+    branches-ignore: [release-state]
+  # The weekly run catches newly reported vulnerabilities even when the code hasn't changed.
+  schedule:
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same PR makes an in-progress run obsolete; branch pushes always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Job names are required status checks; keep them unchanged.
+jobs:
+  go-test:
+    name: Run ${{ matrix.app }} unit tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: station
+            title: Station
+          - app: scout
+            title: Scout
+
+    defaults:
+      run:
+        working-directory: app/${{ matrix.app }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: app/${{ matrix.app }}/go.mod
+          cache-dependency-path: |
+            app/${{ matrix.app }}/go.sum
+            app/shared/go/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install web UI build tools
+        working-directory: .
+        run: npm --prefix app ci
+
+      # The server embeds static/js, which go generate compiles from static/ts.
+      - name: Generate web UI
+        run: go generate ./...
+
+      # -json output feeds the HTML report, which also prints failures to this log.
+      - name: Run tests
+        env:
+          APP: ${{ matrix.app }}
+          TITLE: ${{ matrix.title }} Go tests
+        run: |
+          mkdir -p ../../reports
+          status=0
+          go test -race -json -coverprofile="../../reports/$APP-coverage.out" ./... ../shared/go/... > "../../reports/$APP-go-tests.json" || status=$?
+          node ../../scripts/test-report.cts go "$TITLE" "../../reports/$APP-go-tests.json" "../../reports/$APP-go-tests.html"
+          if [ -s "../../reports/$APP-coverage.out" ]; then
+            go tool cover -html="../../reports/$APP-coverage.out" -o "../../reports/$APP-coverage.html"
+          fi
+          exit "$status"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.app }}-test-report
+          path: |
+            reports/*.html
+            reports/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  frontend-test:
+    name: Type-check, compile and run UI tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Reject committed JavaScript
+        shell: bash
+        run: |
+          files=$(git ls-files -- '*.js' '*.mjs' '*.cjs' '*.jsx' '*.js.map' '*.mjs.map' '*.cjs.map')
+          if [ -n "$files" ]; then
+            echo "JavaScript must be generated, not committed:"
+            printf '%s\n' "$files"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm --prefix app ci
+
+      - name: Type-check and compile TypeScript
+        run: npm --prefix app run build
+
+      - name: Type-check repository scripts
+        run: app/node_modules/.bin/tsc --noEmit --target es2022 --module commonjs --typeRoots app/node_modules/@types --types node --skipLibCheck scripts/release-state.cts scripts/test-report.cts
+
+      # Also writes reports/frontend-tests.html and this job's summary.
+      - name: Run UI tests
+        run: >-
+          node --test
+          --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout
+          "tests/**/*.test.cts"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-test-report
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  go-lint:
+    name: Lint Go (${{ matrix.module }})
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [shared/go, station, scout]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: app/go.work
+          cache-dependency-path: |
+            app/station/go.sum
+            app/scout/go.sum
+            app/shared/go/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The servers embed static/js, so the packages only type-check once it is generated.
+      - name: Generate web UI
+        run: |
+          npm --prefix app ci
+          npm --prefix app run build
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          working-directory: app/${{ matrix.module }}
+
+  go-format:
+    name: Check Go formatting
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: app/go.work
+          cache: false
+      - name: Check tracked Go sources
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git ls-files -z -- '*.go')
+          unformatted=$(gofmt -l "${files[@]}")
+          if [ -n "$unformatted" ]; then
+            printf 'Run gofmt on these files:\n%s\n' "$unformatted"
+            exit 1
+          fi
+
+  frontend-lint:
+    name: Lint and format TypeScript
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm --prefix app ci
+      - run: npm --prefix app run lint
+
+  repository-lint:
+    name: Lint workflows, shell scripts and Dockerfiles
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # actionlint also runs shellcheck on each workflow's run: blocks.
+      - name: Lint workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: Lint shell scripts
+        run: git ls-files -z -- '*.sh' | xargs -0 shellcheck
+
+      - name: Lint Dockerfiles
+        run: docker run --rm -v "$PWD:/repo" -w /repo hadolint/hadolint:v2.15.1 hadolint --config app/.hadolint.yaml app/station/Dockerfile app/scout/Dockerfile
+
+  secrets:
+    name: Scan for committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      # Full history, so a secret added and then removed in a later commit is still caught.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Test-only fake keys are allowlisted in .gitleaks.toml.
+      - name: Scan git history
+        run: docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.30.1 git --redact --no-banner --verbose /repo
+
+  go-vulnerabilities:
+    name: Scan Go vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # Scan with the patched toolchain used by golang:1.26-alpine builds.
+          go-version: "1.26.x"
+          check-latest: true
+          cache-dependency-path: |
+            app/station/go.sum
+            app/scout/go.sum
+            app/shared/go/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm --prefix app ci
+      - run: npm --prefix app run build
+      - name: Install vulnerability scanner
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+      - name: Scan all workspace modules
+        run: |
+          for module in app/shared/go app/station app/scout; do
+            (cd "$module" && govulncheck ./...)
+          done
+
+  npm-vulnerabilities:
+    name: Audit frontend build dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm --prefix app ci
+      - run: npm --prefix app audit --audit-level=high
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      # Go must be installed before init, which puts CodeQL's go wrapper first on PATH.
+      - uses: actions/setup-go@v7
+        if: matrix.language == 'go'
+        with:
+          go-version-file: app/go.work
+          cache-dependency-path: |
+            app/station/go.sum
+            app/scout/go.sum
+            app/shared/go/go.sum
+
+      - uses: actions/setup-node@v7
+        if: matrix.language == 'go'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The servers embed static/js, so generate it before the Go build.
+      - name: Generate web UI
+        if: matrix.language == 'go'
+        run: |
+          npm --prefix app ci
+          npm --prefix app run build
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Generated static/js is build output; CodeQL analyzes the TypeScript sources.
+          config: |
+            paths-ignore:
+              - app/*/static/js
+              - "**/node_modules"
+
+      - name: Build Go modules
+        if: matrix.language == 'go'
+        run: |
+          for module in app/shared/go app/station app/scout; do
+            (cd "$module" && go build ./...)
+          done
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
