@@ -25,7 +25,7 @@ flowchart LR
     PUB -.->|dispatches| IMG[Image: Stable release]
 ```
 
-Release Please (pinned in `package.json`) runs through `scripts/release-state.cts` instead of the standard action, which can't tag a branch other than the one holding its metadata. `release-please-config.json` uses the `go` strategy, unprefixed `vX.Y.Z` tags, and `initial-version: 1.0.0`.
+Release Please (pinned in `app/package.json`) runs through `scripts/release-state.cts` instead of the standard action, which can't tag a branch other than the one holding its metadata. `release-please-config.json` uses the `go` strategy, unprefixed `vX.Y.Z` tags, and `initial-version: 1.0.0`.
 
 Events from the built-in `GITHUB_TOKEN` don't trigger other workflows, so the release workflow dispatches validation and image builds explicitly. Checks on automation-created PRs may show **Approve workflows to run**.
 

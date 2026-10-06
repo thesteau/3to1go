@@ -1,7 +1,7 @@
 # Shared Go packages
 
 Station and Scout depend on this local module through their existing `replace`
-directives and the root `go.work` file.
+directives and the `app/go.work` file.
 
 - `auth`: account types, password verification, account lifecycle, session
   middleware, and account HTTP handlers. SQL remains in each application's store.
@@ -20,7 +20,7 @@ Application entry points, database implementations, backup workflows, and
 platform-specific configuration paths remain in Station and Scout. Shared packages
 must not import either application.
 
-After `npm ci` and `npm run build`, run all Go tests from the repository root:
+After `npm ci` and `npm run build`, run all Go tests from the `app/` directory:
 
 ```sh
 go test -race ./shared/go/... ./station/... ./scout/...

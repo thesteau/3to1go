@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 function loadPageScripts(app) {
-  const base = path.join(__dirname, "..", "..", app, "static");
+  const base = path.join(__dirname, "..", "..", "app", app, "static");
   const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
   const ctx = vm.createContext({ window: { fetch() {} } });
   // App startup needs a live DOM; load its dependencies in the real page order.

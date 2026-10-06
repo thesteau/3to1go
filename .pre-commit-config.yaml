@@ -1,11 +1,11 @@
 # Optional local hooks that mirror the CI lint checks: `pre-commit install` once per clone.
-# The local hooks need npm ci, Go and golangci-lint; hadolint needs Docker.
+# The local hooks need npm --prefix app ci, Go and golangci-lint; hadolint needs Docker.
 repos:
   - repo: local
     hooks:
       - id: biome
         name: biome (format and lint TypeScript)
-        entry: npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true
+        entry: app/node_modules/.bin/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true
         language: system
         types_or: [ts, json]
       - id: gofmt
@@ -15,7 +15,7 @@ repos:
         types: [go]
       - id: golangci-lint
         name: golangci-lint
-        entry: sh -c 'for m in shared/go station scout; do (cd "$m" && golangci-lint run ./...) || exit 1; done'
+        entry: sh -c 'for m in app/shared/go app/station app/scout; do (cd "$m" && golangci-lint run ./...) || exit 1; done'
         language: system
         types: [go]
         pass_filenames: false
@@ -34,3 +34,4 @@ repos:
     rev: v2.15.1
     hooks:
       - id: hadolint-docker
+        args: [--config, app/.hadolint.yaml]

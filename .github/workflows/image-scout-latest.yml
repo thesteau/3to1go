@@ -33,8 +33,8 @@ jobs:
       - name: Check for Scout changes
         id: changes
         run: |
-          if git diff --quiet HEAD^ HEAD -- scout station/go.mod shared go.work .dockerignore \
-              package.json package-lock.json tsconfig.base.json .github/workflows/image-scout-latest.yml; then
+          if git diff --quiet HEAD^ HEAD -- app/scout app/station/go.mod app/shared app/go.work app/.dockerignore \
+              app/package.json app/package-lock.json app/tsconfig.base.json .github/workflows/image-scout-latest.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -66,8 +66,8 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: ./scout/Dockerfile
+          context: app
+          file: app/scout/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |

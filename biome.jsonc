@@ -1,12 +1,13 @@
 {
-  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "$schema": "./app/node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": {
     "enabled": true,
+    "root": ".",
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.cts", "**/*.json", "!package-lock.json", "!**/static/js"]
+    "includes": ["**/*.ts", "**/*.cts", "**/*.json", "!**/package-lock.json", "!**/static/js"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -34,7 +35,7 @@
     {
       // The UI files are classic scripts sharing one global scope: their top-level names are used
       // and reassigned from other files and from inline onclick handlers, which Biome cannot see.
-      "includes": ["station/static/ts/**", "scout/static/ts/**", "shared/ts/**"],
+      "includes": ["**/station/static/ts/**", "**/scout/static/ts/**", "**/shared/ts/**"],
       "linter": {
         "rules": {
           "correctness": {

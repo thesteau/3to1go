@@ -7,7 +7,7 @@ const vm = require("node:vm");
 
 for (const app of ["scout", "station"]) {
   test(`${app} Admin shows the version and links to the docs`, async () => {
-    const dialog = fs.readFileSync(path.join(__dirname, "../..", app, "static/html/users-dialog.html"), "utf8");
+    const dialog = fs.readFileSync(path.join(__dirname, "../..", "app", app, "static/html/users-dialog.html"), "utf8");
     assert.match(dialog, /id="build-info"/);
     assert.match(dialog, /href="https:\/\/3to1go\.docs\.thesteau\.com\/"/);
 

@@ -33,8 +33,8 @@ jobs:
       - name: Check for Station changes
         id: changes
         run: |
-          if git diff --quiet HEAD^ HEAD -- station scout/go.mod shared go.work .dockerignore \
-              package.json package-lock.json tsconfig.base.json .github/workflows/image-station-latest.yml; then
+          if git diff --quiet HEAD^ HEAD -- app/station app/scout/go.mod app/shared app/go.work app/.dockerignore \
+              app/package.json app/package-lock.json app/tsconfig.base.json .github/workflows/image-station-latest.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -62,8 +62,8 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: ./station/Dockerfile
+          context: app
+          file: app/station/Dockerfile
           push: true
           build-args: |
             REVISION=${{ github.event.workflow_run.head_sha }}
