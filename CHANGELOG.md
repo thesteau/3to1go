@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/thesteau/3to1go/compare/v1.3.2...v1.3.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* Refactor app to a new designation with doc and app bug fixes related to deployment ([#101](https://github.com/thesteau/3to1go/issues/101)) ([e7ca558](https://github.com/thesteau/3to1go/commit/e7ca5580e2f0c4f71bb46aa65a11b50ab9345951))
+
 ## [1.3.2](https://github.com/thesteau/3to1go/compare/v1.3.1...v1.3.2) (2026-10-05)
 
 
