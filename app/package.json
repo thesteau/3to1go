@@ -6,9 +6,9 @@
     "build": "tsc -p station/static && tsc -p scout/static",
     "watch": "tsc -p station/static --watch --preserveWatchOutput",
     "watch:scout": "tsc -p scout/static --watch --preserveWatchOutput",
-    "lint": "biome ci .",
-    "fix": "biome check --write .",
-    "test": "npm run build && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""
+    "lint": "cd .. && node app/node_modules/@biomejs/biome/bin/biome ci .",
+    "fix": "cd .. && node app/node_modules/@biomejs/biome/bin/biome check --write .",
+    "test": "npm run build && cd .. && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

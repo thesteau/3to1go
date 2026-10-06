@@ -31,26 +31,27 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ matrix.app }}
+        working-directory: app/${{ matrix.app }}
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: ${{ matrix.app }}/go.mod
+          go-version-file: app/${{ matrix.app }}/go.mod
           cache-dependency-path: |
-            ${{ matrix.app }}/go.sum
-            shared/go/go.sum
+            app/${{ matrix.app }}/go.sum
+            app/shared/go/go.sum
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: app/package-lock.json
 
       - name: Install web UI build tools
         working-directory: .
-        run: npm ci
+        run: npm --prefix app ci
 
       # The server embeds static/js, which go generate compiles from static/ts.
       - name: Generate web UI
@@ -62,12 +63,12 @@ jobs:
           APP: ${{ matrix.app }}
           TITLE: ${{ matrix.title }} Go tests
         run: |
-          mkdir -p ../reports
+          mkdir -p ../../reports
           status=0
-          go test -race -json -coverprofile="../reports/$APP-coverage.out" ./... ../shared/go/... > "../reports/$APP-go-tests.json" || status=$?
-          node ../scripts/test-report.cts go "$TITLE" "../reports/$APP-go-tests.json" "../reports/$APP-go-tests.html"
-          if [ -s "../reports/$APP-coverage.out" ]; then
-            go tool cover -html="../reports/$APP-coverage.out" -o "../reports/$APP-coverage.html"
+          go test -race -json -coverprofile="../../reports/$APP-coverage.out" ./... ../shared/go/... > "../../reports/$APP-go-tests.json" || status=$?
+          node ../../scripts/test-report.cts go "$TITLE" "../../reports/$APP-go-tests.json" "../../reports/$APP-go-tests.html"
+          if [ -s "../../reports/$APP-coverage.out" ]; then
+            go tool cover -html="../../reports/$APP-coverage.out" -o "../../reports/$APP-coverage.html"
           fi
           exit "$status"
 

@@ -38,15 +38,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm --prefix app ci
 
       - name: Type-check and compile TypeScript
-        run: npm run build
+        run: npm --prefix app run build
 
       - name: Type-check repository scripts
-        run: npx tsc --noEmit --target es2022 --module commonjs --types node --skipLibCheck scripts/release-state.cts scripts/test-report.cts
+        run: app/node_modules/.bin/tsc --noEmit --target es2022 --module commonjs --typeRoots app/node_modules/@types --types node --skipLibCheck scripts/release-state.cts scripts/test-report.cts
 
       # Also writes reports/frontend-tests.html and this job's summary.
       - name: Run UI tests

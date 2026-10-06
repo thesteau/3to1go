@@ -2,11 +2,14 @@
 // changelog generation; this bridge stores those updates off the code branches.
 const { execFileSync } = require("node:child_process");
 const { readFileSync } = require("node:fs");
-const { GitHub } = require("release-please");
-const { buildStrategy } = require("release-please/build/src/factory");
-const { parseConventionalCommits } = require("release-please/build/src/commit");
-const { Version } = require("release-please/build/src/version");
-const { TagName } = require("release-please/build/src/util/tag-name");
+const requireBuildTool = require("node:module").createRequire(
+  require("node:path").resolve(__dirname, "../app/package.json"),
+);
+const { GitHub } = requireBuildTool("release-please");
+const { buildStrategy } = requireBuildTool("release-please/build/src/factory");
+const { parseConventionalCommits } = requireBuildTool("release-please/build/src/commit");
+const { Version } = requireBuildTool("release-please/build/src/version");
+const { TagName } = requireBuildTool("release-please/build/src/util/tag-name");
 
 const STATE_BRANCH = "release-state";
 const PR_BRANCH = "release-please--branches--release-state";

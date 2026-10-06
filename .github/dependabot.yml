@@ -2,9 +2,9 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directories:
-      - /station
-      - /scout
-      - /shared/go
+      - /app/station
+      - /app/scout
+      - /app/shared/go
     schedule:
       interval: weekly
     commit-message:
@@ -13,7 +13,7 @@ updates:
       go-dependencies:
         patterns: ["*"]
   - package-ecosystem: npm
-    directory: /
+    directory: /app
     schedule:
       interval: weekly
     commit-message:
@@ -32,8 +32,8 @@ updates:
         patterns: ["*"]
   - package-ecosystem: docker
     directories:
-      - /station
-      - /scout
+      - /app/station
+      - /app/scout
     schedule:
       interval: weekly
     commit-message:

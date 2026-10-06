@@ -27,8 +27,8 @@ jobs:
       - name: Build Station validation image
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: station/Dockerfile
+          context: app
+          file: app/station/Dockerfile
           tags: 3to1go-station-validation
           load: true
           cache-from: |
@@ -39,8 +39,8 @@ jobs:
       - name: Build Scout validation image
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: scout/Dockerfile
+          context: app
+          file: app/scout/Dockerfile
           tags: 3to1go-scout-validation
           load: true
           cache-from: |

@@ -7,7 +7,7 @@ const loaded = new WeakMap<object, Set<string>>();
 // Use the page's actual script order and paths, including shared dependencies.
 // Tests may load a feature in isolation without running application startup.
 function loadFeature(context: object, app: string, feature: string): void {
-  const base = path.join(__dirname, "../..", app, "static");
+  const base = path.join(__dirname, "../..", "app", app, "static");
   const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
   const files = [...html.matchAll(/<script defer src="\/static\/js\/([^"]+)"/g)]
     .map((match) => match[1])
