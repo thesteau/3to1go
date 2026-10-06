@@ -1,0 +1,4 @@
+exclude: []
+follow_symlinks: false
+include_hidden: true
+job_name: scan

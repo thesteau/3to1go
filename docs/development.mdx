@@ -11,29 +11,30 @@ Open normal development PRs against `main`, titled as Conventional Commits (`fea
 
 | Path | Contents |
 |---|---|
-| `station/` | Station's receiver API, storage logic, and web UI |
-| `scout/` | Scout's scanning, encryption, upload, restore, and web UI |
-| `shared/go/` | Wire protocol, authentication, HTTP helpers, certificates, hooks, ntfy templates, locks, configuration helpers, and web UI serving |
-| `shared/ts/` | Browser scripts and types compiled into both UIs |
+| `app/` | Go workspace, npm build tools and lockfile, base TypeScript config, and Docker build context |
+| `app/station/` | Station's receiver API, storage logic, and web UI |
+| `app/scout/` | Scout's scanning, encryption, upload, restore, and web UI |
+| `app/shared/go/` | Wire protocol, authentication, HTTP helpers, certificates, hooks, ntfy templates, locks, configuration helpers, and web UI serving |
+| `app/shared/ts/` | Browser scripts and types compiled into both UIs |
 | `tests/` | TypeScript tests, grouped by area: `scout/`, `station/`, `shared/` (both UIs), `release/` (release automation), and `ci/` (CI tooling) |
 | `deploy-example/station/`, `deploy-example/scout/` | Compose deployments using published images |
 | `docs/` | Mintlify documentation |
 
-The root `go.work` joins three Go modules: `station`, `scout`, and `shared/go`. Behavior specific to one app stays in that app's directory. Go also discovers the parent workspace when commands run inside an app directory.
+`app/go.work` joins three Go modules: `app/station`, `app/scout`, and `app/shared/go`. Behavior specific to one app stays in that app's directory. Both `go.work` and `go.work.sum` live in `app/`. Git hooks, tests, and release scripts stay at the root. Go and Docker lint configuration lives in `app/`. The root `biome.jsonc` checks TypeScript and JSON across the apps, tests, and scripts. Run npm commands inside `app/`, or use `npm --prefix app` from the root. Go also discovers the parent workspace when commands run inside an app directory.
 
 ## Build locally
 
-Use the Go version declared in the repository's `go.work` and module files, and **Node.js 24** for the frontend build. From the repository root, install the build tools and generate both UIs:
+Use the Go version declared in the repository's `app/go.work` and module files, and **Node.js 24** for the frontend build. From the repository root, install the build tools and generate both UIs:
 
 ```sh
-npm ci
-npm run build
+npm --prefix app ci
+npm --prefix app run build
 ```
 
 Then build an individual server from its app directory:
 
 ```sh
-cd station
+cd app/station
 go build ./cmd/server
 ```
 
@@ -45,18 +46,18 @@ CI runs the Go and frontend tests on every PR, and the end-to-end test after eac
 
 | Suite | Needs |
 |---|---|
-| Go unit tests | Go, Node.js 24, and `npm ci` (Go embeds the generated UI) |
-| Frontend and release tests | Node.js 24, `npm ci`, and `git` |
+| Go unit tests | Go, Node.js 24, and `npm --prefix app ci` (Go embeds the generated UI) |
+| Frontend and release tests | Node.js 24, `npm --prefix app ci`, and `git` |
 | End-to-end test | Docker, `bash`, `curl`, and `jq` |
 
 ### Go unit tests
 
 ```sh
-npm run build
-go test ./shared/go/... ./station/... ./scout/...
+npm --prefix app run build
+(cd app && go test ./shared/go/... ./station/... ./scout/...)
 
 # One package, filtered by test name
-go test ./scout/internal/services/directories/ -run ListChildren -v
+(cd app/scout && go test ./internal/services/directories/ -run ListChildren -v)
 ```
 
 CI also passes `-race`, which needs a C compiler. On Windows, tests that need symlinks, POSIX permissions, or `sh` report `SKIP`, but CI still runs them.
@@ -64,7 +65,7 @@ CI also passes `-race`, which needs a C compiler. On Windows, tests that need sy
 ### Frontend and release tests
 
 ```sh
-npm test
+npm --prefix app test
 ```
 
 This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grouped by area:
@@ -77,7 +78,7 @@ This rebuilds both UIs and runs every `tests/**/*.test.cts` file. Tests are grou
 | `tests/release/` | Release scripts and workflows |
 | `tests/ci/` | CI tooling, such as the test report generator |
 
-To run some tests without rebuilding every time, run `npm run build` once (again after TypeScript changes), then:
+To run some tests without rebuilding every time, run `npm --prefix app run build` once (again after TypeScript changes), then:
 
 ```sh
 node --test tests/scout/directory-tree.test.cts                            # one file
@@ -92,8 +93,8 @@ Quote globs so Node expands them, not your shell. Name new test files after thei
 `tests/integration/e2e.sh` runs PostgreSQL, Station, and Scout in Docker, takes a backup, and recovers it. Build the images it expects first:
 
 ```sh
-docker build -t 3to1go-station-validation -f station/Dockerfile .
-docker build -t 3to1go-scout-validation -f scout/Dockerfile .
+docker build -t 3to1go-station-validation -f app/station/Dockerfile app
+docker build -t 3to1go-scout-validation -f app/scout/Dockerfile app
 bash tests/integration/e2e.sh
 ```
 
@@ -101,13 +102,13 @@ It uses host ports `16555` and `16556` and cleans up after itself. On Windows, r
 
 ### Test reports
 
-`scripts/test-report.cts` turns results into a single HTML page with pass, fail, and skip counts and each failure's output. `npm test` writes `reports/frontend-tests.html`. For Go tests, convert the `go test -json` output. The coverage page is optional:
+`scripts/test-report.cts` turns results into a single HTML page with pass, fail, and skip counts and each failure's output. `npm --prefix app test` writes `reports/frontend-tests.html`. For Go tests, convert the `go test -json` output. The coverage page is optional:
 
 ```sh
-mkdir -p reports && cd scout
-go test -json -coverprofile=../reports/scout-coverage.out ./... ../shared/go/... > ../reports/scout-go-tests.json
-node ../scripts/test-report.cts go "Scout Go tests" ../reports/scout-go-tests.json ../reports/scout-go-tests.html
-go tool cover -html=../reports/scout-coverage.out -o ../reports/scout-coverage.html
+mkdir -p reports && cd app/scout
+go test -json -coverprofile=../../reports/scout-coverage.out ./... ../shared/go/... > ../../reports/scout-go-tests.json
+node ../../scripts/test-report.cts go "Scout Go tests" ../../reports/scout-go-tests.json ../../reports/scout-go-tests.html
+go tool cover -html=../../reports/scout-coverage.out -o ../../reports/scout-coverage.html
 ```
 
 In CI, each test job writes a summary on its run page and uploads its reports as an artifact, kept for 14 days. Download it from **Artifacts** at the bottom of the run, unzip, and open the HTML file.
@@ -124,27 +125,27 @@ The lint workflow runs on PRs and pushes to `main` and `prod`:
 
 | Check | Tool | Config |
 |---|---|---|
-| Go | [golangci-lint](https://golangci-lint.run/) (`errcheck`, `govet`, `ineffassign`, `staticcheck`, `unused`) on each Go module | `.golangci.yml` |
+| Go | [golangci-lint](https://golangci-lint.run/) (`errcheck`, `govet`, `ineffassign`, `staticcheck`, `unused`) on each Go module | `app/.golangci.yml` |
 | TypeScript and JSON | [Biome](https://biomejs.dev/) lint and format check | `biome.jsonc` |
 | Workflows | [actionlint](https://github.com/rhysd/actionlint), which also shellchecks `run:` blocks | |
 | Shell scripts | [ShellCheck](https://www.shellcheck.net/) | |
-| Dockerfiles | [hadolint](https://github.com/hadolint/hadolint) | `.hadolint.yaml` |
+| Dockerfiles | [hadolint](https://github.com/hadolint/hadolint) | `app/.hadolint.yaml` |
 
-Run the TypeScript checks with `npm run lint`, and apply formatting and safe fixes with `npm run fix`. Run golangci-lint from a module folder after `npm run build`:
+Run the TypeScript checks with `npm --prefix app run lint`, and apply formatting and safe fixes with `npm --prefix app run fix`. Run golangci-lint from a module folder after `npm --prefix app run build`:
 
 ```sh
-cd scout && golangci-lint run ./...
+cd app/scout && golangci-lint run ./...
 ```
 
 ESLint isn't used. TypeScript 7 has no JavaScript compiler API, which typescript-eslint needs. Biome parses TypeScript itself.
 
 Biome doesn't flag unused top-level names or `let` globals in the UI folders. Those files share one global scope, so other files and inline `onclick` handlers use and reassign those names.
 
-To run the same checks before each commit, install [pre-commit](https://pre-commit.com/) and run `pre-commit install` once. The hooks in `.pre-commit-config.yaml` need `npm ci`, Go, and golangci-lint locally. The hadolint hook needs Docker.
+To run the same checks before each commit, install [pre-commit](https://pre-commit.com/) and run `pre-commit install` once. The hooks in `.pre-commit-config.yaml` need `npm --prefix app ci`, Go, and golangci-lint locally. The hadolint hook needs Docker.
 
 ## Repository maintenance
 
-The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed.
+The maintenance workflow checks Go formatting with `gofmt`, scans all three Go modules with `govulncheck`, and runs `npm --prefix app audit --audit-level=high`, including the frontend build tools. It runs on PRs, pushes to `main` and `prod`, and once a week. The weekly run checks for newly reported vulnerabilities even when the code hasn't changed.
 
 Dependabot opens weekly update PRs for Go dependencies, npm tools, GitHub Actions, and Dockerfile base images. These PRs use Conventional Commit titles and go through the usual CI and review. Dependabot isn't set up to merge them automatically. See [Dependabot configuration](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference) and [Go vulnerability management](https://go.dev/doc/security/vuln/) for details.
 
@@ -152,11 +153,11 @@ Report vulnerabilities using the repository's [security policy](https://github.c
 
 ## Frontend sources and generated files
 
-Edit TypeScript in `station/static/ts`, `scout/static/ts`, or `shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
+Edit TypeScript in `app/station/static/ts`, `app/scout/static/ts`, or `app/shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
 
-Go embeds the generated `station/static/js` and `scout/static/js`, so generate them before `go build` or `go test` with `npm run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
+Go embeds the generated `app/station/static/js` and `app/scout/static/js`, so generate them before `go build` or `go test` with `npm --prefix app run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
 
-For continuous compilation, use `npm run watch` (Station) or `npm run watch:scout` (Scout), then rebuild and restart the Go server to serve the new assets.
+For continuous compilation, use `npm --prefix app run watch` (Station) or `npm --prefix app run watch:scout` (Scout), then rebuild and restart the Go server to serve the new assets.
 
 ## Names in code
 
@@ -171,7 +172,7 @@ Keep these code names. File names, API routes, JSON fields, database names, and 
 
 ## Build with Docker Compose
 
-`station/docker-compose.yml` and `scout/docker-compose.yml` build from this checkout, using the repository root as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Station installation](/station/install) or [Scout installation](/scout/install), then from that app's folder:
+`app/station/docker-compose.yml` and `app/scout/docker-compose.yml` build from this checkout, using `app/` as build context so shared code is included. Copy the app's `.env.example` to `.env`, configure it as in [Station installation](/station/install) or [Scout installation](/scout/install), then from that app's folder:
 
 ```sh
 docker compose up -d --build
