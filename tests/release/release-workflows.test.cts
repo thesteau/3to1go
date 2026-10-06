@@ -131,7 +131,7 @@ test("metadata dispatch resolves only open same-repository automation PRs into r
 });
 
 test("PR titles must be Conventional Commits and report their release effect", async () => {
-  const run = new AsyncFunction("core", "process", scripts("pr-title")[0]);
+  const run = new AsyncFunction("core", "process", scripts("pr-checks")[0]);
   for (const [title, expected] of [
     ["feat: add restore preview", 'notice:"feat" title: minor release once promoted to prod.'],
     ["fix(scout): retry uploads", 'notice:"fix" title: patch release once promoted to prod.'],

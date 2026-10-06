@@ -1,8 +1,8 @@
-name: "PR: Conventional Commit title"
+name: "PR: Checks"
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, prod]
     types: [opened, edited, synchronize, reopened]
 
 permissions:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   title:
     name: Validate Conventional Commit PR title
+    if: github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       # Squash merges use the PR title as the commit Release Please reads on prod.
@@ -33,3 +34,15 @@ jobs:
             const effect = match[3] ? 'major release' :
               bump ? `${bump} release` : 'no release on its own';
             core.notice(`"${match[1]}${match[3] ?? ''}" title: ${effect} once promoted to prod.`);
+
+  source:
+    name: Validate production PR source
+    if: github.base_ref == 'prod'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require same-repository main promotion
+        env:
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          [[ "$SAME_REPO" == true && "$HEAD_BRANCH" == main ]]
