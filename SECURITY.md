@@ -15,7 +15,7 @@ without describing the vulnerability.
 
 Include the Station or Scout version, how you're running it, steps to reproduce
 the problem, and what an attacker could do. A small example helps. Remove passwords,
-Scout credentials, encryption and signing keys, private hostnames, and backup data
+Station tokens, Scout keys, signing keys, private hostnames, and backup data
 from logs and attachments. Keep exploit details private while the report is reviewed.
 
 There's no guaranteed response time. Where possible, the maintainer will work

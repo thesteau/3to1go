@@ -3,7 +3,7 @@ title: "Unusual backups"
 description: "How Scout spots backups that look nothing like a job's history, such as ransomware damage, and holds them for review."
 ---
 
-Each job builds up a picture of what its backups normally look like. When a new backup looks very different, such as a folder that suddenly emptied or files that ransomware encrypted, Scout holds it instead of uploading it. Your good snapshots on Station stay safe from retention until you decide.
+Each job builds up a picture of what its backups normally look like. In the default **Hold and alert** mode, Scout holds a newly built backup if its statistics differ sharply from the job's history, such as a large drop in file count or a sudden loss of compression. A held archive isn't uploaded, so it doesn't trigger retention of that job's snapshots on Station.
 
 ```mermaid
 flowchart LR
@@ -15,29 +15,33 @@ flowchart LR
     U --> L[Becomes part of<br/>the job's history]
 ```
 
-Detection only uses file paths, sizes, file types, and how well the archive compresses. It never reads your files' contents.
+The checks use file paths, sizes, filename extensions, and the archive's compression ratio. They don't inspect file contents or identify malware. Scout still reads the included files to build the archive.
+
+<Note>
+  These checks run when Scout builds a new archive. Edits that keep the same file paths and sizes don't trigger a scheduled backup or these checks. **Force Upload** bypasses the checks. See [Path-and-size fingerprinting](/concepts/design-decisions#path-and-size-fingerprinting).
+</Note>
 
 ## What Scout checks
 
 | Check | Flags | Needs |
 |---|---|---|
-| **File count and size** | A folder that's less than half or more than double its usual size or file count | 5 earlier backups |
-| **Compression** | An archive that stopped compressing. Encrypted files look random, so ransomware pushes the archive to about 100% of the original size. | 3 earlier backups over 1 MB |
-| **Changed files** | Most files renamed or rewritten while the file count barely moved | 1 earlier backup, 20+ files |
-| **File types** | One file type suddenly taking over, such as `.locked` going from 0% to most of the folder | 1 earlier backup, 20+ files |
+| **File count and size** | File count or source size drops to half its usual value or grows to double, and falls far outside its normal range | 5 earlier backups |
+| **Compression** | A previously compressible job whose archive is now at least 90% of the source size, with a ratio increase of at least 25 percentage points | 3 earlier backups with at least 1 MiB of source files |
+| **Changed files** | Most file paths or sizes changed while the file count barely moved | 1 earlier backup, 20+ files in both backups |
+| **File types** | One filename extension suddenly taking over, such as `.locked` going from 0% to most of the folder | 1 earlier backup, 20+ files in both backups |
 
 Each job keeps its last 20 uploaded backups as its "normal". Photo and video folders that never compress well aren't flagged by the compression check, and adding lots of new files only trips the count check, not the changed-files check.
 
 ## Machine learning
 
-Detection is unsupervised anomaly detection. Scout doesn't use a trained model. It learns each job's own baseline from that job's past backups and flags a backup that falls far outside it. There's nothing to download or train, nothing leaves the Scout, and a check takes milliseconds.
+Scout uses statistical anomaly detection rather than a pretrained model. It builds each job's baseline from that job's past backups and flags a backup that falls far outside it. No model needs to be downloaded or trained. The checks and their history stay on Scout; configured notifications can send alerts with the reasons.
 
 | Check | Method |
 |---|---|
 | File count and size | A robust z-score on a log scale. The baseline is the median of past backups, and the spread is the median absolute deviation (MAD). A backup is flagged only if it's at least 4 spreads from the median **and** at least half or double the usual value. |
 | Compression | The archive's size divided by the original size, compared with the median ratio of past backups. |
 | Changed files | Similarity to the last backup, estimated with MinHash over file paths and sizes. Flagged when under 25% of files are unchanged. |
-| File types | The share of each file extension, compared with the last backup using the Jensen-Shannon divergence. Flagged when one new type takes over the folder. |
+| File types | The share of each filename extension, compared with the last backup using the Jensen-Shannon divergence. Flagged when a previously rare extension takes over the folder. |
 
 The median and MAD ignore a few odd backups in the history, where an average would be pulled off by them. The log scale treats growing from 1 GB to 2 GB the same as 10 GB to 20 GB.
 
@@ -51,10 +55,10 @@ The job shows **held for review** with the reasons, for example:
 
 Scout also sends a high-priority [ntfy](/scout/notifications) alert if notifications are set up. Then either:
 
-- **The change is expected**, such as a reorganized folder: click **Upload anyway**. The backup uploads and becomes part of the job's normal, so the same pattern won't be flagged again.
+- **The change is expected**, such as a reorganized folder: click **Upload anyway**. The backup uploads and joins the job's history. Future backups are compared against that updated history, so some checks may still flag them while the baseline adjusts.
 - **Something is wrong**: click **Clear staged backup** to discard it, then fix the folder, for example by [restoring](/scout/restore) the last good snapshot.
 
-A held job stays held on later cycles while its files stay the same. If the files return to their last uploaded state, the hold clears by itself.
+A held job stays held on later cycles while its path-and-size fingerprint stays the same. If that fingerprint returns to its last successfully uploaded value, the hold clears by itself.
 
 ## Settings
 

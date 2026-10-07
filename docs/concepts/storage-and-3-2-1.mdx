@@ -32,7 +32,7 @@ Copy Station's backup folder somewhere independent of Station. Where Station run
   Running Station offsite does **not** give you three copies on its own. If Station's disk fails at the same time as a machine, there's nothing else to restore from.
 </Warning>
 
-Station only holds encrypted archives, so it can run on hardware you don't fully control, and its folder can be copied anywhere without exposing your files.
+Snapshots stay encrypted when stored on Station or copied elsewhere. Station also keeps metadata such as Scout IDs, job names, timestamps, and archive sizes; encryption protects the files inside the archives.
 
 ## Where Station can store snapshots
 
@@ -40,7 +40,7 @@ Station writes ordinary files into its backup folder (`/backups` in the containe
 
 - **Local disk.** The default.
 - **Mounted NAS or removable drive.** Mount it on the Docker host, give Station write access, and point `BACKUP_DIR` at it.
-- **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The provider only sees encrypted archives.
+- **Dropbox, Google Drive, or OneDrive.** Point `BACKUP_DIR` at the local sync folder. The provider receives encrypted archives and can see their folder names, filenames, and sizes.
 - **Object storage.** There's no native backend. Copy the backup folder with an external tool. If you use a filesystem mount over object storage instead, check that it supports writes, listing, renames, and deletion first.
 
 Keep the Scout keys separately from these copies. To recover Station itself, not just the archives, also keep its signing key and PostgreSQL database. See [Install Station](/station/install#what-gets-created). A mirror may also copy retention deletions, depending on the sync tool's settings.

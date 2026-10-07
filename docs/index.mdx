@@ -7,7 +7,7 @@ description: "Self-hosted, encrypted backups: Scout backs up your machines, Stat
 
 3to1go is a self-hosted backup system. Run one **Station** and a **Scout** on each machine you want to back up. Each has its own container, web UI, sign-in, and settings.
 
-Like the gophers racing above, each Scout heads out on one of your machines, gathers the folders you chose, seals them, and carries them back to the Station. The Station keeps every pack safe but never opens one, because only the Scout has the key. To get files back, the Scout fetches a pack from the Station and unpacks it at home.
+Like the gophers racing above, each Scout gathers the files from your chosen folders, packs them into archives, encrypts them with its Scout key, and carries them back to Station. Station stores the encrypted snapshots without decrypting them. To get files back, Scout fetches a snapshot, decrypts it, and restores the files. You can also download a snapshot through Station's UI, where your browser decrypts it with the Scout key you provide.
 
 <Frame caption="Scouts bring sealed packs to Station. A sync tool can float a copy to the cloud.">
   <img src="/images/gophers/station-overview.svg" alt="A Scout gopher carries a locked box to the Station factory, where gophers in hard hats stack boxes. A gopher outside sends a box on a balloon to a cloud, where another gopher keeps a stack of boxes." />
@@ -51,10 +51,10 @@ It references the [3-2-1 backup rule](https://en.wikipedia.org/wiki/Backup#Stora
 
 ## Why use 3to1go
 
-- **Encrypted before upload.** Station never sees your plaintext files.
+- **Encrypted before upload.** Scout encrypts each archive before sending it to Station. Station's server never receives the Scout key.
 - **Machines stay separate.** Each installation has its own instance ID, so machines never mix or prune each other's snapshots, even with the same `SCOUT_ID`.
 - **Revocable Station tokens.** Mint and revoke Station tokens from Station's UI without deleting snapshots.
-- **No station manifest.** Mark folders with a small file instead of maintaining a backup config.
+- **Jobs live with their folders.** Scout's Job Editor saves each job's settings in a `.upload_dir` file, which you can also edit directly.
 
 ## Next steps
 

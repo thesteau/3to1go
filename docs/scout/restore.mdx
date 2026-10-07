@@ -3,7 +3,7 @@ title: "Restore"
 description: "Bring a snapshot from Station back into a job's folder on Scout."
 ---
 
-Scout can download a snapshot from Station, decrypt it with its own key, and extract it back into the job's folder.
+Scout can download a snapshot from Station, decrypt it with its Scout key, and extract it back into the job's folder. Station can also request a restore to another Scout, where you provide the original snapshot's key before accepting.
 
 <Frame caption="Station sends the sealed snapshot, and Scout opens it with its Scout key.">
   <img src="/images/gophers/restore.svg" alt="Station sends a sealed box to a Scout gopher, who opens it. Files fly out and go back into a house." />
@@ -60,13 +60,13 @@ photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 
 Enter those eight characters (or the full 64-character fingerprint) in **Snapshot fingerprint**, then preview and confirm as above.
 
-Forced backups can share a fingerprint. When several snapshots match, Scout restores the newest. To get an older one, use its **Download** button in Station instead.
+Forced backups can share a fingerprint. When several snapshots match, the job's **Restore** action restores the newest. To choose an older one, use that exact snapshot's **Restore** or **Download** button in Station.
 
-A job can only restore its **own** snapshots. You can't restore one job's snapshot into another job's folder.
+The **Restore** button on a Scout job only restores that job's snapshots from the current Scout instance. To choose another destination or device, use a [restore request from Station](#restore-requests-from-station).
 
 ## Restore requests from Station
 
-Use this when Station still has a snapshot but the folder is gone from Scout. An admin clicks **Restore** on a snapshot in Station. Station only saves the request. Scout lists it under **Restore Requests**, and nothing is restored until someone accepts it in Scout.
+Use this to recover a deleted folder or restore a snapshot to another Scout. An admin clicks **Restore** on a snapshot in Station, chooses the target device in the dialog, and clicks **Request Restore**. Station saves the request and, if the target advertises a URL, sends it a notification. The receiving Scout lists the request under **Restore Requests**, and nothing is restored until someone accepts it in Scout.
 
 ```mermaid
 sequenceDiagram
@@ -94,7 +94,7 @@ sequenceDiagram
 
 <Steps>
   <Step title="Request it in Station">
-    Save that Scout's key in Station, then click **Restore** on the snapshot. The key stays in your browser.
+    Click **Restore** on the snapshot and choose **Target Scout device** in the dialog. For the original device, save its Scout key in Station's UI first; the key stays in your browser. For another device, provide the original snapshot's key on the receiving Scout when accepting. Click **Request Restore**.
   </Step>
   <Step title="Open Restore Requests in Scout">
     The **Restore Requests** tab appears next to **Jobs** when Station has a request for this Scout.
@@ -105,6 +105,7 @@ sequenceDiagram
 </Steps>
 
 - The destination is a folder directly under the scan root. Renames must be a single folder name, without path separators. It may be a folder that no longer exists, and Scout creates it.
+- Accepting restores the whole snapshot into that folder and replaces matching local files. Station requests don't show the file preview available from a job's **Restore** button.
 - Scout only acts on requests it reads from Station itself. It never trusts the notification.
 - If the restore fails, the request stays accepted and Scout shows **Retry Restore**. **Reject** dismisses it.
 - A request lasts 1 hour, whether it's pending, accepted, or rejected. After that Station deletes it. **Accept** on an expired request fails and nothing is restored, so click **Restore** in Station again. **Reject** still works and dismisses it.
@@ -115,7 +116,7 @@ sequenceDiagram
 - Local job restores use the current Scout key. For a Station request targeting another device, provide the **original snapshot’s Scout key** on the receiving Scout. A missing or incorrect key prevents restoration.
 
 <Note>
-  After you [rotate the key](/scout/scout-key#rotate-the-key), Scout can no longer restore snapshots made with the old key, and Station's UI stops accepting the old key after Scout's next upload. Download any older snapshots you need **before** rotating.
+  After you [rotate the key](/scout/scout-key#rotate-the-key), local job restores and same-device requests cannot decrypt snapshots made with the old key. Station's UI stops accepting the old key after Scout's next upload. Download any older snapshots you need **before** rotating and keep the old key; it can still be provided for a restore request targeting another Scout.
 </Note>
 
 ## Rebuilding a lost machine
