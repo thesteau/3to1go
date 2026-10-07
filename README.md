@@ -12,7 +12,7 @@ The name works on three levels: it references the [3-2-1 backup rule](https://en
 - `Scout` runs on the machine that has the files you care about.
 - `Station` receives encrypted backups and keeps them on disk.
 
-Like the gophers racing above, each Scout heads out on one of your machines, gathers the folders you chose, seals them, and carries them back to the Station. The Station keeps every pack safe but never opens one, because only the Scout has the key. When you need your files back, the Scout fetches a pack from the Station and unpacks it at home.
+Like the gophers racing above, each Scout gathers the files from your chosen folders, packs them into archives, encrypts them with its Scout key, and carries them back to Station. Station stores the encrypted snapshots without decrypting them. When you need your files back, Scout fetches a snapshot from Station, decrypts it, and restores the files. You can also download a snapshot through Station's UI, where your browser decrypts it with the Scout key you provide.
 
 If you want the shortest mental model:
 
@@ -26,12 +26,12 @@ If you want the shortest mental model:
 
 ![Three Scouts encrypt backups before uploading to one Station, with an optional external sync to cloud storage for a third copy.](assets/backup-layout.svg)
 
-Each Scout has its own address and web UI on port **6556**. They all upload to Station on port **6555**. Station never sees plaintext files, and an external sync tool can copy its encrypted snapshots to independent storage for a third copy.
+Each Scout has its own address and web UI on port **6556**. They all upload encrypted snapshots to Station on port **6555**. An external sync tool can copy those snapshots to independent storage for a third copy.
 
 ## Why Use 3to1go
 
 - **Choose folders directly.** Create backup jobs in Scout's UI. Each job is a `.upload_dir` file in its folder, which you can also write or edit yourself.
-- **Encrypt before upload.** Station only stores encrypted archives. Downloads are decrypted in your browser, and restores on Scout itself.
+- **Encrypt before upload.** Scout encrypts each archive before sending it to Station. Downloads are decrypted in your browser, and restores on Scout itself.
 - **Keep machines separate.** Each installation has its own instance ID and snapshot history, even when Scout IDs are shared.
 - **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect hooks or ntfy notifications.
 - **Control access.** Mint and revoke Station tokens from Station's UI.
@@ -97,7 +97,7 @@ For more detail, see the [quickstart](https://3to1go.docs.thesteau.com/quickstar
 ## Before You Rely on It
 
 - **Keep your Scout key safe.** Losing it means losing access to the snapshots it encrypted. Practice a [restore](https://3to1go.docs.thesteau.com/scout/restore).
-- **Backups are full snapshots.** Change detection uses sorted file paths and sizes. Same-size edits need **Force Upload**. Clear an older staged backup first so Force Upload builds a fresh archive.
+- **Backups are full snapshots.** Change detection uses sorted file paths and sizes, plus empty folder paths. Same-size edits need **Force Upload**. Clear an older staged backup first so Force Upload builds a fresh archive.
 - **Restore replaces matching files.** Local files absent from the snapshot stay untouched. Review the preview before confirming.
 - **Plan a third copy.** Your original files and Station's snapshots are two copies, even when Station is offsite. See [Storage and the 3-2-1 rule](https://3to1go.docs.thesteau.com/concepts/storage-and-3-2-1).
 

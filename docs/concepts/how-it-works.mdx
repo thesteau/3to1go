@@ -3,7 +3,7 @@ title: "How it works"
 description: "Follow a folder from its .upload_dir marker to a stored, encrypted snapshot."
 ---
 
-Scout does all the work that needs your plaintext files. Station only receives encrypted archives. Scout gathers and seals each pack, and Station stores packs without opening them.
+Scout reads the files in your selected folders, builds an archive for each backup job, and encrypts it before upload. Station receives and stores those encrypted snapshots without decrypting them.
 
 <Frame caption="Each Scout uploads to the same Station. The cloud copy is made by an external tool.">
   <img src="/images/backup-layout.svg" alt="Scout 1 at 192.168.1.21:6556, Scout 2 at 192.168.1.22:6556, and Scout 3 at 192.168.1.23:6556 send backups to Station at 192.168.1.10:6555. An optional external sync sends another copy to cloud storage." />
@@ -17,7 +17,7 @@ The addresses are examples. Each Scout sets its **Station URL** to the same Stat
 | Default UI | `http://localhost:6556/` | `http://localhost:6555/` |
 | Owns | Scanning, fingerprinting, archiving, encryption, scheduling, upload retries, restore | Receiving uploads, storage, retention, Station tokens, integrity checks, snapshot browsing |
 | Stores its settings in | A local SQLite database | PostgreSQL |
-| Sees plaintext files | Yes | No |
+| Reads the files being backed up | Yes | No; stores encrypted snapshots |
 
 ## The backup flow
 
@@ -29,10 +29,10 @@ The addresses are examples. Each Scout sets its **Station URL** to the same Stat
     On each scheduled cycle, Scout walks its scan root looking for markers. Each marked folder is a **job**.
   </Step>
   <Step title="Scout decides whether anything changed">
-    Scout fingerprints the job's sorted file paths and sizes and compares that with the last backup. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
+    Scout fingerprints the job's sorted file paths and sizes, plus empty folder paths, and compares that with the last successful backup. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
   </Step>
   <Step title="Scout builds and encrypts an archive">
-    If the fingerprint changed, Scout creates a `tar.zst` archive of the folder and encrypts it with its own key.
+    If the fingerprint changed, Scout creates a full `tar.zst` archive of the job's included regular files and empty folders, then encrypts it with its Scout key. Files that are already encrypted are included like any other regular file. Scout checks a newly built backup against the job's history and, by default, [holds unusual backups for review](/scout/unusual-backups).
   </Step>
   <Step title="Scout uploads it to Station">
     The encrypted archive is uploaded in chunks, with retries and a circuit breaker if Station is unreachable.
@@ -56,10 +56,16 @@ sequenceDiagram
         alt Something changed
             Scout->>Scout: Create tar.zst archive
             Scout->>Scout: Encrypt archive
-            Scout->>Station: Upload encrypted archive
-            Station-->>Scout: OK
-            Station->>Station: Store by scout_id / instance_id / job
-            Station->>Station: Prune old snapshots
+            Scout->>Scout: Check for unusual changes
+            alt Backup held for review
+                Scout-->>Scout: Keep archive staged for approval
+            else Upload allowed
+                Scout->>Station: Upload encrypted archive
+                Station->>Station: Verify upload checksum
+                Station->>Station: Store by scout_id / instance_id / job
+                Station->>Station: Prune old snapshots
+                Station-->>Scout: OK
+            end
         end
     end
 ```
@@ -72,5 +78,7 @@ sequenceDiagram
 ## Where encryption happens
 
 Each Scout generates its own `encryption.key` on first run and encrypts every archive before upload. Station stores them as-is.
+
+Station also receives metadata such as Scout IDs, job names, timestamps, archive sizes, checksums, and fingerprints. The files inside each archive remain encrypted on Station.
 
 When you download a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the file locally. The key is never sent to Station's server. See [Scout key](/scout/scout-key).

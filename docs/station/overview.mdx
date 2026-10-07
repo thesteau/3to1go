@@ -16,10 +16,11 @@ Station **receives and keeps** backups. Run it on one always-on host, such as a 
 - **Applies retention**, keeping the most recent snapshots per job and instance.
 - **Mints and revokes Station tokens**, so only Scouts you've authorized can upload.
 - **Checks integrity** on a schedule, if enabled.
-- **Lets you browse, download, and delete snapshots** in its web UI, decrypting downloads in your browser.
+- **Lists snapshot history and lets you download or delete snapshots** in its web UI. Your browser decrypts downloads with the Scout key you provide.
+- **Sends restore requests to a Scout**, including another device, for its operator to accept. Station doesn't decrypt the snapshot or send the Scout key.
 - **Sends notifications** to ntfy and runs your own scripts when uploads arrive.
 
-Station never sees your plaintext files, only archives Scout has already encrypted.
+Scout encrypts each archive before uploading it. Station receives the encrypted archive and metadata such as job names, timestamps, sizes, and checksums. It doesn't receive the Scout key or decrypt the files inside the archive.
 
 ## What it runs
 
