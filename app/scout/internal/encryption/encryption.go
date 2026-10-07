@@ -114,7 +114,7 @@ func EncryptFileContext(ctx context.Context, key []byte, src, dst string) error 
 	}
 	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("open plaintext: %w", err)
+		return fmt.Errorf("open source archive: %w", err)
 	}
 	defer func() { _ = in.Close() }()
 
@@ -158,7 +158,7 @@ func DecryptFile(key []byte, src, dst string) error {
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return fmt.Errorf("open plaintext: %w", err)
+		return fmt.Errorf("open decrypted archive: %w", err)
 	}
 	closeOut := true
 	defer func() {

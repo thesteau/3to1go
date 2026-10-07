@@ -8,10 +8,11 @@ Scout **makes** backups. Run one on every machine whose files you want to protec
 ## What Scout does
 
 - **Finds backup jobs** by scanning for folders that contain a `.upload_dir` marker.
-- **Detects changes** with a path-and-size fingerprint, so unchanged folders aren't uploaded again.
-- **Builds and encrypts archives** as `tar.zst` files. The key stays on Scout unless you copy it for safekeeping or browser downloads. It is never sent to Station's server.
+- **Detects changes** from file paths and sizes and empty folder paths. Edits that keep the same paths and sizes need a forced fresh backup. See [Design decisions](/concepts/design-decisions#path-and-size-fingerprinting).
+- **Builds and encrypts archives** as `tar.zst` files. Scout never sends its key to Station's server. You can copy the key for safekeeping, browser downloads, or recovery on another Scout.
 - **Uploads to Station** in chunks, resuming and retrying when the connection drops.
 - **Runs on a schedule** you set with a cron expression, weekly by default.
+- **Checks for unusual backups** and holds them for review by default. See [Unusual backups](/scout/unusual-backups).
 - **Restores snapshots** from Station back into the original folder.
 - **Sends notifications** to ntfy and runs your own scripts around each job.
 

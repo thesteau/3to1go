@@ -119,7 +119,7 @@ On a job, click **Files & exclusions** to browse its files with their sizes.
 
 ## When a job is backed up
 
-On each scheduled cycle, Scout compares the job's file paths and sizes with its last backup. It only builds and uploads a new snapshot when they differ.
+On each scheduled cycle, Scout compares the job's file paths and sizes, plus empty folder paths, with its last successful backup. It builds a new snapshot when they differ, so adding or removing an empty folder also triggers a backup. A newly built snapshot is checked for [unusual changes](/scout/unusual-backups) before upload and may be held for review.
 
 If a failed upload has a staged archive ready for retry, Scout retries that archive first. New edits and exclusions are picked up when a fresh archive is built.
 

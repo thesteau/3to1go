@@ -6,7 +6,7 @@ description: "Browse, download, and delete stored snapshots, and understand rete
 Station's main page, **Stored Snapshots**, lists every Scout, each of its instances, their jobs, and each job's snapshots. The newest snapshot of each job is tagged **latest**.
 
 <Frame caption="An expanded Scout instance with a stored snapshot in a local demo deployment.">
-  <img src="/images/workflows/station-snapshots.png" alt="Station snapshot list showing a Scout instance, decryption key controls, and Download and Delete buttons" />
+  <img src="/images/workflows/station-snapshots.png" alt="Station snapshot list showing a Scout instance, Scout key controls, and Download and Delete buttons" />
 </Frame>
 
 ## How snapshots are stored
@@ -33,7 +33,7 @@ sequenceDiagram
     Browser->>Station: Download encrypted snapshot
     Station-->>Browser: Encrypted tar.zst
     Browser->>Browser: Decrypt as it downloads
-    Browser-->>You: Plain tar.zst file
+    Browser-->>You: Decrypted tar.zst archive
     Note over Browser,Station: The key never leaves your browser
 ```
 
@@ -67,7 +67,7 @@ tar --zstd -xf photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 
 ## Restore a snapshot to Scout
 
-Choose a target device next to **Restore**, then click **Restore** on a snapshot. The original Scout is selected by default. Save that Scout’s key first for a same-device restore. For another device, supply the original snapshot’s Scout key on the receiving Scout when accepting the request. Scout's operator accepts or rejects the request in Scout. See [Restore requests from Station](/scout/restore#restore-requests-from-station).
+Click **Restore** on a snapshot to open **Restore Snapshot**, choose **Target Scout device**, then click **Request Restore**. The original Scout is selected when it's available. Save that Scout's key first for a same-device restore. Another target must already be registered with Station using a Station token; its first upload creates that registration. Supply the original snapshot's Scout key on the receiving Scout when accepting the request. Scout's operator accepts or rejects the request in Scout. See [Restore requests from Station](/scout/restore#restore-requests-from-station).
 
 ## Delete a snapshot
 

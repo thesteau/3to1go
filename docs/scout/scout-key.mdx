@@ -5,7 +5,7 @@ description: "Find, back up, and rotate the key Scout uses to encrypt every snap
 
 Each Scout creates its own Scout key on first start and encrypts every archive with it before upload. Station's server never receives the key. To download a snapshot, you paste the key into Station's UI and your browser decrypts it.
 
-<Frame caption="Only the Scout holds the key. Station keeps the boxes sealed.">
+<Frame caption="Scout encrypts snapshots with its key. Station stores them encrypted.">
   <img src="/images/gophers/scout-key.svg" alt="A Scout gopher holds a gold key next to a sealed, locked box." />
 </Frame>
 
@@ -24,19 +24,19 @@ Scout also shows the key's **fingerprint**, which Station uses to catch a wrongl
 
 ## Back it up
 
-Keep the copied key somewhere that survives losing this machine, such as a password manager. Even better, back up the whole `config` folder, which also holds the instance ID needed to [restore through Scout](/scout/restore#rebuilding-a-lost-machine).
+Keep the copied key somewhere that survives losing this machine, such as a password manager. Even better, back up the whole `config` folder, which also preserves Scout's instance ID and saved settings so a replacement can continue using the same snapshot history. You can also restore to a fresh Scout with the original key. See [Rebuilding a lost machine](/scout/restore#rebuilding-a-lost-machine).
 
 ## When you need it
 
 - **Downloading from Station's UI.** Station asks for the key and decrypts the snapshot in your browser. See [Download a snapshot](/station/snapshots#download-a-snapshot).
-- **Restoring from Scout.** Scout uses its current key automatically. See [Restore](/scout/restore).
+- **Restoring from Scout.** Local job restores use Scout's current key automatically. For a Station restore request targeting another device, provide the original snapshot's Scout key on the receiving Scout. See [Restore](/scout/restore).
 
 ## Rotate the key
 
 **Rotate** creates a new key for archives built from then on. Snapshots already on Station keep the old key, and staged archives aren't rebuilt.
 
 <Warning>
-  After rotating, old snapshots are hard to recover. Scout restores only with the new key. Station's UI only accepts the key Scout reported most recently, and that switches to the new key on Scout's next upload. Download anything you need **before** rotating.
+  After rotating, local job restores and same-device restore requests use the new key and cannot decrypt old snapshots. Station's UI only accepts the key Scout reported most recently, and that switches to the new key on Scout's next upload. Download anything you need **before** rotating, and keep the old key. A restore request targeting another Scout can still use the old key when you provide it on that Scout.
 </Warning>
 
 <Steps>
