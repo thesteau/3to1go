@@ -40,6 +40,14 @@
         <h2>Stored Snapshots</h2>
         <p class="hint">Read straight from the backup folder.</p>
       </div>
+      <label for="snapshot-search">Search backups <span class="hover-hint" tabindex="0" aria-label="Search Scout, instance, or job names, dates, and archive sizes. Combine terms with AND, for example immich and 2026 or immich 100MB-2GB. Dates use your browser's timezone. See the Search guide for details." title="Search Scout, instance, or job names, dates, and archive sizes. Combine terms with AND, for example immich and 2026 or immich 100MB-2GB. Dates use your browser's timezone. See the Search guide for details.">?</span></label>
+      <div class="snapshot-search-controls">
+        <input id="snapshot-search" type="search" placeholder="immich and 2026, 2026-10-07, or 100MB-2GB" oninput="applySnapshotSearch()" aria-describedby="snapshot-search-status">
+        <button id="snapshot-search-clear" type="button" class="secondary" disabled onclick="clearSnapshotSearch()">Clear</button>
+        <a href="https://3to1go.docs.thesteau.com/station/snapshots#search-backups" target="_blank" rel="noopener noreferrer">Search guide</a>
+      </div>
+      <p id="snapshot-search-status" class="hint" role="status" aria-live="polite"></p>
+      <p id="snapshot-search-empty" class="hint" hidden>No stored snapshots match your search.</p>
       <div id="namespaces" class="namespaces-list"><div class="section-loading" role="status"><span class="section-spinner" aria-hidden="true"></span><span>Loading…</span></div></div>
     </section>
   </main>
@@ -75,6 +83,7 @@
   <script defer src="/static/js/station/static/ts/instances.js"></script>
   <script defer src="/static/js/station/static/ts/verification.js"></script>
   <script defer src="/static/js/station/static/ts/overview.js"></script>
+  <script defer src="/static/js/station/static/ts/snapshot-search.js"></script>
   <script defer src="/static/js/station/static/ts/app.js"></script>
 </body>
 </html>

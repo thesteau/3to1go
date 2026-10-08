@@ -1,5 +1,13 @@
 .namespaces-list { display: grid; gap: 14px; }
 
+.snapshot-search-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.snapshot-search-controls input { flex: 1; min-width: 180px; }
+.snapshot-search-controls a { color: var(--accent); white-space: nowrap; }
+.snapshot-search-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+#snapshot-search-status.error { color: var(--red); }
+/* Explicitly hide filtered flex/grid containers as well as ordinary elements. */
+#namespaces [hidden] { display: none; }
+
 .scout-card {
   background: var(--surface-soft);
   border: 1px solid var(--border);

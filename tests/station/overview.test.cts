@@ -18,7 +18,7 @@ function overviewContext(fetch, { rendered = false, ...overrides } = {}) {
     fillSettings() {},
     ...overrides,
   });
-  for (const feature of ["utils", "keys", "verification", "overview"]) {
+  for (const feature of ["utils", "keys", "verification", "overview", "snapshot-search"]) {
     loadFeature(ctx, "station", feature);
   }
   ctx.updateOverviewDom = () => {};

@@ -9,6 +9,10 @@ interface BrowserFileRowOptions {
   selection?: { checked: boolean; disabled: boolean; label: string; change: (checked: boolean) => void };
 }
 
+function fileBrowserMatchesPath(path: string, search: string): boolean {
+  return path.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+}
+
 function fileBrowserButton(
   parent: HTMLElement,
   label: string,

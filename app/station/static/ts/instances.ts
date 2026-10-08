@@ -65,7 +65,7 @@ function renderInstanceCard(scoutId: string, instance: ScoutInstance): string {
         jobs
           .map(
             (job) => `
-        <div class="job-block">
+        <div class="job-block" data-job-name="${escapeHtml(job.job_name)}">
           <div class="job-header">
             <div class="job-header-main">
               <span class="job-name">${escapeHtml(job.job_name)}</span>

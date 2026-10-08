@@ -157,7 +157,7 @@ function visibleSnapshotEntries(view: SnapshotView): { entry: SnapshotArchiveEnt
   if (search)
     return entries
       .map((entry, index) => ({ entry, index, depth: 0 }))
-      .filter(({ entry }) => entry.path.toLocaleLowerCase().includes(search))
+      .filter(({ entry }) => fileBrowserMatchesPath(entry.path, search))
       .sort((a, b) => a.entry.path.localeCompare(b.entry.path));
   const visible: { entry: SnapshotArchiveEntry; index: number; depth: number }[] = [];
   const stack = (view.folders.get("") || []).map((index) => ({ index, depth: 0 })).reverse();

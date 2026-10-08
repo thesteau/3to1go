@@ -328,6 +328,7 @@ async function fetchOverview({
 
     updateOverviewDom(document.getElementById("namespaces")!, overviewHtml);
     _overviewHasData = true;
+    applySnapshotSearch();
     Promise.allSettled(
       allInstances
         .filter(({ instance }) => instance.scout_instance_id)

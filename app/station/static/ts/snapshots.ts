@@ -261,7 +261,7 @@ function renderSnapshots(
       const fp = parseFingerprint(name) || "";
       const isLatest = idx === 0;
       return `
-      <div class="snapshot-row">
+      <div class="snapshot-row" data-snapshot-name="${escapeHtml(name)}" data-size-bytes="${escapeHtml(String(snap.size_bytes ?? ""))}">
         <div class="snapshot-meta">
           <span class="snapshot-date">${escapeHtml(date)}</span>
           ${fp ? renderClipValue("FP", fp, { className: "snapshot-fp", clipLength: 18 }) : ""}
