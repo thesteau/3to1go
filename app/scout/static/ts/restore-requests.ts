@@ -72,14 +72,16 @@ function renderRestoreRequests(requests: StationRestoreRequest[]): void {
       <p>${escapeHtml(request.filename)}</p>
       ${request.source_scout_id ? `<p class="hint">Source: ${escapeHtml(request.source_scout_id)} / ${escapeHtml(request.source_instance_id || "")}</p>` : ""}
       <p class="hint">Requested ${escapeHtml(new Date(request.created_at).toLocaleString())}${request.status === "accepted" ? " · Accepted; retry restoration or reject to dismiss" : ""}</p>
+      <form method="post" ${NON_LOGIN_AUTOFILL_ATTRIBUTES} onsubmit="event.preventDefault();">
       <label>Folder name (optional rename)
         <input type="text" id="restore-destination-${escapeHtml(request.id)}" placeholder="${escapeHtml(request.job_name)}" autocomplete="off">
       </label>
-      ${request.source_scout_id && (request.source_scout_id !== request.scout_id || request.source_instance_id !== request.scout_instance_id) ? `<label>Original snapshot's Scout key (required)<input type="text" class="secret-value" id="restore-key-${escapeHtml(request.id)}" autocomplete="off" spellcheck="false" autocapitalize="none"></label>` : ""}
+      ${request.source_scout_id && (request.source_scout_id !== request.scout_id || request.source_instance_id !== request.scout_instance_id) ? `<label>Original snapshot's Scout key (required)<input type="text" name="scout-key" class="secret-value" id="restore-key-${escapeHtml(request.id)}" ${NON_LOGIN_AUTOFILL_ATTRIBUTES} spellcheck="false" autocapitalize="none"></label>` : ""}
       <div class="restore-request-actions">
         <button type="button" onclick="decideStationRestore(${inlineString(request.id)},'accept',this)">${request.status === "accepted" ? "Retry Restore" : "Accept"}</button>
         <button type="button" class="secondary" onclick="decideStationRestore(${inlineString(request.id)},'reject',this)">Reject</button>
       </div>
+      </form>
     </article>`,
       )
       .join("") || '<p class="hint">No pending restore requests.</p>';

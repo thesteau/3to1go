@@ -23,7 +23,10 @@ function restoreContext(overrides = {}) {
     },
     ...overrides,
   });
+  const uiStubs = { setStatus: ctx.setStatus, setButtonBusy: ctx.setButtonBusy, confirmApp: ctx.confirmApp };
   loadFeature(ctx, "scout", "utils");
+  loadFeature(ctx, "scout", "ui");
+  Object.assign(ctx, uiStubs);
   loadFeature(ctx, "scout", "restore-requests");
   return { ctx, elements, messages, calls };
 }

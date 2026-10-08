@@ -13,6 +13,11 @@ const TOAST_DURATION_MS = 8000;
 const TOAST_FADE_MS = 420;
 let _appDialogResolve: ((confirmed: boolean) => void) | null = null;
 
+// These values are app data, not sign-in credentials. Render the hints before
+// focus: password managers can cache their first classification of a field.
+const NON_LOGIN_AUTOFILL_ATTRIBUTES =
+  'autocomplete="off" data-1p-ignore="true" data-op-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"';
+
 function normalizeTheme(theme: string | undefined): "light" | "dark" {
   return theme === "light" ? "light" : "dark";
 }

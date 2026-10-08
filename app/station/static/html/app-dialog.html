@@ -6,10 +6,10 @@
         <p class="hint" id="app-dialog-message"></p>
       </div>
     </div>
-    <div id="app-dialog-input-wrap" class="app-dialog-input-wrap">
+    <form id="app-dialog-input-wrap" class="app-dialog-input-wrap" method="post" autocomplete="off" data-1p-ignore="true" data-op-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other" onsubmit="event.preventDefault(); resolveAppDialog(true);">
       <label id="app-dialog-input-label" for="app-dialog-input"></label>
-      <input id="app-dialog-input" type="text">
-    </div>
+      <input id="app-dialog-input" name="app-value" type="text" autocomplete="off" spellcheck="false" autocapitalize="none" data-1p-ignore="true" data-op-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other">
+    </form>
     <div class="toolbar modal-actions">
       <button id="app-dialog-confirm" type="button" onclick="resolveAppDialog(true)">Continue</button>
       <button id="app-dialog-cancel" type="button" class="secondary" onclick="resolveAppDialog(false)">Cancel</button>

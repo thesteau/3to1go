@@ -10,6 +10,12 @@ cleanup, settings payloads, and refresh behavior in the application's `static/ts
 Shared feature functions can call local functions such as `renderCertificateFiles`
 or `loadHookConfig`; both applications must supply those functions.
 
+`NON_LOGIN_AUTOFILL_ATTRIBUTES` in `ui.ts` keeps password-manager ignore hints
+consistent when rendering Scout keys and other values that aren't sign-in
+credentials. Static controls declare the same hints in their HTML, before a
+password manager can classify them. Login and password-change fields keep their
+standard credential autocomplete settings.
+
 `files.ts` provides file-table rows, safe names, sizes, selection controls, and
 expandable-folder controls for Scout's live file browser and Station's snapshot
 viewer. Each app supplies its own data, loading behavior, and row actions.
