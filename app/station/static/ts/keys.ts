@@ -7,6 +7,7 @@ let _keySessionGeneration = 0;
 function clearSessionEncKeys(): void {
   // Invalidate key validation and prompts already in flight as well as stored keys.
   _keySessionGeneration += 1;
+  if (typeof closeSnapshotView === "function") closeSnapshotView();
   for (const key of Object.keys(_encKeys)) delete _encKeys[key];
   for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
     const key = sessionStorage.key(index);
@@ -49,6 +50,7 @@ function clearStoredEncKey(scoutId: string, scoutInstanceId: string | null | und
   const keyId = buildScoutKeyId(scoutId, scoutInstanceId);
   delete _encKeys[keyId];
   sessionStorage.removeItem(`3to1go_enc_${keyId}`);
+  if (typeof closeSnapshotViewForKey === "function") closeSnapshotViewForKey(keyId);
 }
 
 function keyInputElement(scoutId: string, scoutInstanceId: string | null | undefined): HTMLInputElement | null {

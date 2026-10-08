@@ -1,13 +1,33 @@
 ---
 title: "Snapshots"
-description: "Browse, download, and delete stored snapshots, and understand retention and integrity checks."
+description: "Search backups across Scouts, browse snapshot files, download selections, restore or delete snapshots, and understand retention and integrity checks."
 ---
 
 Station's main page, **Stored Snapshots**, lists every Scout, each of its instances, their jobs, and each job's snapshots. The newest snapshot of each job is tagged **latest**.
 
-<Frame caption="An expanded Scout instance with a stored snapshot in a local demo deployment.">
-  <img src="/images/workflows/station-snapshots.png" alt="Station snapshot list showing a Scout instance, Scout key controls, and Download and Delete buttons" />
+<Frame caption="Backup search finding Immich snapshots across two Scouts in a local demo deployment.">
+  <img src="/images/workflows/station-snapshots.png" alt="Station searching for immich and 2026 across Scouts, with Scout key controls and Download, View, Restore, and Delete buttons" />
 </Frame>
+
+## Search backups
+
+Use **Search backups** above the snapshot list to find a stored backup across all Scouts and instances. Matching snapshots appear under their Scout and job, and matching Scout cards expand automatically. **Clear** shows the full list again.
+
+Type a Scout ID, instance ID, job name, or snapshot filename. Text matches are case-insensitive and can match part of a name. Combine words, dates, and sizes in the same field: every term must match the same snapshot. Spaces mean AND; writing `and` or `AND` between terms is optional.
+
+| Search | Finds |
+| --- | --- |
+| `immich` | Snapshots with `immich` in their job, Scout, instance, or filename |
+| `immich and 2026` | Immich snapshots from 2026, across all Scouts |
+| `2026-10` | Snapshots from October 2026 |
+| `2026-10-07` | Snapshots from October 7, 2026 |
+| `100MB-2GB` | Snapshots whose stored archive size is between 100 MB and 2 GB, including both limits |
+| `immich >=500MB <2GB` | Immich snapshots at least 500 MB and smaller than 2 GB |
+| `scout-home immich 2026` | Immich snapshots from 2026 on a Scout whose ID contains `scout-home` |
+
+Dates accept `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` and use your browser's timezone, matching the date displayed in the list. Sizes refer to the stored archive, including its encryption overhead, rather than the original files. Use `B`, `KB`, `MB`, `GB`, or `TB` (case-insensitive); `KiB`, `MiB`, `GiB`, and `TiB` also work. As in the UI's size display, each step is 1024. Put a unit on both ends of a range. Spaces around units and operators are allowed, such as `100 MB - 2 GB`. Comparisons support `>`, `>=`, `<`, `<=`, and `=`; a size without an operator matches that exact byte size.
+
+Search uses Station's snapshot metadata and doesn't require a Scout key. Once you find a backup, click **View** and supply its Scout key to browse or search paths inside it. Hover over **?** beside the search label for a quick reminder, or follow **Search guide** for these details.
 
 ## How snapshots are stored
 
@@ -64,6 +84,19 @@ tar --zstd -xf photos__2026-09-30T02-00-00Z__abcdef12.tar.zst
 <Tip>
   To put files back on the original machine, [restore from Scout](/scout/restore) instead. It downloads, decrypts, and extracts for you.
 </Tip>
+
+## View and download individual files
+
+The snapshot buttons are **Download**, **View**, **Restore**, and **Delete**. Click **View** to open a popup with the snapshot's folders and files. Supply that Scout's **Scout key**, or use the key already saved in the tab. The key never leaves your browser.
+
+Station downloads and decrypts the full snapshot in your browser before showing its contents. Large snapshots can take time to open and need enough browser storage and memory for the expanded archive. Closing the popup releases its contents and cancels work still in progress. Clearing the Scout key or signing out also closes it.
+
+- Click a folder to expand or collapse it in place, just like Scout's file browser, or search for a path across the whole snapshot.
+- Click a file name to preview text or supported images. Other files can still be downloaded. Text previews show up to 2 MB; image previews support PNG, JPEG, GIF, WebP, BMP, AVIF, and ICO files up to 10 MB. HTML and SVG are shown as text.
+- Click a file's **Download** button to save that file, or use the checkboxes and **Download selected**. Selections stay selected when expanding or collapsing folders or searching. **Select shown files** selects the files on the current page.
+- One or two selected files download individually. Your browser may ask you to allow multiple downloads for two files. Three or more download as one ZIP containing their relative folder paths.
+
+The existing **Download** button still saves the entire decrypted `tar.zst` snapshot.
 
 ## Restore a snapshot to Scout
 

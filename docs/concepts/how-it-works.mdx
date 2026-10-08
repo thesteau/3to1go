@@ -41,7 +41,7 @@ The addresses are examples. Each Scout sets its **Station URL** to the same Stat
     Station checks the upload, stores it under `scout_id/scout_instance_id/job_name`, and prunes older snapshots for that instance.
   </Step>
   <Step title="You browse, download, or restore">
-    Download snapshots from Station's UI (decrypted in your browser) or restore them from Scout.
+    [Search backups across Scouts](/station/snapshots#search-backups) in Station, then download a whole snapshot or [view and download individual files](/station/snapshots#view-and-download-individual-files), decrypted in your browser with the Scout key. Restore from Scout, or send a restore request from Station.
   </Step>
 </Steps>
 
@@ -81,4 +81,4 @@ Each Scout generates its own `encryption.key` on first run and encrypts every ar
 
 Station also receives metadata such as Scout IDs, job names, timestamps, archive sizes, checksums, and fingerprints. The files inside each archive remain encrypted on Station.
 
-When you download a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the file locally. The key is never sent to Station's server. See [Scout key](/scout/scout-key).
+When you download or view a snapshot in Station's UI, your browser asks for that Scout's key, checks it against the fingerprint Scout reported, and decrypts the archive locally. The key is never sent to Station's server. Searching backup metadata doesn't need the key; browsing paths or previewing files inside a snapshot does. See [Scout key](/scout/scout-key).

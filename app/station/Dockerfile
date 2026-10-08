@@ -9,7 +9,8 @@ COPY tsconfig.base.json ./
 COPY shared/ts ./shared/ts
 COPY station/static/tsconfig.json ./station/static/
 COPY station/static/ts ./station/static/ts
-RUN npx tsc -p station/static
+COPY station/static/copy-libs.cts ./station/static/
+RUN npm run build:station
 
 # Runs on the build machine and cross-compiles for each target platform. With
 # CGO off, Go needs no emulation, which is far faster than building on QEMU.
