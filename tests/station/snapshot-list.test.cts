@@ -26,3 +26,10 @@ test("snapshots with an unusual size show a badge explaining why", () => {
   );
   assert.doesNotMatch(html, /<b>/, "the reason is escaped");
 });
+
+test("snapshot actions keep Download, View, Restore, Delete in that order", () => {
+  const html = renderSnapshots([{ name: "docs.tar.zst", size_bytes: 500 }]);
+  const labels = [...html.matchAll(/>(Download|View|Restore|Delete)<\/button>/g)].map((match) => match[1]);
+  assert.deepEqual(labels, ["Download", "View", "Restore", "Delete"]);
+  assert.match(html, /openSnapshotView\(/);
+});

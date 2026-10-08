@@ -71,47 +71,23 @@ async function browseFiles(path: string): Promise<void> {
 }
 
 function fileBrowserRow(entry: BrowseEntry, depth: number): HTMLTableRowElement {
-  const row = document.createElement("tr");
-  const cell = (text = "") => {
-    const element = document.createElement("td");
-    element.textContent = text;
-    row.appendChild(element);
-    return element;
-  };
-  const button = (parent: HTMLElement, label: string, action: (element: HTMLButtonElement) => unknown) => {
-    const element = document.createElement("button");
-    element.type = "button";
-    element.className = "secondary";
-    element.textContent = label;
-    element.onclick = () => action(element);
-    parent.appendChild(element);
-    return element;
-  };
   const expandable = entry.kind === "directory" && entry.reason !== "Scout runtime data";
-  const name = cell();
-  if (depth > 0) name.style.paddingLeft = `${depth * 1.25 + 0.75}rem`;
+  const { row, size, details, actions } = browserFileRow({
+    name: entry.name,
+    kind: entry.kind,
+    size: entry.kind === "file" ? entry.size : undefined,
+    depth,
+    details: entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"),
+    folder: expandable ? { expanded: false, toggle: (toggle) => toggleFolder(entry, depth, row, toggle) } : undefined,
+  });
   if (expandable) {
-    const toggle = button(name, `▸ ${entry.name}`, () => toggleFolder(entry, depth, row, toggle));
-    toggle.setAttribute("aria-expanded", "false");
-  } else {
-    name.textContent = entry.name;
+    size.textContent = "";
+    fileBrowserButton(size, "Calculate size", (btn) => calculateFolderSize(entry.relative_path, btn));
   }
-  cell(entry.kind);
-  const sizeCell = cell();
-  if (expandable) {
-    button(sizeCell, "Calculate size", (btn) => calculateFolderSize(entry.relative_path, btn));
-  } else if (entry.kind === "file") {
-    sizeCell.textContent = formatBytes(entry.size);
-    sizeCell.title = `${entry.size.toLocaleString()} bytes`;
-  } else {
-    sizeCell.textContent = "—";
-  }
-  const reason = cell(entry.reason || (entry.job_path ? `Included in ${entry.job_path}` : "No parent backup job"));
-  const actions = cell();
   if (entry.job_path && !entry.excluded && currentUser?.is_admin) {
-    button(actions, "Exclude", (btn) => excludeFilePath(entry.relative_path, btn));
+    fileBrowserButton(actions, "Exclude", (btn) => excludeFilePath(entry.relative_path, btn));
   }
-  fileBrowserRows.set(entry.relative_path, { row, reason, actions });
+  fileBrowserRows.set(entry.relative_path, { row, reason: details!, actions });
   return row;
 }
 
@@ -124,15 +100,13 @@ async function toggleFolder(
 ): Promise<void> {
   const path = entry.relative_path;
   if (fileBrowserExpanded.has(path)) {
-    fileBrowserExpanded.delete(path);
+    collapseFileBrowserFolders(fileBrowserExpanded, path);
     for (const [rowPath, child] of fileBrowserRows) {
       if (!rowPath.startsWith(`${path}/`)) continue;
       child.row.remove();
       fileBrowserRows.delete(rowPath);
-      fileBrowserExpanded.delete(rowPath);
     }
-    toggle.textContent = `▸ ${entry.name}`;
-    toggle.setAttribute("aria-expanded", "false");
+    setFileBrowserFolderLabel(toggle, entry.name, false);
     return;
   }
   const request = fileBrowserRequest;
@@ -143,8 +117,7 @@ async function toggleFolder(
     if (request !== fileBrowserRequest || !fileBrowserRows.has(path)) return;
     fileBrowserExpanded.add(path);
     row.after(...entries.map((child) => fileBrowserRow(child, depth + 1)));
-    toggle.textContent = `▾ ${entry.name}`;
-    toggle.setAttribute("aria-expanded", "true");
+    setFileBrowserFolderLabel(toggle, entry.name, true);
     if (!entries.length) setStatus("files-status", `${entry.name} is empty.`, "info");
   } catch (error) {
     if (request === fileBrowserRequest) setStatus("files-status", (error as Error).message, "error");

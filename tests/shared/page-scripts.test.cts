@@ -7,7 +7,24 @@ const vm = require("node:vm");
 function loadPageScripts(app) {
   const base = path.join(__dirname, "..", "..", "app", app, "static");
   const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
-  const ctx = vm.createContext({ window: { fetch() {} } });
+  const ctx = vm.createContext({
+    window: { fetch() {} },
+    Blob,
+    Response,
+    TextEncoder,
+    TextDecoder,
+    TransformStream,
+    ReadableStream,
+    WritableStream,
+    CompressionStream,
+    DecompressionStream,
+    crypto: globalThis.crypto,
+    atob,
+    btoa,
+    setTimeout,
+    clearTimeout,
+    structuredClone,
+  });
   // App startup needs a live DOM; load its dependencies in the real page order.
   for (const [, file] of html.matchAll(/<script defer src="\/static\/js\/([^"]+)"/g)) {
     const source = fs.readFileSync(path.join(base, "js", file), "utf8");
@@ -77,7 +94,12 @@ test("Station snapshot and instance actions preserve quoted identifiers", () => 
   const job = "job');throw new Error('unexpected');//";
   const name = "snapshot's.tar.zst";
   const calls = [];
-  const snapshotActions = new Set(["downloadSnapshot", "deleteSnapshot", "openSnapshotRestoreDialog"]);
+  const snapshotActions = new Set([
+    "downloadSnapshot",
+    "openSnapshotView",
+    "deleteSnapshot",
+    "openSnapshotRestoreDialog",
+  ]);
   for (const action of [
     ...snapshotActions,
     "deleteInstance",
@@ -93,7 +115,7 @@ test("Station snapshot and instance actions preserve quoted identifiers", () => 
     jobs: [{ job_name: job, snapshots: [{ name }] }],
   });
   for (const handler of handlers(html)) vm.runInContext(handler, ctx);
-  assert.equal(calls.length, 7);
+  assert.equal(calls.length, 8);
   for (const [action, ...args] of calls) {
     assert.deepEqual(args, snapshotActions.has(action) ? [scout, instance, job, name] : [scout, instance]);
   }

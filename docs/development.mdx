@@ -166,7 +166,7 @@ Report vulnerabilities using the repository's [security policy](https://github.c
 
 Edit TypeScript in `app/station/static/ts`, `app/scout/static/ts`, or `app/shared/ts`. Each app compiles the shared scripts along with its own. They're classic scripts that share one global scope per app, so inline HTML handlers can call their functions. Don't add `import` or `export`.
 
-Go embeds the generated `app/station/static/js` and `app/scout/static/js`, so generate them before `go build` or `go test` with `npm --prefix app run build` at the root, or `go generate ./...` in an app folder. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
+Go embeds the generated `app/station/static/js` and `app/scout/static/js`, so generate them before `go build` or `go test` with `npm --prefix app run build` at the root, or `go generate ./...` in an app folder. Station's build also copies its pinned Zstandard decoder and ZIP library from npm into `static/js/vendor`, including their licenses; the file viewer serves them locally. They're gitignored. Don't edit or commit them or any other JavaScript (`.js`, `.mjs`, `.cjs`, `.jsx`, or source maps). CI rejects it.
 
 For continuous compilation, use `npm --prefix app run watch` (Station) or `npm --prefix app run watch:scout` (Scout), then rebuild and restart the Go server to serve the new assets.
 
