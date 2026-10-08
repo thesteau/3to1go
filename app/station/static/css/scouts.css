@@ -2,7 +2,7 @@
 
 .snapshot-search-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .snapshot-search-controls input { flex: 1; min-width: 180px; }
-.snapshot-search-controls a { color: var(--accent); white-space: nowrap; }
+.snapshot-search-controls button { white-space: nowrap; }
 .snapshot-search-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
 #snapshot-search-status.error { color: var(--red); }
 /* Explicitly hide filtered flex/grid containers as well as ordinary elements. */

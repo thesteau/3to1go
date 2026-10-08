@@ -13,14 +13,14 @@ function renderKeyManager(ns: {
         <strong>Scout Key</strong>
         ${renderStaticClipValue("Expected key fingerprint", expectedFingerprint || "unknown", { className: "scout-detail", clipLength: 24 })}
       </div>
-      <div class="scout-key-controls">
+      <form class="scout-key-controls" method="post" ${NON_LOGIN_AUTOFILL_ATTRIBUTES} onsubmit="event.preventDefault(); rememberEncKey(${inlineString(scoutId)},${inlineString(scoutInstanceId)});">
         <input
-          type="text" class="secret-value" autocomplete="off" spellcheck="false" autocapitalize="none"
+          type="text" name="scout-key" class="secret-value" ${NON_LOGIN_AUTOFILL_ATTRIBUTES} spellcheck="false" autocapitalize="none" aria-label="Scout key"
           placeholder="Paste the Scout key"
           data-scout-key-input="${escapeHtml(scoutKeyId)}">
         <button class="btn btn-key" type="button" onclick="rememberEncKey(${inlineString(scoutId)},${inlineString(scoutInstanceId)})">Save Key</button>
         <button class="btn btn-clear" type="button" onclick="clearEncKey(${inlineString(scoutId)},${inlineString(scoutInstanceId)})">Clear</button>
-      </div>
+      </form>
       <div class="key-status info" data-scout-key-status="${escapeHtml(scoutKeyId)}"></div>
     </div>
   `;
