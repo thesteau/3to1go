@@ -1,8 +1,8 @@
 {
-  "version": "1.3.4",
-  "tag": "v1.3.4",
-  "prodSha": "374f2573d63a59858c1d55fc2b8a636032388737",
-  "previousTag": "v1.3.3",
-  "previousSha": "7b1e9c190413ca7cd2fd78da663ea6cca3154729",
-  "notes": "## [1.3.4](https://github.com/thesteau/3to1go/compare/v1.3.3...v1.3.4) (2026-10-08)\n\n\n### Bug Fixes\n\n* Security review fixes ([#109](https://github.com/thesteau/3to1go/issues/109)) ([374f257](https://github.com/thesteau/3to1go/commit/374f2573d63a59858c1d55fc2b8a636032388737))"
+  "version": "1.4.0",
+  "tag": "v1.4.0",
+  "prodSha": "aa6532d421b02096b57a58a1e3b78bdb9fb57f19",
+  "previousTag": "v1.3.4",
+  "previousSha": "374f2573d63a59858c1d55fc2b8a636032388737",
+  "notes": "## [1.4.0](https://github.com/thesteau/3to1go/compare/v1.3.4...v1.4.0) (2026-10-08)\n\n\n### Features\n\n* add Station view and station search ([#112](https://github.com/thesteau/3to1go/issues/112)) ([685a305](https://github.com/thesteau/3to1go/commit/685a305433c054850560f612bbe019b0a8457dfc))\n\n\n### Bug Fixes\n\n* query bugs from the station view ([#115](https://github.com/thesteau/3to1go/issues/115)) ([aa6532d](https://github.com/thesteau/3to1go/commit/aa6532d421b02096b57a58a1e3b78bdb9fb57f19))"
 }

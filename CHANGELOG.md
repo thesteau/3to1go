@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/thesteau/3to1go/compare/v1.3.4...v1.4.0) (2026-10-08)
+
+
+### Features
+
+* add Station view and station search ([#112](https://github.com/thesteau/3to1go/issues/112)) ([685a305](https://github.com/thesteau/3to1go/commit/685a305433c054850560f612bbe019b0a8457dfc))
+
+
+### Bug Fixes
+
+* query bugs from the station view ([#115](https://github.com/thesteau/3to1go/issues/115)) ([aa6532d](https://github.com/thesteau/3to1go/commit/aa6532d421b02096b57a58a1e3b78bdb9fb57f19))
+
 ## [1.3.4](https://github.com/thesteau/3to1go/compare/v1.3.3...v1.3.4) (2026-10-08)
 
 
