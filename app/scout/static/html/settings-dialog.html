@@ -49,7 +49,9 @@
     <input id="settings_advertised_url" placeholder="https://scout.example.com" data-requires="settings" disabled>
 
     <label for="settings_scout_credential">Station Token</label>
-    <input id="settings_scout_credential" type="text" class="secret-value" autocomplete="off" spellcheck="false" autocapitalize="none" placeholder="Minted on Station" data-requires="settings" disabled>
+    <form method="post" autocomplete="off" data-1p-ignore="true" data-op-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other" onsubmit="event.preventDefault();">
+      <input id="settings_scout_credential" name="station-token" type="text" class="secret-value" autocomplete="off" spellcheck="false" autocapitalize="none" data-1p-ignore="true" data-op-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other" placeholder="Minted on Station" data-requires="settings" disabled>
+    </form>
 
     <label for="settings_cron_schedule">Cron Schedule</label>
     <input id="settings_cron_schedule" placeholder="0 2 * * 0" data-requires="settings" disabled>

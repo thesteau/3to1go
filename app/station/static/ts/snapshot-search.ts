@@ -191,3 +191,7 @@ function clearSnapshotSearch(): void {
   applySnapshotSearch();
   input.focus();
 }
+
+function openSnapshotSearchGuide(): void {
+  window.open("https://3to1go.docs.thesteau.com/station/snapshots#search-backups", "_blank", "noopener,noreferrer");
+}
