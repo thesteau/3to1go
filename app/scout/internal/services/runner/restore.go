@@ -45,7 +45,7 @@ func restoreDestination(scanRoot, relativePath string) (string, error) {
 		return "", err
 	}
 	relativePath = filepath.Clean(filepath.FromSlash(relativePath))
-	if relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+	if !filepath.IsLocal(relativePath) {
 		return "", fmt.Errorf("destination must remain within scan root")
 	}
 	current := root

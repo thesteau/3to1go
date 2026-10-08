@@ -64,10 +64,11 @@ func (d *DirectoryService) resolveBrowsePath(relativePath string) (string, strin
 	if relativePath == "" {
 		relativePath = "."
 	}
-	if relativePath != "." && !filepath.IsLocal(filepath.FromSlash(relativePath)) {
+	relativePath = filepath.FromSlash(relativePath)
+	if !filepath.IsLocal(relativePath) {
 		return "", "", fmt.Errorf("path must remain within scan root")
 	}
-	path := filepath.Join(root, filepath.FromSlash(relativePath))
+	path := filepath.Join(root, relativePath)
 	realRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return "", "", err

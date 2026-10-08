@@ -519,22 +519,9 @@ func (d *DirectoryService) serializeDirectory(dir string) (DirectoryEntry, error
 }
 
 func (d *DirectoryService) resolveDirectory(relativePath string) (string, error) {
-	scanRoot, err := filepath.Abs(d.settings.ScanRoot)
+	_, candidate, err := d.resolveBrowsePath(relativePath)
 	if err != nil {
 		return "", err
-	}
-	var candidate string
-	if relativePath == "." || relativePath == "" {
-		candidate = scanRoot
-	} else {
-		candidate = filepath.Join(scanRoot, filepath.FromSlash(relativePath))
-	}
-	candidate, err = filepath.Abs(candidate)
-	if err != nil {
-		return "", err
-	}
-	if !strings.HasPrefix(candidate+string(filepath.Separator), scanRoot+string(filepath.Separator)) && candidate != scanRoot {
-		return "", fmt.Errorf("path must remain within scan root")
 	}
 	fi, err := os.Stat(candidate)
 	if err != nil || !fi.IsDir() {

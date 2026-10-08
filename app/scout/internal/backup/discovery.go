@@ -120,7 +120,21 @@ func LoadJobDefinition(dir, markerPath string, warnf func(string, ...any)) (*Job
 
 // ReadUploadDirPayload reads and parses the YAML content of a .upload_dir file.
 func ReadUploadDirPayload(markerPath string) (map[string]any, error) {
-	raw, err := os.ReadFile(markerPath)
+	dir, err := os.OpenRoot(filepath.Dir(markerPath))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = dir.Close() }()
+	name := filepath.Base(markerPath)
+	info, err := dir.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("backup settings must be a regular file")
+	}
+	// Rooted reads also reject an escaping symlink substituted after Lstat.
+	raw, err := dir.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +205,19 @@ func WriteUploadDir(dir string, payload map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, UploadDirFilename), out, 0o644)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	info, err := root.Lstat(UploadDirFilename)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("backup settings must be a regular file")
+	}
+	return root.WriteFile(UploadDirFilename, out, 0o644)
 }
 
 // DeleteUploadDir removes the .upload_dir marker from a directory.

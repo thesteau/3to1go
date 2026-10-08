@@ -63,11 +63,13 @@ func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:   a.CookieName,
-		Value:  "",
-		MaxAge: -1,
-		Path:   "/",
-		Secure: httpx.SessionCookieSecure(),
+		Name:     a.CookieName,
+		Value:    "",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+		Path:     "/",
+		Secure:   httpx.SessionCookieSecure(),
 	})
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
