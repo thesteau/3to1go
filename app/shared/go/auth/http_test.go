@@ -30,6 +30,34 @@ func (s *sessionStore) UserForSession(_ context.Context, token string) (*User, e
 	return s.user, nil
 }
 
+func (s *sessionStore) DeleteSession(_ context.Context, token string) error {
+	s.token = token
+	return nil
+}
+
+func TestLogoutCookieAttributes(t *testing.T) {
+	for _, secure := range []string{"true", "false"} {
+		t.Run(secure, func(t *testing.T) {
+			t.Setenv("SESSION_COOKIE_SECURE", secure)
+			store := &sessionStore{}
+			h := &Handler{Store: store, CookieName: "session"}
+			request := httptest.NewRequest("POST", "/api/session/logout", nil)
+			request.AddCookie(&http.Cookie{Name: "session", Value: "session-token"})
+			response := httptest.NewRecorder()
+			h.Logout(response, request)
+			cookies := response.Result().Cookies()
+			if response.Code != http.StatusOK || len(cookies) != 1 || store.token != "session-token" {
+				t.Fatalf("logout: %d, cookies: %v, deleted token: %q", response.Code, cookies, store.token)
+			}
+			cookie := cookies[0]
+			if cookie.Name != "session" || cookie.Value != "" || cookie.MaxAge != -1 || cookie.Path != "/" ||
+				!cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Secure != (secure == "true") {
+				t.Fatalf("logout cookie: %+v", cookie)
+			}
+		})
+	}
+}
+
 func TestSessionCookieIsolation(t *testing.T) {
 	t.Setenv("SESSION_COOKIE_SECURE", "true")
 	for _, name := range []string{"three_to_one_go_session", "three_to_one_go_scout_session"} {

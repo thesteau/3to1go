@@ -351,3 +351,32 @@ func TestWriteUploadDir_CreatesFile(t *testing.T) {
 		t.Errorf("expected %s to exist: %v", UploadDirFilename, err)
 	}
 }
+
+func TestUploadDirRejectsSymlinkMarkers(t *testing.T) {
+	for _, withinJob := range []bool{false, true} {
+		dir := t.TempDir()
+		targetDir := t.TempDir()
+		if withinJob {
+			targetDir = dir
+		}
+		target := filepath.Join(targetDir, "settings.yaml")
+		original := []byte("job_name: outside\n")
+		if err := os.WriteFile(target, original, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		marker := filepath.Join(dir, UploadDirFilename)
+		if err := os.Symlink(target, marker); err != nil {
+			t.Skipf("symlinks unavailable: %v", err)
+		}
+		if _, err := ReadUploadDirPayload(marker); err == nil {
+			t.Error("read a symlinked job marker")
+		}
+		if err := WriteUploadDir(dir, map[string]any{"job_name": "changed"}); err == nil {
+			t.Error("wrote through a symlinked job marker")
+		}
+		after, err := os.ReadFile(target)
+		if err != nil || string(after) != string(original) {
+			t.Fatalf("symlink target changed: %q, %v", after, err)
+		}
+	}
+}
