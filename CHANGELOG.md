@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/thesteau/3to1go/compare/v1.3.3...v1.3.4) (2026-10-08)
+
+
+### Bug Fixes
+
+* Security review fixes ([#109](https://github.com/thesteau/3to1go/issues/109)) ([374f257](https://github.com/thesteau/3to1go/commit/374f2573d63a59858c1d55fc2b8a636032388737))
+
 ## [1.3.3](https://github.com/thesteau/3to1go/compare/v1.3.2...v1.3.3) (2026-10-06)
 
 
