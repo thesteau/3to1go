@@ -3,8 +3,9 @@
   "private": true,
   "description": "TypeScript sources for the Station and Scout web UIs. Compiled to */static/js (not committed), which the Go servers embed.",
   "scripts": {
-    "build": "tsc -p station/static && tsc -p scout/static",
-    "watch": "tsc -p station/static --watch --preserveWatchOutput",
+    "build": "npm run build:station && tsc -p scout/static",
+    "build:station": "tsc -p station/static && node station/static/copy-libs.cts",
+    "watch": "node station/static/copy-libs.cts && tsc -p station/static --watch --preserveWatchOutput",
     "watch:scout": "tsc -p scout/static --watch --preserveWatchOutput",
     "lint": "cd .. && node app/node_modules/@biomejs/biome/bin/biome ci .",
     "fix": "cd .. && node app/node_modules/@biomejs/biome/bin/biome check --write .",
@@ -15,5 +16,9 @@
     "@types/node": "26.6.4",
     "release-please": "17.11.2",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "2.23.0",
+    "fzstd": "0.1.1"
   }
 }

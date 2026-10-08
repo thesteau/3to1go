@@ -1,0 +1,42 @@
+<dialog id="snapshot-view-dialog" class="modal snapshot-view-dialog" aria-labelledby="snapshot-view-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="snapshot-view-title">View Snapshot</h2>
+        <p class="hint snapshot-view-source" id="snapshot-view-source"></p>
+      </div>
+      <button type="button" class="secondary" onclick="closeSnapshotView()">Close</button>
+    </div>
+    <p id="snapshot-view-status" role="status" aria-live="polite"></p>
+    <div id="snapshot-view-content" hidden>
+      <label for="snapshot-view-search">Find a file or folder</label>
+      <input id="snapshot-view-search" type="search" placeholder="Search all paths in this snapshot" oninput="renderSnapshotView()">
+      <div class="toolbar snapshot-view-toolbar">
+        <button id="snapshot-view-select" type="button" class="secondary" onclick="selectVisibleSnapshotFiles()">Select shown files</button>
+        <button id="snapshot-view-clear" type="button" class="secondary" onclick="clearSnapshotSelection()">Clear selection</button>
+        <span id="snapshot-view-count" class="hint" role="status"></span>
+        <span class="toolbar-spacer"></span>
+        <button id="snapshot-view-download" type="button" disabled onclick="downloadSelectedSnapshotFiles(this)">Download selected</button>
+      </div>
+      <p class="hint">One or two files download individually. Three or more download as a ZIP with their folder paths.</p>
+      <div class="snapshot-view-table-wrap">
+        <table class="snapshot-view-table">
+          <thead><tr><th scope="col">Select</th><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Size</th><th scope="col">Action</th></tr></thead>
+          <tbody id="snapshot-view-files"></tbody>
+        </table>
+      </div>
+      <div class="snapshot-view-paging">
+        <button id="snapshot-view-prev" type="button" class="secondary" onclick="changeSnapshotViewPage(-1)">Previous</button>
+        <span id="snapshot-view-page" class="hint" role="status"></span>
+        <button id="snapshot-view-next" type="button" class="secondary" onclick="changeSnapshotViewPage(1)">Next</button>
+      </div>
+      <section id="snapshot-view-preview" class="snapshot-view-preview" hidden aria-labelledby="snapshot-view-preview-title">
+        <div class="modal-head">
+          <h3 id="snapshot-view-preview-title"></h3>
+          <button type="button" class="secondary" onclick="clearSnapshotPreview()">Close preview</button>
+        </div>
+        <div id="snapshot-view-preview-body"></div>
+      </section>
+    </div>
+  </div>
+</dialog>

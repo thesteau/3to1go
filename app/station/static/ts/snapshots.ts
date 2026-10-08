@@ -24,8 +24,8 @@ function formatDate(d: Date | null): string {
 }
 
 // Returns the snapshot response, or null after reporting why it could not be fetched.
-async function fetchSnapshot(path: string): Promise<Response | null> {
-  const res = await fetch(path);
+async function fetchSnapshot(path: string, signal?: AbortSignal): Promise<Response | null> {
+  const res = await fetch(path, signal ? { signal } : undefined);
   if (res.ok) return res;
   if (res.status === 404) {
     await loadOverview({ silent: true, force: true });
@@ -36,22 +36,25 @@ async function fetchSnapshot(path: string): Promise<Response | null> {
   return null;
 }
 
-async function downloadSnapshot(
+// Shared by whole-archive downloads and the file viewer. The Scout key stays in this tab.
+async function loadSnapshotBlob(
   scoutId: string,
   scoutInstanceId: string | null,
   jobName: string,
   filename: string,
-  btn: HTMLButtonElement,
-): Promise<void> {
+  signal?: AbortSignal,
+): Promise<Blob | null> {
   const basePath = scoutInstanceId
     ? `/api/snapshots/${encodeURIComponent(scoutId)}/${encodeURIComponent(scoutInstanceId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`
     : `/api/snapshots/${encodeURIComponent(scoutId)}/${encodeURIComponent(jobName)}/${encodeURIComponent(filename)}`;
-  const restore = setButtonBusy(btn, "Downloading…");
+  const generation = _keySessionGeneration;
+  let reader: SnapshotReader | null = null;
   try {
-    let res = await fetchSnapshot(basePath);
-    if (!res) return;
+    let res = await fetchSnapshot(basePath, signal);
+    if (!res) return null;
     // The snapshot streams through decryption, so a large archive is never held whole in the tab.
-    let reader = snapshotReaderFromResponse(res);
+    reader = snapshotReaderFromResponse(res);
+    if (signal?.aborted || generation !== _keySessionGeneration) return null;
     let key: string | null = null;
     if (snapshotEncryption(await reader.peek(SNAPSHOT_HEAD_LEN))) {
       key = getEncKey(scoutId, scoutInstanceId);
@@ -60,19 +63,21 @@ async function downloadSnapshot(
         // the server's write timeout meanwhile. Fetch the snapshot again once the key is known.
         reader.cancel();
         key = await resolveEncKey(scoutId, scoutInstanceId);
-        if (!key) return;
-        res = await fetchSnapshot(basePath);
-        if (!res) return;
+        if (!key || signal?.aborted) return null;
+        res = await fetchSnapshot(basePath, signal);
+        if (!res) return null;
         reader = snapshotReaderFromResponse(res);
       }
     }
 
     try {
-      triggerBlobDownload(await readSnapshot(reader, key), filename);
+      const blob = await readSnapshot(reader, key);
+      return generation === _keySessionGeneration && !signal?.aborted ? blob : null;
     } catch (error) {
+      if (signal?.aborted || generation !== _keySessionGeneration) return null;
       if (error instanceof SnapshotReadError) {
         setActionStatus("The download was interrupted. Check the connection and retry.", "error");
-        return;
+        return null;
       }
       clearStoredEncKey(scoutId, scoutInstanceId);
       await refreshKeyPanel(scoutId, scoutInstanceId);
@@ -83,7 +88,34 @@ async function downloadSnapshot(
           : "Decryption failed - wrong key or corrupted archive.",
         "error",
       );
+      return null;
     }
+  } catch (error) {
+    if (!signal?.aborted && generation === _keySessionGeneration) {
+      setActionStatus(
+        error instanceof SnapshotReadError
+          ? "The download was interrupted. Check the connection and retry."
+          : "Could not download the snapshot. Check the connection and retry.",
+        "error",
+      );
+    }
+    return null;
+  } finally {
+    reader?.cancel();
+  }
+}
+
+async function downloadSnapshot(
+  scoutId: string,
+  scoutInstanceId: string | null,
+  jobName: string,
+  filename: string,
+  btn: HTMLButtonElement,
+): Promise<void> {
+  const restore = setButtonBusy(btn, "Downloading…");
+  try {
+    const blob = await loadSnapshotBlob(scoutId, scoutInstanceId, jobName, filename);
+    if (blob) triggerBlobDownload(blob, filename);
   } finally {
     restore();
   }
@@ -240,6 +272,8 @@ function renderSnapshots(
         <div class="snapshot-actions">
           <button class="btn btn-dl"
             onclick="downloadSnapshot(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">Download</button>
+          <button class="btn btn-view"
+            onclick="openSnapshotView(${inlineString(scoutId)},${scoutInstanceId ? inlineString(scoutInstanceId) : "null"},${inlineString(jobName)},${inlineString(name)},this)">View</button>
           ${
             scoutInstanceId
               ? `<button class="btn btn-restore"

@@ -10,6 +10,10 @@ cleanup, settings payloads, and refresh behavior in the application's `static/ts
 Shared feature functions can call local functions such as `renderCertificateFiles`
 or `loadHookConfig`; both applications must supply those functions.
 
+`files.ts` provides file-table rows, safe names, sizes, selection controls, and
+expandable-folder controls for Scout's live file browser and Station's snapshot
+viewer. Each app supplies its own data, loading behavior, and row actions.
+
 Run `npm run build` from the `app/` directory, or `go generate ./...` from either
 Go application. The existing watch commands also watch these shared sources.
 No additional bundler or build script is needed.
