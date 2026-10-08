@@ -491,6 +491,59 @@ func TestSaveJob_PathTraversalRejected(t *testing.T) {
 	}
 }
 
+func TestJobOperations_RejectSymlinksLeavingScanRoot(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	writeMarker(t, outside, map[string]any{"job_name": "outside"})
+	marker := filepath.Join(outside, backup.UploadDirFilename)
+	before, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	svc, _ := newDirService(t, root)
+	for _, path := range []string{"escape", "escape/child/.."} {
+		if _, err := svc.SaveJob(path, map[string]any{"job_name": "changed"}); err == nil {
+			t.Errorf("saved job outside scan root through %q", path)
+		}
+		if _, err := svc.LoadJob(path); err == nil {
+			t.Errorf("loaded job outside scan root through %q", path)
+		}
+		if err := svc.DeleteJob(path); err == nil {
+			t.Errorf("deleted job outside scan root through %q", path)
+		}
+	}
+	after, err := os.ReadFile(marker)
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("outside marker changed: %q, %v", after, err)
+	}
+}
+
+func TestJobOperations_AllowSymlinksWithinScanRoot(t *testing.T) {
+	root := t.TempDir()
+	inside := filepath.Join(root, "inside")
+	if err := os.Mkdir(inside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(inside, filepath.Join(root, "alias")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	svc, _ := newDirService(t, root)
+	if _, err := svc.SaveJob("alias", map[string]any{"job_name": "inside"}); err != nil {
+		t.Fatal(err)
+	}
+	if job, err := svc.LoadJob("alias"); err != nil || job.JobName != "inside" {
+		t.Fatalf("load through alias: %v, %v", job, err)
+	}
+	if err := svc.DeleteJob("alias"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(inside, backup.UploadDirFilename)); !os.IsNotExist(err) {
+		t.Fatalf("marker remains after deletion: %v", err)
+	}
+}
+
 func TestSaveJob_NestedUnderExistingJob(t *testing.T) {
 	root := t.TempDir()
 	parentDir := filepath.Join(root, "parent")
