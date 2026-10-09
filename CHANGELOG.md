@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/thesteau/3to1go/compare/v1.4.0...v1.4.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* Document API and add session handling fixes ([#117](https://github.com/thesteau/3to1go/issues/117)) ([f153c7a](https://github.com/thesteau/3to1go/commit/f153c7ae8f1aebd3d8883358d0f5304bcd17f49b))
+
 ## [1.4.0](https://github.com/thesteau/3to1go/compare/v1.3.4...v1.4.0) (2026-10-08)
 
 
