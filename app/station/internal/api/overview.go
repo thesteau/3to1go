@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/ingest"
@@ -33,6 +34,9 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
 		return
+	}
+	if auth.RestrictedAutomation(r) {
+		delete(data, "settings")
 	}
 	httpx.WriteJSON(w, http.StatusOK, data)
 }

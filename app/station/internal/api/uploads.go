@@ -31,41 +31,27 @@ func (a *App) authorizeCredentialForInstance(r *http.Request, cred *store.Creden
 	if cred == nil || cred.TokenHash == "" {
 		return http.StatusUnauthorized, "unauthorized"
 	}
+	if allowBinding {
+		err := a.credStore.Bind(r.Context(), cred.TokenHash, scoutID, instID)
+		switch {
+		case err == nil:
+			return 0, ""
+		case errors.Is(err, store.ErrCredentialUnavailable):
+			return http.StatusUnauthorized, err.Error()
+		case errors.Is(err, store.ErrCredentialBinding), errors.Is(err, store.ErrCredentialLimit):
+			return http.StatusForbidden, err.Error()
+		default:
+			return http.StatusInternalServerError, "failed to bind Station token"
+		}
+	}
 	reg, err := a.snapIndex.GetScoutRegistration(r.Context(), scoutID, instID)
 	if err != nil {
 		return http.StatusInternalServerError, "failed to inspect Station token scope"
 	}
-	if reg != nil && reg.CredentialHash != nil && *reg.CredentialHash != "" {
-		if *reg.CredentialHash == cred.TokenHash {
-			return 0, ""
-		}
-		return http.StatusForbidden, "Station token is not bound to this scout instance"
+	if reg != nil && reg.CredentialHash != nil && *reg.CredentialHash == cred.TokenHash {
+		return 0, ""
 	}
-	if !allowBinding {
-		return http.StatusForbidden, "Station token has not been bound to this scout instance"
-	}
-
-	allRegs, err := a.snapIndex.ListScoutRegistrations(r.Context(), nil)
-	if err != nil {
-		return http.StatusInternalServerError, "failed to inspect Station token users"
-	}
-	used := 0
-	for _, r2 := range allRegs {
-		if r2.CredentialHash != nil && *r2.CredentialHash == cred.TokenHash {
-			used++
-		}
-	}
-	limit := max(cred.MaxRegistrations, 1)
-	if !cred.Shared {
-		limit = 1
-	}
-	if used >= limit {
-		if cred.Shared {
-			return http.StatusForbidden, "shared Station token registration limit reached"
-		}
-		return http.StatusForbidden, "single-use Station token is already bound to another scout instance"
-	}
-	return 0, ""
+	return http.StatusForbidden, "Station token is not bound to this Scout instance"
 }
 
 func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
@@ -134,17 +120,17 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if status, detail := a.authorizeCredentialForInstance(r, cred, scoutID, instID, true); status != 0 {
-		httpx.WriteError(w, status, detail)
-		return
-	}
-
 	if body.ArchiveFormat != protocol.ArchiveFormatTarZst {
 		httpx.WriteError(w, http.StatusBadRequest, "archive_format must be tar.zst")
 		return
 	}
-	if len(body.ArchiveSHA256) != 64 {
+	if len(body.ArchiveSHA256) != 64 || !fingerprintQueryRE.MatchString(body.ArchiveSHA256) {
 		httpx.WriteError(w, http.StatusBadRequest, "archive_sha256 must be a 64-character lowercase hex digest")
+		return
+	}
+
+	if status, detail := a.authorizeCredentialForInstance(r, cred, scoutID, instID, true); status != 0 {
+		httpx.WriteError(w, status, detail)
 		return
 	}
 
@@ -161,11 +147,16 @@ func (a *App) handleInitiateUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleAppendChunk(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.authorizeBearer(r); err != nil {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	uploadID := r.PathValue("upload_id")
+	if err := a.ingest.AuthorizeUpload(r.Context(), uploadID, cred.TokenHash); err != nil {
+		writeHTTPError(w, err)
+		return
+	}
 	offsetStr := r.URL.Query().Get("offset")
 	offset, err := strconv.ParseInt(offsetStr, 10, 64)
 	if err != nil || offset < 0 {
@@ -181,11 +172,16 @@ func (a *App) handleAppendChunk(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleFinalizeUpload(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.authorizeBearer(r); err != nil {
+	cred, err := a.authorizeBearer(r)
+	if err != nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	uploadID := r.PathValue("upload_id")
+	if err := a.ingest.AuthorizeUpload(r.Context(), uploadID, cred.TokenHash); err != nil {
+		writeHTTPError(w, err)
+		return
+	}
 	resp, err := a.ingest.FinalizeUpload(r.Context(), uploadID)
 	if err != nil {
 		writeHTTPError(w, err)

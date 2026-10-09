@@ -94,9 +94,19 @@ async function changeOwnPassword(): Promise<void> {
   startScoutApp();
 }
 
-async function logoutUser(): Promise<void> {
-  await rawFetch("/api/session/logout", { method: "POST" });
+async function logoutUser(allBrowsers = false): Promise<void> {
+  try {
+    const response = await rawFetch(allBrowsers ? "/api/session/logout-all" : "/api/session/logout", {
+      method: "POST",
+    });
+    if (!response.ok) throw new Error("Sign out failed. Please try again.");
+  } catch (error) {
+    setActionStatus((error as Error).message || "Sign out failed. Please try again.", "error");
+    return;
+  }
   clearScoutView();
+  const tokenOutput = document.getElementById("automation_token_output") as HTMLTextAreaElement | null;
+  if (tokenOutput) tokenOutput.value = "";
   currentUser = null;
   closeDialog("users-dialog");
   openLoginDialog();

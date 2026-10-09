@@ -319,6 +319,8 @@ func (s *SnapshotIndex) GetScoutRegistration(ctx context.Context, scoutID, instI
 }
 
 func (s *SnapshotIndex) UpsertScoutRegistration(ctx context.Context, r *ScoutRegistration) error {
+	// Binding changes belong to CredentialStore.Bind/Revoke. A metadata refresh
+	// must not overwrite a concurrent token replacement or revocation.
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO scout_registration
 			(scout_id, scout_instance_id, encryption_key_fingerprint, advertised_url,
@@ -329,7 +331,6 @@ func (s *SnapshotIndex) UpsertScoutRegistration(ctx context.Context, r *ScoutReg
 			advertised_url = EXCLUDED.advertised_url,
 			first_seen_at = EXCLUDED.first_seen_at,
 			last_seen_at = EXCLUDED.last_seen_at,
-			credential_hash = EXCLUDED.credential_hash,
 			last_upload_tls = EXCLUDED.last_upload_tls`,
 		r.ScoutID, r.ScoutInstanceID, r.EncryptionKeyFingerprint, r.AdvertisedURL,
 		r.FirstSeenAt, r.LastSeenAt, r.CredentialHash, r.LastUploadTLS)

@@ -120,6 +120,9 @@ curl -fsS -c "$cookie_station" -H 'Content-Type: application/json' \
 curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"current_password":"admin","new_password":"e2e-admin","confirm_new_password":"e2e-admin"}' \
   http://127.0.0.1:16555/api/session/change-password >/dev/null
+# shellcheck source=tests/integration/auth.sh
+source "$(dirname "${BASH_SOURCE[0]}")/auth.sh"
+
 minted="$(curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"shared":false}' http://127.0.0.1:16555/api/credentials/mint)"
 credential="$(printf '%s' "$minted" | jq -er '.credential')"
@@ -145,7 +148,15 @@ settings_payload="$(curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/sett
   jq -ec --arg credential "$credential" '.settings | objects | .scout_credential = $credential')"
 curl -fsS -b "$cookie_scout" -H 'Content-Type: application/json' \
   -X POST -d "$settings_payload" http://127.0.0.1:16556/api/settings >/dev/null
-curl -fsS -b "$cookie_scout" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
+# A Scout automation token uses its SQLite store, without leaking settings.
+scout_automation="$(curl -fsS -b "$cookie_scout" -H 'Content-Type: application/json' -d '{"name":"e2e-backup","scopes":["read","backup"],"ttl_days":1}' http://127.0.0.1:16556/api/automation-tokens)"
+scout_api_token="$(printf '%s' "$scout_automation" | jq -er '.token')"
+scout_api_token_id="$(printf '%s' "$scout_automation" | jq -er '.automation_token.id')"
+curl -fsS -H "Authorization: Bearer $scout_api_token" http://127.0.0.1:16556/api/status | jq -e 'has("settings") | not' >/dev/null
+expect_status 403 -H "Authorization: Bearer $scout_api_token" http://127.0.0.1:16556/api/encryption-key
+curl -fsS -H "Authorization: Bearer $scout_api_token" -X POST http://127.0.0.1:16556/api/run-now >/dev/null
+expect_status 200 -b "$cookie_scout" -X DELETE "http://127.0.0.1:16556/api/automation-tokens/$scout_api_token_id"
+expect_status 401 -H "Authorization: Bearer $scout_api_token" http://127.0.0.1:16556/api/status
 
 instance="$(curl -fsS -b "$cookie_scout" http://127.0.0.1:16556/api/status | \
   jq -er '.scout_instance_id')"

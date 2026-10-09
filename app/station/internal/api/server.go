@@ -29,6 +29,7 @@ type userStorer interface {
 	CreateSession(ctx context.Context, userID int) (string, error)
 	DeleteSession(ctx context.Context, token string) error
 	DeleteSessionsForUser(ctx context.Context, userID int) error
+	DeleteOtherSessionsForUser(context.Context, int, string) error
 	ListUsers(ctx context.Context) ([]*store.User, error)
 	CreateUser(ctx context.Context, username, password string, isAdmin bool) (*store.User, error)
 	UpdateUser(ctx context.Context, userID int, username, password *string, isAdmin, mustChangePassword *bool) (*store.User, error)
@@ -37,6 +38,8 @@ type userStorer interface {
 }
 
 type credStorer interface {
+	Bind(context.Context, string, string, string) error
+	List(context.Context) ([]store.CredentialInfo, error)
 	Verify(ctx context.Context, token string, pub ed25519.PublicKey) (*store.CredentialRecord, error)
 	Mint(ctx context.Context, priv ed25519.PrivateKey, ttlDays int, scopes ...signing.CredentialScope) (string, error)
 	Revoke(ctx context.Context, tokenHash string) (int64, error)
@@ -60,6 +63,7 @@ type snapIndexer interface {
 }
 
 type ingestSvc interface {
+	AuthorizeUpload(context.Context, string, string) error
 	StartUpload(ctx context.Context, req ingest.UploadInitRequest, sourceAddr, credHash *string, sourceTLS bool) (*ingest.SessionResponse, error)
 	AppendChunk(ctx context.Context, uploadID string, offset int64, body io.Reader) (*ingest.ChunkResponse, error)
 	FinalizeUpload(ctx context.Context, uploadID string) (*ingest.FinalizeResponse, error)
@@ -214,6 +218,11 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/session/me", a.handleSessionMe)
 	r.Post("/api/session/login", a.handleLogin)
 	r.Post("/api/session/logout", a.handleLogout)
+	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
+	r.Post("/api/session/logout-all", access.LogoutAll)
+	r.Get("/api/automation-tokens", access.ListAutomationTokens)
+	r.Post("/api/automation-tokens", access.CreateAutomationToken)
+	r.Delete("/api/automation-tokens/{token_id}", httpx.WithPathValues(access.RevokeAutomationToken, "token_id"))
 	r.Post("/api/session/change-password", a.handleChangePassword)
 
 	// Users (auth required)
@@ -231,6 +240,8 @@ func (a *App) Handler() http.Handler {
 	r.Delete("/api/instances/{scout_id}/{scout_instance_id}", httpx.WithPathValues(a.handleDeleteInstance, "scout_id", "scout_instance_id"))
 
 	// Credentials
+	r.Get("/api/credentials", a.handleListCredentials)
+	r.Delete("/api/credentials/{token_hash}", httpx.WithPathValues(a.handleRevokeCredentialByHash, "token_hash"))
 	r.Post("/api/credentials/mint", a.handleMintCredential)
 	r.Delete("/api/credentials/instances/{scout_id}/{scout_instance_id}", httpx.WithPathValues(a.handleRevokeCredential, "scout_id", "scout_instance_id"))
 
@@ -290,7 +301,7 @@ func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 
 func isPublicPath(path string) bool {
 	switch path {
-	case "/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/change-password":
+	case "/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/logout-all", "/api/session/change-password":
 		return true
 	}
 	return path == "/" ||

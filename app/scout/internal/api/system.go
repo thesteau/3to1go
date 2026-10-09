@@ -7,6 +7,7 @@ import (
 
 	"github.com/3to1go/scout/internal/config"
 	_ "github.com/3to1go/scout/internal/schedule"
+	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
 )
 
@@ -15,6 +16,16 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := a.runner.StatusSnapshot()
+	if auth.RestrictedAutomation(r) {
+		// Copy the map so a store mock or cached snapshot is never mutated.
+		filtered := make(map[string]any, len(resp))
+		for key, value := range resp {
+			if key != "settings" {
+				filtered[key] = value
+			}
+		}
+		resp = filtered
+	}
 	resp["scheduler"] = a.scheduler.Snapshot()
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }

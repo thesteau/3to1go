@@ -57,6 +57,8 @@ func (m *mockUserStore) CreateSession(_ context.Context, _ int) (string, error) 
 func (m *mockUserStore) DeleteSession(_ context.Context, _ string) error {
 	return m.deleteSessionErr
 }
+func (m *mockUserStore) DeleteOtherSessionsForUser(context.Context, int, string) error { return nil }
+
 func (m *mockUserStore) DeleteSessionsForUser(_ context.Context, _ int) error { return nil }
 func (m *mockUserStore) ListUsers(_ context.Context) ([]*store.User, error) {
 	return m.listUsers, m.listErr

@@ -218,6 +218,11 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		return nil, err
 	}
 	if existing != nil {
+		if existing.ScoutID != req.ScoutID || existing.ScoutInstanceID != req.ScoutInstanceID || existing.JobName != req.JobName || existing.ArchiveSizeBytes != req.ArchiveSizeBytes {
+			return nil, httpError(http.StatusConflict, "idempotency key belongs to another upload")
+		}
+		// Re-initiation after token replacement is authorized by the instance binding.
+		existing.CredentialHash = credHash
 		existing.UploadedBytes = s.currentUploadSize(existing.UploadID)
 		existing.UpdatedAt = utcNow()
 		existing.ExpiresAt = utcAfter(s.sessionTTL())
@@ -268,6 +273,7 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 		ArchiveSizeBytes: req.ArchiveSizeBytes,
 		ArchiveSHA256:    req.ArchiveSHA256,
 		SourceAddress:    sourceAddr,
+		CredentialHash:   credHash,
 		UploadedBytes:    0,
 		Status:           "initiated",
 		CreatedAt:        now,

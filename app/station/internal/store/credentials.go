@@ -111,11 +111,16 @@ func (s *CredentialStore) Revoke(ctx context.Context, tokenHash string) (int64, 
 	if tokenHash == "" {
 		return 0, nil
 	}
-	tag, err := s.pool.Exec(ctx, `DELETE FROM scout_credentials WHERE token_hash = $1`, tokenHash)
+	var revoked int64
+	err := s.pool.QueryRow(ctx, `WITH revoked AS (
+ DELETE FROM scout_credentials WHERE token_hash = $1 RETURNING token_hash
+ ) , cleared AS (UPDATE scout_registration SET credential_hash = NULL
+ WHERE credential_hash IN (SELECT token_hash FROM revoked) RETURNING scout_id)
+ SELECT COUNT(*) FROM revoked`, tokenHash).Scan(&revoked)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	return revoked, nil
 }
 
 func (s *CredentialStore) CleanupExpired(ctx context.Context) (int64, error) {

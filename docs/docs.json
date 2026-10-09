@@ -60,6 +60,7 @@
           {
             "group": "Using Station",
             "pages": [
+              "station/api",
               "station/station-tokens",
               "station/snapshots",
               "station/notifications",
@@ -81,6 +82,7 @@
           {
             "group": "Using Scout",
             "pages": [
+              "scout/api",
               "scout/backup-jobs",
               "scout/unusual-backups",
               "scout/multiple-folders",
