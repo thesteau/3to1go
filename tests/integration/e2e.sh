@@ -120,6 +120,7 @@ curl -fsS -c "$cookie_station" -H 'Content-Type: application/json' \
 curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \
   -d '{"current_password":"admin","new_password":"e2e-admin","confirm_new_password":"e2e-admin"}' \
   http://127.0.0.1:16555/api/session/change-password >/dev/null
+# shellcheck source=tests/integration/auth.sh
 source "$(dirname "${BASH_SOURCE[0]}")/auth.sh"
 
 minted="$(curl -fsS -b "$cookie_station" -H 'Content-Type: application/json' \

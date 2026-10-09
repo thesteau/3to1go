@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	ErrCredentialUnavailable = errors.New("Station token is expired or revoked")
-	ErrCredentialBinding     = errors.New("Station token is not bound to this Scout instance")
-	ErrCredentialLimit       = errors.New("Station token registration limit reached")
+	ErrCredentialUnavailable = errors.New("the Station token is expired or revoked")
+	ErrCredentialBinding     = errors.New("the Station token is not bound to this Scout instance")
+	ErrCredentialLimit       = errors.New("the Station token registration limit has been reached")
 )
 
 type transactionPool interface {
@@ -25,7 +25,7 @@ type transactionPool interface {
 func (s *CredentialStore) Bind(ctx context.Context, hash, scoutID, instanceID string) error {
 	pool, ok := s.pool.(transactionPool)
 	if !ok {
-		return errors.New("Station token store does not support transactions")
+		return errors.New("the Station token store does not support transactions")
 	}
 	tx, err := pool.Begin(ctx)
 	if err != nil {

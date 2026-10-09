@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const { loadFeature } = require("../helpers/scripts.cts");
 
-function tokenContext() {
+function tokenContext(name = "<script>untrusted</script>") {
   const elements = new Map([
     ["automation-token-section", { hidden: true }],
     ["automation-token-list", { innerHTML: "" }],
@@ -17,7 +17,7 @@ function tokenContext() {
   ]);
   const requests = [];
   const statuses = [];
-  const info = { id: "token-id", name: "<script>untrusted</script>", scopes: ["read"], expires_at: "2027-01-01" };
+  const info = { id: "token-id", name, scopes: ["read"], expires_at: "2027-01-01" };
   const ctx = vm.createContext({
     currentUser: { id: 1, is_admin: true },
     document: { getElementById: (id) => elements.get(id) },
@@ -40,7 +40,7 @@ test("automation token UI keeps secrets out of metadata and escapes names and id
   await ctx.loadAutomationTokens();
   const html = elements.get("automation-token-list").innerHTML;
   assert.match(html, /&lt;script&gt;untrusted&lt;\/script&gt;/);
-  assert.doesNotMatch(html, /old-secret|3to1go_api_once|<script>/);
+  assert.doesNotMatch(html, /old-secret|3to1go_api_once|<script\b/i);
   const id = "token');throw Error('unexpected');//";
   const rendered = ctx.renderAutomationTokens([{ id, name: "example", scopes: ["read"], expires_at: "tomorrow" }]);
   const handler = rendered.match(/onclick="([^"]*)"/)[1].replaceAll("&quot;", '"');
@@ -50,6 +50,16 @@ test("automation token UI keeps secrets out of metadata and escapes names and id
   };
   vm.runInContext(handler, ctx);
   assert.equal(received, id);
+});
+
+test("automation token UI escapes uppercase and mixed-case script tags", async () => {
+  for (const tag of ["SCRIPT", "ScRiPt"]) {
+    const { ctx, elements } = tokenContext(`<${tag}>untrusted</${tag}>`);
+    await ctx.loadAutomationTokens();
+    const html = elements.get("automation-token-list").innerHTML;
+    assert.ok(html.includes(`&lt;${tag}&gt;untrusted&lt;/${tag}&gt;`));
+    assert.doesNotMatch(html, /<script\b/i);
+  }
 });
 
 test("creation uses selected permissions and reveals only the new secret", async () => {

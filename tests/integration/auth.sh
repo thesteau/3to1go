@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Sourced by e2e.sh after Station's admin has changed its password.
 
+# Explicitly require the inputs supplied by the parent end-to-end script.
+: "${root:?auth.sh requires the end-to-end temporary directory}"
+: "${cookie_station:?auth.sh requires the Station cookie jar}"
+: "${postgres:?auth.sh requires the PostgreSQL container name}"
+
 expect_status() {
   local expected="$1"
   shift

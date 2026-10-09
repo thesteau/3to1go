@@ -66,6 +66,13 @@ func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("session_delete_failed", "error", err)
 		}
 	}
+	a.clearSessionCookie(w)
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// clearSessionCookie also supports HTTP deployments: the expired cookie contains
+// no session secret and must use the same Secure setting as the login cookie.
+func (a *Handler) clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     a.CookieName,
 		Value:    "",
@@ -75,7 +82,6 @@ func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Secure:   httpx.SessionCookieSecure(),
 	})
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // LogoutAll invalidates browser sessions; automation tokens are revoked separately.
@@ -88,7 +94,7 @@ func (a *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to sign out browser sessions")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: a.CookieName, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: httpx.SessionCookieSecure()})
+	a.clearSessionCookie(w)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
