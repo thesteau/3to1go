@@ -1,8 +1,8 @@
 {
-  "version": "1.4.0",
-  "tag": "v1.4.0",
-  "prodSha": "aa6532d421b02096b57a58a1e3b78bdb9fb57f19",
-  "previousTag": "v1.3.4",
-  "previousSha": "374f2573d63a59858c1d55fc2b8a636032388737",
-  "notes": "## [1.4.0](https://github.com/thesteau/3to1go/compare/v1.3.4...v1.4.0) (2026-10-08)\n\n\n### Features\n\n* add Station view and station search ([#112](https://github.com/thesteau/3to1go/issues/112)) ([685a305](https://github.com/thesteau/3to1go/commit/685a305433c054850560f612bbe019b0a8457dfc))\n\n\n### Bug Fixes\n\n* query bugs from the station view ([#115](https://github.com/thesteau/3to1go/issues/115)) ([aa6532d](https://github.com/thesteau/3to1go/commit/aa6532d421b02096b57a58a1e3b78bdb9fb57f19))"
+  "version": "1.4.1",
+  "tag": "v1.4.1",
+  "prodSha": "f153c7ae8f1aebd3d8883358d0f5304bcd17f49b",
+  "previousTag": "v1.4.0",
+  "previousSha": "aa6532d421b02096b57a58a1e3b78bdb9fb57f19",
+  "notes": "## [1.4.1](https://github.com/thesteau/3to1go/compare/v1.4.0...v1.4.1) (2026-10-09)\n\n\n### Bug Fixes\n\n* Document API and add session handling fixes ([#117](https://github.com/thesteau/3to1go/issues/117)) ([f153c7a](https://github.com/thesteau/3to1go/commit/f153c7ae8f1aebd3d8883358d0f5304bcd17f49b))"
 }
