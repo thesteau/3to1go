@@ -1,0 +1,248 @@
+---
+title: "Scout API"
+description: "Automate Scout jobs, settings, backups, and restores with the HTTP API used by its web UI."
+---
+
+Scout exposes an HTTP API on the same address as its web UI, normally `http://<scout-host>:6556`. Scripts can manage jobs and trigger backups without opening a browser. The UI reads the same backend state, so API changes also appear there.
+
+Use the [Station API](/station/api) to manage stored snapshots and mint Station tokens. Each app has its own sign-in session.
+
+## Authenticate
+
+Management endpoints use Scout's session cookie, `three_to_one_go_scout_session`. A Station token does **not** authenticate these endpoints. **Session** in the tables means a signed-in account; **Admin** also requires admin access. Accounts are intended for [one operator](/shared/sign-in#accounts-are-for-one-operator).
+
+The examples use a POSIX shell and curl; the settings example also uses jq. Replace password placeholders with your own values. Use your HTTPS address for remote access; see [Session cookies over HTTPS](/shared/sign-in#session-cookies-over-https).
+
+Sign in and save the cookie for subsequent calls:
+
+```sh
+SCOUT_URL='http://127.0.0.1:6556'
+umask 077
+
+curl --fail-with-body -sS --cookie-jar scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"username":"admin","password":"<your-current-password>"}' \
+  "$SCOUT_URL/api/session/login"
+```
+
+The response contains `status` and `user`. If `user.must_change_password` is `true`, change the password before calling other management endpoints. This is required on the first admin sign-in, even with a custom `INITIAL_ADMIN_PASSWORD`:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"current_password":"<your-current-password>","new_password":"<your-new-password>","confirm_new_password":"<your-new-password>"}' \
+  "$SCOUT_URL/api/session/change-password"
+```
+
+Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session.
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `POST` | `/api/session/login` | Public | JSON `username`, `password`; sets the session cookie and returns `status`, `user`. |
+| `GET` | `/api/session/me` | Public | Returns `authenticated` and `user` (null when signed out). |
+| `POST` | `/api/session/change-password` | Session, including when a password change is required | JSON `current_password`, `new_password`, `confirm_new_password`. |
+| `POST` | `/api/session/logout` | Public | No body; clears the current session cookie. |
+
+## Status, schedule, and settings
+
+| Method | Endpoint | Access | What it does |
+|---|---|---|---|
+| `GET` | `/health` | Public | Returns `{"status":"ok"}` while Scout's HTTP server is running. |
+| `GET` | `/api/status` | Session | Returns Scout and instance IDs, effective `settings`, Scout key fingerprint, upload circuit status, and `scheduler`. |
+| `POST` | `/api/run-now` | Session | No body; requests a backup cycle for the configured jobs. Returns `status: "queued"` or `"already_running"`. |
+| `GET` | `/api/settings` | Admin | Returns the current settings under `settings`. |
+| `POST` | `/api/settings` | Admin | Applies a full settings object and returns the normalized `settings`. |
+| `POST` | `/api/uploads/pause` | Admin | No body; pauses Scout uploads. |
+| `POST` | `/api/uploads/resume` | Admin | No body; resumes Scout uploads. |
+| `POST` | `/api/cancel-operation` | Admin | No body; requests cancellation of the active backup cycle or forced upload. Returns `status: "cancelling"` or `"idle"`. |
+
+### Run a backup cycle
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -X POST "$SCOUT_URL/api/run-now"
+
+curl --fail-with-body -sS --cookie scout.cookies \
+  "$SCOUT_URL/api/status"
+
+curl --fail-with-body -sS --cookie scout.cookies \
+  "$SCOUT_URL/api/directories"
+```
+
+`queued` means the request was accepted, not that a backup completed. Poll `/api/status` for `scheduler.state`, `run_now_requested`, and the cycle timestamps, and `/api/directories` for each job's `state.last_status` and error details. `already_running` means an operation is in progress; it does not schedule an additional run. These endpoints don't return an operation ID.
+
+A normal cycle uses the existing change detection: file paths and sizes plus empty folder paths. Same-size edits require a [forced fresh backup](#jobs-and-files).
+
+### Change settings
+
+`POST /api/settings` takes the settings object itself, **without** a surrounding `settings` property. It replaces the submitted settings; omitted fields fall back to defaults and environment overrides. Read the current settings, change the desired fields, then submit the full object:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  "$SCOUT_URL/api/settings" \
+  | jq '.settings | .cron_schedule = "0 2 * * *"' > scout-settings.json
+
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data @scout-settings.json \
+  "$SCOUT_URL/api/settings"
+```
+
+See [Scout configuration](/scout/configuration) for settings and environment precedence. The Station token field remains `scout_credential` in JSON. Settings and status responses can contain that token, so keep them out of public logs. Read current values again before a later update rather than replaying an old settings file.
+
+## Jobs and files
+
+`relative_path` is relative to Scout's scan root, using `/` between folders. Use `.` for the scan root. Job actions identify the folder path, not the job name used on Station.
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `GET` | `/api/directories` | Session | Returns `directories` with each job's `relative_path`, `config`, `config_error`, and `state`; `discovering` indicates an incomplete initial search. |
+| `GET` | `/api/directories/children` | Session | Query `relative_path`; returns child folders under `directories`. |
+| `GET` | `/api/directories/browse` | Session | Query `relative_path`; returns file and folder `entries`, including exclusion information. |
+| `GET` | `/api/directories/size` | Session | Query `relative_path`; calculates source folder size, including excluded files. |
+| `POST` | `/api/directories/save-job` | Admin | JSON `relative_path` and `config`; creates or rewrites the folder's `.upload_dir` and returns `directory`. |
+| `POST` | `/api/directories/delete-job` | Admin | JSON `relative_path`; removes the job marker and local job state. Files and Station snapshots are kept. |
+| `POST` | `/api/directories/exclude` | Admin | JSON `relative_path` of a file or folder within a job; adds an exclusion to the job's marker. |
+| `POST` | `/api/directories/force-send` | Admin | JSON `relative_path`; requests a forced upload of one job. Returns `queued` or `already_running`. |
+| `POST` | `/api/directories/clear-staged` | Admin | JSON `relative_path`; discards that job's pending archive and clears retry and held-review state. |
+
+### Create or update a job
+
+The folder must already exist under the scan root. `config` uses the [same fields as `.upload_dir`](/scout/backup-jobs#edit-the-upload_dir-file), and saving replaces the marker's configuration:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"relative_path":"documents","config":{"job_name":"documents","include_hidden":true,"follow_symlinks":false,"exclude":["*.tmp","cache/"]}}' \
+  "$SCOUT_URL/api/directories/save-job"
+```
+
+Job names must be unique across the Scout. An empty `config` uses the job defaults. The returned `directory.config_error` reports configuration problems; inspect it rather than treating HTTP success alone as proof that the job is valid.
+
+Browse a folder with query encoding:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies --get \
+  --data-urlencode 'relative_path=documents' \
+  "$SCOUT_URL/api/directories/browse"
+```
+
+### Force a fresh backup
+
+Force upload can reuse a staged archive. To include same-size edits or new exclusions when an archive is already staged, wait for active work to finish, clear the staged backup, then force the upload:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"relative_path":"documents"}' \
+  "$SCOUT_URL/api/directories/clear-staged"
+
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"relative_path":"documents"}' \
+  "$SCOUT_URL/api/directories/force-send"
+```
+
+Poll the job's state for completion. See [Job actions](/scout/backup-jobs#job-actions) and [Unusual backups](/scout/unusual-backups) for staged archives, held backups, and retries.
+
+## Restore
+
+All restore actions require admin access. They restore whole snapshots and replace destination files with matching paths; files absent from the snapshot are left untouched.
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `POST` | `/api/recovery/preview` | Admin | JSON `relative_path`, optional `fingerprint`; downloads the snapshot and previews files to add or replace. |
+| `POST` | `/api/recovery/restore` | Admin | The same JSON; downloads, decrypts, and restores the job's snapshot. |
+| `GET` | `/api/restore-requests` | Session | Returns an array of this Scout's restore requests retrieved from Station. |
+| `POST` | `/api/restore-requests/decision` | Admin | JSON `id`, `decision` (`accept` or `reject`), optional `relative_path`, and optional `encryption_key`. Accept downloads and restores the archive. |
+| `POST` | `/backup/restore-notifications` | Public; verified against Station | JSON `id`; Station's notification hint. Scout checks its request list from Station. This never accepts or performs a restore. |
+
+For a local job restore, omit `fingerprint` or use an empty string for the latest snapshot. An 8- or 64-character lowercase hex fingerprint selects the newest matching snapshot from the current Scout instance:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"relative_path":"documents","fingerprint":""}' \
+  "$SCOUT_URL/api/recovery/preview"
+```
+
+After reviewing the preview, send the same body to `/api/recovery/restore` to write the files. These calls wait for their work to finish; a restore can also return `status: "already_running"` without restoring anything.
+
+For a request created through [Station's API](/station/api#restore-requests), `relative_path` is a single folder name directly under the scan root and defaults to the request's job name. When restoring from another Scout instance, supply the original snapshot's Scout key in `encryption_key`. It is used for that restore and does not replace this Scout's own key. Requests expire after one hour. See [Restore requests](/scout/restore#restore-requests-from-station) for retries and destination rules.
+
+## Scout key
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `GET` | `/api/encryption-key` | Admin | Returns `fingerprint` and `key_base64`, the Scout key encoded as base64url text. |
+| `POST` | `/api/encryption-key/rotate` | Admin | No body; replaces the key and returns `new_fingerprint` and `key_base64`. |
+
+The route names are retained for compatibility; the user-facing name is **Scout key**. Keep keys private. Before rotating, read [Rotate the key](/scout/scout-key#rotate-the-key): old snapshots still need the old key, and local job restores use the current key.
+
+## Notifications, hooks, and certificates
+
+JSON writes to these settings endpoints replace the listed fields within their section. Include every value you want to keep. File uploads use multipart form data instead of JSON.
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `GET` | `/api/ntfy` | Session | Returns ntfy settings and the default message template. |
+| `POST` | `/api/ntfy` | Admin | JSON `ntfy_url`, `ntfy_topic`, `ntfy_message_template`; saves notification settings. |
+| `POST` | `/api/ntfy/test` | Admin | The same JSON; sends a test using supplied values without saving them. |
+| `GET` | `/api/hooks` | Session | Returns hook settings and uploaded files. |
+| `POST` | `/api/hooks` | Admin | JSON `hook_pre_command`, `hook_post_command`; saves commands. |
+| `POST` | `/api/hooks/files` | Admin | Multipart field `hook_file`; uploads a script. |
+| `GET` | `/api/hooks/files/{filename}` | Session | Returns `filename` and text `content`. |
+| `DELETE` | `/api/hooks/files/{filename}` | Admin | Deletes the uploaded script. |
+| `GET` | `/api/certificates` | Session | Returns trusted certificate information. |
+| `POST` | `/api/certificates/files` | Admin | Multipart field `certificate_file`; uploads a certificate. |
+| `DELETE` | `/api/certificates/files/{filename}` | Admin | Deletes the uploaded certificate. |
+
+For example:
+
+```sh
+curl --fail-with-body -sS --cookie scout.cookies \
+  -F 'hook_file=@/path/to/pre-backup.sh' \
+  "$SCOUT_URL/api/hooks/files"
+```
+
+See [Notifications](/scout/notifications), [Hooks](/scout/hooks), and [Trusted certificates](/shared/trusted-certificates) for supported values and file requirements.
+
+## Accounts
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `GET` | `/api/users` | Session | Returns `users` and `build`; admins see all accounts, other accounts see themselves. |
+| `POST` | `/api/users` | Admin | JSON `username`, `password`, `is_admin`; creates an account. |
+| `PUT` | `/api/users/{user_id}` | Own account or Admin | JSON optional `username`, `password`, `is_admin`; admin access changes and resetting another account's password require an admin. Use change-password for your own password. |
+| `DELETE` | `/api/users/{user_id}` | Admin | Deletes an account, subject to the [account restrictions](/shared/sign-in#accounts-are-for-one-operator). |
+
+## Errors and automation
+
+Send JSON bodies with `Content-Type: application/json`. API errors generally return a `detail` property:
+
+```json
+{"detail":"login required"}
+```
+
+| HTTP status | Meaning |
+|---|---|
+| `400` | Invalid JSON, path, configuration, or operation request. |
+| `401` | Sign-in required or incorrect sign-in details. |
+| `403` | Admin access or a password change is required. |
+| `404` | Requested resource was not found. |
+| `409` | An operation or settings change conflicts with current state, or a restore request expired. |
+| `429` | Rate limit reached; wait for the number of seconds in `Retry-After`. |
+| `500` | Server-side failure. |
+| `502` | Station or another upstream service could not complete the request. |
+
+Check both the HTTP status and the response's operation `status`. Don't repeatedly log in for every API call, and don't assume a queued backup has completed. Poll status at a reasonable interval and avoid blindly retrying restore or key-rotation calls.
+
+### How API changes appear in the UI
+
+Scout's dashboard reads the same job and settings state as scripts. It normally refreshes every 15 seconds while idle and every 2.5 seconds during active work. Automatic refresh pauses while the tab is hidden or a dialog is open. Folder-tree details, the displayed Scout key, and other panels may need a manual refresh or reopening to fetch new values. Refresh after external changes before editing settings or jobs so an older draft doesn't overwrite them.
+
+### MCP and running without a browser
+
+An external MCP adapter can call these HTTP endpoints using a Scout session and expose actions such as listing jobs or running a backup. Use the API so the same validation and job state are used by both the adapter and the UI.
+
+Scout currently has no built-in MCP server or setting to disable the frontend. You can automate it without using the UI; the published app still serves the UI alongside the API.

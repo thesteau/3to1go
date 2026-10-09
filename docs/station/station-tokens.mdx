@@ -5,6 +5,10 @@ description: "Authorize Scouts to upload to Station, share a token between machi
 
 Scouts authenticate to Station with a signed Station token that Station mints. Station keeps a record of each token but never stores the raw token.
 
+**You sign in to manage Station. An admin session lets you mint a Station token. Scout uses that token to upload and recover snapshots.**
+
+Station checks your admin access through your sign-in session. See [API authentication](/station/api#authenticate) for how scripts sign in and check whether their session has admin access.
+
 <Frame caption="Station mints a token, and Scout saves it in its settings.">
   <img src="/images/gophers/station-token.svg" alt="A Station gopher runs a stamping press that mints a gold Station token, which flies to a Scout gopher." />
 </Frame>
