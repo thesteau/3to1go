@@ -21,9 +21,30 @@
         <button type="button" onclick="createUser()">Add User</button>
       </div>
     </div>
+    <section id="automation-token-section" class="hook-section admin-only" hidden>
+      <h3>Automation Tokens</h3>
+      <p class="hint">For scripts and MCP clients. Tokens belong to your account and are shown once.</p>
+      <div class="user-form">
+        <input id="automation_token_name" type="text" placeholder="token name" maxlength="100" aria-label="Token name">
+        <input id="automation_token_days" type="number" value="90" min="1" max="3650" aria-label="Expires in days">
+      </div>
+      <div class="toolbar">
+        <label class="checkbox"><input id="automation_scope_read" type="checkbox" checked><span>Read status</span></label>
+        <label class="checkbox"><input id="automation_scope_backup" type="checkbox"><span>Run backups</span></label>
+        <label class="checkbox"><input id="automation_scope_restore" type="checkbox"><span>Restore</span></label>
+        <label class="checkbox"><input id="automation_scope_manage" type="checkbox"><span>Manage settings</span></label>
+      </div>
+      <p class="hint">Manage includes all app operations and secrets. Restore can replace files. Sign-in and automation token controls require a browser session.</p>
+      <button type="button" onclick="createAutomationToken()">Create Token</button>
+      <label for="automation_token_output">New token — copy before closing</label>
+      <textarea id="automation_token_output" class="secret-value" readonly spellcheck="false" rows="2"></textarea>
+      <div id="automation-token-list"></div>
+      <p id="automation-token-status" class="hint" role="status"></p>
+    </section>
     <div class="toolbar">
       <button type="button" class="secondary" onclick="openPasswordDialog(false)">Change My Password</button>
       <button type="button" class="secondary" onclick="logoutUser()">Sign Out</button>
+      <button type="button" class="secondary" onclick="logoutUser(true)">Sign Out All Browsers</button>
     </div>
     <div class="dialog-icon-links">
       <span id="build-info" class="hint build-info"></span>

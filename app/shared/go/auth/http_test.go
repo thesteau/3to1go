@@ -39,20 +39,35 @@ func TestLogoutCookieAttributes(t *testing.T) {
 	for _, secure := range []string{"true", "false"} {
 		t.Run(secure, func(t *testing.T) {
 			t.Setenv("SESSION_COOKIE_SECURE", secure)
-			store := &sessionStore{}
-			h := &Handler{Store: store, CookieName: "session"}
-			request := httptest.NewRequest("POST", "/api/session/logout", nil)
-			request.AddCookie(&http.Cookie{Name: "session", Value: "session-token"})
-			response := httptest.NewRecorder()
-			h.Logout(response, request)
-			cookies := response.Result().Cookies()
-			if response.Code != http.StatusOK || len(cookies) != 1 || store.token != "session-token" {
-				t.Fatalf("logout: %d, cookies: %v, deleted token: %q", response.Code, cookies, store.token)
-			}
-			cookie := cookies[0]
-			if cookie.Name != "session" || cookie.Value != "" || cookie.MaxAge != -1 || cookie.Path != "/" ||
-				!cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Secure != (secure == "true") {
-				t.Fatalf("logout cookie: %+v", cookie)
+			for _, action := range []string{"logout", "logout-all"} {
+				t.Run(action, func(t *testing.T) {
+					store := &automationStoreMock{sessionStore: &sessionStore{}, user: &User{ID: 9}}
+					h := &Handler{Store: store, CookieName: "session"}
+					request := httptest.NewRequest("POST", "/api/session/"+action, nil)
+					request.AddCookie(&http.Cookie{Name: "session", Value: "session-token"})
+					request = request.WithContext(context.WithValue(request.Context(), ContextKeyUser, store.user))
+					response := httptest.NewRecorder()
+					if action == "logout-all" {
+						h.LogoutAll(response, request)
+						if store.signedOutID != 9 {
+							t.Fatal("sessions were not invalidated")
+						}
+					} else {
+						h.Logout(response, request)
+						if store.token != "session-token" {
+							t.Fatal("session was not invalidated")
+						}
+					}
+					cookies := response.Result().Cookies()
+					if response.Code != http.StatusOK || len(cookies) != 1 {
+						t.Fatalf("logout: %d, cookies: %v", response.Code, cookies)
+					}
+					cookie := cookies[0]
+					if cookie.Name != "session" || cookie.Value != "" || cookie.MaxAge != -1 || cookie.Path != "/" ||
+						!cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Secure != (secure == "true") {
+						t.Fatalf("logout cookie: %+v", cookie)
+					}
+				})
 			}
 		})
 	}

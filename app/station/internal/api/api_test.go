@@ -62,6 +62,8 @@ func (m *mockUserStore) CreateSession(_ context.Context, _ int) (string, error) 
 
 func (m *mockUserStore) DeleteSession(_ context.Context, _ string) error { return m.deleteSessionErr }
 
+func (m *mockUserStore) DeleteOtherSessionsForUser(context.Context, int, string) error { return nil }
+
 func (m *mockUserStore) DeleteSessionsForUser(_ context.Context, _ int) error { return nil }
 
 func (m *mockUserStore) ListUsers(_ context.Context) ([]*store.User, error) {
@@ -83,6 +85,9 @@ func (m *mockUserStore) ChangePassword(_ context.Context, _ int, _, _ string) (*
 }
 
 type mockCredStore struct {
+	bindErr      error
+	listTokens   []store.CredentialInfo
+	listErr      error
 	verifyResult *store.CredentialRecord
 	verifyErr    error
 	mintResult   string
@@ -91,6 +96,11 @@ type mockCredStore struct {
 	revokeErr    error
 	cleanupN     int64
 	cleanupErr   error
+}
+
+func (m *mockCredStore) Bind(context.Context, string, string, string) error { return m.bindErr }
+func (m *mockCredStore) List(context.Context) ([]store.CredentialInfo, error) {
+	return m.listTokens, m.listErr
 }
 
 func (m *mockCredStore) Verify(_ context.Context, _ string, _ ed25519.PublicKey) (*store.CredentialRecord, error) {
@@ -165,12 +175,21 @@ func (m *mockSnapIndex) ListNamespaces(_ context.Context) ([]store.NamespaceEntr
 }
 
 type mockIngest struct {
-	startResp *ingest.SessionResponse
-	startErr  error
-	chunkResp *ingest.ChunkResponse
-	chunkErr  error
-	finResp   *ingest.FinalizeResponse
-	finErr    error
+	authErr        error
+	ownerHash      string
+	chunkCalled    bool
+	finalizeCalled bool
+	startResp      *ingest.SessionResponse
+	startErr       error
+	chunkResp      *ingest.ChunkResponse
+	chunkErr       error
+	finResp        *ingest.FinalizeResponse
+	finErr         error
+}
+
+func (m *mockIngest) AuthorizeUpload(_ context.Context, _ string, hash string) error {
+	m.ownerHash = hash
+	return m.authErr
 }
 
 func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, _, _ *string, _ bool) (*ingest.SessionResponse, error) {
@@ -178,10 +197,12 @@ func (m *mockIngest) StartUpload(_ context.Context, _ ingest.UploadInitRequest, 
 }
 
 func (m *mockIngest) AppendChunk(_ context.Context, _ string, _ int64, _ io.Reader) (*ingest.ChunkResponse, error) {
+	m.chunkCalled = true
 	return m.chunkResp, m.chunkErr
 }
 
 func (m *mockIngest) FinalizeUpload(_ context.Context, _ string) (*ingest.FinalizeResponse, error) {
+	m.finalizeCalled = true
 	return m.finResp, m.finErr
 }
 

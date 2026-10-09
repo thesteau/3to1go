@@ -244,8 +244,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          # Scan with the patched toolchain used by golang:1.26-alpine builds.
-          go-version: "1.26.x"
+          # Scan with the patched toolchain used by golang:1.27-alpine builds.
+          go-version: "1.27.x"
           check-latest: true
           cache-dependency-path: |
             app/station/go.sum

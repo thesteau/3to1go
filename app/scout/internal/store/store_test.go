@@ -165,6 +165,7 @@ func TestUserStoreEnsureSchema(t *testing.T) {
 	s, mock := testUserStore(t)
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_users").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_sessions").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS app_automation_tokens").WillReturnResult(sqlmock.NewResult(0, 0))
 	if err := s.EnsureSchema(context.Background()); err != nil {
 		t.Fatal(err)
 	}

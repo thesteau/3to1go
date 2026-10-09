@@ -11,6 +11,10 @@ import (
 )
 
 func (a *Handler) SessionMe(w http.ResponseWriter, r *http.Request) {
+	if automation := CurrentAutomationToken(r); automation != nil {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": CurrentUser(r), "automation_token": automation})
+		return
+	}
 	cookie, _ := r.Cookie(a.CookieName)
 	var token string
 	if cookie != nil {
@@ -62,6 +66,13 @@ func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("session_delete_failed", "error", err)
 		}
 	}
+	a.clearSessionCookie(w)
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// clearSessionCookie also supports HTTP deployments: the expired cookie contains
+// no session secret and must use the same Secure setting as the login cookie.
+func (a *Handler) clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     a.CookieName,
 		Value:    "",
@@ -71,6 +82,19 @@ func (a *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Secure:   httpx.SessionCookieSecure(),
 	})
+}
+
+// LogoutAll invalidates browser sessions; automation tokens are revoked separately.
+func (a *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	user := RequireUser(w, r)
+	if user == nil {
+		return
+	}
+	if err := a.Store.DeleteSessionsForUser(r.Context(), user.ID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to sign out browser sessions")
+		return
+	}
+	a.clearSessionCookie(w)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -98,6 +122,15 @@ func (a *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	keep := ""
+	if cookie, _ := r.Cookie(a.CookieName); cookie != nil {
+		keep = cookie.Value
+	}
+	if err := a.Store.DeleteOtherSessionsForUser(r.Context(), user.ID, keep); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "password changed, but other browser sessions could not be signed out")
+		return
+	}
+
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "user": updated})
 }
 
@@ -213,6 +246,7 @@ type Store interface {
 	CreateUser(context.Context, string, string, bool) (*User, error)
 	UpdateUser(context.Context, int, *string, *string, *bool, *bool) (*User, error)
 	DeleteSessionsForUser(context.Context, int) error
+	DeleteOtherSessionsForUser(context.Context, int, string) error
 	DeleteUser(context.Context, int) error
 }
 type Handler struct {

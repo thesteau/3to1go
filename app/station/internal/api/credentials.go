@@ -69,12 +69,13 @@ func (a *App) handleMintCredential(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to mint Station token")
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"credential":        credential,
 		"ttl_days":          ttlDays,
 		"shared":            shared,
 		"max_registrations": maxRegistrations,
-		"message":           "This Station token can be revoked from Station after a Scout instance reports in with it, or it can expire naturally.",
+		"message":           "Copy this Station token before closing. You can revoke it from the token list, even before a Scout uses it.",
 	})
 }
 
@@ -102,8 +103,10 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, "instance has not used a database-backed Station token yet")
 		return
 	}
-	tokenHash := *reg.CredentialHash
+	a.revokeCredentialHash(w, r, *reg.CredentialHash)
+}
 
+func (a *App) revokeCredentialHash(w http.ResponseWriter, r *http.Request, tokenHash string) {
 	// Find all instances using this credential
 	allRegs, err := a.snapIndex.ListScoutRegistrations(r.Context(), nil)
 	if err != nil {
@@ -126,21 +129,33 @@ func (a *App) handleRevokeCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear credential_hash on affected registrations
-	for _, r2 := range allRegs {
-		if r2.CredentialHash != nil && *r2.CredentialHash == tokenHash {
-			copy := r2
-			copy.CredentialHash = nil
-			if err := a.snapIndex.UpsertScoutRegistration(r.Context(), &copy); err != nil {
-				httpx.WriteError(w, http.StatusInternalServerError, "failed to update Station token registrations")
-				return
-			}
-		}
-	}
-
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status":             "revoked",
 		"revoked_rows":       revoked,
 		"affected_instances": affected,
 	})
+}
+
+func (a *App) handleListCredentials(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	tokens, err := a.credStore.List(r.Context())
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to list Station tokens")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"credentials": tokens})
+}
+
+func (a *App) handleRevokeCredentialByHash(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	hash := r.PathValue("token_hash")
+	if len(hash) != 64 || !fingerprintQueryRE.MatchString(hash) {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid token_hash")
+		return
+	}
+	a.revokeCredentialHash(w, r, hash)
 }

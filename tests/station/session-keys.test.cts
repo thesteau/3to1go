@@ -3,7 +3,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 
-function keyContext() {
+function keyContext(fetch = async () => ({ ok: true })) {
   const storage = new Map([["unrelated", "keep"]]);
   const input = { value: "unsaved-key" };
   const status = { textContent: "Key saved" };
@@ -19,10 +19,11 @@ function keyContext() {
       removeItem: (key) => storage.delete(key),
     },
     document: {
+      getElementById: () => null,
       querySelectorAll: (selector) => (selector.includes("input") ? [input] : [status]),
       querySelector: () => status,
     },
-    window: { fetch: async () => ({ ok: true }), setTimeout() {} },
+    window: { fetch, setTimeout() {} },
     closeDialog() {},
     openDialog() {},
     clearStatus() {},
@@ -81,4 +82,20 @@ test("a key prompt started before logout cannot save a key afterwards", async ()
   finish("secret");
   assert.equal(await pending, null);
   assert.equal(ctx.getEncKey("scout", "instance"), null);
+});
+
+test("signing out all browsers uses the revocation endpoint and reports a failure", async () => {
+  const requests = [];
+  const { ctx, messages } = keyContext(async (url) => {
+    requests.push(url);
+    return { ok: false };
+  });
+  let opened = false;
+  ctx.openLoginDialog = () => {
+    opened = true;
+  };
+  await ctx.logoutUser(true);
+  assert.deepEqual(requests, ["/api/session/logout-all"]);
+  assert.equal(opened, false);
+  assert.match(messages[0][0], /Sign out failed/);
 });

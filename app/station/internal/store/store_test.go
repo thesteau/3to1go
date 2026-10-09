@@ -893,12 +893,15 @@ func TestCredentialStore_Revoke_EmptyHash(t *testing.T) {
 }
 
 func TestCredentialStore_Revoke_Success(t *testing.T) {
-	s := newCredStore(&mockPool{execFn: func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-		return pgconn.NewCommandTag("DELETE 1"), nil
+	s := newCredStore(&mockPool{queryRowFn: func(ctx context.Context, sql string, args ...any) pgx.Row {
+		if !strings.Contains(sql, "UPDATE scout_registration SET credential_hash = NULL") || !strings.Contains(sql, "SELECT COUNT(*) FROM revoked") || args[0] != "somehash" {
+			t.Fatal("revocation must atomically delete token and clear bindings")
+		}
+		return &mockRow{scanFn: func(dest ...any) error { *dest[0].(*int64) = 1; return nil }}
 	}})
 	n, err := s.Revoke(context.Background(), "somehash")
 	if err != nil || n != 1 {
-		t.Errorf("Revoke: %v, %v", n, err)
+		t.Fatalf("Revoke: %v, %v", n, err)
 	}
 }
 

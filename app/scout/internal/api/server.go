@@ -20,6 +20,7 @@ type userStorer interface {
 	CreateSession(ctx context.Context, userID int) (string, error)
 	DeleteSession(ctx context.Context, token string) error
 	DeleteSessionsForUser(ctx context.Context, userID int) error
+	DeleteOtherSessionsForUser(context.Context, int, string) error
 	UserForSession(ctx context.Context, token string) (*store.User, error)
 	ListUsers(ctx context.Context) ([]*store.User, error)
 	GetUserByID(ctx context.Context, id int) (*store.User, error)
@@ -120,6 +121,11 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/session/me", a.handleSessionMe)
 	r.Post("/api/session/login", a.handleLogin)
 	r.Post("/api/session/logout", a.handleLogout)
+	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
+	r.Post("/api/session/logout-all", access.LogoutAll)
+	r.Get("/api/automation-tokens", access.ListAutomationTokens)
+	r.Post("/api/automation-tokens", access.CreateAutomationToken)
+	r.Delete("/api/automation-tokens/{token_id}", httpx.WithPathValues(access.RevokeAutomationToken, "token_id"))
 	r.Post("/api/session/change-password", a.handleChangePassword)
 
 	// Users
@@ -193,7 +199,7 @@ func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 
 func isPublicPath(path string) bool {
 	switch path {
-	case "/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/change-password":
+	case "/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/logout-all", "/api/session/change-password":
 		return true
 	case "/backup/restore-notifications":
 		// Station has no Scout session; the handler checks the ID against Station itself.

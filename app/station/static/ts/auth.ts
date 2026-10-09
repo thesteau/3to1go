@@ -95,16 +95,20 @@ async function changeOwnPassword(): Promise<void> {
   startStationApp();
 }
 
-async function logoutUser(): Promise<void> {
+async function logoutUser(allBrowsers = false): Promise<void> {
   clearSessionEncKeys();
   resolveAppDialog(false);
   try {
-    const response = await rawFetch("/api/session/logout", { method: "POST" });
+    const response = await rawFetch(allBrowsers ? "/api/session/logout-all" : "/api/session/logout", {
+      method: "POST",
+    });
     if (!response.ok) throw new Error("Sign out failed. Please try again.");
   } catch (error) {
     setActionStatus((error as Error).message || "Sign out failed. Please try again.", "error");
     return;
   }
+  const tokenOutput = document.getElementById("automation_token_output") as HTMLTextAreaElement | null;
+  if (tokenOutput) tokenOutput.value = "";
   currentUser = null;
   closeDialog("users-dialog");
   openLoginDialog();
