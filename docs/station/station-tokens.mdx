@@ -37,13 +37,14 @@ Station checks your admin access through your sign-in session. See [API authenti
 
 ## How binding works
 
-A normal token is **single-instance**: it binds to the first Scout installation that uploads with it, and Station rejects it from any other installation.
+A normal token is **single-instance**: it binds to the first Scout installation that uploads with it, and Station rejects it from any other installation. The reservation is atomic, so concurrent first uploads cannot exceed the limit. Every chunk and finalize request must also use the token that owns its upload session.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Minted
     Minted --> Bound: First upload from a Scout
     Minted --> Expired: TTL ends unused
+    Minted --> Revoked: Revoke unused token
     Bound --> Bound: Uploads and restores
     Bound --> Revoked: Revoke Station Token
     Bound --> Expired: TTL ends
@@ -62,12 +63,12 @@ Each machine still gets its own instance ID, so their snapshots stay separate on
 Click **Revoke Station Token** on the Scout instance in Station's snapshot view. That Scout can no longer upload or restore. Snapshots already stored are **kept**, and you can still download them from Station's UI. Revoking a shared token stops **every** Scout using it.
 
 <Note>
-  A token can only be revoked after a Scout has reported in with it. An unused token just expires at the end of its TTL.
+  Open **Mint Station Token → Issued Station Tokens** to revoke any issued token, including one that no Scout has used yet. The list shows its hash prefix, creation time, expiry, and sharing limit; it never reveals the original token.
 </Note>
 
 ## Replace a token
 
-Revoke the old token first, because Station rejects a new one while the instance is still bound to the old one. The replacement binds on Scout's next upload, not when you save it.
+Revoke the old token first, or wait for it to expire, because Station rejects a new one while the instance is still bound to a live token. The replacement binds on Scout's next upload, not when you save it.
 
 ## Delete a Scout instance
 

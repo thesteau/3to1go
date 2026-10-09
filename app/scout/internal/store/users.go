@@ -60,7 +60,10 @@ func (s *UserStore) EnsureSchema(ctx context.Context) error {
 			expires_at TEXT NOT NULL,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.ensureAutomationSchema(ctx)
 }
 
 func (s *UserStore) EnsureDefaultAdmin(ctx context.Context, initialPassword string) error {
@@ -343,4 +346,10 @@ func scanUser(row *sql.Row) (*User, error) {
 	u.IsAdmin = isAdminInt != 0
 	u.MustChangePassword = mustChangeInt != 0
 	return u, nil
+}
+
+// DeleteOtherSessionsForUser keeps the browser that changed its password signed in.
+func (s *UserStore) DeleteOtherSessionsForUser(ctx context.Context, userID int, keepToken string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM app_sessions WHERE user_id = ? AND token <> ?`, userID, keepToken)
+	return err
 }

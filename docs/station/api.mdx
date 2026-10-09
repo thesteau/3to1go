@@ -11,14 +11,14 @@ Use the [Scout API](/scout/api) to create backup jobs, trigger backups, or resto
 
 **You sign in to manage Station. An admin session lets you mint a Station token. Scout uses that token to upload and recover snapshots.**
 
-Station uses two separate authentication methods:
+Station separates management authentication from Scout upload authentication:
 
 | API | Authentication | Used for |
 |---|---|---|
-| `/api/...` | Operator session cookie, `three_to_one_go_session` | Settings, token management, snapshot management, and requesting restores. |
+| `/api/...` | Operator session cookie, `three_to_one_go_session`, or a scoped automation token | Settings, token management, snapshot management, and requesting restores. |
 | `/backup/...` | `Authorization: Bearer <station-token>` | Scout's upload and recovery protocol. Recovery checks that the token is bound to the requested Scout instance. |
 
-Station recognizes an admin by looking up the session cookie and checking the account's `is_admin` flag in its database. Call `GET /api/session/me` with your cookie to check `authenticated` and `user.is_admin`.
+Station recognizes an admin by looking up the session cookie (or the automation token's owner) and checking the account's `is_admin` flag in its database. Automation requests must also pass their token's scope checks. Call `GET /api/session/me` with your cookie to check `authenticated` and `user.is_admin`.
 
 A Station token does **not** grant management access to `/api/...`, and an operator session does **not** authenticate `/backup/...`. **Session** in the tables means a signed-in account; **Admin** also requires admin access. Accounts are intended for [one operator](/shared/sign-in#accounts-are-for-one-operator), and Scout has its own separate session.
 
@@ -45,7 +45,7 @@ curl --fail-with-body -sS --cookie station.cookies \
   "$STATION_URL/api/session/change-password"
 ```
 
-Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session.
+Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session. Changing your password signs out other browsers while keeping the calling session. **Sign Out All Browsers** ends all your browser sessions in this app. Automation tokens are revoked separately.
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
@@ -53,6 +53,47 @@ Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it 
 | `GET` | `/api/session/me` | Public | Returns `authenticated` and `user` (null when signed out). |
 | `POST` | `/api/session/change-password` | Session, including when a password change is required | JSON `current_password`, `new_password`, `confirm_new_password`. |
 | `POST` | `/api/session/logout` | Public | No body; clears the current session cookie. |
+| `POST` | `/api/session/logout-all` | Session | No body; invalidates all browser sessions for the signed-in account and clears its cookie. |
+
+## Automation tokens
+
+For scripts or an external MCP adapter, open **Admin → Users & Access → Automation Tokens**. Choose a name, expiry, and permissions; copy the returned token once. The token belongs to the existing operator account. It is valid only in the app that issued it, and it stops working if revoked, expired, or its owner no longer has admin access or must change their password.
+
+| Scope | Allowed requests |
+|---|---|
+| `read` | `GET /api/overview` (storage and snapshots; omits `settings`) and `GET /api/admin/verify`. `section=settings` is forbidden. |
+| `backup` | `POST /api/admin/uploads/pause` or `/api/admin/uploads/resume`. Trigger individual backups through Scout. |
+| `restore` | Snapshot download endpoints and `POST /api/snapshots/{scout_id}/{scout_instance_id}/{job_name}/{filename}/restore`. Restore can replace destination files. |
+| `manage` | All app management operations and secrets, except account, session, and automation token controls. |
+
+Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available. There is no per-job or per-instance ownership model.
+
+Creating, listing, and revoking automation tokens requires an **admin session cookie**:
+
+| Method | Endpoint | Request or response |
+|---|---|---|
+| `POST` | `/api/automation-tokens` | JSON `name`, `scopes`, and optional `ttl_days` (default 90, range 1–3650). Returns `201` with `token` and `automation_token` metadata. |
+| `GET` | `/api/automation-tokens` | Returns the signed-in operator's token metadata under `tokens`, including expired tokens. Secrets are never returned again. |
+| `DELETE` | `/api/automation-tokens/{token_id}` | Revokes one token immediately. Use its metadata `id`. |
+
+```sh
+curl --fail-with-body -sS --cookie station.cookies \
+  -H 'Content-Type: application/json' \
+  --data '{"name":"backup-script","scopes":["read","backup"],"ttl_days":90}' \
+  "$STATION_URL/api/automation-tokens"
+```
+
+Use the returned secret as a bearer token:
+
+```sh
+API_TOKEN='<returned-automation-token>'
+curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" \
+  "$STATION_URL/api/overview?section=snapshots"
+```
+
+`GET /api/session/me` also accepts an automation token and returns its metadata under `automation_token`. The endpoint tables below describe session access; automation tokens additionally require the applicable scope. An invalid bearer token returns `401` even if a valid cookie is also present.
+
+Browser writes from another origin are rejected with `403`. Serve the UI through the same origin as its API, and preserve the request host through a reverse proxy. Ordinary curl requests without browser origin headers continue to work.
 
 ## Overview, settings, and maintenance
 
@@ -101,6 +142,8 @@ These are the tokens Scouts use for `/backup/...`. The older route and JSON name
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
+| `GET` | `/api/credentials` | Admin | Lists issued token metadata under `credentials`: `token_hash`, `created_at`, `expires_at`, `shared`, and `max_registrations`. Never returns raw tokens. |
+| `DELETE` | `/api/credentials/{token_hash}` | Admin | Revokes any issued token, including an unused one, and clears its instance bindings. |
 | `POST` | `/api/credentials/mint` | Admin | JSON optional `ttl_days`, `shared`, `max_registrations`; returns `credential`, `ttl_days`, `shared`, `max_registrations`, and `message`. |
 | `DELETE` | `/api/credentials/instances/{scout_id}/{scout_instance_id}` | Admin | Revokes the token used by that instance; returns `revoked_rows` and `affected_instances`. |
 
@@ -115,7 +158,7 @@ curl --fail-with-body -sS --cookie station.cookies \
 
 `ttl_days` defaults to 365 and accepts 1 to 3650. A normal token allows one instance. For a shared token, set `shared: true` and `max_registrations` from 2 to 10000. The endpoint also accepts a `ttl_days` query parameter; a nonzero JSON `ttl_days` takes precedence.
 
-Keep the returned token private; Station doesn't provide an endpoint to retrieve it later. A normal token binds on the first Scout upload, and recovery requires an existing binding. Revocation is available after an instance has reported in with the token. Revoking a shared token stops every instance using it. See [Station tokens](/station/station-tokens) for binding and replacement rules.
+Keep the returned token private; Station doesn't provide an endpoint to retrieve it later. A normal token binds on the first Scout upload, and recovery requires an existing binding. List issued tokens with `GET /api/credentials`, then revoke by `token_hash` before or after a Scout uses one. The instance-based revoke route remains available. Revoking a shared token stops every instance using it. See [Station tokens](/station/station-tokens) for binding and replacement rules.
 
 ## Snapshots and instances
 
@@ -209,7 +252,9 @@ Every backup is a full, self-contained archive. A compatible client compresses a
 | `PUT` | `/backup/uploads/{upload_id}/chunk` | Required query `offset` (nonnegative byte offset), raw binary body; returns `upload_id`, `status`, `next_offset`, and `received_bytes`. |
 | `POST` | `/backup/uploads/{upload_id}/finalize` | No body; verifies and stores the archive, applies retention, and returns `status`, `stored_as`, `pruned`, `duplicate`, and optionally `unusual`. |
 
-Send `Authorization: Bearer <station-token>` on each request. Initiation takes:
+Send `Authorization: Bearer <station-token>` on each request. Chunk and finalize requests must use the token that owns that upload session. Initiation reserves an instance atomically, including the shared registration limit. Existing sessions from older releases are checked against their instance binding.
+
+Initiation takes:
 
 | JSON field | Value |
 |---|---|
@@ -221,7 +266,7 @@ Send `Authorization: Bearer <station-token>` on each request. Initiation takes:
 | `archive_format` | Required `tar.zst`. |
 | `archive_size_bytes` | Required positive size of the uploaded archive bytes. |
 | `archive_sha256` | Required 64-character lowercase hex SHA-256 checksum of the uploaded archive bytes. This verifies transfer integrity; it is separate from change detection. |
-| `idempotency_key` | Required key reused when resuming the same upload. Reusing it with a different archive checksum returns `409`. |
+| `idempotency_key` | Required key reused when resuming the same upload. Reusing it with a different archive checksum, size, or Scout/instance/job namespace returns `409`. |
 | `encryption_key_fingerprint` | Optional Scout key fingerprint; lets Station associate the instance with its key fingerprint. Never send the key itself. |
 | `advertised_url` | Optional Scout callback URL for restore notification hints. |
 
@@ -285,6 +330,6 @@ Scout keys supplied to Station's UI stay in the browser session. Managing snapsh
 
 ### MCP and running without a browser
 
-An external MCP adapter can call these HTTP endpoints using an operator session and expose actions such as listing snapshots or requesting a restore. Use the API so the same validation and snapshot state are used by both the adapter and the UI.
+An external MCP adapter can call these HTTP endpoints using an automation token and expose actions such as listing snapshots or requesting a restore. Use the API so the same validation and snapshot state are used by both the adapter and the UI.
 
 Station currently has no built-in MCP server or setting to disable the frontend. You can automate it without using the UI; the published app still serves the UI alongside the API.

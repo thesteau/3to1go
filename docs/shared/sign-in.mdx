@@ -62,7 +62,7 @@ An admin reset signs the target account out of its existing sessions and require
 
 Open **Admin**, then **Change My Password**. Enter your current password and the new password twice. Passwords must be at least five characters and cannot consist only of spaces.
 
-The same dialog appears when a password change is required. Changing your own password keeps your existing sessions signed in.
+The same dialog appears when a password change is required. Changing your own password keeps the calling browser signed in and signs out your other browser sessions. Automation tokens are managed separately.
 
 <Frame caption="Change My Password in Station. Scout has the same fields.">
   <img src="/images/sign-in/station-change-password.png" alt="Change Password dialog with current password, new password, and confirmation fields" />
@@ -70,7 +70,13 @@ The same dialog appears when a password change is required. Changing your own pa
 
 ## Sessions and sign-out
 
-Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session. Other browsers stay signed in. Station and Scout use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
+Sessions expire seven days after sign-in. Use **Admin → Sign Out** to end the current session. Other browsers stay signed in unless you choose **Sign Out All Browsers**. This control applies to the current app; it does not revoke automation tokens. Station and Scout use separate session cookies, both marked `HttpOnly` and `SameSite=Lax`.
+
+## Automation and browser protection
+
+For scripts and external MCP adapters, admins can create named, expiring **Automation Tokens** in **Users & Access**. Choose read, backup, restore, or manage permissions. Tokens are tied to your existing account, their secrets are shown once, and they can be revoked from the same dialog. See the [Scout API](/scout/api#automation-tokens) and [Station API](/station/api#automation-tokens) for the exact scopes and curl examples. Station tokens used by Scout for uploads remain separate.
+
+The server rejects browser write requests from another origin. This covers sibling applications or subdomains that may otherwise receive the same-site cookie protection. The normal UI uses its own API origin; scripts without browser origin headers continue to work.
 
 ## Session cookies over HTTPS
 
