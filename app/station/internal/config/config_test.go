@@ -83,8 +83,8 @@ func TestCoerceURL_ValidHTTP(t *testing.T) {
 }
 
 func TestCoerceURL_ValidHTTPS(t *testing.T) {
-	v, err := coerceURL("https://ntfy.sh/topic")
-	if err != nil || v != "https://ntfy.sh/topic" {
+	v, err := coerceURL("https://example.com/topic")
+	if err != nil || v != "https://example.com/topic" {
 		t.Errorf("got (%q, %v)", v, err)
 	}
 }
@@ -339,12 +339,6 @@ func TestSettingsToPayload_RoundTrip(t *testing.T) {
 		UploadChunkSizeMB:      16,
 		UploadSessionTTLHours:  48,
 		UploadCleanupIntervalS: 600,
-		NtfyURL:                "https://ntfy.sh",
-		NtfyTopic:              "mytopic",
-		NtfyMessageTemplate:    "hello",
-		NtfyMatchScoutID:       "scout1",
-		NtfyMatchScoutInstID:   "inst1",
-		NtfyMatchSource:        "1.2.3.4",
 		HookPreCommand:         "pre.sh",
 		HookPostCommand:        "post.sh",
 	}
@@ -352,8 +346,8 @@ func TestSettingsToPayload_RoundTrip(t *testing.T) {
 	if p.RetentionKeepLast != 5 || p.LogLevel != "DEBUG" || p.Theme != "light" {
 		t.Errorf("payload mismatch: %+v", p)
 	}
-	if p.NtfyURL != "https://ntfy.sh" || p.HookPreCommand != "pre.sh" {
-		t.Errorf("payload mismatch: %+v", p)
+	if p.HookPreCommand != "pre.sh" {
+		t.Errorf("hook command missing: %+v", p)
 	}
 }
 
@@ -393,8 +387,6 @@ func TestBuildSettings_WithPayload(t *testing.T) {
 		LogLevel:          "warn",
 		Theme:             "light",
 		MaxUploadSizeMB:   512,
-		NtfyURL:           "https://ntfy.example.com",
-		NtfyTopic:         "alerts",
 	}
 	s, err := BuildSettings(p)
 	if err != nil {
@@ -408,21 +400,6 @@ func TestBuildSettings_WithPayload(t *testing.T) {
 	}
 	if s.Theme != "light" {
 		t.Errorf("Theme = %q", s.Theme)
-	}
-	if s.NtfyURL != "https://ntfy.example.com" {
-		t.Errorf("NtfyURL = %q", s.NtfyURL)
-	}
-}
-
-func TestBuildSettings_BadNtfyURL(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("ISSUER_KEY_FILE", filepath.Join(dir, "issuer.key"))
-	t.Setenv("INDEX_DATABASE_URL", "postgresql://u:p@h/d")
-
-	p := &SettingsPayload{NtfyURL: "ftp://bad.url"}
-	_, err := BuildSettings(p)
-	if err == nil {
-		t.Error("expected error for bad ntfy URL")
 	}
 }
 

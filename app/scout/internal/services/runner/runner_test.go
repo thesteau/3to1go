@@ -14,7 +14,6 @@ import (
 	"github.com/3to1go/scout/internal/backup"
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/services/locks"
-	"github.com/3to1go/scout/internal/services/ntfy"
 	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/services/upload"
 	"github.com/3to1go/shared/hooks"
@@ -28,15 +27,14 @@ func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadCl
 	stateStore := newMockStateStore()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	return &ScoutRunner{
-		Settings:      settings,
-		logger:        logger,
-		encKey:        []byte("0123456789abcdef0123456789abcdef"),
-		StateStore:    stateStore,
-		UploadClient:  client,
-		LockManager:   locks.NewJobLockManager(),
-		HookManager:   hooks.NewHookManager("scout", t.TempDir(), logger),
-		NtfyPublisher: ntfy.NewNtfyPublisher(logger),
-		Anomalies:     newMockAnomalyStore(),
+		Settings:     settings,
+		logger:       logger,
+		encKey:       []byte("0123456789abcdef0123456789abcdef"),
+		StateStore:   stateStore,
+		UploadClient: client,
+		LockManager:  locks.NewJobLockManager(),
+		HookManager:  hooks.NewHookManager("scout", t.TempDir(), logger),
+		Anomalies:    newMockAnomalyStore(),
 	}
 }
 

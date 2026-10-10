@@ -177,24 +177,14 @@ func (h *HookManager) RunCommandContext(parent context.Context, command, phase s
 	cmd.Dir = h.ScriptsDir
 	cmd.Env = env
 
-	stdout, runErr := cmd.Output()
-	var stderr []byte
-	if exitErr, ok := runErr.(*exec.ExitError); ok {
-		stderr = exitErr.Stderr
-	}
+	runErr := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		h.logger.Warn("hook_execution_timeout", "phase", phase, "command", normalized)
+		h.logger.Warn("hook_execution_timeout", "phase", phase)
 		return
 	}
 
-	if len(stdout) > 0 {
-		h.logger.Info("hook_execution_stdout", "phase", phase, "command", normalized, "output", strings.TrimSpace(string(stdout)))
-	}
-	if len(stderr) > 0 {
-		h.logger.Warn("hook_execution_stderr", "phase", phase, "command", normalized, "output", strings.TrimSpace(string(stderr)))
-	}
 	if runErr != nil {
-		h.logger.Warn("hook_execution_nonzero", "phase", phase, "command", normalized, "error", runErr)
+		h.logger.Warn("hook_execution_nonzero", "phase", phase, "detail", "command failed")
 	}
 }
 

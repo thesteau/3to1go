@@ -96,6 +96,8 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("init runner: %w", err)
 	}
 
+	defer scoutRunner.Integrations.Close()
+
 	// Look for jobs now, so the first page load doesn't wait for it.
 	scoutRunner.DirService.StartDiscovery()
 
@@ -107,7 +109,7 @@ func run(logger *slog.Logger) error {
 	sched.Start()
 
 	// Build the HTTP app.
-	app := api.NewApp(scoutRunner, sched, userStore, settingsStore, logger)
+	app := api.NewApp(scoutRunner, sched, userStore, settingsStore, logger, scoutRunner.Integrations)
 
 	addr := net.JoinHostPort(settings.HTTPHost, fmt.Sprint(settings.HTTPPort))
 	ln, err := net.Listen("tcp", addr)

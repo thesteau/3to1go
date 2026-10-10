@@ -239,8 +239,6 @@ func TestSettingsToPayload_RoundTrip(t *testing.T) {
 		LogLevel:     "DEBUG",
 		Theme:        "light",
 		HTTPPort:     6556,
-		NtfyURL:      "https://ntfy.sh",
-		NtfyTopic:    "alerts",
 	}
 	p := SettingsToPayload(s)
 	if p.ScoutID != "my-scout" {
@@ -251,9 +249,6 @@ func TestSettingsToPayload_RoundTrip(t *testing.T) {
 	}
 	if p.HTTPPort != 6556 {
 		t.Errorf("HTTPPort = %d, want 6556", p.HTTPPort)
-	}
-	if p.NtfyURL != "https://ntfy.sh" {
-		t.Errorf("NtfyURL = %q, want https://ntfy.sh", p.NtfyURL)
 	}
 }
 
@@ -394,14 +389,6 @@ func TestBuildSettings_BadStationURL(t *testing.T) {
 	defer t.Setenv("STATION_URL", "")
 	if _, err := BuildSettings(nil); err == nil {
 		t.Error("expected error for bad station URL")
-	}
-}
-
-func TestBuildSettings_BadNtfyURL(t *testing.T) {
-	t.Setenv("STATION_URL", "")
-	p := &SettingsPayload{NtfyURL: "not-a-url"}
-	if _, err := BuildSettings(p); err == nil {
-		t.Error("expected error for bad ntfy URL")
 	}
 }
 

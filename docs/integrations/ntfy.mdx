@@ -1,0 +1,25 @@
+---
+title: "ntfy"
+description: "Publish backup messages to an ntfy topic through the generic HTTP integration."
+---
+
+ntfy uses the same **Integrations** dialog as other receivers. There is no separate ntfy configuration or template system.
+
+<Steps>
+  <Step title="Choose the topic">
+    Use your HTTPS ntfy server and a topic you control, such as `https://ntfy.example.com/backups`. Subscribe to that topic in your ntfy app. A topic name alone isn't access control; configure the server's permissions for private messages.
+  </Step>
+  <Step title="Add a plain-text destination">
+    In 3to1go's **Integrations**, choose **Plain text**, enter the complete topic URL as the secret destination, and select the events you want.
+  </Step>
+  <Step title="Supply authentication if required">
+    For token authentication, use secret headers such as `{"Authorization":"Bearer YOUR_NTFY_TOKEN"}`. Other publishing headers can go in the same JSON object, for example `{"Authorization":"Bearer YOUR_NTFY_TOKEN","Title":"Backup events"}`.
+  </Step>
+  <Step title="Save, test, and subscribe">
+    Save, click **Test saved destination**, and verify the message in the subscribed topic. If your server uses a private CA, configure [Trusted certificates](/shared/trusted-certificates).
+  </Step>
+</Steps>
+
+Create separate destinations for success and unusual events if you want different templates or headers. For example, an unusual-events destination can use a `Priority` header with value `5`; its priority applies to every event selected for that destination.
+
+See ntfy's official [publishing guide](https://docs.ntfy.sh/publish/), [authentication section](https://docs.ntfy.sh/publish/#authentication), and [access control guide](https://docs.ntfy.sh/config/#access-control) for server-side permissions and supported headers. Protect the topic URL and token as described in [Integration secrets](/integrations/secrets).
