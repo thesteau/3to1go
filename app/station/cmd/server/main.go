@@ -15,11 +15,11 @@ import (
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/configutil"
 	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/station/internal/api"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/ingest"
 	"github.com/3to1go/station/internal/services/locks"
-	"github.com/3to1go/station/internal/services/ntfy"
 	"github.com/3to1go/station/internal/services/verify"
 	"github.com/3to1go/station/internal/storage"
 	"github.com/3to1go/station/internal/store"
@@ -111,9 +111,13 @@ func run(logger *slog.Logger) error {
 	lockMgr := locks.NewNamespaceLockManager()
 	hookMgr := hooks.NewHookManager("station", config.HookScriptsDir(), logger)
 	certMgr := certificates.NewCertManager(config.TrustedCertificatesDir())
-	ntfyPub := ntfy.NewNtfyPublisher(logger)
+	notifications, err := integrations.New("station", config.DefaultConfigDir(), logger, certMgr.TLSConfig)
+	if err != nil {
+		return err
+	}
+	defer notifications.Close()
 
-	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hookMgr, ntfyPub, uploadSessionStore)
+	ingestSvc, err := ingest.New(settings, backend, snapIndex, lockMgr, hookMgr, notifications, uploadSessionStore)
 	if err != nil {
 		return fmt.Errorf("initialize ingest service: %w", err)
 	}
@@ -122,7 +126,7 @@ func run(logger *slog.Logger) error {
 
 	app := api.NewApp(
 		settings, userStore, credStore, settingsStore, snapIndex,
-		backend, ingestSvc, hookMgr, certMgr, ntfyPub, verifySvc, logger,
+		backend, ingestSvc, hookMgr, certMgr, notifications, verifySvc, logger,
 	)
 
 	if settings.SnapshotVerifyIntervalHours > 0 {

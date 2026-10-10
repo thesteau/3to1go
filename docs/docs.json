@@ -44,6 +44,17 @@
             "pages": ["shared/sign-in", "shared/trusted-certificates"]
           },
           {
+            "group": "Integrations",
+            "pages": [
+              "shared/integrations",
+              "integrations/secrets",
+              "integrations/discord",
+              "integrations/n8n",
+              "integrations/ntfy",
+              "integrations/http"
+            ]
+          },
+          {
             "group": "Contributing",
             "pages": ["development", "releases"]
           }

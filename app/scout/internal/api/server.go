@@ -11,6 +11,7 @@ import (
 	"github.com/3to1go/scout/internal/store"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
+	"github.com/3to1go/shared/integrations"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -39,9 +40,6 @@ type scoutRunner interface {
 
 	StatusSnapshot() map[string]any
 	DirectoriesSnapshot() map[string]any
-
-	NtfySnapshot(cfg *config.Settings) map[string]any
-	TestNtfy(ntfyURL, ntfyTopic, messageTemplate string) error
 
 	CertSnapshot() map[string]any
 	SaveCertFile(filename string, content []byte) (any, error)
@@ -84,6 +82,7 @@ type App struct {
 	userStore     userStorer
 	settingsStore settingsStorer
 	logger        *slog.Logger
+	integrations  integrations.Store
 }
 
 // NewApp constructs the App from its dependencies.
@@ -93,13 +92,19 @@ func NewApp(
 	userStore userStorer,
 	settingsStore settingsStorer,
 	logger *slog.Logger,
+	notificationStores ...integrations.Store,
 ) *App {
+	var notifications integrations.Store
+	if len(notificationStores) > 0 {
+		notifications = notificationStores[0]
+	}
 	return &App{
 		runner:        runner,
 		scheduler:     scheduler,
 		userStore:     userStore,
 		settingsStore: settingsStore,
 		logger:        logger,
+		integrations:  notifications,
 	}
 }
 
@@ -165,10 +170,8 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/settings", a.handleGetSettings)
 	r.Post("/api/settings", a.handleSaveSettings)
 
-	// Ntfy
-	r.Get("/api/ntfy", a.handleGetNtfy)
-	r.Post("/api/ntfy", a.handleSaveNtfy)
-	r.Post("/api/ntfy/test", a.handleTestNtfy)
+	// Integrations
+	integrations.Register(r, a.integrations, "scout")
 
 	// Certificates
 	r.Get("/api/certificates", a.handleGetCertificates)

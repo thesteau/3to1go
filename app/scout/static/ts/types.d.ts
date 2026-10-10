@@ -25,9 +25,6 @@ interface ScoutSettings {
   upload_min_throughput_bytes_per_second?: number;
   circuit_breaker_failure_threshold?: number;
   circuit_breaker_cooldown_seconds?: number;
-  ntfy_url?: string;
-  ntfy_topic?: string;
-  ntfy_message_template?: string;
   hook_pre_command?: string;
   hook_post_command?: string;
 }
@@ -117,13 +114,6 @@ interface EncryptionKeyResponse extends ApiBody {
   key_base64?: string;
   fingerprint?: string;
   new_fingerprint?: string;
-}
-
-interface NtfyConfig extends ApiBody {
-  ntfy_url?: string;
-  ntfy_topic?: string;
-  ntfy_message_template?: string;
-  default_message_template?: string;
 }
 
 interface BrowseEntry {

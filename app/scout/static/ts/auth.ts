@@ -23,6 +23,8 @@ window.fetch = async (...args: Parameters<typeof fetch>) => {
 };
 
 function openLoginDialog(): void {
+  if (typeof clearIntegrationSecrets === "function") clearIntegrationSecrets();
+  closeDialog("integrations-dialog");
   clearStatus("login-status");
   openDialog("login-dialog");
   window.setTimeout(() => document.getElementById("login_password")?.focus(), 0);

@@ -17,7 +17,7 @@ for (const app of ["scout", "station"]) {
         throw new Error("Unexpected request");
       },
     });
-    for (const feature of ["ui", "admin", "notifications", "certificates", "hooks"]) {
+    for (const feature of ["ui", "admin", "integrations", "certificates", "hooks"]) {
       loadFeature(ctx, app, feature);
     }
     ctx.setActionStatus = () => {};
@@ -48,7 +48,7 @@ for (const app of ["scout", "station"]) {
     };
     const ctx = vm.createContext({
       document: {
-        getElementById: (id) => (id === "ntfy-load-status" ? status : null),
+        getElementById: (id) => (id === "integrations-load-status" ? status : null),
         querySelectorAll: () => [control],
         createElement: () => ({}),
       },
@@ -59,7 +59,7 @@ for (const app of ["scout", "station"]) {
       if (++attempts === 1) throw new Error("down");
       return "ok";
     };
-    await assert.rejects(ctx.loadEditorPanel("ntfy", task));
+    await assert.rejects(ctx.loadEditorPanel("integrations", task));
     assert.equal(control.disabled, true);
     assert.match(status.textContent, /Could not load/);
     const retry = status.children.find((child) => child.textContent === "Retry");

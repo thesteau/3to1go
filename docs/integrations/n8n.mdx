@@ -1,0 +1,27 @@
+---
+title: "n8n"
+description: "Start an n8n workflow from structured backup events."
+---
+
+n8n can receive 3to1go events and decide what to do next: send email, post to chat, aggregate successes, or open a task for failures. 3to1go needs only its generic JSON destination; n8n manages the downstream services.
+
+<Steps>
+  <Step title="Add a Webhook node">
+    In an n8n workflow, add **Webhook**, set its method to **POST**, and configure **Header auth**. Use a secret header, for example `X-Backup-Token`, with a randomly generated value managed in n8n's credentials. Configure it to respond **Immediately** so the sender doesn't wait for the rest of the workflow.
+  </Step>
+  <Step title="Choose the production URL">
+    Publish the workflow and copy its **Production URL**. Use HTTPS. The Test URL listens only when you explicitly start a test in n8n, so it is unsuitable for unattended backup notifications.
+  </Step>
+  <Step title="Configure 3to1go">
+    In **Integrations**, select **JSON event**, paste the URL, and supply headers such as `{"X-Backup-Token":"YOUR_RANDOM_TOKEN"}`. Select your events, save, and click **Test saved destination**.
+  </Step>
+  <Step title="Route the event">
+    Check n8n's **Executions** history. Use an IF or Switch node to inspect `$json.body.event`, `$json.body.status`, or `$json.body.job_name`, then connect the appropriate action nodes. The test event has `event: "test"`; give it a test branch or ignore it in production actions.
+  </Step>
+</Steps>
+
+Examples of useful branches are `unusual-backup`, `unusual-upload`, and `job-finished` with a status that needs attention. Scout's common statuses are listed in the [hook guide](/scout/hooks#example-report-each-job-to-a-health-check). Station reports `ok` or `error` for `upload-received`.
+
+An immediate `2xx` response confirms acceptance by n8n, not successful completion of every downstream node. Use n8n's own execution and error handling for subsequent failures. 3to1go does not replay failed or lost notifications.
+
+Consult n8n's official [Webhook node guide](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/) and [Webhook credentials guide](https://docs.n8n.io/integrations/builtin/credentials/webhook/) for URL lifecycle, authentication, and response settings. The [HTTP guide](/integrations/http) documents the exact payload.

@@ -49,11 +49,14 @@ When using an external database, also remove the bundled `postgres` service and 
 | `BACKUP_ROOT` | `/backups` | Snapshot folder inside the container. |
 | `STAGING_DIR` | `/staging` | Folder for uploads in progress. |
 | `ISSUER_KEY_FILE` | `/config/issuer.key` | Key used to sign Station tokens. Created on first start if missing. |
+| `INTEGRATIONS_KEY_FILE` | `/config/integrations/key` | Optional external integration encryption key file, containing 64 hexadecimal characters. An external key is never generated. See [Integration secrets](/integrations/secrets). |
 | `SESSION_COOKIE_SECURE` | off | Set to `true` when serving Station over HTTPS. See [Sign-in](/shared/sign-in#session-cookies-over-https). |
 
 ## Settings in the UI
 
 Open **Edit Station Settings**.
+
+Configure HTTP notifications separately in **Integrations**. Destinations and their write-only secrets are encrypted under `/config/integrations`, outside the settings database. See [Integrations](/shared/integrations) for events and service guides.
 
 | Setting | Default | Description |
 |---|---|---|

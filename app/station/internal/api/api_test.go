@@ -17,9 +17,9 @@ import (
 
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/ingest"
-	"github.com/3to1go/station/internal/services/ntfy"
 	"github.com/3to1go/station/internal/signing"
 	"github.com/3to1go/station/internal/storage"
 	"github.com/3to1go/station/internal/store"
@@ -233,7 +233,11 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	backend := storage.NewLocalBackend(settings.BackupRoot)
 	hookMgr := hooks.NewHookManager("station", t.TempDir(), discardLogger())
 	certMgr := certificates.NewCertManager(t.TempDir())
-	ntfyPub := ntfy.NewNtfyPublisher(discardLogger())
+	notifications, err := integrations.New("station", t.TempDir(), discardLogger(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(notifications.Close)
 	if us == nil {
 		us = &mockUserStore{}
 	}
@@ -246,7 +250,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, ntfyPub, nil, discardLogger())
+	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, notifications, nil, discardLogger())
 }
 
 func jsonReq(method, path string, body any) *http.Request {
@@ -802,27 +806,8 @@ func TestHandleSaveSettings_SaveError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// handleGetNtfy / handleGetHooks / handleGetCertificates
+// handleGetHooks / handleGetCertificates
 // ---------------------------------------------------------------------------
-
-func TestHandleGetNtfy_RequiresAuth(t *testing.T) {
-	app := newTestApp(t, nil, nil, nil, nil)
-	rr := httptest.NewRecorder()
-	app.handleGetNtfy(rr, httptest.NewRequest("GET", "/api/ntfy", nil))
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("code = %d, want 401", rr.Code)
-	}
-}
-
-func TestHandleGetNtfy_Success(t *testing.T) {
-	app := newTestApp(t, nil, nil, nil, nil)
-	rr := httptest.NewRecorder()
-	req := withUser(httptest.NewRequest("GET", "/api/ntfy", nil), adminUser())
-	app.handleGetNtfy(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Errorf("code = %d, want 200", rr.Code)
-	}
-}
 
 func TestHandleGetHooks_Success(t *testing.T) {
 	app := newTestApp(t, nil, nil, nil, nil)

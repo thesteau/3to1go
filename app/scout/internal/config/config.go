@@ -39,9 +39,6 @@ type Settings struct {
 	UploadMinThroughputBytesPerSecond int
 	CircuitBreakerFailureThreshold    int
 	CircuitBreakerCooldownSeconds     int
-	NtfyURL                           string
-	NtfyTopic                         string
-	NtfyMessageTemplate               string
 	HookPreCommand                    string
 	HookPostCommand                   string
 	HTTPHost                          string
@@ -177,9 +174,6 @@ type SettingsPayload struct {
 	UploadMinThroughputBytesPerSecond int    `json:"upload_min_throughput_bytes_per_second"`
 	CircuitBreakerFailureThreshold    int    `json:"circuit_breaker_failure_threshold"`
 	CircuitBreakerCooldownSeconds     int    `json:"circuit_breaker_cooldown_seconds"`
-	NtfyURL                           string `json:"ntfy_url"`
-	NtfyTopic                         string `json:"ntfy_topic"`
-	NtfyMessageTemplate               string `json:"ntfy_message_template"`
 	HookPreCommand                    string `json:"hook_pre_command"`
 	HookPostCommand                   string `json:"hook_post_command"`
 	HTTPHost                          string `json:"http_host"`
@@ -213,9 +207,6 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		UploadMinThroughputBytesPerSecond: s.UploadMinThroughputBytesPerSecond,
 		CircuitBreakerFailureThreshold:    s.CircuitBreakerFailureThreshold,
 		CircuitBreakerCooldownSeconds:     s.CircuitBreakerCooldownSeconds,
-		NtfyURL:                           s.NtfyURL,
-		NtfyTopic:                         s.NtfyTopic,
-		NtfyMessageTemplate:               s.NtfyMessageTemplate,
 		HookPreCommand:                    s.HookPreCommand,
 		HookPostCommand:                   s.HookPostCommand,
 		HTTPHost:                          s.HTTPHost,
@@ -249,10 +240,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("advertised_url: %w", err)
 	}
-	ntfyURL, err := coerceURL(raw.NtfyURL, "")
-	if err != nil {
-		return nil, fmt.Errorf("ntfy_url: %w", err)
-	}
 
 	stateDir := coerceText(raw.StateDir, DefaultStateDir())
 	spoolDir := coerceText(raw.SpoolDir, DefaultSpoolDir())
@@ -283,9 +270,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		UploadMinThroughputBytesPerSecond: coerceInt(raw.UploadMinThroughputBytesPerSecond, 262144, 1024),
 		CircuitBreakerFailureThreshold:    coerceInt(raw.CircuitBreakerFailureThreshold, 5, 1),
 		CircuitBreakerCooldownSeconds:     coerceInt(raw.CircuitBreakerCooldownSeconds, 300, 1),
-		NtfyURL:                           ntfyURL,
-		NtfyTopic:                         strings.TrimSpace(raw.NtfyTopic),
-		NtfyMessageTemplate:               strings.TrimSpace(raw.NtfyMessageTemplate),
 		HookPreCommand:                    strings.TrimSpace(raw.HookPreCommand),
 		HookPostCommand:                   strings.TrimSpace(raw.HookPostCommand),
 		HTTPHost:                          httpHost,

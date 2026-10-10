@@ -14,6 +14,7 @@ import (
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/hooks"
 	"github.com/3to1go/shared/httpx"
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/ingest"
 	"github.com/3to1go/station/internal/services/verify"
@@ -91,11 +92,6 @@ type hookManager interface {
 	DeleteFile(filename string) error
 }
 
-type ntfyPublisher interface {
-	Snapshot(s *config.Settings) map[string]any
-	PublishTest(cfg map[string]any) error
-}
-
 // App holds all server state.
 type App struct {
 	mu            sync.RWMutex
@@ -108,7 +104,7 @@ type App struct {
 	ingest        ingestSvc
 	hooks         hookManager
 	certs         certManager
-	ntfy          ntfyPublisher
+	integrations  integrations.Store
 	verify        *verify.Service
 	logger        *slog.Logger
 
@@ -126,7 +122,7 @@ func NewApp(
 	ingestSvc ingestSvc,
 	hooks hookManager,
 	certs certManager,
-	ntfy ntfyPublisher,
+	notifications integrations.Store,
 	verify *verify.Service,
 	logger *slog.Logger,
 ) *App {
@@ -140,7 +136,7 @@ func NewApp(
 		ingest:        ingestSvc,
 		hooks:         hooks,
 		certs:         certs,
-		ntfy:          ntfy,
+		integrations:  notifications,
 		verify:        verify,
 		logger:        logger,
 	}
@@ -254,10 +250,8 @@ func (a *App) Handler() http.Handler {
 	r.Get("/api/admin/verify", a.handleGetVerifyStatus)
 	r.Post("/api/admin/verify", a.handleRunVerify)
 
-	// Ntfy
-	r.Get("/api/ntfy", a.handleGetNtfy)
-	r.Post("/api/ntfy", a.handleSaveNtfy)
-	r.Post("/api/ntfy/test", a.handleTestNtfy)
+	// Integrations
+	integrations.Register(r, a.integrations, "station")
 
 	// Hooks
 	r.Get("/api/hooks", a.handleGetHooks)

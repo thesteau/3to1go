@@ -106,66 +106,6 @@ func (a *App) setUploadsPaused(w http.ResponseWriter, r *http.Request, paused bo
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "ok", "uploads_paused": paused})
 }
 
-func (a *App) handleGetNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, a.runner.NtfySnapshot(a.runner.CurrentSettings()))
-}
-
-func (a *App) handleSaveNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireAdmin(w, r) == nil {
-		return
-	}
-	var body struct {
-		NtfyURL             string `json:"ntfy_url"`
-		NtfyTopic           string `json:"ntfy_topic"`
-		NtfyMessageTemplate string `json:"ntfy_message_template"`
-	}
-	if err := httpx.ReadJSON(r, &body); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	existing := config.SettingsToPayload(a.runner.CurrentSettings())
-	existing.NtfyURL = body.NtfyURL
-	existing.NtfyTopic = body.NtfyTopic
-	existing.NtfyMessageTemplate = body.NtfyMessageTemplate
-	newSettings, err := config.BuildSettings(&existing)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := a.settingsStore.Save(r.Context(), &existing); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to save settings")
-		return
-	}
-	if err := a.runner.UpdateSettings(newSettings); err != nil {
-		httpx.WriteError(w, http.StatusConflict, err.Error())
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, a.runner.NtfySnapshot(newSettings))
-}
-
-func (a *App) handleTestNtfy(w http.ResponseWriter, r *http.Request) {
-	if requireAdmin(w, r) == nil {
-		return
-	}
-	var body struct {
-		NtfyURL             string `json:"ntfy_url"`
-		NtfyTopic           string `json:"ntfy_topic"`
-		NtfyMessageTemplate string `json:"ntfy_message_template"`
-	}
-	if err := httpx.ReadJSON(r, &body); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := a.runner.TestNtfy(body.NtfyURL, body.NtfyTopic, body.NtfyMessageTemplate); err != nil {
-		httpx.WriteError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
 func (a *App) handleGetCertificates(w http.ResponseWriter, r *http.Request) {
 	if requireUser(w, r) == nil {
 		return

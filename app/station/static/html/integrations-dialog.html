@@ -1,0 +1,45 @@
+<dialog id="integrations-dialog" class="modal" aria-labelledby="integrations-dialog-title">
+  <div class="modal-card">
+    <div id="integrations-load-status" role="status"></div>
+    <div class="modal-head">
+      <h2 id="integrations-dialog-title">Integrations</h2>
+      <button type="button" class="secondary" onclick="closeDialog('integrations-dialog')">Close</button>
+    </div>
+    <p class="hint">Send backup notifications to HTTP services. URLs and headers are secret: saved values are never shown again.</p>
+    <p class="hint">Use HTTPS for this UI when entering secrets. <a href="https://3to1go.docs.thesteau.com/shared/integrations" target="_blank" rel="noopener noreferrer">Setup and service guides</a></p>
+    <label for="integration-select">Destination</label>
+    <select id="integration-select" onchange="editIntegration()" data-requires="integrations" disabled></select>
+    <label for="integration-name">Name</label>
+    <input id="integration-name" type="text" maxlength="100" data-requires="integrations" disabled>
+    <label><input id="integration-enabled" type="checkbox" data-requires="integrations" disabled> Enabled</label>
+    <label for="integration-format">Payload format</label>
+    <select id="integration-format" data-requires="integrations" disabled>
+      <option value="json">JSON event</option><option value="text">Plain text</option><option value="discord">Discord message</option>
+    </select>
+    <label for="integration-url">Destination URL (secret)</label>
+    <input id="integration-url" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
+    <label for="integration-headers">Headers as JSON (secret)</label>
+    <input id="integration-headers" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
+    <label><input id="integration-clear-headers" type="checkbox" data-requires="integrations" disabled> Clear saved headers</label>
+    <fieldset><legend>Events</legend><div id="integration-events"></div></fieldset>
+    <div class="form-grid">
+      <div><label for="integration-scout">Match Scout ID</label><input id="integration-scout" type="text" data-requires="integrations" disabled></div>
+      <div><label for="integration-instance">Match instance ID</label><input id="integration-instance" type="text" data-requires="integrations" disabled></div>
+      <div><label for="integration-job">Match job name</label><input id="integration-job" type="text" data-requires="integrations" disabled></div>
+      <div><label for="integration-source">Match source address (Station)</label><input id="integration-source" type="text" data-requires="integrations" disabled></div>
+    </div>
+    <p class="hint">Leave filters empty to match all. Every filled filter must match exactly.</p>
+    <label for="integration-template">Message template</label>
+    <textarea id="integration-template" maxlength="2000" placeholder="{{ app }} {{ event }}: {{ job_name }} ({{ status }})." data-requires="integrations" disabled></textarea>
+    <p class="hint">Templates: app, event, scout_id, scout_instance_id, job_name, status, stored_as, error_category, detail, time. Keep secrets out of names and templates.</p>
+    <label><input id="integration-detail" type="checkbox" data-requires="integrations" disabled> Include error and unusual-backup details (may contain private information)</label>
+    <label for="integration-timeout">Delivery timeout (seconds, 1–30)</label>
+    <input id="integration-timeout" type="number" min="1" max="30" value="5" data-requires="integrations" disabled>
+    <div class="modal-actions">
+      <button type="button" onclick="saveIntegration()" data-requires="integrations" disabled>Save</button>
+      <button id="integration-test" type="button" class="secondary" onclick="testIntegration()" data-requires="integrations" disabled hidden>Test saved destination</button>
+      <button id="integration-delete" type="button" class="danger" onclick="deleteIntegration()" data-requires="integrations" disabled hidden>Delete</button>
+    </div>
+    <div id="integrations-status" role="status"></div>
+  </div>
+</dialog>

@@ -120,7 +120,7 @@ func TestSettingsStoreRoundTrip(t *testing.T) {
 	if got, err := s.Load(ctx); err != nil || got != nil {
 		t.Fatalf("empty: %+v, %v", got, err)
 	}
-	payload := &config.SettingsPayload{ScoutID: "scout-1", ScanRoot: "/data", StationURL: "https://station.example", CronSchedule: "*/30 * * * *", UploadChunkSizeMB: 16, NtfyTopic: "backups"}
+	payload := &config.SettingsPayload{ScoutID: "scout-1", ScanRoot: "/data", StationURL: "https://station.example", CronSchedule: "*/30 * * * *", UploadChunkSizeMB: 16}
 	for _, name := range []string{"scout-1", "scout-2"} {
 		payload.ScoutID = name
 		raw, err := json.Marshal(payload)
