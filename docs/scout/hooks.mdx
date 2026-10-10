@@ -10,7 +10,7 @@ flowchart LR
     PRE[Pre command] --> F{Paths or sizes<br/>changed?}
     F -->|No| POST[Post command]
     F -->|Yes| A[Archive and encrypt] --> U[Upload to Station] --> POST
-    POST --> N[ntfy, if uploaded]
+    POST --> N[Queue HTTP notifications]
 ```
 
 - **Pre command**: before Scout scans the job. Scout waits for it, so it can prepare files in the folder first.
@@ -34,7 +34,7 @@ Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force 
   </Step>
 </Steps>
 
-Commands run with `sh -c` inside the Scout container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Output and non-zero exit codes go to Scout's logs. A failing hook doesn't stop the backup.
+Commands run with `sh -c` inside the Scout container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Command text, standard output, and standard error are omitted from Scout's logs to protect secrets. Timeout and failure outcomes are logged. A failing hook doesn't stop the backup.
 
 The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs.
 
@@ -98,3 +98,7 @@ Set **Post Command** to `after-job.sh`.
 <Note>
   The Scout image is a minimal Alpine image with `sh` and `curl`. Other tools, such as database clients, aren't included. To dump a database before a backup, run the dump on the host on a schedule ahead of Scout's cycle.
 </Note>
+
+## Notifications and secrets
+
+Use [Integrations](/shared/integrations) for HTTP notifications instead of embedding webhook credentials in commands or scripts. For local scripts that need credentials, mount a separate read-only secret file outside `/hook-scripts` and selected backup jobs. Commands and uploaded scripts can be viewed through authenticated APIs. Hooks inherit the app environment and aren't sandboxed; run only trusted scripts. See [Integration secrets](/integrations/secrets#secrets-used-by-custom-scripts).

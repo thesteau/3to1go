@@ -11,28 +11,12 @@ interface StationSettings {
   snapshot_verify_interval_hours?: number;
   uploads_paused?: boolean;
   anomaly_mode?: string;
-  ntfy_url?: string;
-  ntfy_topic?: string;
-  ntfy_message_template?: string;
-  ntfy_match_scout_id?: string;
-  ntfy_match_scout_instance_id?: string;
-  ntfy_match_source?: string;
   hook_pre_command?: string;
   hook_post_command?: string;
 }
 
 interface SettingsResponse extends ApiBody {
   settings?: StationSettings;
-}
-
-interface NtfyConfig extends ApiBody {
-  ntfy_url?: string;
-  ntfy_topic?: string;
-  ntfy_message_template?: string;
-  ntfy_match_scout_id?: string;
-  ntfy_match_scout_instance_id?: string;
-  ntfy_match_source?: string;
-  default_message_template?: string;
 }
 
 interface MintCredentialResponse extends ApiBody {

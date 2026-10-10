@@ -23,7 +23,7 @@
       <span class="hover-hint" tabindex="0" aria-label="Reject new uploads. Uploads in progress finish." title="Reject new uploads. Uploads in progress finish.">?</span>
     </button>
 
-    <label for="settings_anomaly_mode">Unusual uploads <span class="field-help hover-hint" tabindex="0" aria-label="Station learns each job's usual archive size and flags uploads that are much smaller or larger, with an ntfy alert if notifications are set up." title="Station learns each job's usual archive size and flags uploads that are much smaller or larger, with an ntfy alert if notifications are set up.">?</span></label>
+    <label for="settings_anomaly_mode">Unusual uploads <span class="field-help hover-hint" tabindex="0" aria-label="Station learns each job's usual archive size and flags uploads that are much smaller or larger, with an integration alert if notifications are set up." title="Station learns each job's usual archive size and flags uploads that are much smaller or larger, with an integration alert if notifications are set up.">?</span></label>
     <select id="settings_anomaly_mode" data-requires="settings" disabled>
       <option value="alert">Flag and alert</option>
       <option value="off">Off</option>
@@ -76,7 +76,7 @@
     <div class="hook-section">
       <div class="hook-section-head">
         <div>
-          <h3>Trusted Certificates <span class="field-help hover-hint" tabindex="0" aria-label="Upload internal CA certificates (.crt, PEM) so Station trusts HTTPS connections to ntfy." title="Upload internal CA certificates (.crt, PEM) so Station trusts HTTPS connections to ntfy.">?</span></h3>
+          <h3>Trusted Certificates <span class="field-help hover-hint" tabindex="0" aria-label="Upload internal CA certificates (.crt, PEM) so Station trusts HTTPS connections to integrations." title="Upload internal CA certificates (.crt, PEM) so Station trusts HTTPS connections to integrations.">?</span></h3>
         </div>
         <span class="hint">Up to 10 .crt files. Folder: <code id="certificate-dir">loading...</code></span>
       </div>

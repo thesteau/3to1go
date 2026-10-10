@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/services/locks"
-	"github.com/3to1go/station/internal/services/ntfy"
 	"github.com/3to1go/station/internal/storage"
 )
 
@@ -275,7 +275,7 @@ func newTestService(t *testing.T) *Service {
 	lockMgr := locks.NewNamespaceLockManager()
 	logger := discardLogger()
 	hookMgr := hooks.NewHookManager("station", filepath.Join(tmpDir, "hooks"), logger)
-	ntfyPub := ntfy.NewNtfyPublisher(logger)
+	notifications := newTestNotifications(t, logger)
 
 	return &Service{
 		settings: &config.Settings{
@@ -286,14 +286,14 @@ func newTestService(t *testing.T) *Service {
 			BackupRoot:            filepath.Join(tmpDir, "backups"),
 			StagingDir:            tmpDir,
 		},
-		backend:    backend,
-		index:      nil, // not used in filesystem-only tests
-		locks:      lockMgr,
-		hooks:      hookMgr,
-		ntfy:       ntfyPub,
-		stagingDir: tmpDir,
-		uploadRoot: uploadRoot,
-		keyRoot:    keyRoot,
+		backend:       backend,
+		index:         nil, // not used in filesystem-only tests
+		locks:         lockMgr,
+		hooks:         hookMgr,
+		notifications: notifications,
+		stagingDir:    tmpDir,
+		uploadRoot:    uploadRoot,
+		keyRoot:       keyRoot,
 	}
 }
 
@@ -686,10 +686,10 @@ func TestNew_CreatesDirectories(t *testing.T) {
 	lockMgr2 := locks.NewNamespaceLockManager()
 	logger := discardLogger()
 	hookMgr2 := hooks.NewHookManager("station", filepath.Join(tmpDir, "hooks"), logger)
-	ntfyPub2 := ntfy.NewNtfyPublisher(logger)
+	notifications2 := newTestNotifications(t, logger)
 	backend := storage.NewLocalBackend(filepath.Join(tmpDir, "backups"))
 
-	svc, err := New(settings, backend, nil, lockMgr2, hookMgr2, ntfyPub2)
+	svc, err := New(settings, backend, nil, lockMgr2, hookMgr2, notifications2)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -826,13 +826,44 @@ func TestHookContext(t *testing.T) {
 	if ctx["staged_path"] != src {
 		t.Errorf("hookContext staged_path = %v", ctx["staged_path"])
 	}
+	if ctx["source_address"] != addr {
+		t.Errorf("hookContext source_address must be its value: %v", ctx["source_address"])
+	}
+}
+
+type recordingNotifications struct{ events []integrations.Event }
+
+func (n *recordingNotifications) Publish(event integrations.Event) {
+	n.events = append(n.events, event)
+}
+
+func TestPostUploadNotificationExcludesHookSecrets(t *testing.T) {
+	svc := newTestService(t)
+	notifications := &recordingNotifications{}
+	svc.notifications = notifications
+	fields := map[string]any{"scout_id": "scout", "scout_instance_id": "instance", "job_name": "job", "source_address": "source", "staged_path": "private-path", "credential": "private-token", "advertised_url": "private-url"}
+	for _, status := range []string{"ok", "error"} {
+		svc.runPostHook(fields, status, "archive.tar.zst", 0, false)
+	}
+	if len(notifications.events) != 2 {
+		t.Fatalf("expected two upload events, got %d", len(notifications.events))
+	}
+	for i, event := range notifications.events {
+		if event.Type != integrations.UploadReceived || event.ScoutID != "scout" || event.ScoutInstanceID != "instance" || event.JobName != "job" || event.StoredAs != "archive.tar.zst" || event.SourceAddress != "source" || event.Status != []string{"ok", "error"}[i] {
+			t.Fatalf("wrong upload event: %+v", event)
+		}
+		payload, _ := json.Marshal(event)
+		if strings.Contains(string(payload), "private") || strings.Contains(string(payload), "source_address") {
+			t.Fatal("private hook fields entered the notification")
+		}
+	}
 }
 
 // --- runPostHook ---
 
 func TestRunPostHook_NoOp(t *testing.T) {
 	svc := newTestService(t)
-	// No pre/post command configured, ntfy has no URL - should be a no-op
+	// No pre/post command configured and no notification destinations - should be a no-op
 	ctx := map[string]any{"scout_id": "e1"}
 	svc.runPostHook(ctx, "ok", "file.tar.zst", 0, false)
 }
@@ -1274,4 +1305,14 @@ func TestUploadInitRequest_JSON(t *testing.T) {
 	if out.ScoutID != req.ScoutID || out.ArchiveSizeBytes != req.ArchiveSizeBytes {
 		t.Errorf("roundtrip mismatch: %+v", out)
 	}
+}
+
+func newTestNotifications(t *testing.T, logger *slog.Logger) *integrations.Manager {
+	t.Helper()
+	m, err := integrations.New("station", t.TempDir(), logger, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.Close)
+	return m
 }

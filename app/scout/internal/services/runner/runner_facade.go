@@ -29,16 +29,6 @@ func (r *ScoutRunner) DirectoriesSnapshot() map[string]any {
 	return BuildDirectoryResponse(s, r.DirService)
 }
 
-// NtfySnapshot delegates to the embedded NtfyPublisher.
-func (r *ScoutRunner) NtfySnapshot(cfg *config.Settings) map[string]any {
-	return r.NtfyPublisher.Snapshot(cfg)
-}
-
-// TestNtfy delegates to the embedded NtfyPublisher.
-func (r *ScoutRunner) TestNtfy(ntfyURL, ntfyTopic, messageTemplate string) error {
-	return r.NtfyPublisher.PublishTest(ntfyURL, ntfyTopic, messageTemplate)
-}
-
 // CertSnapshot delegates to the embedded CertManager.
 func (r *ScoutRunner) CertSnapshot() map[string]any {
 	return r.CertManager.Snapshot()

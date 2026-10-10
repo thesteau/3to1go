@@ -3,7 +3,7 @@ title: "Trusted certificates"
 description: "Let Station and Scout verify internal HTTPS services signed by your own CA."
 ---
 
-If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Scout needs to trust Station's CA, and each app needs to trust its ntfy server's CA. Each app keeps its own list.
+If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Scout needs to trust Station's CA, and each app needs to trust its integration receivers' CAs. Each app keeps its own list.
 
 This configures outbound trust. It doesn't enable HTTPS on either web UI or make your browser trust a private CA. Set those up in your reverse proxy and browser.
 

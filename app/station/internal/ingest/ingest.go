@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/3to1go/shared/anomaly"
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/shared/protocol"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/services/retention"
@@ -62,10 +63,7 @@ type hookRunner interface {
 	RunCommand(command, phase string, hookCtx map[string]any)
 }
 
-type ntfyBroadcaster interface {
-	PublishBestEffort(s *config.Settings, ctx map[string]any)
-	PublishUnusualUpload(s *config.Settings, ctx map[string]any)
-}
+type notificationPublisher interface{ Publish(integrations.Event) }
 
 // UploadSession holds state for a resumable upload.
 type UploadSession struct {
@@ -144,7 +142,7 @@ type Service struct {
 	sessions      UploadSessionStore
 	locks         namespaceLocks
 	hooks         hookRunner
-	ntfy          ntfyBroadcaster
+	notifications notificationPublisher
 	stagingDir    string
 	uploadRoot    string
 	keyRoot       string
@@ -159,7 +157,7 @@ func New(
 	index snapshotIndexer,
 	locks namespaceLocks,
 	hooks hookRunner,
-	ntfy ntfyBroadcaster,
+	notifications notificationPublisher,
 	sessionStores ...UploadSessionStore,
 ) (*Service, error) {
 	stagingDir := settings.StagingDir
@@ -176,16 +174,16 @@ func New(
 		sessionStore = sessionStores[0]
 	}
 	return &Service{
-		settings:   settings,
-		backend:    backend,
-		index:      index,
-		sessions:   sessionStore,
-		locks:      locks,
-		hooks:      hooks,
-		ntfy:       ntfy,
-		stagingDir: stagingDir,
-		uploadRoot: uploadRoot,
-		keyRoot:    keyRoot,
+		settings:      settings,
+		backend:       backend,
+		index:         index,
+		sessions:      sessionStore,
+		locks:         locks,
+		hooks:         hooks,
+		notifications: notifications,
+		stagingDir:    stagingDir,
+		uploadRoot:    uploadRoot,
+		keyRoot:       keyRoot,
 	}, nil
 }
 
@@ -468,8 +466,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 
 	hookCtx["unusual"] = result.Unusual
 	if result.Unusual != "" {
-		alert := maps.Clone(hookCtx)
-		s.ntfy.PublishUnusualUpload(s.settings, alert)
+		s.publish(hookCtx, integrations.UnusualUpload, "ok", result.StoredAs)
 	}
 	s.runPostHook(hookCtx, "ok", result.StoredAs, result.Pruned, result.Duplicate)
 	return result, nil
@@ -553,7 +550,7 @@ func (s *Service) runPostHook(hookCtx map[string]any, status, storedAs string, p
 	final["pruned"] = pruned
 	final["duplicate"] = duplicate
 	s.hooks.RunCommand(s.settings.HookPostCommand, "post", final)
-	s.ntfy.PublishBestEffort(s.settings, final)
+	s.publish(final, integrations.UploadReceived, status, storedAs)
 }
 
 func (s *Service) hookContext(session *UploadSession, stagedPath string) map[string]any {
@@ -568,7 +565,7 @@ func (s *Service) hookContext(session *UploadSession, stagedPath string) map[str
 		"timestamp":          session.Timestamp,
 		"archive_sha256":     session.ArchiveSHA256,
 		"archive_size_bytes": session.ArchiveSizeBytes,
-		"source_address":     session.SourceAddress,
+		"source_address":     advertisedURLValue(session.SourceAddress),
 		"advertised_url":     advertisedURLValue(session.AdvertisedURL),
 		"staged_path":        stagedPath,
 	}
@@ -1076,4 +1073,17 @@ func SourceAddress(r *http.Request) *string {
 		return nil
 	}
 	return &host
+}
+
+func (s *Service) publish(fields map[string]any, eventType, status, storedAs string) {
+	if s.notifications == nil {
+		return
+	}
+	field := func(name string) string {
+		if value := fields[name]; value != nil {
+			return fmt.Sprint(value)
+		}
+		return ""
+	}
+	s.notifications.Publish(integrations.Event{Type: eventType, ScoutID: field("scout_id"), ScoutInstanceID: field("scout_instance_id"), JobName: field("job_name"), Status: status, StoredAs: storedAs, Detail: field("unusual"), SourceAddress: field("source_address")})
 }

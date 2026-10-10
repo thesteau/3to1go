@@ -1,0 +1,71 @@
+---
+title: "Integrations"
+description: "Send backup events to HTTP services with encrypted, write-only destination secrets."
+---
+
+Scout and Station each have an **Integrations** dialog. Add up to ten destinations to send notifications to Discord, n8n, ntfy, or an HTTP endpoint you control. Every destination uses the same event and secret handling; choose the payload format its receiver expects.
+
+Use [custom scripts](/scout/hooks) for file preparation, cleanup, or automation that needs local commands. HTTP notifications run in the background and don't need a shell script.
+
+## Set up a destination
+
+<Steps>
+  <Step title="Open Integrations">
+    Sign in as an admin and click **Integrations** in the app that should send the events. The apps keep separate destinations and secrets.
+  </Step>
+  <Step title="Choose the receiver">
+    Select **New integration**, give it a name, and choose **JSON event**, **Plain text**, or **Discord message**. Enter the complete HTTPS destination URL. If authentication is needed, enter headers as a JSON object, for example `{"Authorization":"Bearer YOUR_TOKEN"}`.
+  </Step>
+  <Step title="Choose events and filters">
+    Select the events you want. Filled Scout ID, instance ID, job name, and source address filters must all match exactly. Source address applies to Station only; leave it empty on Scout. Leave **Include error and unusual-backup details** off unless the receiver should get those details.
+  </Step>
+  <Step title="Save and test">
+    Click **Save**, then **Test saved destination**. A test uses the saved URL and headers, even when the destination is disabled. It sends an `event: "test"` sample and bypasses event filters. Unsaved form edits don't affect the test.
+  </Step>
+</Steps>
+
+Use HTTPS for the web UI when entering secrets. If the receiving service uses a private CA, upload its root certificate under [Trusted certificates](/shared/trusted-certificates). Certificate validation stays enabled.
+
+## Service guides
+
+- [Discord](/integrations/discord): send messages to a channel webhook.
+- [n8n](/integrations/n8n): trigger a workflow and route events to other services.
+- [ntfy](/integrations/ntfy): publish plain text to a topic.
+- [Generic HTTP POST](/integrations/http): receive the event schema in your own service.
+- [Secrets and recovery](/integrations/secrets): encryption, external keys, and custom-script secrets.
+
+## Events
+
+| App | Event | When it happens |
+|---|---|---|
+| Scout | `job-finished` | A job attempt finishes in a scheduled cycle, **Run Backup Cycle Now**, or **Force Upload**. Includes unchanged, empty, held, and failed jobs. Cancellation and jobs that can't acquire their lock don't emit it. |
+| Scout | `upload-finished` | A job uploads successfully, including **Force Upload**. |
+| Scout | `unusual-backup` | Scout records a newly detected unusual backup, whether held or allowed through in alert mode. |
+| Station | `upload-received` | Station completes its storage handling, with `status: "ok"` or `"error"`. Uploads rejected before that stage don't emit it. |
+| Station | `unusual-upload` | A stored archive's size differs sharply from its history. |
+
+Station receives forced uploads too. A retry of an already finalized upload doesn't repeat its events. Station cannot report a Scout that stops sending backups; use a separate uptime or dead-man monitor for that.
+
+Selecting both `job-finished` and `upload-finished` sends two events for a successful Scout job. Selecting the same upload on both apps also produces separate notifications. Choose the event that matches what you want to monitor.
+
+## Payloads and templates
+
+**JSON event** sends the [event schema](/integrations/http#event-schema), including a rendered `message`. **Plain text** sends only that message. **Discord message** sends a JSON `content` field with mentions disabled and message length capped at 2,000 characters.
+
+An empty template uses:
+
+```text
+{{ app }} {{ event }}: {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} ({{ status }}).
+```
+
+Supported placeholders are `app`, `event`, `scout_id`, `scout_instance_id`, `job_name`, `status`, `stored_as`, `error_category`, `detail`, and `time`. Surround each with `{{ }}`. Unknown placeholders become empty. Inserted values are encoded safely in JSON and aren't interpreted as more template tokens.
+
+`detail` is empty unless you enable **Include error and unusual-backup details**. Job names, IDs, archive filenames, and error categories are sent normally. Credentials, file contents, local paths, advertised URLs, settings, and source addresses are not automatically included. Source addresses can still be used for matching. Treat names and templates as public metadata and keep secrets out of them.
+
+For plain text and Discord messages, add `{{ detail }}` to the template to display those opted-in details. JSON events include the separate `detail` field when enabled and nonempty.
+
+## Delivery behavior
+
+Delivery is best effort. A bounded, in-memory queue holds up to 128 events; a full queue logs a warning and drops new events. Events aren't replayed after a restart, and failed deliveries aren't retried automatically. A destination has a five-second timeout by default, configurable from one to thirty seconds.
+
+HTTP `2xx` means accepted. Redirects and all other statuses fail; credentials aren't forwarded to a redirect destination. Logs identify the integration by ID and report a safe failure description or HTTP status. They don't include URLs, headers, request payloads, or response bodies. Use the receiver's own execution history to investigate downstream processing.

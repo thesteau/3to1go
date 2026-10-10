@@ -56,3 +56,31 @@ interface HookFileResponse extends ApiBody {
   filename?: string;
   content?: string;
 }
+
+interface IntegrationDestination {
+  id: string;
+  name: string;
+  enabled: boolean;
+  format: string;
+  events: string[];
+  match_scout_id: string;
+  match_instance_id: string;
+  match_job_name: string;
+  match_source_address: string;
+  message_template: string;
+  include_detail: boolean;
+  timeout_seconds: number;
+  url_configured?: boolean;
+  headers_configured?: boolean;
+}
+
+interface IntegrationUpdate extends IntegrationDestination {
+  url?: string;
+  headers?: Record<string, string>;
+}
+
+interface IntegrationsResponse extends ApiBody {
+  destinations?: IntegrationDestination[];
+  destination?: IntegrationDestination;
+  events?: string[];
+}

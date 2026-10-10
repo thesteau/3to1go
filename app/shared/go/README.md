@@ -9,8 +9,8 @@ directives and the `app/go.work` file.
 - `hooks`: hook files and command execution, including caller cancellation.
 - `httpx`: JSON responses, validation, rate limiting, request logging, and route
   parameter adaptation. Applications supply route policies.
-- `ntfy`: template rendering. Notification delivery stays local because timeouts,
-  event headers, filters, and error handling differ.
+- `integrations`: encrypted destination storage, write-only admin APIs, bounded
+  background HTTP notifications, templates, and generic payload formats.
 - `keylock`: per-key mutex allocation for blocking and nonblocking callers.
 - `configutil`: common configuration coercion and log-level parsing.
 - `protocol`: Scout–Station wire types and constants.

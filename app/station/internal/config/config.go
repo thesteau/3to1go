@@ -29,12 +29,6 @@ type Settings struct {
 	UploadChunkSizeMB           int
 	UploadSessionTTLHours       int
 	UploadCleanupIntervalS      int
-	NtfyURL                     string
-	NtfyTopic                   string
-	NtfyMessageTemplate         string
-	NtfyMatchScoutID            string
-	NtfyMatchScoutInstID        string
-	NtfyMatchSource             string
 	HookPreCommand              string
 	HookPostCommand             string
 	Theme                       string
@@ -115,12 +109,6 @@ type SettingsPayload struct {
 	UploadChunkSizeMB           int    `json:"upload_chunk_size_mb"`
 	UploadSessionTTLHours       int    `json:"upload_session_ttl_hours"`
 	UploadCleanupIntervalS      int    `json:"upload_cleanup_interval_seconds"`
-	NtfyURL                     string `json:"ntfy_url"`
-	NtfyTopic                   string `json:"ntfy_topic"`
-	NtfyMessageTemplate         string `json:"ntfy_message_template"`
-	NtfyMatchScoutID            string `json:"ntfy_match_scout_id"`
-	NtfyMatchScoutInstID        string `json:"ntfy_match_scout_instance_id"`
-	NtfyMatchSource             string `json:"ntfy_match_source"`
 	HookPreCommand              string `json:"hook_pre_command"`
 	HookPostCommand             string `json:"hook_post_command"`
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
@@ -137,12 +125,6 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		UploadChunkSizeMB:           s.UploadChunkSizeMB,
 		UploadSessionTTLHours:       s.UploadSessionTTLHours,
 		UploadCleanupIntervalS:      s.UploadCleanupIntervalS,
-		NtfyURL:                     s.NtfyURL,
-		NtfyTopic:                   s.NtfyTopic,
-		NtfyMessageTemplate:         s.NtfyMessageTemplate,
-		NtfyMatchScoutID:            s.NtfyMatchScoutID,
-		NtfyMatchScoutInstID:        s.NtfyMatchScoutInstID,
-		NtfyMatchSource:             s.NtfyMatchSource,
 		HookPreCommand:              s.HookPreCommand,
 		HookPostCommand:             s.HookPostCommand,
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
@@ -164,7 +146,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		return nil, err
 	}
 
-	ntfyURL := ""
 	hookPre := ""
 	hookPost := ""
 	theme := "dark"
@@ -174,11 +155,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	uploadChunkSizeMB := 8
 	uploadSessionTTLHours := 24
 	uploadCleanupIntervalS := 300
-	ntfyTopic := ""
-	ntfyTemplate := ""
-	ntfyMatchScout := ""
-	ntfyMatchInst := ""
-	ntfyMatchSrc := ""
 	verifyIntervalHours := 0
 
 	if p != nil {
@@ -201,16 +177,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		if p.UploadCleanupIntervalS > 0 {
 			uploadCleanupIntervalS = maxInt(10, p.UploadCleanupIntervalS)
 		}
-		var err error
-		ntfyURL, err = coerceURL(p.NtfyURL)
-		if err != nil {
-			return nil, err
-		}
-		ntfyTopic = strings.TrimSpace(p.NtfyTopic)
-		ntfyTemplate = strings.TrimSpace(p.NtfyMessageTemplate)
-		ntfyMatchScout = strings.TrimSpace(p.NtfyMatchScoutID)
-		ntfyMatchInst = strings.TrimSpace(p.NtfyMatchScoutInstID)
-		ntfyMatchSrc = strings.TrimSpace(p.NtfyMatchSource)
 		hookPre = strings.TrimSpace(p.HookPreCommand)
 		hookPost = strings.TrimSpace(p.HookPostCommand)
 		if p.SnapshotVerifyIntervalHours > 0 {
@@ -244,12 +210,6 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		UploadChunkSizeMB:           uploadChunkSizeMB,
 		UploadSessionTTLHours:       uploadSessionTTLHours,
 		UploadCleanupIntervalS:      uploadCleanupIntervalS,
-		NtfyURL:                     ntfyURL,
-		NtfyTopic:                   ntfyTopic,
-		NtfyMessageTemplate:         ntfyTemplate,
-		NtfyMatchScoutID:            ntfyMatchScout,
-		NtfyMatchScoutInstID:        ntfyMatchInst,
-		NtfyMatchSource:             ntfyMatchSrc,
 		HookPreCommand:              hookPre,
 		HookPostCommand:             hookPost,
 		HTTPHost:                    coerceText(os.Getenv("HTTP_HOST"), "0.0.0.0"),

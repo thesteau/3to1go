@@ -1,0 +1,71 @@
+---
+title: "Generic HTTP POST"
+description: "Receive structured events or plain-text messages at an HTTPS endpoint you control."
+---
+
+Create a destination with **JSON event** for structured data or **Plain text** for only the rendered message. The sender makes an HTTPS `POST` request with `Content-Type: application/json` or `text/plain; charset=utf-8`. Use secret custom headers for authentication.
+
+Reserved HTTP transport headers and `Content-Type` cannot be overridden. The sender also supplies:
+
+| Header | Value |
+|---|---|
+| `X-3to1go-Event` | Event name, such as `upload-finished` |
+| `X-3to1go-Event-ID` | Random ID for this emitted event, shared across its destinations |
+
+Validate authentication at the receiver before accepting work. Respond promptly with `2xx`. A redirect fails rather than forwarding your credentials. If processing takes longer, accept the event and queue it in your own service.
+
+## Event schema
+
+```json
+{
+  "id": "EXAMPLE_EVENT_ID",
+  "app": "scout",
+  "event": "upload-finished",
+  "time": "2026-10-09T12:00:00Z",
+  "scout_id": "scout-example",
+  "scout_instance_id": "instance-example",
+  "job_name": "documents",
+  "status": "success",
+  "stored_as": "EXAMPLE_SNAPSHOT_FILENAME",
+  "message": "scout upload-finished: scout-example/instance-example job documents (success)."
+}
+```
+
+The `id`, `app`, `event`, `time`, and `message` fields are present in JSON. Other fields are omitted when empty. `error_category` may describe a failed Scout job. `detail` is present only when nonempty and explicitly enabled for the destination. The sender never automatically serializes the full app settings or hook environment.
+
+Design receivers to tolerate additional fields and new event names. JSON encoding preserves quotes and newlines in values. An HTTP delivery ID identifies an emission; it doesn't guarantee that related Scout and Station events share an ID.
+
+## Manage destinations through the API
+
+Both apps expose the same endpoints. Sign in as an admin, or use a **manage** automation token belonging to an admin. Use HTTPS and keep secret request files private.
+
+| Method | Endpoint | Action |
+|---|---|---|
+| `GET` | `/api/integrations` | Lists safe destination metadata and supported event names. Never returns URLs or headers. |
+| `POST` | `/api/integrations` | Creates a destination, or updates it when `id` is supplied. Returns safe metadata. |
+| `DELETE` | `/api/integrations/{id}` | Deletes a destination and its current secrets. |
+| `POST` | `/api/integrations/{id}/test` | Sends a sample to the saved destination, bypassing filters and enabled state. |
+
+For example, a creation request on Scout is:
+
+```json
+{
+  "name": "Workflow notifications",
+  "enabled": true,
+  "format": "json",
+  "events": ["upload-finished", "unusual-backup"],
+  "match_scout_id": "",
+  "match_instance_id": "",
+  "match_job_name": "",
+  "match_source_address": "",
+  "message_template": "{{ job_name }}: {{ event }} ({{ status }})",
+  "include_detail": false,
+  "timeout_seconds": 5,
+  "url": "https://receiver.example.com/events",
+  "headers": {"Authorization": "Bearer YOUR_TOKEN"}
+}
+```
+
+Updates replace non-secret metadata, so provide those fields together with the destination `id`. Omit `url` and `headers` to preserve secrets; supply replacements to change them, or an empty headers object to clear headers. An empty or insecure URL is rejected. The flags `url_configured` and `headers_configured` in responses describe saved state, not retrievable secret values.
+
+Tests use saved credentials and therefore don't need a body. Errors report a safe message or HTTP status, never the receiver's response body. See [delivery limits](/shared/integrations#delivery-behavior) and [secret storage](/integrations/secrets) before relying on events for critical automation.

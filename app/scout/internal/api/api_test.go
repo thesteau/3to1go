@@ -89,8 +89,6 @@ type mockRunner struct {
 	keyBase64         string
 	statusSnapshot    map[string]any
 	dirSnapshot       map[string]any
-	ntfySnapshot      map[string]any
-	testNtfyErr       error
 	certSnapshot      map[string]any
 	saveCertResult    any
 	saveCertErr       error
@@ -115,6 +113,11 @@ type mockRunner struct {
 	rotateKeyErr      error
 	pathActionErr     error
 	pathActionPath    string
+}
+
+func (m *mockRunner) CertSnapshot() map[string]any { return m.certSnapshot }
+func (m *mockRunner) SaveCertFile(_ string, _ []byte) (any, error) {
+	return m.saveCertResult, m.saveCertErr
 }
 
 func (m *mockRunner) ClearStagedBackup(path string) error {
@@ -150,15 +153,7 @@ func (m *mockRunner) EncryptionKeyFingerprint() string    { return m.fingerprint
 func (m *mockRunner) EncryptionKeyBase64() string         { return m.keyBase64 }
 func (m *mockRunner) StatusSnapshot() map[string]any      { return m.statusSnapshot }
 func (m *mockRunner) DirectoriesSnapshot() map[string]any { return m.dirSnapshot }
-func (m *mockRunner) NtfySnapshot(_ *config.Settings) map[string]any {
-	return m.ntfySnapshot
-}
-func (m *mockRunner) TestNtfy(_, _, _ string) error { return m.testNtfyErr }
-func (m *mockRunner) CertSnapshot() map[string]any  { return m.certSnapshot }
-func (m *mockRunner) SaveCertFile(_ string, _ []byte) (any, error) {
-	return m.saveCertResult, m.saveCertErr
-}
-func (m *mockRunner) DeleteCertFile(_ string) error { return m.deleteCertErr }
+func (m *mockRunner) DeleteCertFile(_ string) error       { return m.deleteCertErr }
 func (m *mockRunner) HookSnapshot(_, _ string) map[string]any {
 	return m.hookSnapshot
 }
@@ -262,7 +257,6 @@ func defaultRunner() *mockRunner {
 		settings:       defaultSettings(),
 		statusSnapshot: map[string]any{"scout_id": "test"},
 		dirSnapshot:    map[string]any{"directories": []any{}},
-		ntfySnapshot:   map[string]any{"ntfy_url": ""},
 		certSnapshot:   map[string]any{"files": []any{}},
 		hookSnapshot:   map[string]any{"files": []any{}},
 		fingerprint:    "abc123",
@@ -792,82 +786,6 @@ func TestHandleSaveSettings_UpdateFailure(t *testing.T) {
 	rr := doAuthRequest(app.Handler(), "POST", "/api/settings", config.SettingsPayload{})
 	if rr.Code != http.StatusConflict {
 		t.Errorf("status = %d, want 409", rr.Code)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// GET /api/ntfy
-// ---------------------------------------------------------------------------
-
-func TestHandleGetNtfy_ReturnsSnapshot(t *testing.T) {
-	runner := defaultRunner()
-	runner.ntfySnapshot = map[string]any{"ntfy_url": "https://ntfy.example.com"}
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "GET", "/api/ntfy", nil)
-	if rr.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rr.Code)
-	}
-	var resp map[string]any
-	decodeJSON(t, rr, &resp)
-	if resp["ntfy_url"] != "https://ntfy.example.com" {
-		t.Errorf("ntfy_url = %v, want https://ntfy.example.com", resp["ntfy_url"])
-	}
-}
-
-// ---------------------------------------------------------------------------
-// POST /api/ntfy
-// ---------------------------------------------------------------------------
-
-func TestHandleSaveNtfy_Success(t *testing.T) {
-	runner := defaultRunner()
-	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy", map[string]string{
-		"ntfy_url":   "https://ntfy.example.com",
-		"ntfy_topic": "backups",
-	})
-	if rr.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rr.Code)
-	}
-}
-
-func TestHandleSaveNtfy_UpdateFailure(t *testing.T) {
-	runner := &mockRunner{
-		settings:          defaultSettings(),
-		updateSettingsErr: errors.New("cycle running"),
-		ntfySnapshot:      map[string]any{},
-	}
-	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy", map[string]string{})
-	if rr.Code != http.StatusConflict {
-		t.Errorf("status = %d, want 409", rr.Code)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// POST /api/ntfy/test
-// ---------------------------------------------------------------------------
-
-func TestHandleTestNtfy_Success(t *testing.T) {
-	runner := defaultRunner()
-	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy/test", map[string]string{
-		"ntfy_url":   "https://ntfy.example.com",
-		"ntfy_topic": "backups",
-	})
-	if rr.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rr.Code)
-	}
-}
-
-func TestHandleTestNtfy_Failure(t *testing.T) {
-	runner := defaultRunner()
-	runner.testNtfyErr = errors.New("connection refused")
-	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
-	rr := doAuthRequest(app.Handler(), "POST", "/api/ntfy/test", map[string]string{
-		"ntfy_url": "https://ntfy.example.com",
-	})
-	if rr.Code != http.StatusBadGateway {
-		t.Errorf("status = %d, want 502", rr.Code)
 	}
 }
 

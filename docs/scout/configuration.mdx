@@ -15,7 +15,7 @@ Most Scout settings are changed in **Edit Scout Settings** and saved in Scout's 
 |---|---|---|---|
 | Scout ID | `SCOUT_ID` | `scout-01` | Name used to group installations in Station. A unique name per machine is easiest to recognize. Instance IDs keep installations separate either way. |
 | Station URL | `STATION_URL` | `http://127.0.0.1:6555` | Where to upload. Must be reachable from inside the container. |
-| Advertised URL | none | empty | Optional URL for this Scout's UI that Scout reports to Station. Station can include it in [notifications](/station/notifications). |
+| Advertised URL | none | empty | Optional URL for this Scout's UI that Scout reports to Station. Available to [custom scripts](/station/hooks); HTTP notifications omit it. |
 | Station Token | none | empty | Token minted by Station. See [Station tokens](/station/station-tokens). |
 
 ## Schedule and scanning
@@ -66,6 +66,8 @@ These rarely need changing. They control how Scout talks to Station over slow or
 After the circuit breaker's failure threshold is reached, Scout stops trying Station for the cooldown period instead of retrying endlessly.
 
 ## Other
+
+HTTP destinations are configured separately in **Integrations**, with encrypted, write-only URL and header fields. Set `INTEGRATIONS_KEY_FILE` in the container environment to use an external key instead of `/config/integrations/key`. The file must contain a 32-byte key as 64 hexadecimal characters. See [Integration secrets](/integrations/secrets) for mounting a key and preserving existing destinations.
 
 | UI setting | Environment variable | Default | Description |
 |---|---|---|---|

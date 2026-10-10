@@ -226,9 +226,10 @@ JSON writes to these settings endpoints replace the listed fields within their s
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
-| `GET` | `/api/ntfy` | Session | Returns ntfy settings and the default message template. |
-| `POST` | `/api/ntfy` | Admin | JSON `ntfy_url`, `ntfy_topic`, `ntfy_message_template`; saves notification settings. |
-| `POST` | `/api/ntfy/test` | Admin | The same JSON; sends a test using supplied values without saving them. |
+| `GET` | `/api/integrations` | Admin | Lists destination metadata and supported events; never returns URLs or headers. |
+| `POST` | `/api/integrations` | Admin | Creates or updates a destination with encrypted, write-only secrets. |
+| `DELETE` | `/api/integrations/{id}` | Admin | Removes a destination and its current secrets. |
+| `POST` | `/api/integrations/{id}/test` | Admin | Tests the saved destination, including when disabled; bypasses event filters. |
 | `GET` | `/api/hooks` | Session | Returns hook settings and uploaded files. |
 | `POST` | `/api/hooks` | Admin | JSON `hook_pre_command`, `hook_post_command`; saves commands. |
 | `POST` | `/api/hooks/files` | Admin | Multipart field `hook_file`; uploads a script. |
@@ -246,7 +247,7 @@ curl --fail-with-body -sS --cookie scout.cookies \
   "$SCOUT_URL/api/hooks/files"
 ```
 
-See [Notifications](/scout/notifications), [Hooks](/scout/hooks), and [Trusted certificates](/shared/trusted-certificates) for supported values and file requirements.
+See [Notifications](/scout/notifications), [Hooks](/scout/hooks), and [Trusted certificates](/shared/trusted-certificates) for supported values and file requirements. Integration request fields and secret-preserving updates are documented in the [HTTP integration API guide](/integrations/http#manage-destinations-through-the-api).
 
 ## Accounts
 

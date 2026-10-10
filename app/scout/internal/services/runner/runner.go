@@ -22,12 +22,12 @@ import (
 	"github.com/3to1go/scout/internal/identity"
 	"github.com/3to1go/scout/internal/services/directories"
 	"github.com/3to1go/scout/internal/services/locks"
-	"github.com/3to1go/scout/internal/services/ntfy"
 	"github.com/3to1go/scout/internal/services/recovery"
 	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/services/upload"
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/hooks"
+	"github.com/3to1go/shared/integrations"
 )
 
 type jobStateStore interface {
@@ -56,15 +56,15 @@ type ScoutRunner struct {
 	operationCtx    context.Context
 	operationCancel context.CancelFunc
 
-	StateStore    jobStateStore
-	UploadClient  *upload.UploadClient
-	LockManager   *locks.JobLockManager
-	HookManager   *hooks.HookManager
-	CertManager   *certificates.CertManager
-	NtfyPublisher *ntfy.NtfyPublisher
-	DirService    *directories.DirectoryService
-	Recovery      *recovery.RecoveryService
-	Anomalies     anomalyStore
+	StateStore   jobStateStore
+	UploadClient *upload.UploadClient
+	LockManager  *locks.JobLockManager
+	HookManager  *hooks.HookManager
+	CertManager  *certificates.CertManager
+	Integrations *integrations.Manager
+	DirService   *directories.DirectoryService
+	Recovery     *recovery.RecoveryService
+	Anomalies    anomalyStore
 }
 
 // uploadWork is the handoff between the compress goroutines and the serial upload worker.
@@ -101,23 +101,26 @@ func NewScoutRunner(settings *config.Settings, logger *slog.Logger, certMgr *cer
 	uploadClient := upload.NewUploadClient(settings, encKey, certMgr)
 	lockMgr := locks.NewJobLockManager()
 	hookMgr := hooks.NewHookManager("scout", config.HookScriptsDir(), logger)
-	ntfyPub := ntfy.NewNtfyPublisher(logger)
+	notifications, err := integrations.New("scout", config.DefaultConfigDir(), logger, certMgr.TLSConfig)
+	if err != nil {
+		return nil, err
+	}
 	dirSvc := directories.NewDirectoryService(settings, logger, stateStore)
 	recoverySvc := recovery.NewRecoveryService(settings, logger, stateStore, uploadClient, encKey)
 
 	return &ScoutRunner{
-		Settings:      settings,
-		logger:        logger,
-		encKey:        encKey,
-		StateStore:    stateStore,
-		UploadClient:  uploadClient,
-		LockManager:   lockMgr,
-		HookManager:   hookMgr,
-		CertManager:   certMgr,
-		NtfyPublisher: ntfyPub,
-		DirService:    dirSvc,
-		Recovery:      recoverySvc,
-		Anomalies:     anomalies,
+		Settings:     settings,
+		logger:       logger,
+		encKey:       encKey,
+		StateStore:   stateStore,
+		UploadClient: uploadClient,
+		LockManager:  lockMgr,
+		HookManager:  hookMgr,
+		CertManager:  certMgr,
+		Integrations: notifications,
+		DirService:   dirSvc,
+		Recovery:     recoverySvc,
+		Anomalies:    anomalies,
 	}, nil
 }
 
@@ -231,7 +234,7 @@ func (r *ScoutRunner) prepareJob(job *backup.JobDefinition, settings *config.Set
 	workCh <- &uploadWork{job: job, state: fresh, unlock: unlock}
 }
 
-// finishJob runs the post-hook and publishes ntfy if the last status was success.
+// finishJob runs the post-hook and emits notifications for the completed job.
 func (r *ScoutRunner) finishJob(job *backup.JobDefinition, settings *config.Settings) {
 	if r.operationContext().Err() != nil {
 		return
@@ -240,13 +243,7 @@ func (r *ScoutRunner) finishJob(job *backup.JobDefinition, settings *config.Sett
 	s.JobName = job.JobName
 	ctx := r.hookContext(job, &s, settings)
 	r.HookManager.RunCommandContext(r.operationContext(), settings.HookPostCommand, "post", ctx)
-	if s.LastStatus == "success" {
-		ntfyCtx := make(map[string]string, len(ctx))
-		for k, v := range ctx {
-			ntfyCtx[k] = fmt.Sprintf("%v", v)
-		}
-		r.NtfyPublisher.PublishBestEffort(settings, ntfyCtx)
-	}
+	r.publishJob(job, s, settings)
 }
 
 // ForceSendJob forces a single named job through the upload pipeline synchronously.
@@ -291,6 +288,9 @@ func (r *ScoutRunner) ForceSendJob(ctx context.Context, jobName string) (map[str
 		r.saveState(job, s)
 	}
 	r.processJobLocked(job, &s, settings, true)
+	if r.operationContext().Err() == nil {
+		r.publishJob(job, r.StateStore.Get(job.RootPath), settings)
+	}
 
 	return map[string]any{
 		"status":               "started",
@@ -329,6 +329,9 @@ func (r *ScoutRunner) StartForceSendAsync(relativePath string) (map[string]any, 
 		defer r.cycleLock.Unlock()
 		defer done()
 		r.processJobLocked(job, &s, settings, true)
+		if r.operationContext().Err() == nil {
+			r.publishJob(job, r.StateStore.Get(job.RootPath), settings)
+		}
 	}()
 
 	return map[string]any{
@@ -419,7 +422,6 @@ func (r *ScoutRunner) applySettings(settings *config.Settings) error {
 	r.DirService = dirSvc
 	r.Recovery = recoverySvc
 	r.HookManager.SetLogger(r.logger)
-	r.NtfyPublisher.SetLogger(r.logger)
 	r.mu.Unlock()
 	return nil
 }
@@ -597,11 +599,7 @@ func (r *ScoutRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.J
 	// Alert only once the outcome is saved, so a restart can't lose a hold.
 	if review != nil {
 		r.logger.Warn("unusual_backup", "job_name", job.JobName, "held", review.hold, "detail", review.summary)
-		r.NtfyPublisher.PublishUnusualBackup(settings, map[string]string{
-			"scout_id": settings.ScoutID,
-			"job_name": job.JobName,
-			"detail":   review.summary,
-		}, review.hold)
+		r.Integrations.Publish(integrations.Event{Type: integrations.UnusualBackup, ScoutID: settings.ScoutID, ScoutInstanceID: identity.LoadOrCreate(config.InstallationIDPath()), JobName: job.JobName, Status: s.LastStatus, Detail: review.summary})
 	}
 	return !holdArchive, nil
 }
@@ -1048,4 +1046,16 @@ func sha256FileContext(ctx context.Context, path string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func (r *ScoutRunner) publishJob(job *backup.JobDefinition, s state.JobState, settings *config.Settings) {
+	event := integrations.Event{Type: integrations.JobFinished, ScoutID: settings.ScoutID, ScoutInstanceID: identity.LoadOrCreate(config.InstallationIDPath()), JobName: job.JobName, Status: s.LastStatus, ErrorCategory: s.LastErrorCategory, Detail: s.LastErrorDetail}
+	if s.LastStatus == "success" {
+		event.StoredAs = s.LastStoredAs
+	}
+	r.Integrations.Publish(event)
+	if s.LastStatus == "success" {
+		event.Type = integrations.UploadFinished
+		r.Integrations.Publish(event)
+	}
 }
