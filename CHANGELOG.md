@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/thesteau/3to1go/compare/v1.4.1...v1.4.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* Add integration for other apps in docs and modify existing infra ([#120](https://github.com/thesteau/3to1go/issues/120)) ([f2a5ba2](https://github.com/thesteau/3to1go/commit/f2a5ba26bb04dc175c253b25b33640d96dc985cc))
+
 ## [1.4.1](https://github.com/thesteau/3to1go/compare/v1.4.0...v1.4.1) (2026-10-09)
 
 
