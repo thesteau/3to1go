@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.3](https://github.com/thesteau/3to1go/compare/v1.4.2...v1.4.3) (2026-10-11)
+
+
+### Bug Fixes
+
+* Add admin only integrations restrictions ([#126](https://github.com/thesteau/3to1go/issues/126)) ([5f0f5ba](https://github.com/thesteau/3to1go/commit/5f0f5bab49a8de234f150d05d5d48b76139cfda9))
+* Change notification behavior ([#123](https://github.com/thesteau/3to1go/issues/123)) ([367d13c](https://github.com/thesteau/3to1go/commit/367d13c1e0f31b8d2938e6525cb357f46d5a56ac))
+
 ## [1.4.2](https://github.com/thesteau/3to1go/compare/v1.4.1...v1.4.2) (2026-10-10)
 
 

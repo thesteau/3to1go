@@ -1,8 +1,8 @@
 {
-  "version": "1.4.2",
-  "tag": "v1.4.2",
-  "prodSha": "f2a5ba26bb04dc175c253b25b33640d96dc985cc",
-  "previousTag": "v1.4.1",
-  "previousSha": "f153c7ae8f1aebd3d8883358d0f5304bcd17f49b",
-  "notes": "## [1.4.2](https://github.com/thesteau/3to1go/compare/v1.4.1...v1.4.2) (2026-10-10)\n\n\n### Bug Fixes\n\n* Add integration for other apps in docs and modify existing infra ([#120](https://github.com/thesteau/3to1go/issues/120)) ([f2a5ba2](https://github.com/thesteau/3to1go/commit/f2a5ba26bb04dc175c253b25b33640d96dc985cc))"
+  "version": "1.4.3",
+  "tag": "v1.4.3",
+  "prodSha": "5f0f5bab49a8de234f150d05d5d48b76139cfda9",
+  "previousTag": "v1.4.2",
+  "previousSha": "f2a5ba26bb04dc175c253b25b33640d96dc985cc",
+  "notes": "## [1.4.3](https://github.com/thesteau/3to1go/compare/v1.4.2...v1.4.3) (2026-10-11)\n\n\n### Bug Fixes\n\n* Add admin only integrations restrictions ([#126](https://github.com/thesteau/3to1go/issues/126)) ([5f0f5ba](https://github.com/thesteau/3to1go/commit/5f0f5bab49a8de234f150d05d5d48b76139cfda9))\n* Change notification behavior ([#123](https://github.com/thesteau/3to1go/issues/123)) ([367d13c](https://github.com/thesteau/3to1go/commit/367d13c1e0f31b8d2938e6525cb357f46d5a56ac))"
 }
