@@ -6,6 +6,7 @@ const vm = require("node:vm");
 // Stubs for the features refresh.js renders into; tests override what they observe.
 function refreshContext(overrides) {
   const ctx = vm.createContext({
+    currentUser: { is_admin: true },
     window: {},
     document: { getElementById: () => null },
     setHtmlIfChanged() {},

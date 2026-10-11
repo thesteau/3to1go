@@ -29,6 +29,7 @@ async function uploadHookFile(): Promise<void> {
 }
 
 async function viewHookFile(filename: string, viewable: boolean): Promise<void> {
+  const user = currentUser;
   if (!viewable) {
     setActionStatus("This file cannot be viewed.", "error");
     return;
@@ -39,6 +40,7 @@ async function viewHookFile(filename: string, viewable: boolean): Promise<void> 
     setActionStatus(body.detail || "View failed.", "error");
     return;
   }
+  if (currentUser !== user || !canManageIntegrations()) return;
   document.getElementById("hook-view-filename")!.textContent = body.filename || filename;
   (document.getElementById("hook-view-content") as HTMLTextAreaElement).value = body.content || "";
   openDialog("hook-view-dialog");

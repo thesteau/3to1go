@@ -7,6 +7,8 @@ Scout and Station each have one **Integrations** dialog with **HTTP notification
 
 Both apps use the same HTTP notification system: setup, formats, templates, filters, secret handling, test delivery, and delivery limits work the same way. Each app keeps its own destinations and secrets; configuring Scout does not configure Station.
 
+Only admin accounts can view or change integrations, PRE/POST commands, and uploaded scripts.
+
 PRE and POST are independent actions. A PRE action runs before processing; a POST action reports an outcome or alert. To use different actions before and after, create separate HTTP destinations with their own URLs, headers, filters, and templates, or set different PRE and POST script commands. Leave either script command empty if you only need the other.
 
 HTTP notifications run in the background. A PRE notification is queued before processing, but processing does not wait for the receiver. Use a PRE script for file preparation or any action that must finish first. See [Custom scripts](/shared/hooks) for their shared setup and the app-specific timing and environment references.

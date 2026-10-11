@@ -24,7 +24,11 @@ function editor(app: string) {
   ]) {
     fields.set(`integration-${name}`, { value: "", checked: false });
   }
-  fields.set("integration-select", { value: "saved-id" });
+  fields.set("integration-select", { value: "saved-id", replaceChildren() {} });
+  fields.set("integrations-button", { hidden: true });
+  fields.set("hook_pre_command", { value: "" });
+  fields.set("hook_post_command", { value: "" });
+  fields.set("hook-view-content", { value: "" });
   for (const name of [
     "events",
     "payload-editor",
@@ -52,6 +56,7 @@ function editor(app: string) {
   fields.get("integration-enabled").checked = true;
   fields.get("integration-timing").value = "post";
   const ctx = vm.createContext({
+    currentUser: { id: 1, is_admin: true },
     document: {
       getElementById: (id) => fields.get(id),
       querySelectorAll: () => [{ value: "upload-finished" }],
@@ -65,6 +70,8 @@ function editor(app: string) {
       createTextNode: (text) => text,
     },
     requirePanelReady: () => true,
+    setPanelReady: () => {},
+    closeDialog: () => {},
     setStatus: () => {},
   });
   loadFeature(ctx, app, "integrations");
@@ -72,6 +79,64 @@ function editor(app: string) {
 }
 
 for (const app of ["scout", "station"]) {
+  test(`${app} only admins can open integrations or load its script panel`, async () => {
+    const { ctx, fields } = editor(app);
+    let opened = 0;
+    let loaded = 0;
+    ctx.openDialog = () => opened++;
+    ctx.clearStatus = () => {};
+    ctx.setActionStatus = () => {};
+    ctx.loadIntegrations = async () => loaded++;
+    ctx.loadHookConfig = async () => loaded++;
+    for (const user of [null, { is_admin: false }, { is_admin: true, must_change_password: true }]) {
+      ctx.currentUser = user;
+      await ctx.openIntegrationsDialog();
+      await ctx.showIntegrationPanel("scripts");
+      assert.equal(fields.get("integrations-button").hidden, true);
+    }
+    assert.equal(opened, 0);
+    assert.equal(loaded, 0);
+    ctx.currentUser = { is_admin: true };
+    ctx.updateIntegrationAccess();
+    assert.equal(fields.get("integrations-button").hidden, false);
+    await ctx.openIntegrationsDialog();
+    assert.equal(opened, 1);
+    assert.equal(loaded, 1);
+  });
+
+  test(`${app} losing admin access clears private commands, templates and script contents`, () => {
+    const { ctx, fields } = editor(app);
+    const privateFields = [
+      "integration-url",
+      "integration-headers",
+      "integration-template",
+      "integration-payload-template",
+      "hook_pre_command",
+      "hook_post_command",
+      "hook-view-content",
+    ];
+    for (const id of privateFields) fields.get(id).value = "private-server-address";
+    vm.runInContext('integrationDestinations = [{ name: "private-server" }]', ctx);
+    ctx.currentUser.is_admin = false;
+    ctx.updateIntegrationAccess();
+    for (const id of privateFields) assert.equal(fields.get(id).value, "");
+    assert.equal(vm.runInContext("integrationDestinations.length", ctx), 0);
+    assert.equal(fields.get("integrations-button").hidden, true);
+  });
+
+  test(`${app} a pending integration response cannot restore private data after sign-out`, async () => {
+    const { ctx } = editor(app);
+    let finish;
+    ctx.loadEditorPanel = async (_name, task) => task();
+    ctx.fetch = () => new Promise((resolve) => (finish = resolve));
+    const loading = ctx.loadIntegrations();
+    ctx.currentUser = null;
+    ctx.updateIntegrationAccess();
+    finish({ ok: true, json: async () => ({ destinations: [{ name: "private-server" }] }) });
+    await assert.rejects(loading, /Admin access required/);
+    assert.equal(vm.runInContext("integrationDestinations.length", ctx), 0);
+  });
+
   test(`${app} requesting sign-in clears draft integration secrets`, () => {
     const { ctx, fields } = editor(app);
     ctx.window = { fetch: () => {}, setTimeout: () => {} };

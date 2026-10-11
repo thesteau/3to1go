@@ -101,7 +101,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 |---|---|---|---|
 | `GET` | `/health` | Public | Checks storage and returns storage and upload-limit information. Can return `503`. |
 | `GET` | `/health/ready` | Public | Checks storage and the staging directory; returns `{"status":"ok"}` or `503`. |
-| `GET` | `/api/overview` | Session | Returns settings, storage information, and Scouts with instances, jobs, and snapshots. |
+| `GET` | `/api/overview` | Session | Returns storage information and Scouts with instances, jobs, and snapshots. Settings are included for admin accounts only. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns normalized `settings`. |
 | `POST` | `/api/admin/uploads/pause` | Admin | No body; pauses acceptance of new uploads. |
 | `POST` | `/api/admin/uploads/resume` | Admin | No body; resumes acceptance of new uploads. |
@@ -110,7 +110,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 
 ### List snapshots
 
-To request only one overview section, pass `section=settings`, `section=storage`, or `section=snapshots`. Without a section, the response includes all three:
+To request only one overview section, pass `section=settings`, `section=storage`, or `section=snapshots`. `section=settings` requires an admin account. Without a section, the response includes all sections permitted for the account:
 
 ```sh
 curl --fail-with-body -sS --cookie station.cookies \
@@ -211,7 +211,7 @@ JSON writes to these settings endpoints replace the listed fields within their s
 | `POST` | `/api/integrations` | Admin | Creates or updates a destination with encrypted, write-only secrets. |
 | `DELETE` | `/api/integrations/{id}` | Admin | Removes a destination and its current secrets. |
 | `POST` | `/api/integrations/{id}/test` | Admin | Tests the saved destination, including when disabled; bypasses event filters. |
-| `GET` | `/api/hooks` | Session | Returns hook settings and uploaded files. |
+| `GET` | `/api/hooks` | Admin | Returns hook settings and uploaded files. |
 | `POST` | `/api/hooks` | Admin | JSON `pre_command`, `post_command`; saves commands. These differ from Scout's `hook_pre_command` and `hook_post_command` fields on its hooks endpoint. |
 | `POST` | `/api/hooks/files` | Admin | Multipart field `hook_file`; uploads a script. |
 | `GET` | `/api/hooks/files/{filename}` | Admin | Returns `filename` and text `content`. |

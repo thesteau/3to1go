@@ -65,7 +65,7 @@ func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
 // --- Hooks ---
 
 func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	s := a.Settings()

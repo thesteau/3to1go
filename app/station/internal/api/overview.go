@@ -14,7 +14,8 @@ import (
 )
 
 func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	user := requireUser(w, r)
+	if user == nil {
 		return
 	}
 	s := a.Settings()
@@ -24,6 +25,9 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 	case "storage":
 		data = overview.BuildStorageOverview(a.backend)
 	case "settings":
+		if requireAdmin(w, r) == nil {
+			return
+		}
 		// Small and fast, so the settings editor doesn't wait for the snapshot list.
 		data = map[string]any{"settings": config.SettingsToPayload(s)}
 	case "snapshots":
@@ -35,7 +39,7 @@ func (a *App) handleOverview(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "failed to build overview")
 		return
 	}
-	if auth.RestrictedAutomation(r) {
+	if !user.IsAdmin || auth.RestrictedAutomation(r) {
 		delete(data, "settings")
 	}
 	httpx.WriteJSON(w, http.StatusOK, data)

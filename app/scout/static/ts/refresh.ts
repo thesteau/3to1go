@@ -142,10 +142,12 @@ async function fetchScoutData({
   if (!directoryTreeLoaded()) setHtmlIfChanged("directory-tree", spinner);
 
   const statusFetch = (async () => {
+    const user = currentUser;
     const res = await fetch("/api/status", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     if (!res.ok) throw new Error("Status unavailable");
     const statusData: StatusResponse = await res.json();
-    latestData = { ...(latestData || {}), ...statusData };
+    if (currentUser !== user || !currentUser?.is_admin) delete statusData.settings;
+    latestData = { ...(latestData || {}), ...statusData, settings: statusData.settings };
     if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {
       applyTheme(latestData.settings?.theme || "dark");
     }

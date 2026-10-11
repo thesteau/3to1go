@@ -63,12 +63,19 @@ async function loadStationSettings(): Promise<void> {
 }
 
 async function fetchStationSettings(): Promise<void> {
+  const user = currentUser;
+  if (!currentUser?.is_admin) {
+    delete window.__stationSettings;
+    setPanelReady("settings", false);
+    return;
+  }
   try {
     const response = await fetch("/api/overview?section=settings", {
       signal: globalThis.AbortSignal?.timeout?.(30000),
     });
     if (!response.ok) throw new Error("Settings unavailable");
     const data: OverviewResponse = await response.json();
+    if (currentUser !== user || !currentUser?.is_admin) return;
     window.__stationSettings = data.settings || {};
     setPanelReady("settings", Boolean(data.settings && Object.keys(data.settings).length));
     if (!(document.getElementById("settings-dialog") as HTMLDialogElement | null)?.open) {

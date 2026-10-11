@@ -104,7 +104,10 @@ async function saveUser(userId: number): Promise<void> {
   const body = await readJson<UserResponse>(response);
   setStatus("users-status", response.ok ? "Saved." : body.detail || "Save failed.", response.ok ? "success" : "error");
   if (response.ok) {
-    if (currentUser?.id === userId) currentUser = body.user;
+    if (currentUser?.id === userId) {
+      currentUser = body.user;
+      updateIntegrationAccess();
+    }
     await loadUsers();
   }
 }
