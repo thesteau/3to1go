@@ -89,7 +89,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
 | `GET` | `/health` | Public | Returns `{"status":"ok"}` while Scout's HTTP server is running. |
-| `GET` | `/api/status` | Session | Returns Scout and instance IDs, effective `settings`, Scout key fingerprint, upload circuit status, and `scheduler`. |
+| `GET` | `/api/status` | Session | Returns Scout and instance IDs, Scout key fingerprint, upload circuit status, and `scheduler`. Effective `settings` are included for admin accounts only. |
 | `POST` | `/api/run-now` | Session | No body; requests a backup cycle for the configured jobs. Returns `status: "queued"` or `"already_running"`. |
 | `GET` | `/api/settings` | Admin | Returns the current settings under `settings`. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns the normalized `settings`. |
@@ -230,10 +230,10 @@ JSON writes to these settings endpoints replace the listed fields within their s
 | `POST` | `/api/integrations` | Admin | Creates or updates a destination with encrypted, write-only secrets. |
 | `DELETE` | `/api/integrations/{id}` | Admin | Removes a destination and its current secrets. |
 | `POST` | `/api/integrations/{id}/test` | Admin | Tests the saved destination, including when disabled; bypasses event filters. |
-| `GET` | `/api/hooks` | Session | Returns hook settings and uploaded files. |
+| `GET` | `/api/hooks` | Admin | Returns hook settings and uploaded files. |
 | `POST` | `/api/hooks` | Admin | JSON `hook_pre_command`, `hook_post_command`; saves commands. |
 | `POST` | `/api/hooks/files` | Admin | Multipart field `hook_file`; uploads a script. |
-| `GET` | `/api/hooks/files/{filename}` | Session | Returns `filename` and text `content`. |
+| `GET` | `/api/hooks/files/{filename}` | Admin | Returns `filename` and text `content`. |
 | `DELETE` | `/api/hooks/files/{filename}` | Admin | Deletes the uploaded script. |
 | `GET` | `/api/certificates` | Session | Returns trusted certificate information. |
 | `POST` | `/api/certificates/files` | Admin | Multipart field `certificate_file`; uploads a certificate. |

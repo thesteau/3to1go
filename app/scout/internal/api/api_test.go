@@ -889,7 +889,7 @@ func TestHandleDeleteCertificate_OtherError(t *testing.T) {
 func TestHandleGetHooks_ReturnsSnapshot(t *testing.T) {
 	runner := defaultRunner()
 	runner.hookSnapshot = map[string]any{"pre_command": "", "post_command": ""}
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/hooks", nil)
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
@@ -963,7 +963,7 @@ func TestHandleViewHookFile_Success(t *testing.T) {
 	runner := defaultRunner()
 	runner.readHookName = "pre.sh"
 	runner.readHookContent = "#!/bin/sh"
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/hooks/files/pre.sh", nil)
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
@@ -978,7 +978,7 @@ func TestHandleViewHookFile_Success(t *testing.T) {
 func TestHandleViewHookFile_NotFound(t *testing.T) {
 	runner := defaultRunner()
 	runner.readHookErr = fmt.Errorf("pre.sh: not found")
-	app := newTestAppFull(regularUserStore(), runner, defaultScheduler())
+	app := newTestAppFull(adminUserStore(), runner, defaultScheduler())
 	rr := doAuthRequest(app.Handler(), "GET", "/api/hooks/files/pre.sh", nil)
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", rr.Code)

@@ -12,11 +12,12 @@ import (
 )
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	user := requireUser(w, r)
+	if user == nil {
 		return
 	}
 	resp := a.runner.StatusSnapshot()
-	if auth.RestrictedAutomation(r) {
+	if !user.IsAdmin || auth.RestrictedAutomation(r) {
 		// Copy the map so a store mock or cached snapshot is never mutated.
 		filtered := make(map[string]any, len(resp))
 		for key, value := range resp {
@@ -157,7 +158,7 @@ func (a *App) handleDeleteCertificate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleGetHooks(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	s := a.runner.CurrentSettings()
@@ -223,7 +224,7 @@ func (a *App) handleUploadHookFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleViewHookFile(w http.ResponseWriter, r *http.Request) {
-	if requireUser(w, r) == nil {
+	if requireAdmin(w, r) == nil {
 		return
 	}
 	filename := r.PathValue("filename")

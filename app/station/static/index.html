@@ -26,7 +26,7 @@
       <div class="toolbar">
         <button type="button" onclick="manualRefresh()">Refresh</button>
 <button type="button" class="secondary" onclick="openCredentialDialog()">Mint Station Token</button>
-        <button type="button" class="secondary" onclick="openIntegrationsDialog()">Integrations</button>
+        <button id="integrations-button" type="button" class="secondary admin-only" onclick="openIntegrationsDialog()" hidden>Integrations</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="secondary" onclick="openUserManagementDialog()">Admin</button>
         <button type="button" data-requires="settings" disabled onclick="openSettingsDialog()">Edit Station Settings</button>

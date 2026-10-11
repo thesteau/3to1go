@@ -27,12 +27,14 @@ function keyContext(fetch = async () => ({ ok: true })) {
     closeDialog() {},
     openDialog() {},
     clearStatus() {},
+    setPanelReady() {},
     resolveAppDialog() {},
     setActionStatus: (...args) => messages.push(args),
     escapeSelectorValue: (value) => value,
   });
   loadFeature(ctx, "station", "keys");
   loadFeature(ctx, "station", "auth");
+  loadFeature(ctx, "station", "integrations");
   return { ctx, storage, input, status, messages };
 }
 
