@@ -1,6 +1,11 @@
 let scoutHookConfig: HookConfig | null = null;
 let hookDraftDirty = { pre: false, post: false };
 
+function clearHookState(): void {
+  scoutHookConfig = null;
+  hookDraftDirty = { pre: false, post: false };
+}
+
 function renderHookFiles(files: StoredFile[] | undefined): string {
   const items = files || [];
   if (!items.length) {
@@ -39,12 +44,14 @@ function fillHookForm(config: HookConfig | null | undefined, { preserveDrafts = 
 }
 
 async function loadHookConfig({ preserveDrafts = true } = {}): Promise<HookConfig> {
+  const user = currentUser;
   return loadEditorPanel("hooks", async () => {
     const response = await fetch("/api/hooks", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     const body: HookConfig = await response.json();
     if (!response.ok) {
       throw new Error(body.detail || "Failed to load hook settings.");
     }
+    if (currentUser !== user || !canManageIntegrations()) throw new Error("Admin access required.");
     scoutHookConfig = body;
     fillHookForm(body, { preserveDrafts });
     return body;

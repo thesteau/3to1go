@@ -8,6 +8,7 @@ function overviewContext(fetch, { rendered = false, ...overrides } = {}) {
   const messages = [];
   const elements = { meta: {}, "storage-meta": {}, namespaces: { children: rendered ? [{}] : [] } };
   const ctx = vm.createContext({
+    currentUser: { is_admin: true },
     window: {},
     document: { getElementById: (id) => elements[id] || null, querySelectorAll: () => [] },
     fetch,
@@ -37,6 +38,15 @@ test("Station reports failure without a success toast for HTTP and network error
     assert.equal(messages.length, 1);
     assert.equal(messages[0][1], "error");
   }
+});
+
+test("Station does not fetch or retain settings for non-admin accounts", async () => {
+  let fetches = 0;
+  const { ctx } = overviewContext(async () => fetches++, { currentUser: { is_admin: false } });
+  ctx.window.__stationSettings = { hook_post_command: "private-command" };
+  await ctx.loadStationSettings();
+  assert.equal(fetches, 0);
+  assert.equal(ctx.window.__stationSettings, undefined);
 });
 
 test("Station reports success only after a successful overview refresh", async () => {

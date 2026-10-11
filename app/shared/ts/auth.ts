@@ -2,6 +2,7 @@ async function refreshSession(): Promise<CurrentUser | null> {
   const response = await rawFetch("/api/session/me", { signal: globalThis.AbortSignal?.timeout?.(30000) });
   const body = await readJson<SessionResponse>(response);
   currentUser = body.user || null;
+  updateIntegrationAccess();
   return body.authenticated ? currentUser : null;
 }
 

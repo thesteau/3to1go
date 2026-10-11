@@ -23,7 +23,9 @@ window.fetch = async (...args: Parameters<typeof fetch>) => {
 };
 
 function openLoginDialog(): void {
-  if (typeof clearIntegrationSecrets === "function") clearIntegrationSecrets();
+  currentUser = null;
+  updateIntegrationAccess();
+  if (typeof latestData !== "undefined" && latestData) delete latestData.settings;
   closeDialog("integrations-dialog");
   clearStatus("login-status");
   openDialog("login-dialog");
@@ -46,6 +48,7 @@ async function loginUser(): Promise<void> {
     return;
   }
   currentUser = body.user;
+  updateIntegrationAccess();
   closeDialog("login-dialog");
   (document.getElementById("login_password") as HTMLInputElement).value = "";
   if (currentUser.must_change_password) {
@@ -91,6 +94,7 @@ async function changeOwnPassword(): Promise<void> {
     return;
   }
   currentUser = body.user;
+  updateIntegrationAccess();
   closeDialog("password-dialog");
   setActionStatus("Password updated.", "success");
   startScoutApp();

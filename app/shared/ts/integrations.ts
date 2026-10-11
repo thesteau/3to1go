@@ -4,7 +4,62 @@ let integrationDefaultMessage = "";
 let integrationDefaultPayload = "";
 let integrationLoadedPanels = new Set<string>();
 
+function canManageIntegrations(): boolean {
+  return Boolean(currentUser?.is_admin && !currentUser.must_change_password);
+}
+
+function updateIntegrationAccess(): void {
+  const allowed = canManageIntegrations();
+  const button = document.getElementById("integrations-button");
+  if (button) button.hidden = !allowed;
+  if (!allowed) clearIntegrationState();
+}
+
+function clearIntegrationState(): void {
+  clearIntegrationSecrets();
+  integrationDestinations = [];
+  integrationEvents = [];
+  integrationDefaultMessage = "";
+  integrationDefaultPayload = "";
+  integrationLoadedPanels.clear();
+  if (typeof clearHookState === "function") clearHookState();
+  for (const id of [
+    "integration-name",
+    "integration-scout",
+    "integration-instance",
+    "integration-job",
+    "integration-source",
+    "integration-template",
+    "integration-payload-template",
+    "hook_pre_command",
+    "hook_post_command",
+    "hook_file_input",
+    "hook-view-content",
+  ]) {
+    const input = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (input) input.value = "";
+  }
+  for (const id of [
+    "integration-select",
+    "integration-events",
+    "hook-files",
+    "hook-view-filename",
+    "hook-script-dir",
+  ]) {
+    document.getElementById(id)?.replaceChildren();
+  }
+  setPanelReady("integrations", false);
+  setPanelReady("hooks", false);
+  closeDialog("integrations-dialog");
+  closeDialog("hook-view-dialog");
+}
+
 async function openIntegrationsDialog(panel: "notifications" | "scripts" = "notifications"): Promise<void> {
+  if (!canManageIntegrations()) {
+    updateIntegrationAccess();
+    setActionStatus("Admin access required.", "error");
+    return;
+  }
   clearStatus("integrations-status");
   clearStatus("hooks-status");
   integrationLoadedPanels.clear();
@@ -13,6 +68,7 @@ async function openIntegrationsDialog(panel: "notifications" | "scripts" = "noti
 }
 
 async function showIntegrationPanel(panel: "notifications" | "scripts"): Promise<void> {
+  if (!canManageIntegrations()) return;
   for (const name of ["notifications", "scripts"]) {
     const selected = name === panel;
     document.getElementById(`integration-${name}-panel`)!.hidden = !selected;
@@ -41,10 +97,12 @@ function handleIntegrationTabKey(event: KeyboardEvent): void {
 }
 
 async function loadIntegrations(selectedID = ""): Promise<void> {
+  const user = currentUser;
   await loadEditorPanel("integrations", async () => {
     const response = await fetch("/api/integrations", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     const body: IntegrationsResponse = await response.json();
     if (!response.ok) throw new Error(body.detail || "Failed to load integrations.");
+    if (currentUser !== user || !canManageIntegrations()) throw new Error("Admin access required.");
     integrationDestinations = body.destinations || [];
     integrationEvents = body.events || [];
     integrationDefaultMessage = body.default_message_template || "";
