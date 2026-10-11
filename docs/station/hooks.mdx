@@ -1,5 +1,5 @@
 ---
-title: "Station hooks"
+title: "Station scripts"
 description: "Run your own commands before and after Station stores an upload."
 ---
 
@@ -9,10 +9,11 @@ Hooks run a shell command at two points while Station stores an upload. Use them
 flowchart LR
     A[Upload complete] --> B{Checksum OK?}
     B -->|No| X[Scout retries upload<br/>no hooks run]
-    B -->|Yes| PRE[Pre command]
+    B -->|Yes| NPRE[Queue PRE HTTP event]
+    NPRE --> PRE[PRE command]
     PRE --> S[Store archive<br/>and apply retention]
-    S --> POST[Post command<br/>status ok or error]
-    POST --> N[Queue HTTP notifications]
+    S --> POST[POST command<br/>status ok or error]
+    POST --> N[Queue POST HTTP events]
 ```
 
 - **Pre command**: after the upload passes its checksum, before Station stores it. Station waits for it to finish.
@@ -20,23 +21,11 @@ flowchart LR
 
 ## Set up
 
-<Steps>
-  <Step title="Open Custom Scripts">
-    In Station, click **Custom Scripts**.
-  </Step>
-  <Step title="Upload a script (optional)">
-    Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable, and Windows line endings are converted.
-  </Step>
-  <Step title="Set the commands">
-    Enter a **Pre Command** and/or **Post Command**. Either:
-    - the name of an uploaded script, such as `after-upload.sh`, or
-    - any shell command, such as `curl -fsS https://hc-ping.com/your-id`.
-  </Step>
-</Steps>
-
-Commands run with `sh -c` inside the Station container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. Command text, standard output, and standard error are omitted from Station's logs to protect secrets. Timeout and failure outcomes are logged. A failing hook doesn't stop the upload.
+Follow the [shared custom-script setup](/shared/hooks#set-up) for uploading files, configuring independent PRE and POST commands, execution limits, and secret handling.
 
 ## Environment variables
+
+Use shell variables such as `$THREETOONEGO_JOB_NAME` in commands and scripts. The `{{ job_name }}` syntax applies to [HTTP message and JSON templates](/shared/integrations#payloads-and-templates), and is not expanded in shell scripts.
 
 Every hook gets these variables:
 
@@ -77,7 +66,7 @@ The **post** command also gets:
 printf '%s\n' "stored $THREETOONEGO_NAMESPACE/$THREETOONEGO_STORED_AS" >> /hook-scripts/receipts.log
 ```
 
-Set **Post Command** to `after-upload.sh`. This script manages its own log; keep it private and arrange rotation on the host.
+Set **POST command** to `after-upload.sh`. This script manages its own log; keep it private and arrange rotation on the host.
 
 <Note>
   The Station image is a minimal Alpine image with `sh` and `curl`. Tools like `rclone` aren't included. Run those on the host or in another container that reads the same backup folder.
@@ -85,4 +74,4 @@ Set **Post Command** to `after-upload.sh`. This script manages its own log; keep
 
 ## Notifications and secrets
 
-Use [Integrations](/shared/integrations) for HTTP notifications instead of embedding webhook credentials in commands or scripts. For local scripts that need credentials, mount a separate read-only secret file outside `/hook-scripts` and selected backup jobs. Commands and uploaded scripts can be viewed through authenticated APIs. Hooks inherit the app environment and aren't sandboxed; run only trusted scripts. See [Integration secrets](/integrations/secrets#secrets-used-by-custom-scripts).
+Use [HTTP notifications](/shared/integrations#station-events) for remote messages. For script credentials and execution permissions, see [Custom scripts](/shared/hooks#secrets-and-permissions) and [Integration secrets](/integrations/secrets#secrets-used-by-custom-scripts).

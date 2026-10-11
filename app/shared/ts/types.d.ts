@@ -68,6 +68,7 @@ interface IntegrationDestination {
   match_job_name: string;
   match_source_address: string;
   message_template: string;
+  payload_template?: string;
   include_detail: boolean;
   timeout_seconds: number;
   url_configured?: boolean;
@@ -83,4 +84,6 @@ interface IntegrationsResponse extends ApiBody {
   destinations?: IntegrationDestination[];
   destination?: IntegrationDestination;
   events?: string[];
+  default_message_template?: string;
+  default_payload_template?: string;
 }

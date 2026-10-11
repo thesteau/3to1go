@@ -53,7 +53,7 @@ The job shows **held for review** with the reasons, for example:
 
 > The archive barely compresses (100% of the original size, usually 41%), which is typical of encrypted files. Files ending in .locked went from 0% to 100% of the folder.
 
-Scout also emits an `unusual-backup` event to matching [integrations](/scout/notifications). Enable details on the destination if the alert should include the reasons. Then either:
+Scout also emits an `unusual-backup` event to matching [integrations](/shared/integrations#scout-events). Enable details on the destination if the alert should include the reasons. Then either:
 
 - **The change is expected**, such as a reorganized folder: click **Upload anyway**. The backup uploads and joins the job's history. Future backups are compared against that updated history, so some checks may still flag them while the baseline adjusts.
 - **Something is wrong**: click **Clear staged backup** to discard it, then fix the folder, for example by [restoring](/scout/restore) the last good snapshot.

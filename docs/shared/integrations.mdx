@@ -1,11 +1,27 @@
 ---
 title: "Integrations"
-description: "Send backup events to HTTP services with encrypted, write-only destination secrets."
+description: "Configure independent PRE and POST actions using HTTP notifications or custom scripts."
 ---
 
-Scout and Station each have an **Integrations** dialog. Add up to ten destinations to send notifications to Discord, n8n, ntfy, or an HTTP endpoint you control. Every destination uses the same event and secret handling; choose the payload format its receiver expects.
+Scout and Station each have one **Integrations** dialog with **HTTP notifications** and **Custom scripts (PRE / POST)**. Add up to ten HTTP destinations for any receiver, using generic plain text or JSON formats.
 
-Use [custom scripts](/scout/hooks) for file preparation, cleanup, or automation that needs local commands. HTTP notifications run in the background and don't need a shell script.
+Both apps use the same HTTP notification system: setup, formats, templates, filters, secret handling, test delivery, and delivery limits work the same way. Each app keeps its own destinations and secrets; configuring Scout does not configure Station.
+
+PRE and POST are independent actions. A PRE action runs before processing; a POST action reports an outcome or alert. To use different actions before and after, create separate HTTP destinations with their own URLs, headers, filters, and templates, or set different PRE and POST script commands. Leave either script command empty if you only need the other.
+
+HTTP notifications run in the background. A PRE notification is queued before processing, but processing does not wait for the receiver. Use a PRE script for file preparation or any action that must finish first. See [Custom scripts](/shared/hooks) for their shared setup and the app-specific timing and environment references.
+
+## Choose which app sends the notification
+
+| Behavior | Scout | Station |
+|---|---|---|
+| PRE event | Before processing a backup job | After checksum verification, before storing an upload |
+| POST outcomes | Job outcomes, including unchanged, held, and failed jobs; successful uploads | Storage outcomes with `ok` or `error` |
+| Unusual activity | Unusual backups detected on the source machine | Unusual archive sizes detected after upload |
+| Filters | Scout ID, instance ID, and job name | The same filters, plus upload source address |
+| Scope | Jobs on this Scout, including failures that never reach Station | Uploads that reach this Station from any Scout |
+
+Use Scout to monitor job preparation and all job outcomes. Use Station to monitor storage handling across your Scouts. Configuring both can send separate notifications about the same successful upload.
 
 ## Set up a destination
 
@@ -14,10 +30,10 @@ Use [custom scripts](/scout/hooks) for file preparation, cleanup, or automation 
     Sign in as an admin and click **Integrations** in the app that should send the events. The apps keep separate destinations and secrets.
   </Step>
   <Step title="Choose the receiver">
-    Select **New integration**, give it a name, and choose **JSON event**, **Plain text**, or **Discord message**. Enter the complete HTTPS destination URL. If authentication is needed, enter headers as a JSON object, for example `{"Authorization":"Bearer YOUR_TOKEN"}`.
+    Under **HTTP notifications**, select **New integration**, give it a name, and choose **PRE — before processing** or **POST — outcomes and alerts**. Choose **JSON event**, **Plain text**, or **Custom JSON**. Enter the complete HTTPS destination URL. If authentication is needed, enter headers as a JSON object, for example `{"Authorization":"Bearer YOUR_TOKEN"}`.
   </Step>
   <Step title="Choose events and filters">
-    Select the events you want. Filled Scout ID, instance ID, job name, and source address filters must all match exactly. Source address applies to Station only; leave it empty on Scout. Leave **Include error and unusual-backup details** off unless the receiver should get those details.
+    Select the events you want. Filled Scout ID, instance ID, job name, and source address filters must all match exactly. The source-address filter is available on Station only. Leave **Include error and unusual-backup details** off unless the receiver should get those details.
   </Step>
   <Step title="Save and test">
     Click **Save**, then **Test saved destination**. A test uses the saved URL and headers, even when the destination is disabled. It sends an `event: "test"` sample and bypasses event filters. Unsaved form edits don't affect the test.
@@ -36,33 +52,82 @@ Use HTTPS for the web UI when entering secrets. If the receiving service uses a 
 
 ## Events
 
-| App | Event | When it happens |
-|---|---|---|
-| Scout | `job-finished` | A job attempt finishes in a scheduled cycle, **Run Backup Cycle Now**, or **Force Upload**. Includes unchanged, empty, held, and failed jobs. Cancellation and jobs that can't acquire their lock don't emit it. |
-| Scout | `upload-finished` | A job uploads successfully, including **Force Upload**. |
-| Scout | `unusual-backup` | Scout records a newly detected unusual backup, whether held or allowed through in alert mode. |
-| Station | `upload-received` | Station completes its storage handling, with `status: "ok"` or `"error"`. Uploads rejected before that stage don't emit it. |
-| Station | `unusual-upload` | A stored archive's size differs sharply from its history. |
+A destination can select PRE events or POST outcomes and alerts. It cannot combine those timings; create a second destination for the other action. Alert events fire when detected, so an unusual-backup alert can arrive before the job finishes.
 
-Station receives forced uploads too. A retry of an already finalized upload doesn't repeat its events. Station cannot report a Scout that stops sending backups; use a separate uptime or dead-man monitor for that.
+### Scout events
 
-Selecting both `job-finished` and `upload-finished` sends two events for a successful Scout job. Selecting the same upload on both apps also produces separate notifications. Choose the event that matches what you want to monitor.
+| Event | When it happens |
+|---|---|
+| `job-started` (PRE) | Before scanning or processing a job, including **Force Upload**. Locked jobs and attempts already cancelled don't emit it. `status` is `started`. |
+| `job-finished` | A job attempt finishes in a scheduled cycle, **Run Backup Cycle Now**, or **Force Upload**. Includes unchanged, empty, held, and failed jobs. Cancellation and jobs that can't acquire their lock don't emit it. |
+| `upload-finished` | A job uploads successfully, including **Force Upload**. |
+| `unusual-backup` | Scout records a newly detected [unusual backup](/scout/unusual-backups), whether held or allowed through in alert mode. |
+
+Choose `upload-finished` for success notices, `unusual-backup` for anomaly alerts, or `job-finished` for all job outcomes. Selecting both `job-finished` and `upload-finished` sends two events for a successful Scout job. Error and unusual-backup details require explicit opt-in.
+
+HTTP events include forced jobs, but [Scout scripts](/scout/hooks) run only around jobs in scheduled or manual cycles. Choosing HTTP events does not change script timing.
+
+### Station events
+
+| Event | When it happens |
+|---|---|
+| `upload-started` (PRE) | After an upload passes checksum verification, before storage handling. `status` is `started`. Already finalized uploads don't emit it again. |
+| `upload-received` | Station completes its storage handling, with `status: "ok"` or `"error"`. Uploads rejected before that stage don't emit it. |
+| `unusual-upload` | A stored archive's size differs sharply from its history. See [Unusual sizes](/station/snapshots#unusual-sizes). |
+
+Check the status in `upload-received`: receiving this event alone isn't proof of successful storage. Station receives forced Scout uploads too. A retry of an already finalized upload doesn't repeat its events. [Station scripts](/station/hooks) run around storage handling.
+
+Source addresses can filter Station destinations but aren't included in outgoing payloads. Unusual-size reasons require explicit opt-in to include details. Station cannot report a Scout that stops sending backups; use a separate uptime or dead-man monitor for that.
 
 ## Payloads and templates
 
-**JSON event** sends the [event schema](/integrations/http#event-schema), including a rendered `message`. **Plain text** sends only that message. **Discord message** sends a JSON `content` field with mentions disabled and message length capped at 2,000 characters.
+| Format | Default payload | What you can edit |
+|---|---|---|
+| **Plain text** | Rendered message text | Message template |
+| **JSON event** | The [event schema](/integrations/http#event-schema), including a rendered `message` | Message template; the event structure is fixed |
+| **Custom JSON** | `{"message": "{{ message }}"}` | Message template and JSON body template |
 
-An empty template uses:
+New destinations have this message template filled in. You can change it at any time:
 
 ```text
 {{ app }} {{ event }}: {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} ({{ status }}).
 ```
 
-Supported placeholders are `app`, `event`, `scout_id`, `scout_instance_id`, `job_name`, `status`, `stored_as`, `error_category`, `detail`, and `time`. Surround each with `{{ }}`. Unknown placeholders become empty. Inserted values are encoded safely in JSON and aren't interpreted as more template tokens.
+**Reset to default** restores the message draft. Custom JSON has a separate reset button for the JSON body, which restores `{"message": "{{ message }}"}`. Click **Save** to apply a reset. Sending an empty message template through the API also selects the default.
+
+Expand **Template variables** in the dialog, or use this table:
+
+| Variable | Value | Example |
+|---|---|---|
+| `{{ app }}` | App sending the event | `scout` or `station` |
+| `{{ event }}` | Selected event name | `job-started`, `upload-finished` |
+| `{{ scout_id }}` | Scout ID | `home-server` |
+| `{{ scout_instance_id }}` | Scout installation ID | `instance-example` |
+| `{{ job_name }}` | Backup job name | `documents` |
+| `{{ status }}` | PRE start or POST outcome | `started`, `success`, `ok`, `error` |
+| `{{ stored_as }}` | Stored archive filename, when available after upload | `documents__TIMESTAMP__FINGERPRINT.tar.zst` |
+| `{{ error_category }}` | Error category, when available | `unexpected` |
+| `{{ detail }}` | Error or unusual-backup detail, only when enabled | Empty by default |
+| `{{ time }}` | Event time in UTC, RFC 3339 | `2026-10-10T12:00:00Z` |
+| `{{ message }}` | Rendered message; available only in the custom JSON body | Result of the message template |
+
+For example, set the message to `{{ job_name }}: {{ event }} ({{ status }})`. For a receiver needing a different JSON shape, select **Custom JSON** and enter:
+
+```json
+{
+  "text": "{{ message }}",
+  "job": "{{ job_name }}",
+  "result": "{{ status }}"
+}
+```
+
+The JSON body must be valid JSON before rendering: put placeholders inside string values, including strings in nested objects and arrays. Object keys are literal; numbers, booleans, and null stay unchanged. Quotes and newlines in inserted values are escaped automatically. Unknown placeholders become empty, and inserted values aren't interpreted as more template tokens.
+
+Scripts use shell environment variables such as `$THREETOONEGO_JOB_NAME`, rather than `{{ job_name }}`. Their complete tables are in the [Scout](/scout/hooks#environment-variables) and [Station](/station/hooks#environment-variables) script guides.
 
 `detail` is empty unless you enable **Include error and unusual-backup details**. Job names, IDs, archive filenames, and error categories are sent normally. Credentials, file contents, local paths, advertised URLs, settings, and source addresses are not automatically included. Source addresses can still be used for matching. Treat names and templates as public metadata and keep secrets out of them.
 
-For plain text and Discord messages, add `{{ detail }}` to the template to display those opted-in details. JSON events include the separate `detail` field when enabled and nonempty.
+For plain text, add `{{ detail }}` to the message template to display opted-in details. Custom JSON can use it in any string value. JSON events include the separate `detail` field when enabled and nonempty.
 
 ## Delivery behavior
 

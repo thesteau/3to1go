@@ -17,20 +17,52 @@ function editor(app: string) {
     "job",
     "source",
     "template",
+    "payload-template",
+    "timing",
     "detail",
     "timeout",
   ]) {
     fields.set(`integration-${name}`, { value: "", checked: false });
   }
   fields.set("integration-select", { value: "saved-id" });
+  for (const name of [
+    "events",
+    "payload-editor",
+    "test",
+    "delete",
+    "notifications-panel",
+    "scripts-panel",
+    "notifications-tab",
+    "scripts-tab",
+  ]) {
+    fields.set(`integration-${name}`, {
+      children: [],
+      replaceChildren() {
+        this.children = [];
+      },
+      appendChild(child) {
+        this.children.push(child);
+      },
+      setAttribute() {},
+    });
+  }
   fields.get("integration-name").value = "Backup alerts";
   fields.get("integration-format").value = "json";
   fields.get("integration-timeout").value = "5";
   fields.get("integration-enabled").checked = true;
+  fields.get("integration-timing").value = "post";
   const ctx = vm.createContext({
     document: {
       getElementById: (id) => fields.get(id),
       querySelectorAll: () => [{ value: "upload-finished" }],
+      createElement: () => ({
+        dataset: {},
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        },
+      }),
+      createTextNode: (text) => text,
     },
     requirePanelReady: () => true,
     setStatus: () => {},
@@ -111,5 +143,75 @@ for (const app of ["scout", "station"]) {
     assert.equal(fields.get("integration-url").value, "");
     assert.equal(fields.get("integration-headers").value, "");
     assert.equal(selectedID, "saved-id");
+  });
+
+  test(`${app} new integrations and reset use generic defaults while edits are preserved`, () => {
+    const { ctx, fields } = editor(app);
+    vm.runInContext(
+      'integrationDefaultMessage = "{{ job_name }}: {{ status }}"; integrationDefaultPayload = \'{"message":"{{ message }}"}\';',
+      ctx,
+    );
+    fields.get("integration-select").value = "";
+    ctx.editIntegration();
+    assert.equal(fields.get("integration-template").value, "{{ job_name }}: {{ status }}");
+    assert.equal(fields.get("integration-payload-template").value, '{"message":"{{ message }}"}');
+    assert.equal(fields.get("integration-payload-editor").hidden, true);
+    fields.get("integration-template").value = "Edited message";
+    fields.get("integration-payload-template").value = '{"text":"{{ message }}"}';
+    fields.get("integration-format").value = "custom-json";
+    ctx.updateIntegrationFormat();
+    assert.equal(fields.get("integration-payload-editor").hidden, false);
+    assert.equal(ctx.collectIntegrationPayload().payload_template, '{"text":"{{ message }}"}');
+    ctx.resetIntegrationTemplate("message");
+    assert.equal(fields.get("integration-template").value, "{{ job_name }}: {{ status }}");
+    assert.equal(fields.get("integration-payload-template").value, '{"text":"{{ message }}"}');
+    ctx.resetIntegrationTemplate("payload");
+    assert.equal(fields.get("integration-payload-template").value, '{"message":"{{ message }}"}');
+  });
+
+  test(`${app} custom JSON rejects malformed templates before saving`, () => {
+    const { ctx, fields } = editor(app);
+    fields.get("integration-format").value = "custom-json";
+    fields.get("integration-payload-template").value = '{"job": {{ job_name }}}';
+    assert.throws(() => ctx.collectIntegrationPayload(), /Payload template must be valid JSON/);
+  });
+
+  test(`${app} PRE and POST show separate events for independent destinations`, () => {
+    const { ctx, fields } = editor(app);
+    const preEvent = app === "scout" ? "job-started" : "upload-started";
+    const postEvent = app === "scout" ? "upload-finished" : "upload-received";
+    vm.runInContext(`integrationEvents = ${JSON.stringify([preEvent, postEvent])};`, ctx);
+    ctx.renderIntegrationEvents();
+    const postRows = fields.get("integration-events").children;
+    assert.equal(postRows.length, 1);
+    assert.equal(postRows[0].children[0].value, postEvent);
+    fields.get("integration-timing").value = "pre";
+    ctx.renderIntegrationEvents();
+    const preRows = fields.get("integration-events").children;
+    assert.equal(preRows.length, 1);
+    assert.equal(preRows[0].children[0].value, preEvent);
+    assert.equal(preRows[0].children[0].checked, true);
+    assert.equal(ctx.isIntegrationPreEvent(preEvent), true);
+    assert.equal(ctx.isIntegrationPreEvent(postEvent), false);
+  });
+
+  test(`${app} switching integration panels preserves separate action drafts`, async () => {
+    const { ctx, fields } = editor(app);
+    let scriptLoads = 0;
+    let notificationLoads = 0;
+    ctx.loadHookConfig = async () => {
+      scriptLoads++;
+    };
+    ctx.loadIntegrations = async () => {
+      notificationLoads++;
+    };
+    fields.get("integration-template").value = "Notification draft";
+    await ctx.showIntegrationPanel("scripts");
+    assert.equal(fields.get("integration-notifications-panel").hidden, true);
+    await ctx.showIntegrationPanel("notifications");
+    await ctx.showIntegrationPanel("scripts");
+    assert.equal(scriptLoads, 1);
+    assert.equal(notificationLoads, 1);
+    assert.equal(fields.get("integration-template").value, "Notification draft");
   });
 }

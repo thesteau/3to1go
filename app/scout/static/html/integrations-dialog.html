@@ -1,45 +1,127 @@
 <dialog id="integrations-dialog" class="modal" aria-labelledby="integrations-dialog-title">
   <div class="modal-card">
-    <div id="integrations-load-status" role="status"></div>
     <div class="modal-head">
       <h2 id="integrations-dialog-title">Integrations</h2>
       <button type="button" class="secondary" onclick="closeDialog('integrations-dialog')">Close</button>
     </div>
-    <p class="hint">Send backup notifications to HTTP services. URLs and headers are secret: saved values are never shown again.</p>
-    <p class="hint">Use HTTPS for this UI when entering secrets. <a href="https://3to1go.docs.thesteau.com/shared/integrations" target="_blank" rel="noopener noreferrer">Setup and service guides</a></p>
-    <label for="integration-select">Destination</label>
-    <select id="integration-select" onchange="editIntegration()" data-requires="integrations" disabled></select>
-    <label for="integration-name">Name</label>
-    <input id="integration-name" type="text" maxlength="100" data-requires="integrations" disabled>
-    <label><input id="integration-enabled" type="checkbox" data-requires="integrations" disabled> Enabled</label>
-    <label for="integration-format">Payload format</label>
-    <select id="integration-format" data-requires="integrations" disabled>
-      <option value="json">JSON event</option><option value="text">Plain text</option><option value="discord">Discord message</option>
-    </select>
-    <label for="integration-url">Destination URL (secret)</label>
-    <input id="integration-url" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
-    <label for="integration-headers">Headers as JSON (secret)</label>
-    <input id="integration-headers" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
-    <label><input id="integration-clear-headers" type="checkbox" data-requires="integrations" disabled> Clear saved headers</label>
-    <fieldset><legend>Events</legend><div id="integration-events"></div></fieldset>
-    <div class="form-grid">
-      <div><label for="integration-scout">Match Scout ID</label><input id="integration-scout" type="text" data-requires="integrations" disabled></div>
-      <div><label for="integration-instance">Match instance ID</label><input id="integration-instance" type="text" data-requires="integrations" disabled></div>
-      <div><label for="integration-job">Match job name</label><input id="integration-job" type="text" data-requires="integrations" disabled></div>
-      <div><label for="integration-source">Match source address (Station)</label><input id="integration-source" type="text" data-requires="integrations" disabled></div>
+    <div class="integration-tabs" role="tablist" aria-label="Integration actions" onkeydown="handleIntegrationTabKey(event)">
+      <button type="button" role="tab" id="integration-notifications-tab" aria-controls="integration-notifications-panel" aria-selected="true" tabindex="0" onclick="showIntegrationPanel('notifications')">HTTP notifications</button>
+      <button type="button" role="tab" id="integration-scripts-tab" aria-controls="integration-scripts-panel" aria-selected="false" tabindex="-1" onclick="showIntegrationPanel('scripts')">Custom scripts (PRE / POST)</button>
     </div>
-    <p class="hint">Leave filters empty to match all. Every filled filter must match exactly.</p>
-    <label for="integration-template">Message template</label>
-    <textarea id="integration-template" maxlength="2000" placeholder="{{ app }} {{ event }}: {{ job_name }} ({{ status }})." data-requires="integrations" disabled></textarea>
-    <p class="hint">Templates: app, event, scout_id, scout_instance_id, job_name, status, stored_as, error_category, detail, time. Keep secrets out of names and templates.</p>
-    <label><input id="integration-detail" type="checkbox" data-requires="integrations" disabled> Include error and unusual-backup details (may contain private information)</label>
-    <label for="integration-timeout">Delivery timeout (seconds, 1–30)</label>
-    <input id="integration-timeout" type="number" min="1" max="30" value="5" data-requires="integrations" disabled>
-    <div class="modal-actions">
-      <button type="button" onclick="saveIntegration()" data-requires="integrations" disabled>Save</button>
-      <button id="integration-test" type="button" class="secondary" onclick="testIntegration()" data-requires="integrations" disabled hidden>Test saved destination</button>
-      <button id="integration-delete" type="button" class="danger" onclick="deleteIntegration()" data-requires="integrations" disabled hidden>Delete</button>
+    <div id="integration-notifications-panel" role="tabpanel" aria-labelledby="integration-notifications-tab">
+      <div id="integrations-load-status" role="status"></div>
+      <p class="hint">Send backup notifications to HTTP services. URLs and headers are secret: saved values are never shown again.</p>
+      <p class="hint">Use HTTPS for this UI when entering secrets. <a href="https://3to1go.docs.thesteau.com/shared/integrations" target="_blank" rel="noopener noreferrer">Setup and service guides</a></p>
+      <label for="integration-select">Destination</label>
+      <select id="integration-select" onchange="editIntegration()" data-requires="integrations" disabled></select>
+      <label for="integration-name">Name</label>
+      <input id="integration-name" type="text" maxlength="100" data-requires="integrations" disabled>
+      <label class="integration-check"><input id="integration-enabled" type="checkbox" data-requires="integrations" disabled> Enabled</label>
+      <label for="integration-timing">Action timing</label>
+      <select id="integration-timing" onchange="renderIntegrationEvents()" data-requires="integrations" disabled>
+        <option value="pre">PRE — before processing</option>
+        <option value="post" selected>POST — outcomes and alerts</option>
+      </select>
+      <p class="hint">Each destination is a separate action with its own URL and templates. For different before and after actions, save a PRE destination and a separate POST destination. HTTP delivery runs in the background; use a PRE script when processing must wait for an action to finish.</p>
+      <label for="integration-format">Payload format</label>
+      <select id="integration-format" onchange="updateIntegrationFormat()" data-requires="integrations" disabled>
+        <option value="json">JSON event</option><option value="text">Plain text</option><option value="custom-json">Custom JSON</option>
+      </select>
+      <label for="integration-url">Destination URL (secret)</label>
+      <input id="integration-url" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
+      <label for="integration-headers">Headers as JSON (secret)</label>
+      <input id="integration-headers" type="password" autocomplete="new-password" spellcheck="false" data-requires="integrations" disabled>
+      <label class="integration-check"><input id="integration-clear-headers" type="checkbox" data-requires="integrations" disabled> Clear saved headers</label>
+      <fieldset><legend>Events for this action</legend><div id="integration-events"></div></fieldset>
+      <div class="form-grid">
+        <div><label for="integration-scout">Match Scout ID</label><input id="integration-scout" type="text" data-requires="integrations" disabled></div>
+        <div><label for="integration-instance">Match instance ID</label><input id="integration-instance" type="text" data-requires="integrations" disabled></div>
+        <div><label for="integration-job">Match job name</label><input id="integration-job" type="text" data-requires="integrations" disabled></div>
+        <input id="integration-source" type="hidden" value="">
+      </div>
+      <p class="hint">Leave filters empty to match all. Every filled filter must match exactly.</p>
+      <div class="label-row">
+        <label for="integration-template">Message template</label>
+        <button type="button" class="secondary" onclick="resetIntegrationTemplate('message')" data-requires="integrations" disabled>Reset to default</button>
+      </div>
+      <textarea id="integration-template" maxlength="2000" data-requires="integrations" disabled></textarea>
+      <p class="hint">Plain text sends this message. JSON event includes it in the message field. Custom JSON can insert it with <code>{{ message }}</code>. Reset changes the draft; click Save to apply it.</p>
+      <div id="integration-payload-editor" hidden>
+        <div class="label-row">
+          <label for="integration-payload-template">JSON body template</label>
+          <button type="button" class="secondary" onclick="resetIntegrationTemplate('payload')" data-requires="integrations" disabled>Reset to default</button>
+        </div>
+        <textarea id="integration-payload-template" maxlength="16384" spellcheck="false" data-requires="integrations" disabled></textarea>
+        <p class="hint">Enter valid JSON. Put variables inside string values, for example <code>{"message": "{{ message }}"}</code>. Values are escaped automatically.</p>
+      </div>
+      <details><summary>Template variables</summary>
+        <div class="integration-table-wrap"><table class="placeholder-table">
+          <thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>
+          <tr><td><code>{{ app }}</code></td><td>scout or station</td></tr>
+          <tr><td><code>{{ event }}</code></td><td>Event name</td></tr>
+          <tr><td><code>{{ scout_id }}</code></td><td>Scout ID</td></tr>
+          <tr><td><code>{{ scout_instance_id }}</code></td><td>Installation ID</td></tr>
+          <tr><td><code>{{ job_name }}</code></td><td>Backup job name</td></tr>
+          <tr><td><code>{{ status }}</code></td><td>started for PRE; outcome for POST</td></tr>
+          <tr><td><code>{{ stored_as }}</code></td><td>Stored archive filename, when available</td></tr>
+          <tr><td><code>{{ error_category }}</code></td><td>Error category, when available</td></tr>
+          <tr><td><code>{{ detail }}</code></td><td>Details, only when explicitly enabled</td></tr>
+          <tr><td><code>{{ time }}</code></td><td>Event time in UTC (RFC 3339)</td></tr>
+          <tr><td><code>{{ message }}</code></td><td>Rendered message, only in the custom JSON body</td></tr>
+        </tbody></table></div>
+        <p class="hint">Unknown variables become empty. Keep secrets out of names and templates.</p>
+      </details>
+      <label class="integration-check"><input id="integration-detail" type="checkbox" data-requires="integrations" disabled> Include error and unusual-backup details (may contain private information)</label>
+      <label for="integration-timeout">Delivery timeout (seconds, 1–30)</label>
+      <input id="integration-timeout" type="number" min="1" max="30" value="5" data-requires="integrations" disabled>
+      <div class="modal-actions">
+        <button type="button" onclick="saveIntegration()" data-requires="integrations" disabled>Save</button>
+        <button id="integration-test" type="button" class="secondary" onclick="testIntegration()" data-requires="integrations" disabled hidden>Test saved destination</button>
+        <button id="integration-delete" type="button" class="danger" onclick="deleteIntegration()" data-requires="integrations" disabled hidden>Delete</button>
+      </div>
+      <div id="integrations-status" role="status"></div>
     </div>
-    <div id="integrations-status" role="status"></div>
+    <div id="integration-scripts-panel" role="tabpanel" aria-labelledby="integration-scripts-tab" hidden>
+      <div id="hooks-load-status" role="status"></div>
+      <p class="hint">Configure PRE and POST independently. Leave either command empty to skip it.</p>
+      <p class="hint">PRE runs before scanning each job in a backup cycle. POST runs after that job finishes, including unchanged and failed jobs. Force Upload skips scripts; cancellation skips POST. <a href="https://3to1go.docs.thesteau.com/shared/hooks" target="_blank" rel="noopener noreferrer">Script setup</a> · <a href="https://3to1go.docs.thesteau.com/scout/hooks#environment-variables" target="_blank" rel="noopener noreferrer">Examples and environment variables</a></p>
+      <div class="hook-section">
+        <div class="hook-section-head">
+          <h3>PRE — before</h3>
+          <div class="hook-inline-actions">
+            <button type="button" class="secondary" onclick="clearHookCommand('pre')" data-requires="hooks" disabled>Clear</button>
+          </div>
+        </div>
+        <label for="hook_pre_command">PRE command</label>
+        <textarea id="hook_pre_command" placeholder="Optional command or script filename" data-requires="hooks" disabled></textarea>
+      </div>
+
+      <div class="hook-section">
+        <div class="hook-section-head">
+          <h3>POST — after</h3>
+          <div class="hook-inline-actions">
+            <button type="button" class="secondary" onclick="clearHookCommand('post')" data-requires="hooks" disabled>Clear</button>
+          </div>
+        </div>
+        <label for="hook_post_command">POST command</label>
+        <textarea id="hook_post_command" placeholder="Optional command or script filename" data-requires="hooks" disabled></textarea>
+      </div>
+
+      <p class="hint">Scripts use shell variables such as <code>$THREETOONEGO_JOB_NAME</code>. <code>{{ job_name }}</code> belongs to HTTP templates.</p>
+      <button type="button" onclick="saveHookCommands()" data-requires="hooks" disabled>Save script commands</button>
+      <div class="hook-section">
+        <div class="hook-section-head">
+          <h3>Uploaded Items <span class="field-help hover-hint" tabindex="0" aria-label="Upload .sh scripts and .txt helper files that your pre and post commands can use." title="Upload .sh scripts and .txt helper files that your pre and post commands can use.">?</span></h3>
+          <span class="hint">Up to 3 files. Folder: <code id="hook-script-dir">loading...</code></span>
+        </div>
+        <div class="hook-upload-row">
+          <input id="hook_file_input" type="file" accept=".sh,.txt" data-requires="hooks" disabled>
+          <button type="button" class="secondary" onclick="uploadHookFile()" data-requires="hooks" disabled>Upload</button>
+        </div>
+        <div id="hook-files" class="hook-files"></div>
+      </div>
+
+      <div id="hooks-status" role="status"></div>
+    </div>
   </div>
 </dialog>

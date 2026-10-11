@@ -1,29 +1,36 @@
 ---
 title: "Discord"
-description: "Send backup notifications to a Discord channel using an incoming webhook."
+description: "Use a generic custom JSON template to post backup notifications to a Discord webhook."
 ---
 
 Create an incoming webhook in the Discord channel where you want notifications. You need permission to manage that channel's webhooks. A bot application is not needed for this setup.
+
+Discord uses the same generic HTTP integration as other receivers. There is no Discord-specific format or default message, and no local script is required.
 
 <Steps>
   <Step title="Create the webhook in Discord">
     Open the channel settings, then **Integrations → Webhooks**. Create a webhook, select the channel, and copy its webhook URL. Follow [Discord's webhook setup guide](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for the current UI and permissions.
   </Step>
   <Step title="Create a destination in 3to1go">
-    Open **Integrations** in Scout or Station. Name it, choose **Discord message**, and paste the complete webhook URL into **Destination URL (secret)**. No authorization header is required: the token is already in the URL. For delivery confirmation, append `?wait=true`, or `&wait=true` if the URL already has a query.
+    Open **Integrations → HTTP notifications** in Scout or Station. Name it, choose **PRE** or **POST** timing, select **Custom JSON**, and paste the complete webhook URL into **Destination URL (secret)**. No authorization header is required: the token is already in the URL. For delivery confirmation, append `?wait=true`, or `&wait=true` if the URL already has a query.
   </Step>
   <Step title="Select events and save">
-    On Scout, start with `upload-finished` and `unusual-backup`. On Station, start with `upload-received` and `unusual-upload`. Set a message template, save, and click **Test saved destination**. Confirm that the sample appears in the channel.
+    For POST, start with `upload-finished` and `unusual-backup` on Scout, or `upload-received` and `unusual-upload` on Station. PRE uses `job-started` on Scout or `upload-started` on Station. Keep or edit the generic message template, set the JSON body below, save, and click **Test saved destination**. Configure a separate destination if you want another action at the other timing.
   </Step>
 </Steps>
 
-For example:
+Set **JSON body template** to:
 
-```text
-{{ app }}: {{ job_name }} — {{ event }} / {{ status }}
+```json
+{
+  "content": "{{ message }}",
+  "allowed_mentions": {"parse": []}
+}
 ```
 
-The sender safely encodes message text and disables user, role, and everyone mentions. Messages are capped at 2,000 characters. Start with a normal text channel; forum and media channels need a `thread_id` query parameter identifying an existing thread. See [Discord's execute-webhook reference](https://docs.discord.com/developers/resources/webhook#execute-webhook) for channel types, parameters, and response behavior.
+This template disables user, role, and everyone mentions. The generic sender safely encodes string values but does not impose a service-specific character limit: keep the rendered `content` within Discord's 2,000-character limit. Start with a normal text channel; forum and media channels can use a `thread_id` query parameter identifying an existing thread. See [Discord's execute-webhook reference](https://docs.discord.com/developers/resources/webhook#execute-webhook) for channel types, parameters, and response behavior.
+
+Previously saved Discord destinations are loaded as **Custom JSON** with the equivalent body template and their existing message. **Reset to default** on the JSON body restores the generic message field; reapply the body above to continue posting to Discord.
 
 HTTP `429` is reported as a failed delivery and is not automatically retried. If you have many jobs, use event filters or route through [n8n](/integrations/n8n) to aggregate messages and control volume.
 

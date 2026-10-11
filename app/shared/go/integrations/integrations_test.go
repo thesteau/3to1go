@@ -221,7 +221,7 @@ func TestSlowReceiverTimesOutWithoutExposingURL(t *testing.T) {
 }
 
 func TestFormatsEncodeDataAndOmitPrivateDetails(t *testing.T) {
-	for _, format := range []string{"json", "text", "discord"} {
+	for _, format := range []string{"json", "text", "custom-json"} {
 		t.Run(format, func(t *testing.T) {
 			t.Setenv("INTEGRATIONS_KEY_FILE", "")
 			requests := make(chan *http.Request, 1)
@@ -248,8 +248,8 @@ func TestFormatsEncodeDataAndOmitPrivateDetails(t *testing.T) {
 				if err := json.Unmarshal(body, &payload); err != nil {
 					t.Fatal(err)
 				}
-				if format == "discord" && len(payload["allowed_mentions"].(map[string]any)["parse"].([]any)) != 0 {
-					t.Fatal("Discord mentions enabled")
+				if format == "custom-json" && payload["message"] != render(DefaultMessageTemplate, Event{Type: event.Type, App: event.App, JobName: event.JobName, Status: event.Status}) {
+					t.Fatal("generic default message missing")
 				}
 				if format == "json" && payload["job_name"] != event.JobName {
 					t.Fatal("job name was not preserved")
@@ -378,5 +378,135 @@ func TestValidationRejectsInsecureDestinationsAndHeaders(t *testing.T) {
 	d.Events = []string{UploadReceived}
 	if _, err := m.Save(Update{Destination: d}); err == nil {
 		t.Fatal("Station event accepted by Scout")
+	}
+}
+
+func TestCustomJSONRendersStringValuesWithoutChangingStructure(t *testing.T) {
+	fields := templateFields(Event{JobName: "quotes\"\n{{ detail }}", Detail: "PRIVATE", Status: "success"})
+	fields["message"] = "Job: " + fields["job_name"]
+	payload, err := renderJSON(`{"text":"{{ message }}","nested":[{"job":"{{ job_name }}","unknown":"{{ unknown }}"}],"count":9007199254740993,"enabled":true,"empty":null,"{{ job_name }}":"literal key"}`, fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Text    string              `json:"text"`
+		Nested  []map[string]string `json:"nested"`
+		Count   json.Number         `json:"count"`
+		Enabled bool                `json:"enabled"`
+	}
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Text != fields["message"] || got.Nested[0]["job"] != fields["job_name"] || got.Nested[0]["unknown"] != "" || got.Count.String() != "9007199254740993" || !got.Enabled {
+		t.Fatalf("template changed data: %s", payload)
+	}
+	if !bytes.Contains(payload, []byte(`"{{ job_name }}":"literal key"`)) || bytes.Contains(payload, []byte("PRIVATE")) {
+		t.Fatalf("keys or substituted tokens were interpreted: %s", payload)
+	}
+	for _, template := range []string{`{"job":{{ job_name }}}`, `{"text":"ok"} {}`, `not JSON`} {
+		if _, err := renderJSON(template, fields); err == nil {
+			t.Fatal("invalid JSON accepted")
+		}
+	}
+}
+
+func TestCustomJSONDeliveryUsesOwnTemplateAndDetailOptIn(t *testing.T) {
+	t.Setenv("INTEGRATIONS_KEY_FILE", "")
+	seen := make(chan map[string]string, 1)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Error("wrong custom JSON content type")
+		}
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Error(err)
+		}
+		seen <- payload
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+	m := testManager(t, t.TempDir(), server, io.Discard)
+	d := saveDestination(t, m, server.URL, "custom-json")
+	d.MessageTemplate = "{{ job_name }}: {{ status }}"
+	d.PayloadTemplate = `{"text":"{{ message }}","detail":"{{ detail }}"}`
+	event := Event{JobName: "quotes\"\n{{ detail }}", Status: "success", Detail: "PRIVATE"}
+	for _, detail := range []bool{false, true} {
+		d.IncludeDetail = detail
+		if _, err := m.Save(Update{Destination: d}); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.deliver(context.Background(), m.destinations[0], event); err != nil {
+			t.Fatal(err)
+		}
+		got := <-seen
+		if got["text"] != event.JobName+": success" || (got["detail"] == "PRIVATE") != detail {
+			t.Fatalf("wrong custom body: %+v", got)
+		}
+	}
+}
+
+func TestDefaultsAndIndependentPrePostActions(t *testing.T) {
+	t.Setenv("INTEGRATIONS_KEY_FILE", "")
+	m := testManager(t, t.TempDir(), nil, io.Discard)
+	post := saveDestination(t, m, "https://example.invalid/after", "custom-json")
+	if post.MessageTemplate != DefaultMessageTemplate || post.PayloadTemplate != DefaultPayloadTemplate {
+		t.Fatal("new destination has no generic defaults")
+	}
+	endpoint := "https://example.invalid/before"
+	pre, err := m.Save(Update{Destination: Destination{Name: "Before", Enabled: true, Format: "text", Events: []string{JobStarted}, MessageTemplate: "Preparing {{ job_name }}"}, URL: &endpoint})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Snapshot()) != 2 || pre.MessageTemplate == post.MessageTemplate {
+		t.Fatal("independent actions were combined")
+	}
+	pre.Events = append(pre.Events, JobFinished)
+	if _, err := m.Save(Update{Destination: pre}); err == nil {
+		t.Fatal("mixed PRE and POST action accepted")
+	}
+	post.PayloadTemplate = `{"text": {{ message }}}`
+	if _, err := m.Save(Update{Destination: post}); err == nil {
+		t.Fatal("invalid body template accepted")
+	}
+	if m.Snapshot()[1].MessageTemplate != "Preparing {{ job_name }}" {
+		t.Fatal("another action was overwritten")
+	}
+}
+
+func TestLegacyReceiverLoadsAsGenericJSON(t *testing.T) {
+	t.Setenv("INTEGRATIONS_KEY_FILE", "")
+	dir := t.TempDir()
+	m := testManager(t, dir, nil, io.Discard)
+	d := saveDestination(t, m, "https://example.invalid/private-token", "json")
+	m.destinations[0].Format = "discord"
+	m.destinations[0].MessageTemplate = "Existing {{ job_name }} message"
+	if err := m.persist(m.destinations); err != nil {
+		t.Fatal(err)
+	}
+	reopened := testManager(t, dir, nil, io.Discard)
+	got := reopened.Snapshot()[0]
+	if got.ID != d.ID || got.Format != "custom-json" || got.MessageTemplate != "Existing {{ job_name }} message" || !got.URLConfigured {
+		t.Fatal("legacy destination was lost")
+	}
+	fields := templateFields(Event{JobName: "Job"})
+	fields["message"] = render(got.MessageTemplate, Event{JobName: "Job"})
+	payload, err := renderJSON(got.PayloadTemplate, fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Content         string `json:"content"`
+		AllowedMentions struct {
+			Parse []string `json:"parse"`
+		} `json:"allowed_mentions"`
+	}
+	if err := json.Unmarshal(payload, &body); err != nil || body.Content != "Existing Job message" || body.AllowedMentions.Parse == nil || len(body.AllowedMentions.Parse) != 0 {
+		t.Fatalf("legacy body changed: %s", payload)
+	}
+	if _, err := reopened.Save(Update{Destination: got}); err != nil {
+		t.Fatal(err)
+	}
+	if testManager(t, dir, nil, io.Discard).Snapshot()[0].Format != "custom-json" {
+		t.Fatal("generic destination was not persisted")
 	}
 }

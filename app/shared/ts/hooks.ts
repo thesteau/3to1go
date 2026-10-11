@@ -1,11 +1,5 @@
 async function openHooksDialog(): Promise<void> {
-  clearStatus("hooks-status");
-  openDialog("hooks-dialog");
-  try {
-    await loadHookConfig({ preserveDrafts: false });
-  } catch (error) {
-    setActionStatus((error as Error).message || "Failed to load hook settings.", "error");
-  }
+  await openIntegrationsDialog("scripts");
 }
 
 async function uploadHookFile(): Promise<void> {

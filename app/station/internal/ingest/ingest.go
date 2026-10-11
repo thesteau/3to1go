@@ -443,6 +443,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, uploadID string) (*Finaliz
 	}
 
 	hookCtx := s.hookContext(session, stagedPath)
+	s.publish(hookCtx, integrations.UploadStarted, "started", "")
 	s.hooks.RunCommand(s.settings.HookPreCommand, "pre", hookCtx)
 
 	dup, err := s.index.FindDuplicate(ctx, session.Namespace, actualSHA)

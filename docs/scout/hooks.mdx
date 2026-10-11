@@ -1,5 +1,5 @@
 ---
-title: "Scout hooks"
+title: "Scout scripts"
 description: "Run your own commands before and after Scout processes each backup job."
 ---
 
@@ -7,10 +7,10 @@ Hooks run a shell command around each job in a backup cycle.
 
 ```mermaid
 flowchart LR
-    PRE[Pre command] --> F{Paths or sizes<br/>changed?}
-    F -->|No| POST[Post command]
+    NPRE[Queue PRE HTTP event] --> PRE[PRE command] --> F{Paths or sizes<br/>changed?}
+    F -->|No| POST[POST command]
     F -->|Yes| A[Archive and encrypt] --> U[Upload to Station] --> POST
-    POST --> N[Queue HTTP notifications]
+    POST --> N[Queue POST HTTP events]
 ```
 
 - **Pre command**: before Scout scans the job. Scout waits for it, so it can prepare files in the folder first.
@@ -20,27 +20,15 @@ Hooks run in scheduled cycles and **Run Backup Cycle Now**, but not for **Force 
 
 ## Set up
 
-<Steps>
-  <Step title="Open Custom Scripts">
-    In Scout, click **Custom Scripts**.
-  </Step>
-  <Step title="Upload a script (optional)">
-    Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable, and Windows line endings are converted.
-  </Step>
-  <Step title="Set the commands">
-    Enter a **Pre Command** and/or **Post Command**. Either:
-    - the name of an uploaded script, such as `before-backup.sh`, or
-    - any shell command, such as `curl -fsS https://hc-ping.com/your-id`.
-  </Step>
-</Steps>
+Follow the [shared custom-script setup](/shared/hooks#set-up) for uploading files, configuring independent PRE and POST commands, execution limits, and secret handling.
 
-Commands run with `sh -c` inside the Scout container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout and stops if you click **Cancel operation**. Command text, standard output, and standard error are omitted from Scout's logs to protect secrets. Timeout and failure outcomes are logged. A failing hook doesn't stop the backup.
+The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs. Scout prepares jobs concurrently, so their scripts can overlap; keep per-job output separate.
 
-The same commands run for **every** job. Use `THREETOONEGO_JOB_NAME` to act on specific jobs.
-
-Scout prepares different jobs concurrently, so their hooks can overlap. Keep per-job output separate when your scripts write files.
+**Cancel operation** stops the active Scout commands, and cancellation skips POST.
 
 ## Environment variables
+
+Use shell variables such as `$THREETOONEGO_JOB_NAME` in commands and scripts. The `{{ job_name }}` syntax applies to [HTTP message and JSON templates](/shared/integrations#payloads-and-templates), and is not expanded in shell scripts.
 
 | Variable | Value |
 |---|---|
@@ -93,7 +81,7 @@ Common `THREETOONEGO_LAST_STATUS` values after a job:
 | `manual_intervention_required` | Retries ran out. Check the job in Scout's UI |
 | `unexpected_exception` | Something else went wrong. See Scout's logs |
 
-Set **Post Command** to `after-job.sh`.
+Set **POST command** to `after-job.sh`.
 
 <Note>
   The Scout image is a minimal Alpine image with `sh` and `curl`. Other tools, such as database clients, aren't included. To dump a database before a backup, run the dump on the host on a schedule ahead of Scout's cycle.
@@ -101,4 +89,4 @@ Set **Post Command** to `after-job.sh`.
 
 ## Notifications and secrets
 
-Use [Integrations](/shared/integrations) for HTTP notifications instead of embedding webhook credentials in commands or scripts. For local scripts that need credentials, mount a separate read-only secret file outside `/hook-scripts` and selected backup jobs. Commands and uploaded scripts can be viewed through authenticated APIs. Hooks inherit the app environment and aren't sandboxed; run only trusted scripts. See [Integration secrets](/integrations/secrets#secrets-used-by-custom-scripts).
+Use [HTTP notifications](/shared/integrations#scout-events) for remote messages. For script credentials and execution permissions, see [Custom scripts](/shared/hooks#secrets-and-permissions) and [Integration secrets](/integrations/secrets#secrets-used-by-custom-scripts).

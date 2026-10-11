@@ -47,6 +47,7 @@
             "group": "Integrations",
             "pages": [
               "shared/integrations",
+              "shared/hooks",
               "integrations/secrets",
               "integrations/discord",
               "integrations/n8n",
@@ -74,7 +75,6 @@
               "station/api",
               "station/station-tokens",
               "station/snapshots",
-              "station/notifications",
               "station/hooks",
               "station/reset-admin-password",
               "station/disaster-recovery"
@@ -99,7 +99,6 @@
               "scout/multiple-folders",
               "scout/restore",
               "scout/scout-key",
-              "scout/notifications",
               "scout/hooks"
             ]
           }
@@ -108,6 +107,14 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/scout/notifications",
+      "destination": "/shared/integrations"
+    },
+    {
+      "source": "/station/notifications",
+      "destination": "/shared/integrations"
+    },
     {
       "source": "/scout/encryption-key",
       "destination": "/scout/scout-key"
