@@ -1,0 +1,52 @@
+---
+title: "Custom scripts"
+description: "Set up independent PRE and POST shell commands in Scout or Station."
+---
+
+Both apps use the same custom-script setup in **Integrations → Custom scripts (PRE / POST)**. Configure PRE and POST independently: set only PRE, only POST, or different commands for each. Each app keeps its own commands and uploaded files.
+
+Use scripts to prepare files or run local automation. For HTTP messages, use [HTTP notifications](/shared/integrations); their destinations, templates, and secrets are configured separately in the same dialog.
+
+## Set up
+
+<Steps>
+  <Step title="Open Integrations">
+    In Scout or Station, click **Integrations**, then **Custom scripts (PRE / POST)**.
+  </Step>
+  <Step title="Upload a script (optional)">
+    Under **Uploaded Items**, upload up to **3** files. Only `.sh` scripts and `.txt` helper files are allowed, and they must be UTF-8 text. `.sh` files are made executable and their Windows line endings are converted.
+  </Step>
+  <Step title="Set the commands">
+    Enter the **PRE command**, the **POST command**, or a different command for each. A command can be an uploaded script filename, such as `prepare.sh`, or a shell command. Leave a command empty to skip that phase. Click **Save script commands**.
+  </Step>
+</Steps>
+
+## When scripts run
+
+| App | PRE | POST | Run details |
+|---|---|---|---|
+| Scout | Before scanning each backup job | After the job finishes, including unchanged and failed jobs | Scheduled and manual cycles; **Force Upload** skips scripts and cancellation skips POST |
+| Station | After checksum verification, before storing an upload | After storage handling, with `ok` or `error` | Includes forced Scout uploads; a retry of an already finalized upload does not rerun scripts |
+
+Scripts finish before processing continues. HTTP notifications run in the background, so a PRE HTTP event does not make processing wait for the receiver.
+
+Commands run with `sh -c` inside the app container, from the hook scripts folder (`/hook-scripts`). Each command has a **5-minute** timeout. A failing command is logged and does not stop the backup or upload. Command text, standard output, and standard error are omitted from app logs.
+
+## Use variables
+
+Shell commands use environment variables, for example:
+
+```sh
+printf '%s\n' "$THREETOONEGO_JOB_NAME"
+```
+
+The `{{ job_name }}` syntax belongs to HTTP message and JSON templates; shell scripts do not expand it. Each app provides different job or upload context. Use its full variable table and examples:
+
+- [Scout script variables and examples](/scout/hooks#environment-variables)
+- [Station script variables and examples](/station/hooks#environment-variables)
+
+Scout jobs can run concurrently, so scripts for different jobs can overlap. **Cancel operation** stops Scout's active commands. See [Scout script timing](/scout/hooks) and [Station script timing](/station/hooks) for details.
+
+## Secrets and permissions
+
+Commands and uploaded scripts can be viewed through authenticated APIs. Scripts inherit the app environment and run without a sandbox. Run trusted scripts, and mount any needed secrets in separate read-only files outside `/hook-scripts` and selected backup jobs. See [Secrets used by custom scripts](/integrations/secrets#secrets-used-by-custom-scripts).

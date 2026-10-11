@@ -118,7 +118,7 @@ Station remembers the size of each job's last 20 uploads. When a new archive is 
 
 > This archive is 39.1 KB, but this job's archives are usually about 979.0 KB.
 
-Station also emits an [unusual-upload event](/station/notifications) to matching integrations and passes the reason to the [post hook](/station/hooks). The check needs 5 earlier uploads and can be turned off with **Unusual uploads** in **Edit Station Settings**.
+Station also emits an [unusual-upload event](/shared/integrations#station-events) to matching integrations and passes the reason to the [post hook](/station/hooks). The check needs 5 earlier uploads and can be turned off with **Unusual uploads** in **Edit Station Settings**.
 
 Station only sees archive sizes, and by the time an archive arrives it has already left Scout, so it can flag but not hold. Scout's own checks are stronger and can hold a backup before it uploads. See [Unusual backups](/scout/unusual-backups).
 

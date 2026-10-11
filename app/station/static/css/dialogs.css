@@ -21,6 +21,38 @@
   box-shadow: var(--shadow);
 }
 
+.integration-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.integration-tabs [aria-selected="false"] {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.integration-table-wrap {
+  overflow-x: auto;
+}
+
+.integration-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integration-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+#integration-payload-template {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .modal-head {
   display: flex;
   justify-content: space-between;

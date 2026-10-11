@@ -14,11 +14,44 @@ import (
 
 func render(template string, event Event) string {
 	if template == "" {
-		template = "{{ app }} {{ event }}: {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} ({{ status }})."
+		template = DefaultMessageTemplate
 	}
-	fields := map[string]string{"app": event.App, "event": event.Type, "scout_id": event.ScoutID, "scout_instance_id": event.ScoutInstanceID, "job_name": event.JobName, "status": event.Status, "stored_as": event.StoredAs, "error_category": event.ErrorCategory, "detail": event.Detail, "time": event.Time}
 	// Replace tokens in one pass so inserted values cannot become template instructions.
-	return renderRest(template, fields)
+	return renderRest(template, templateFields(event))
+}
+
+func templateFields(event Event) map[string]string {
+	return map[string]string{"app": event.App, "event": event.Type, "scout_id": event.ScoutID, "scout_instance_id": event.ScoutInstanceID, "job_name": event.JobName, "status": event.Status, "stored_as": event.StoredAs, "error_category": event.ErrorCategory, "detail": event.Detail, "time": event.Time}
+}
+
+// Parse JSON before substituting string values so event data cannot change its structure.
+func renderJSON(template string, fields map[string]string) ([]byte, error) {
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(template))
+	decoder.UseNumber()
+	if !json.Valid([]byte(template)) || decoder.Decode(&value) != nil {
+		return nil, errors.New("payload template must be valid JSON with placeholders inside string values")
+	}
+	return json.Marshal(renderJSONValue(value, fields))
+}
+
+func renderJSONValue(value any, fields map[string]string) any {
+	switch value := value.(type) {
+	case string:
+		return renderRest(value, fields)
+	case map[string]any:
+		for key, item := range value {
+			value[key] = renderJSONValue(item, fields)
+		}
+		return value
+	case []any:
+		for i, item := range value {
+			value[i] = renderJSONValue(item, fields)
+		}
+		return value
+	default:
+		return value
+	}
 }
 
 func renderRest(template string, fields map[string]string) string {
@@ -55,11 +88,18 @@ func (m *Manager) deliver(parent context.Context, d storedDestination, event Eve
 	switch d.Format {
 	case "text":
 		payload, contentType = []byte(message), "text/plain; charset=utf-8"
-	case "discord":
-		// Disable mentions even when a job name contains @everyone or a role mention.
-		characters := []rune(message)
-		message = string(characters[:min(len(characters), 2000)])
-		payload, _ = json.Marshal(map[string]any{"content": message, "allowed_mentions": map[string]any{"parse": []string{}}})
+	case "custom-json":
+		fields := templateFields(event)
+		fields["message"] = message
+		template := d.PayloadTemplate
+		if template == "" {
+			template = DefaultPayloadTemplate
+		}
+		var err error
+		payload, err = renderJSON(template, fields)
+		if err != nil {
+			return err
+		}
 	default:
 		payload, _ = json.Marshal(struct {
 			Event

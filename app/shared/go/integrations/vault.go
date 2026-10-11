@@ -38,6 +38,14 @@ func (m *Manager) load() error {
 	if len(m.destinations) > 10 {
 		return errVault
 	}
+	for i := range m.destinations {
+		d := &m.destinations[i]
+		// Existing receivers keep their body shape through the generic JSON template.
+		if d.Format == "discord" {
+			d.Format = "custom-json"
+			d.PayloadTemplate = `{"content":"{{ message }}","allowed_mentions":{"parse":[]}}`
+		}
+	}
 	m.key = key
 	return nil
 }

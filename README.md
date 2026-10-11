@@ -33,7 +33,7 @@ Each Scout has its own address and web UI on port **6556**. They all upload encr
 - **Choose folders directly.** Create backup jobs in Scout's UI. Each job is a `.upload_dir` file in its folder, which you can also write or edit yourself.
 - **Encrypt before upload.** Scout encrypts each archive before sending it to Station. Downloads are decrypted in your browser, and restores on Scout itself.
 - **Keep machines separate.** Each installation has its own instance ID and snapshot history, even when Scout IDs are shared.
-- **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect hooks or [HTTP notifications](https://3to1go.docs.thesteau.com/shared/integrations).
+- **Automate backups.** Schedule cycles, resume interrupted uploads, configure retention, and connect [custom scripts](https://3to1go.docs.thesteau.com/shared/hooks) or [HTTP notifications](https://3to1go.docs.thesteau.com/shared/integrations).
 - **Control access.** Mint and revoke Station tokens from Station's UI.
 
 ## Get Started

@@ -203,6 +203,7 @@ func (r *ScoutRunner) prepareJob(job *backup.JobDefinition, settings *config.Set
 
 	s := r.StateStore.Get(job.RootPath)
 	s.JobName = job.JobName
+	r.publishJobStarted(job, settings)
 	r.HookManager.RunCommandContext(r.operationContext(), settings.HookPreCommand, "pre", r.hookContext(job, &s, settings))
 
 	ready, err := r.prepareArchiveLocked(job, &s, settings, false)
@@ -706,6 +707,7 @@ func (r *ScoutRunner) checkRetry(job *backup.JobDefinition, s *state.JobState) s
 }
 
 func (r *ScoutRunner) processJobLocked(job *backup.JobDefinition, s *state.JobState, settings *config.Settings, forceSend bool) {
+	r.publishJobStarted(job, settings)
 	if forceSend && s.PendingArchive != "" {
 		if _, err := os.Stat(s.PendingArchive); err == nil {
 			s.NextRetryAt = ""
@@ -1046,6 +1048,13 @@ func sha256FileContext(ctx context.Context, path string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func (r *ScoutRunner) publishJobStarted(job *backup.JobDefinition, settings *config.Settings) {
+	if r.operationContext().Err() != nil {
+		return
+	}
+	r.Integrations.Publish(integrations.Event{Type: integrations.JobStarted, ScoutID: settings.ScoutID, ScoutInstanceID: identity.LoadOrCreate(config.InstallationIDPath()), JobName: job.JobName, Status: "started"})
 }
 
 func (r *ScoutRunner) publishJob(job *backup.JobDefinition, s state.JobState, settings *config.Settings) {

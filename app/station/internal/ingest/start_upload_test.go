@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/3to1go/shared/integrations"
 	"github.com/3to1go/station/internal/store"
 )
 
@@ -324,6 +325,8 @@ func TestWriteKeyMapping_MarshalError(t *testing.T) {
 
 func TestFinalizeUpload_Success(t *testing.T) {
 	svc := newServiceWithIndex(t, &mockIndex{})
+	notifications := &recordingNotifications{}
+	svc.notifications = notifications
 
 	content := []byte("archive content here")
 	archiveSHA := computeSHA256(content)
@@ -350,6 +353,15 @@ func TestFinalizeUpload_Success(t *testing.T) {
 	}
 	if resp.StoredAs == "" {
 		t.Error("StoredAs should be set")
+	}
+	if len(notifications.events) != 2 || notifications.events[0].Type != integrations.UploadStarted || notifications.events[0].Status != "started" || notifications.events[0].StoredAs != "" || notifications.events[1].Type != integrations.UploadReceived || notifications.events[1].StoredAs != resp.StoredAs {
+		t.Fatalf("wrong before/after events: %+v", notifications.events)
+	}
+	if _, err := svc.FinalizeUpload(context.Background(), sess.UploadID); err != nil {
+		t.Fatal(err)
+	}
+	if len(notifications.events) != 2 {
+		t.Fatal("finalized retry repeated PRE or POST")
 	}
 }
 

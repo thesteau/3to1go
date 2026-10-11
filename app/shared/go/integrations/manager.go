@@ -100,8 +100,8 @@ func (m *Manager) Save(update Update) (Destination, error) {
 	if d.Name == "" || len(d.Name) > 100 {
 		return Destination{}, errors.New("integration name must contain 1 to 100 characters")
 	}
-	if !slices.Contains([]string{"json", "text", "discord"}, d.Format) {
-		return Destination{}, errors.New("choose JSON, plain text, or Discord message format")
+	if !slices.Contains([]string{"json", "text", "custom-json"}, d.Format) {
+		return Destination{}, errors.New("choose JSON event, plain text, or custom JSON format")
 	}
 	if len(d.Events) == 0 || len(d.Events) > 5 {
 		return Destination{}, errors.New("select at least one supported event")
@@ -109,6 +109,9 @@ func (m *Manager) Save(update Update) (Destination, error) {
 	for _, event := range d.Events {
 		if !slices.Contains(eventsFor(m.app), event) {
 			return Destination{}, errors.New("unsupported integration event")
+		}
+		if isPreEvent(event) != isPreEvent(d.Events[0]) {
+			return Destination{}, errors.New("configure PRE and POST as separate integrations with their own actions")
 		}
 	}
 	d.Events = slices.Clone(d.Events)
@@ -120,8 +123,19 @@ func (m *Manager) Save(update Update) (Destination, error) {
 	if d.TimeoutSeconds < 1 || d.TimeoutSeconds > 30 {
 		return Destination{}, errors.New("timeout must be between 1 and 30 seconds")
 	}
-	if len(d.MessageTemplate) > 2000 || len(d.MatchJobName) > 255 || len(d.MatchScoutID) > 255 || len(d.MatchInstanceID) > 255 || len(d.MatchSourceAddress) > 255 {
+	if len(d.MessageTemplate) > 2000 || len(d.PayloadTemplate) > 16384 || len(d.MatchJobName) > 255 || len(d.MatchScoutID) > 255 || len(d.MatchInstanceID) > 255 || len(d.MatchSourceAddress) > 255 {
 		return Destination{}, errors.New("integration text is too long")
+	}
+	if d.MessageTemplate == "" {
+		d.MessageTemplate = DefaultMessageTemplate
+	}
+	if d.Format == "custom-json" {
+		if d.PayloadTemplate == "" {
+			d.PayloadTemplate = DefaultPayloadTemplate
+		}
+		if _, err := renderJSON(d.PayloadTemplate, templateFields(Event{})); err != nil {
+			return Destination{}, err
+		}
 	}
 	if update.URL != nil {
 		d.URL = strings.TrimSpace(*update.URL)

@@ -3,7 +3,7 @@ title: "Generic HTTP POST"
 description: "Receive structured events or plain-text messages at an HTTPS endpoint you control."
 ---
 
-Create a destination with **JSON event** for structured data or **Plain text** for only the rendered message. The sender makes an HTTPS `POST` request with `Content-Type: application/json` or `text/plain; charset=utf-8`. Use secret custom headers for authentication.
+Create a destination under **Integrations → HTTP notifications** with **JSON event** for the event schema, **Plain text** for only the rendered message, or **Custom JSON** for an editable JSON body. Each destination is an independent **PRE** or **POST** action; use separate destinations for different before and after actions. The sender makes an HTTPS `POST` request with `Content-Type: application/json` or `text/plain; charset=utf-8`. Use secret custom headers for authentication.
 
 Reserved HTTP transport headers and `Content-Type` cannot be overridden. The sender also supplies:
 
@@ -41,7 +41,7 @@ Both apps expose the same endpoints. Sign in as an admin, or use a **manage** au
 
 | Method | Endpoint | Action |
 |---|---|---|
-| `GET` | `/api/integrations` | Lists safe destination metadata and supported event names. Never returns URLs or headers. |
+| `GET` | `/api/integrations` | Lists safe destination metadata, supported event names, `default_message_template`, and `default_payload_template`. Never returns URLs or headers. |
 | `POST` | `/api/integrations` | Creates a destination, or updates it when `id` is supplied. Returns safe metadata. |
 | `DELETE` | `/api/integrations/{id}` | Deletes a destination and its current secrets. |
 | `POST` | `/api/integrations/{id}/test` | Sends a sample to the saved destination, bypassing filters and enabled state. |
@@ -67,5 +67,9 @@ For example, a creation request on Scout is:
 ```
 
 Updates replace non-secret metadata, so provide those fields together with the destination `id`. Omit `url` and `headers` to preserve secrets; supply replacements to change them, or an empty headers object to clear headers. An empty or insecure URL is rejected. The flags `url_configured` and `headers_configured` in responses describe saved state, not retrievable secret values.
+
+Supported `format` values are `json`, `text`, and `custom-json`. With `custom-json`, supply `payload_template` as a JSON string, for example `"{\"text\":\"{{ message }}\",\"job\":\"{{ job_name }}\"}"`. An empty body template defaults to `{"message":"{{ message }}"}`. Only string values are rendered; the rest of the JSON structure is preserved. See the [variable table and reset behavior](/shared/integrations#payloads-and-templates).
+
+For a PRE destination use `events: ["job-started"]` on Scout or `events: ["upload-started"]` on Station. A destination mixing PRE events and POST outcomes or alerts is rejected. PRE HTTP delivery is asynchronous and doesn't delay processing.
 
 Tests use saved credentials and therefore don't need a body. Errors report a safe message or HTTP status, never the receiver's response body. See [delivery limits](/shared/integrations#delivery-behavior) and [secret storage](/integrations/secrets) before relying on events for critical automation.

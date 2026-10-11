@@ -1172,6 +1172,8 @@ func TestFinalizeUpload_IncompleteUpload(t *testing.T) {
 
 func TestFinalizeUpload_ChecksumMismatch(t *testing.T) {
 	svc := newTestService(t)
+	notifications := &recordingNotifications{}
+	svc.notifications = notifications
 	content := []byte("hello")
 	sess := makeUploadSession(t, svc, int64(len(content)))
 	sess.ArchiveSHA256 = "wrongchecksum1234567890abcdef1234567890abcdef1234567890abcdef1234"
@@ -1196,6 +1198,9 @@ func TestFinalizeUpload_ChecksumMismatch(t *testing.T) {
 	reloaded, _ := svc.loadSession(sess.UploadID)
 	if reloaded.Status != "checksum_retry_required" {
 		t.Errorf("Status = %q, want checksum_retry_required", reloaded.Status)
+	}
+	if len(notifications.events) != 0 {
+		t.Fatal("checksum rejection emitted PRE or POST")
 	}
 }
 

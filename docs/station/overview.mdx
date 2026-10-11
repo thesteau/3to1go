@@ -19,7 +19,7 @@ Station **receives and keeps** backups. Run it on one always-on host, such as a 
 - **Searches backups across all Scouts and instances** by name, date, and stored archive size, with combined queries such as `immich and 2026`. See [Search backups](/station/snapshots#search-backups).
 - **Lists snapshot history and lets you view, download, restore, or delete snapshots** in its web UI. With the Scout key you provide, your browser decrypts whole-archive downloads or opens a file browser with path search, text and image previews, and individual file downloads. One or two selected files download individually; three or more download as a ZIP. See [View and download individual files](/station/snapshots#view-and-download-individual-files).
 - **Sends restore requests to a Scout**, including another device, for its operator to accept. Station doesn't decrypt the snapshot or send the Scout key.
-- **Sends notifications** through [HTTP integrations](/shared/integrations) and runs your own scripts when uploads arrive.
+- **Sends notifications** through [HTTP integrations](/shared/integrations#station-events) and runs [custom scripts](/shared/hooks) when uploads arrive.
 
 Scout encrypts each archive before uploading it. Station receives the encrypted archive and metadata such as job names, timestamps, sizes, and checksums. It doesn't receive the Scout key or decrypt the files inside the archive.
 

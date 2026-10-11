@@ -7,12 +7,17 @@ import (
 )
 
 const (
+	JobStarted     = "job-started"
 	JobFinished    = "job-finished"
+	UploadStarted  = "upload-started"
 	UploadFinished = "upload-finished"
 	UploadReceived = "upload-received"
 	UnusualBackup  = "unusual-backup"
 	UnusualUpload  = "unusual-upload"
 )
+
+const DefaultMessageTemplate = "{{ app }} {{ event }}: {{ scout_id }}/{{ scout_instance_id }} job {{ job_name }} ({{ status }})."
+const DefaultPayloadTemplate = "{\n  \"message\": \"{{ message }}\"\n}"
 
 // Event contains only explicitly selected notification fields, never settings or paths.
 type Event struct {
@@ -42,6 +47,7 @@ type Destination struct {
 	MatchJobName       string   `json:"match_job_name"`
 	MatchSourceAddress string   `json:"match_source_address"`
 	MessageTemplate    string   `json:"message_template"`
+	PayloadTemplate    string   `json:"payload_template"`
 	IncludeDetail      bool     `json:"include_detail"`
 	TimeoutSeconds     int      `json:"timeout_seconds"`
 	URLConfigured      bool     `json:"url_configured"`
@@ -70,9 +76,11 @@ type Store interface {
 
 func eventsFor(app string) []string {
 	if app == "scout" {
-		return []string{JobFinished, UploadFinished, UnusualBackup}
+		return []string{JobStarted, JobFinished, UploadFinished, UnusualBackup}
 	}
-	return []string{UploadReceived, UnusualUpload}
+	return []string{UploadStarted, UploadReceived, UnusualUpload}
 }
+
+func isPreEvent(event string) bool { return event == JobStarted || event == UploadStarted }
 
 func timestamp() string { return time.Now().UTC().Format(time.RFC3339) }

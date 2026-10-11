@@ -31,7 +31,7 @@ func Register(router chi.Router, store Store, app string) {
 		if !guard(w, r) {
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"destinations": store.Snapshot(), "events": eventsFor(app)})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"destinations": store.Snapshot(), "events": eventsFor(app), "default_message_template": DefaultMessageTemplate, "default_payload_template": DefaultPayloadTemplate})
 	})
 	router.Post("/api/integrations", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {
