@@ -72,6 +72,7 @@ function renderRestoreRequests(requests: StationRestoreRequest[]): void {
       <p>${escapeHtml(request.filename)}</p>
       ${request.source_scout_id ? `<p class="hint">Source: ${escapeHtml(request.source_scout_id)} / ${escapeHtml(request.source_instance_id || "")}</p>` : ""}
       <p class="hint">Requested ${escapeHtml(new Date(request.created_at).toLocaleString())}${request.status === "accepted" ? " · Accepted; retry restoration or reject to dismiss" : ""}</p>
+      <div id="restore-progress-${escapeHtml(request.id)}" hidden></div>
       <form method="post" ${NON_LOGIN_AUTOFILL_ATTRIBUTES} onsubmit="event.preventDefault();">
       <label>Folder name (optional rename)
         <input type="text" id="restore-destination-${escapeHtml(request.id)}" placeholder="${escapeHtml(request.job_name)}" autocomplete="off">
@@ -123,6 +124,9 @@ async function decideStationRestore(
   )
     return;
   restoreDecisionBusy = true;
+  const progress = decision === "accept" ? startRestoreProgress(`restore-progress-${id}`) : null;
+  let restored = false;
+  let restoredFiles = 0;
   const done = setButtonBusy(button, decision === "accept" ? "Restoring…" : "Rejecting…");
   try {
     const response = await fetch("/api/restore-requests/decision", {
@@ -132,12 +136,15 @@ async function decideStationRestore(
         id,
         decision,
         relative_path: destination,
+        ...(progress ? { operation_id: progress.operationID } : {}),
         ...(keyInput ? { encryption_key: keyInput.value.trim() } : {}),
       }),
     });
     if (keyInput) keyInput.value = "";
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Restore decision failed.");
+    restored = decision === "accept";
+    restoredFiles = Number(result.restored_files || 0);
     setStatus(
       "restore-requests-status",
       decision === "reject"
@@ -148,9 +155,14 @@ async function decideStationRestore(
   } catch (error) {
     setStatus("restore-requests-status", error instanceof Error ? error.message : "Restore decision failed.", "error");
   } finally {
+    progress?.finish(restored, restored ? restoredFiles : undefined);
     if (keyInput) keyInput.value = "";
     restoreDecisionBusy = false;
     done();
-    await loadRestoreRequests();
+    if (decision === "accept") {
+      await loadData({ silent: true, includeKey: false, refreshDirectoryTree: true });
+    } else {
+      await loadRestoreRequests();
+    }
   }
 }

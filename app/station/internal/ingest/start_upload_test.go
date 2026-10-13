@@ -176,7 +176,7 @@ func TestStartUpload_OversizedRequiresApproval(t *testing.T) {
 	if !ok || detail["status"] != protocol.StatusUploadApprovalRequired || detail["archive_size_bytes"] != req.ArchiveSizeBytes || detail["max_upload_size_bytes"] != int64(1024*1024) {
 		t.Fatalf("wrong approval details: %+v", he.Message)
 	}
-	if message, ok := detail["message"].(string); !ok || !strings.Contains(message, "Upload anyway") || !strings.Contains(message, "10.0 MB") {
+	if message, ok := detail["message"].(string); !ok || !strings.Contains(message, "approval required") || !strings.Contains(message, "10.0 MB") || !strings.Contains(message, "1 MB") {
 		t.Fatalf("missing actionable size warning: %+v", detail)
 	}
 	if svc.reservedBytes() != 0 {

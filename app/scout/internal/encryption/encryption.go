@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/3to1go/scout/internal/cancelio"
+	"github.com/3to1go/scout/internal/transfer"
 	"github.com/minio/sio"
 )
 
@@ -150,11 +151,22 @@ func EncryptFileContext(ctx context.Context, key []byte, src, dst string) error 
 
 // DecryptFile decrypts a minio/sio DARE v2 file written by EncryptFile.
 func DecryptFile(key []byte, src, dst string) error {
+	return DecryptFileContext(context.Background(), key, src, dst)
+}
+
+func DecryptFileContext(ctx context.Context, key []byte, src, dst string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open ciphertext: %w", err)
 	}
 	defer func() { _ = in.Close() }()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
@@ -167,7 +179,7 @@ func DecryptFile(key []byte, src, dst string) error {
 		}
 	}()
 
-	if _, err := sio.Decrypt(out, in, sioConfig(key)); err != nil {
+	if _, err := sio.Decrypt(cancelio.Writer{Context: ctx, Writer: out}, transfer.Observe(ctx, in, info.Size()), sioConfig(key)); err != nil {
 		_ = out.Close()
 		_ = os.Remove(dst)
 		return fmt.Errorf("decrypt: %w", err)

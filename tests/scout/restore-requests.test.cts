@@ -11,15 +11,21 @@ function restoreContext(overrides = {}) {
   };
   const messages = [];
   const calls = [];
+  const refreshes = [];
   const ctx = vm.createContext({
     document: { getElementById: (id) => elements[id] || null },
     latestData: { directories: [] },
     setStatus: (...args) => messages.push(args),
     setButtonBusy: () => () => {},
     confirmApp: async () => true,
+    startRestoreProgress: () => ({ operationID: "restore-operation", finish() {} }),
     fetch: async (url, options) => {
       calls.push([url, options]);
       return { ok: true, json: async () => (options ? { status: "rejected" } : []) };
+    },
+    loadData: async (options) => {
+      refreshes.push(options);
+      await ctx.loadRestoreRequests({ silent: options.silent });
     },
     ...overrides,
   });
@@ -28,7 +34,7 @@ function restoreContext(overrides = {}) {
   loadFeature(ctx, "scout", "ui");
   Object.assign(ctx, uiStubs);
   loadFeature(ctx, "scout", "restore-requests");
-  return { ctx, elements, messages, calls };
+  return { ctx, elements, messages, calls, refreshes };
 }
 
 test("Scout reveals restore requests, escapes archive labels, and offers both decisions", () => {
@@ -55,7 +61,7 @@ test("Scout reveals restore requests, escapes archive labels, and offers both de
 });
 
 test("reject sends the decision without requiring a destination or confirming restore", async () => {
-  const { ctx, elements, calls } = restoreContext({
+  const { ctx, elements, calls, refreshes } = restoreContext({
     confirmApp: async () => {
       throw new Error("reject must not confirm restoration");
     },
@@ -65,18 +71,21 @@ test("reject sends the decision without requiring a destination or confirming re
   const [url, options] = calls[0];
   assert.equal(url, "/api/restore-requests/decision");
   assert.deepEqual(JSON.parse(options.body), { id: "request", decision: "reject", relative_path: "" });
+  assert.equal(refreshes.length, 0);
 });
 
 test("accept allows the default folder and requires confirmation before contacting Station", async () => {
-  const { ctx, elements, calls } = restoreContext({ confirmApp: async () => false });
+  const { ctx, elements, calls, refreshes } = restoreContext({ confirmApp: async () => false });
   await ctx.decideStationRestore("request", "accept", {});
   assert.equal(calls.length, 0);
+  assert.equal(refreshes.length, 0);
   ctx.confirmApp = async () => true;
   await ctx.decideStationRestore("request", "accept", {});
   assert.deepEqual(JSON.parse(calls[0][1].body), {
     id: "request",
     decision: "accept",
     relative_path: "photos",
+    operation_id: "restore-operation",
   });
   elements["restore-destination-request"].value = "";
   elements["restore-destination-request"].focus = () => {};
@@ -84,6 +93,10 @@ test("accept allows the default folder and requires confirmation before contacti
   await ctx.decideStationRestore("request", "accept", {});
   assert.equal(calls.length, 2);
   assert.equal(JSON.parse(calls[0][1].body).relative_path, "");
+  assert.deepEqual(JSON.parse(JSON.stringify(refreshes)), [
+    { silent: true, includeKey: false, refreshDirectoryTree: true },
+    { silent: true, includeKey: false, refreshDirectoryTree: true },
+  ]);
 });
 
 test("cross device acceptance requires a key and clears it after submission", async () => {

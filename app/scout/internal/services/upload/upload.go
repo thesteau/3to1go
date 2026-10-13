@@ -19,6 +19,7 @@ import (
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/encryption"
 	"github.com/3to1go/scout/internal/identity"
+	"github.com/3to1go/scout/internal/transfer"
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/protocol"
 )
@@ -399,7 +400,7 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 	if err != nil {
 		return "", err
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	if _, err := io.Copy(f, transfer.Observe(ctx, resp.Body, resp.ContentLength)); err != nil {
 		_ = f.Close()
 		return "", err
 	}

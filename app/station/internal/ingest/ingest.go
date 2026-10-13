@@ -241,7 +241,7 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 	if req.ArchiveSizeBytes > s.settings.MaxUploadSizeBytes() && !req.AllowOversized {
 		return nil, httpErrorJSON(http.StatusRequestEntityTooLarge, map[string]any{
 			"status":                protocol.StatusUploadApprovalRequired,
-			"message":               fmt.Sprintf("Archive is %.1f MB, above Station's %d MB upload approval threshold. Choose Upload anyway in Scout to approve this backup, or clear the staged backup.", float64(req.ArchiveSizeBytes)/(1024*1024), s.settings.MaxUploadSizeMB),
+			"message":               fmt.Sprintf("Backup is %.1f MB; approval required above %d MB.", float64(req.ArchiveSizeBytes)/(1024*1024), s.settings.MaxUploadSizeMB),
 			"archive_size_bytes":    req.ArchiveSizeBytes,
 			"max_upload_size_bytes": s.settings.MaxUploadSizeBytes(),
 		})

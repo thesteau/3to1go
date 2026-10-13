@@ -743,7 +743,7 @@ func (r *ScoutRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSt
 				if err := r.UploadApprovals.Save(r.operationContext(), pendingLargeUploadApproval(job, s, settings)); err != nil {
 					s.LastStatus = heldForReviewStatus
 					s.ManualInterventionRequired = true
-					s.LastErrorDetail = fmt.Sprintf("Could not save large-upload approval: %v. Try Upload anyway again.", err)
+					s.LastErrorDetail = fmt.Sprintf("Could not save approval: %v. Retry Approve & Upload.", err)
 					r.saveState(job, *s)
 					return
 				}

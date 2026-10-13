@@ -5,6 +5,8 @@ description: "Bring a snapshot from Station back into a job's folder on Scout."
 
 Scout can download a snapshot from Station, decrypt it with its Scout key, and extract it back into the job's folder. Station can also request a restore to another Scout, where you provide the original snapshot's key before accepting.
 
+Scout shows progress during download, decryption, and extraction. Percentages apply to the current phase; extraction shows a moving bar and the number of files restored.
+
 <Frame caption="Station sends the sealed snapshot, and Scout opens it with its Scout key.">
   <img src="/images/gophers/restore.svg" alt="Station sends a sealed box to a Scout gopher, who opens it. Files fly out and go back into a house." />
 </Frame>
@@ -113,11 +115,25 @@ sequenceDiagram
 ## Requirements
 
 - Scout must be able to reach Station, with a valid Station token.
+- Scout's spool folder needs room for the encrypted download and a decrypted copy. The destination also needs space for restored files and a temporary copy of each file being replaced. Scout removes the encrypted download before extraction.
 - Local job restores use the current Scout key. For a Station request targeting another device, provide the **original snapshot’s Scout key** on the receiving Scout. A missing or incorrect key prevents restoration.
 
 <Note>
   After you [rotate the key](/scout/scout-key#rotate-the-key), local job restores and same-device requests cannot decrypt snapshots made with the old key. Station's UI stops accepting the old key after Scout's next upload. Download any older snapshots you need **before** rotating and keep the old key; it can still be provided for a restore request targeting another Scout.
 </Note>
+
+## Not enough space
+
+A restore uses the filesystems mounted at the spool folder and the destination. Space available on another drive does not help those mounts. A filesystem can also run out of inodes while it still has free bytes.
+
+In Kubernetes, check both paths from inside the Scout pod, using your namespace, pod name, and destination:
+
+```sh
+kubectl -n <namespace> exec <scout-pod> -- df -h /scan/<destination> /data/spool
+kubectl -n <namespace> exec <scout-pod> -- df -i /scan/<destination> /data/spool
+```
+
+Use your configured spool path if it differs. Check that each `hostPath` points to the intended VM filesystem; see [Scout on Kubernetes](/scout/kubernetes). After resolving the storage problem, click **Retry Restore** for a Station request, or start the local restore again.
 
 ## Rebuilding a lost machine
 

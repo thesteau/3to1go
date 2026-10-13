@@ -14,8 +14,7 @@ const SCOUT_SETTINGS_HELP: Record<string, string> = {
   settings_log_level: "Log detail.",
   settings_max_depth: "Folder levels scanned below the scan root.",
   settings_keep_local_pending: "Keep failed uploads to retry.",
-  settings_auto_approve_large_uploads:
-    "After a job's first manual size approval, allow its future oversized backups automatically. Remove its remembered approval to ask again.",
+  settings_auto_approve_large_uploads: "Approve once per job. Turn off to approve each large backup.",
   settings_upload_chunk_size_mb: "Preferred upload chunk size.",
   settings_min_upload_chunk_size_mb: "Smallest chunk on a slow network.",
   settings_max_upload_chunk_size_mb: "Largest chunk on a healthy network.",
@@ -151,7 +150,7 @@ async function loadLargeUploadApprovals(): Promise<void> {
               `<tr><td><strong>${escapeHtml(approval.job_name)}</strong><br><span class="hint">${escapeHtml(approval.scout_id)} · ${escapeHtml(approval.job_path)}</span></td><td>${escapeHtml(approval.station_url)}</td><td>${escapeHtml(formatLocalDateTime(approval.approved_at))}</td><td><button type="button" class="secondary" onclick="removeLargeUploadApproval(decodeURIComponent('${encodedPath(approval.id)}'), this)">Remove</button></td></tr>`,
           )
           .join("")}</tbody></table>`
-      : '<p class="hint">No remembered approvals. Each job needs its first manual approval.</p>';
+      : '<p class="hint">No approved jobs.</p>';
   } catch (error) {
     if (currentUser !== user || request !== _largeUploadApprovalsRequest) return;
     container.innerHTML = `<p role="status">${escapeHtml((error as Error).message)} <button type="button" onclick="loadLargeUploadApprovals()">Retry</button></p>`;
@@ -168,7 +167,7 @@ async function removeLargeUploadApproval(id: string, button: HTMLButtonElement):
     if (currentUser !== user) return;
     if (!response.ok) throw new Error(body.detail || "Failed to remove approval.");
     await loadLargeUploadApprovals();
-    setActionStatus("Approval removed. This job's next oversized upload will need approval again.", "success");
+    setActionStatus("Approval removed. The next large backup will ask again.", "success");
     loadData({ silent: true, includeKey: false });
   } catch (error) {
     if (currentUser !== user) return;

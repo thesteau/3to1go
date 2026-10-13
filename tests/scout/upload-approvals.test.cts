@@ -79,8 +79,8 @@ test("remembered approvals show job details safely and Remove restores the promp
   assert.equal(button.disabled, false);
   failRemove = false;
   await ctx.removeLargeUploadApproval("approval-id", button);
-  assert.match(container.innerHTML, /No remembered approvals/);
-  assert.match(messages.at(-1)[0], /next oversized upload will need approval again/);
+  assert.match(container.innerHTML, /No approved jobs/);
+  assert.match(messages.at(-1)[0], /next large backup will ask again/);
   assert.deepEqual(calls, [
     ["/api/upload-approvals", "GET"],
     ["/api/upload-approvals/approval-id", "DELETE"],

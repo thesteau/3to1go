@@ -110,6 +110,7 @@ type mockRunner struct {
 	previewErr        error
 	recoverResult     map[string]any
 	recoverErr        error
+	recoveryProgress  recovery.Progress
 	rotateKeyResult   string
 	rotateKeyErr      error
 	pathActionErr     error
@@ -188,6 +189,8 @@ func (m *mockRunner) PreviewRecovery(_ context.Context, _, _ string) (map[string
 func (m *mockRunner) RecoverJob(_ context.Context, _, _ string) (map[string]any, error) {
 	return m.recoverResult, m.recoverErr
 }
+
+func (m *mockRunner) RecoveryProgress() recovery.Progress { return m.recoveryProgress }
 
 // ---------------------------------------------------------------------------
 // Mock schedulerFacade

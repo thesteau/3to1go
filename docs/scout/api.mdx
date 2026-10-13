@@ -133,7 +133,7 @@ See [Scout configuration](/scout/configuration) for settings and environment pre
 
 ### Remembered large-upload approvals
 
-`auto_approve_large_uploads` is a boolean setting, on by default. Every job still needs one manual size approval through **Upload anyway**. Scout remembers that approval and uses it for future oversized archives of the same job when the setting is on. The setting does not bypass Scout's unusual-backup checks.
+`auto_approve_large_uploads` is a boolean setting, on by default. Every job still needs one manual size approval through **Approve & Upload**. Scout remembers that approval and uses it for future oversized archives of the same job when the setting is on. The setting does not bypass Scout's unusual-backup checks.
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
@@ -205,6 +205,7 @@ All restore actions require admin access. They restore whole snapshots and repla
 |---|---|---|---|
 | `POST` | `/api/recovery/preview` | Admin | JSON `relative_path`, optional `fingerprint`; downloads the snapshot and previews files to add or replace. |
 | `POST` | `/api/recovery/restore` | Admin | The same JSON; downloads, decrypts, and restores the job's snapshot. |
+| `GET` | `/api/recovery/progress` | Admin | Restore status, phase, byte counts, files restored, and current-phase `percent` (`null` when the total is unknown). |
 | `GET` | `/api/restore-requests` | Session | Returns an array of this Scout's restore requests retrieved from Station. |
 | `POST` | `/api/restore-requests/decision` | Admin | JSON `id`, `decision` (`accept` or `reject`), optional `relative_path`, and optional `encryption_key`. Accept downloads and restores the archive. |
 | `POST` | `/backup/restore-notifications` | Public; verified against Station | JSON `id`; Station's notification hint. Scout checks its request list from Station. This never accepts or performs a restore. |
@@ -219,6 +220,8 @@ curl --fail-with-body -sS --cookie scout.cookies \
 ```
 
 After reviewing the preview, send the same body to `/api/recovery/restore` to write the files. These calls wait for their work to finish; a restore can also return `status: "already_running"` without restoring anything.
+
+For progress tracking, include an optional `operation_id` (up to 64 characters) in a restore or restore-decision request, then poll `/api/recovery/progress?operation_id=<id>` while it runs. An unknown operation returns `status: "idle"`. Download and decryption percentages measure bytes processed; extraction has an unknown total and reports bytes read and files restored. Storage exhaustion returns `507`, identifying the folder whose mount needs space or inodes.
 
 For a request created through [Station's API](/station/api#restore-requests), `relative_path` is a single folder name directly under the scan root and defaults to the request's job name. When restoring from another Scout instance, supply the original snapshot's Scout key in `encryption_key`. It is used for that restore and does not replace this Scout's own key. Requests expire after one hour. See [Restore requests](/scout/restore#restore-requests-from-station) for retries and destination rules.
 
