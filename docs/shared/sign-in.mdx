@@ -80,6 +80,8 @@ The server rejects browser write requests from another origin. This covers sibli
 
 ## Session cookies over HTTPS
 
+For the reverse-proxy, server certificate, and browser trust setup, see [HTTPS and homelab certificates](/shared/https).
+
 If you serve an app over HTTPS (for example behind a reverse proxy), set this in its `.env` so the session cookie is only sent over secure connections:
 
 ```sh .env

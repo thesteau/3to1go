@@ -5,7 +5,7 @@ description: "Let Station and Scout verify internal HTTPS services signed by you
 
 If an HTTPS service an app connects to uses a private CA, add that CA to the app's trust list. For example, Scout needs to trust Station's CA, and each app needs to trust its integration receivers' CAs. Each app keeps its own list.
 
-This configures outbound trust. It doesn't enable HTTPS on either web UI or make your browser trust a private CA. Set those up in your reverse proxy and browser.
+This configures outbound trust. It doesn't enable HTTPS on either web UI or make your browser trust a private CA. For a complete reverse-proxy setup with existing certificates, hostname or IP addresses, and browser trust, see [HTTPS and homelab certificates](/shared/https).
 
 ## Upload from the UI
 
@@ -19,6 +19,10 @@ This configures outbound trust. It doesn't enable HTTPS on either web UI or make
 </Steps>
 
 The app saves it under `/config/trusted-certs`, installs it into the container's trust store immediately, and reinstalls it every time the container starts.
+
+<Note>
+  Restart Scout after adding, replacing, or deleting a CA certificate so its existing Station upload/restore client uses the updated trust list. For a consistent refresh after CA changes, restart the affected app. This differs from changing `.env`, which requires recreating the container with `docker compose up -d`.
+</Note>
 
 ## Add files directly
 
