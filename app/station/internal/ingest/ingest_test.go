@@ -870,16 +870,11 @@ func TestRunPostHook_NoOp(t *testing.T) {
 
 // --- validateNewReservation ---
 
-func TestValidateNewReservation_TooLarge(t *testing.T) {
+func TestValidateNewReservation_SizeThresholdDoesNotReplaceCapacityCheck(t *testing.T) {
 	svc := newTestService(t)
-	svc.settings.MaxUploadSizeMB = 1                   // 1MB max
-	err := svc.validateNewReservation(2 * 1024 * 1024) // 2MB request
-	if err == nil {
-		t.Error("expected too large error")
-	}
-	he, ok := err.(*HTTPError)
-	if !ok || he.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("expected 413 HTTPError, got %v", err)
+	svc.settings.MaxUploadSizeMB = 1
+	if err := svc.validateNewReservation(2 * 1024 * 1024); err != nil {
+		t.Fatalf("capacity check rejected an archive above the approval threshold: %v", err)
 	}
 }
 

@@ -337,7 +337,9 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
             const held = entry.state?.last_status === "held_for_review";
             const uploadLabel = held ? "Upload anyway" : "Force Upload";
             const uploadHint = held
-              ? "Unusual backup. Upload it if expected, or clear it."
+              ? entry.state?.last_error_category === "upload_approval_required"
+                ? "Above Station's size threshold. Approve this archive's upload, or clear it."
+                : "Unusual backup. Upload it if expected, or clear it."
               : "Upload even if unchanged. Station may reject as duplicate.";
             return `
       <div class="job-card" data-path="${escapeHtml(entry.relative_path)}">
@@ -359,7 +361,7 @@ function renderSelectedJobs(directories: DirectoryEntry[] | undefined, discoveri
               <button type="button" class="secondary" onclick="return browseFilesFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'))">Files &amp; exclusions</button>
               ${entry.state?.pending_archive || entry.state?.pending_fingerprint ? `<button type="button" class="danger" onclick="return clearStagedFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), this)">Clear staged backup</button>` : ""}
               <span class="hint-with-help">
-                <button type="button" class="btn-force" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">${uploadLabel}</button>
+                <button type="button" class="btn-force" data-held-for-review="${held}" data-size-approval="${entry.state?.last_error_category === "upload_approval_required"}" data-review-reason="${held ? escapeHtml(entry.state?.last_error_detail || "") : ""}" onclick="return forceUploadFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'), this)">${uploadLabel}</button>
                 <span class="hover-hint" title="${escapeHtml(uploadHint)}">?</span>
               </span>
               <button type="button" class="btn-restore" onclick="return openRecoverDialogFromEvent(event, decodeURIComponent('${encodedPath(entry.relative_path)}'), decodeURIComponent('${encodedPath(jobName)}'))">Restore</button>

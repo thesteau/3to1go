@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"sync"
 
 	"github.com/3to1go/scout/internal/anomaly"
@@ -10,6 +11,62 @@ import (
 type mockStateStore struct {
 	mu     sync.Mutex
 	states map[string]state.JobState
+}
+
+type mockUploadApprovalStore struct {
+	mu        sync.Mutex
+	approvals map[string]state.UploadApproval
+	err       error
+}
+
+func newMockUploadApprovalStore() *mockUploadApprovalStore {
+	return &mockUploadApprovalStore{approvals: map[string]state.UploadApproval{}}
+}
+
+func (m *mockUploadApprovalStore) Get(_ context.Context, id string) (*state.UploadApproval, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return nil, m.err
+	}
+	a, ok := m.approvals[id]
+	if !ok {
+		return nil, nil
+	}
+	return &a, nil
+}
+
+func (m *mockUploadApprovalStore) Save(_ context.Context, a state.UploadApproval) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return m.err
+	}
+	m.approvals[a.ID] = a
+	return nil
+}
+
+func (m *mockUploadApprovalStore) List(_ context.Context) ([]state.UploadApproval, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return nil, m.err
+	}
+	list := []state.UploadApproval{}
+	for _, a := range m.approvals {
+		list = append(list, a)
+	}
+	return list, nil
+}
+
+func (m *mockUploadApprovalStore) Delete(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return m.err
+	}
+	delete(m.approvals, id)
+	return nil
 }
 
 func newMockStateStore() *mockStateStore {

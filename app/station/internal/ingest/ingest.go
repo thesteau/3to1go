@@ -238,6 +238,14 @@ func (s *Service) StartUpload(ctx context.Context, req UploadInitRequest, source
 	if dup != nil {
 		return s.buildCommittedDuplicateResponse(req.ArchiveSizeBytes, dup.StoredAs), nil
 	}
+	if req.ArchiveSizeBytes > s.settings.MaxUploadSizeBytes() && !req.AllowOversized {
+		return nil, httpErrorJSON(http.StatusRequestEntityTooLarge, map[string]any{
+			"status":                protocol.StatusUploadApprovalRequired,
+			"message":               fmt.Sprintf("Archive is %.1f MB, above Station's %d MB upload approval threshold. Choose Upload anyway in Scout to approve this backup, or clear the staged backup.", float64(req.ArchiveSizeBytes)/(1024*1024), s.settings.MaxUploadSizeMB),
+			"archive_size_bytes":    req.ArchiveSizeBytes,
+			"max_upload_size_bytes": s.settings.MaxUploadSizeBytes(),
+		})
+	}
 
 	// Serialize the capacity check with the reservation write. Without this,
 	// concurrent initiations can all observe the same free space and overbook
@@ -577,19 +585,16 @@ func (s *Service) validateNewReservation(archiveSizeBytes int64) error {
 }
 
 func (s *Service) validateNewReservationContext(ctx context.Context, archiveSizeBytes int64) error {
-	if archiveSizeBytes > s.settings.MaxUploadSizeBytes() {
-		return httpError(http.StatusRequestEntityTooLarge, "upload too large")
-	}
 	reserved, err := s.reservedBytesContext(ctx)
 	if err != nil {
 		return httpError(http.StatusInternalServerError, "failed to calculate reserved upload storage")
 	}
 	stagingFree, stagingOk := diskFree(s.stagingDir)
-	if !stagingOk || archiveSizeBytes+reserved > stagingFree {
+	if !stagingOk || reserved > stagingFree || archiveSizeBytes > stagingFree-reserved {
 		return httpError(507, "insufficient staging storage")
 	}
 	backupFree, backupOk := diskFree(s.settings.BackupRoot)
-	if !backupOk || archiveSizeBytes+reserved > backupFree {
+	if !backupOk || reserved > backupFree || archiveSizeBytes > backupFree-reserved {
 		return httpError(507, "insufficient backup storage")
 	}
 	return nil

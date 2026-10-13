@@ -17,6 +17,7 @@ import (
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/services/directories"
 	"github.com/3to1go/scout/internal/services/recovery"
+	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/store"
 )
 
@@ -142,6 +143,13 @@ func (m *mockRunner) FolderSize(_ context.Context, path string) (map[string]any,
 }
 
 func (m *mockRunner) CurrentSettings() *config.Settings { return m.settings }
+func (m *mockRunner) LargeUploadApprovals(context.Context) ([]state.UploadApproval, error) {
+	return []state.UploadApproval{}, nil
+}
+func (m *mockRunner) RemoveLargeUploadApproval(_ context.Context, id string) error {
+	m.pathActionPath = id
+	return m.pathActionErr
+}
 func (m *mockRunner) UpdateSettings(s *config.Settings) error {
 	m.updateSettingsHit = true
 	if m.updateSettingsErr == nil {

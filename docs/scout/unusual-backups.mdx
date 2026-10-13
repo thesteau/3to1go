@@ -70,6 +70,16 @@ Choose **Unusual backups** in **Edit Scout Settings**, or set `ANOMALY_MODE` in 
 | Alert only | `alert` | Uploads as normal and alerts |
 | Off | `off` | No checks. History is still recorded, so turning it back on works right away. |
 
-**Force Upload** always uploads without checking, since it's an explicit request.
+**Force Upload** skips Scout's unusual-backup checks, since it's an explicit request.
+
+## Oversized backups
+
+Station's **Upload Approval Above (MB)** setting defaults to `2048`. If a compressed, encrypted archive exceeds it, Scout keeps that backup staged and shows **held for review** with the archive size and threshold. This size check applies in every unusual-backup mode, including **Off**.
+
+Click **Upload anyway** and confirm the size warning, or **Clear staged backup** to discard it. **Auto-approve large uploads after first approval** is on by default in **Edit Scout Settings**. Every job needs its first manual size approval; Scout then remembers it and allows that job's future oversized archives automatically, including after restarts. An approval belongs to the job's folder, name, Scout ID, and Station URL, so changing those requires approval again. Scout's unusual-backup checks still apply, and Station still requires enough free staging and backup storage.
+
+Open **Remembered large-upload approvals** in Scout settings to view the jobs and their approval dates. Click **Remove** to make a job ask for approval on its next oversized upload. Removal takes effect immediately; it doesn't delete backups. Wait for active backup or recovery work to finish before removing an entry.
+
+Turn auto-approval off to approve each new oversized archive. Remembered entries stay available if you turn it back on. An individual archive's manual approval still survives retries and restarts; removing its remembered entry also clears any approval retained for its staged archive.
 
 Station runs its own, simpler check on archive sizes as a second line of defense. See [Unusual sizes](/station/snapshots#unusual-sizes).

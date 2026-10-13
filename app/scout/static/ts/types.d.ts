@@ -12,6 +12,7 @@ interface ScoutSettings {
   theme?: string;
   max_depth?: number;
   keep_local_pending?: boolean;
+  auto_approve_large_uploads?: boolean;
   uploads_paused?: boolean;
   anomaly_mode?: string;
   upload_chunk_size_mb?: number;
@@ -31,6 +32,19 @@ interface ScoutSettings {
 
 interface SettingsResponse extends ApiBody {
   settings?: ScoutSettings;
+}
+
+interface LargeUploadApproval {
+  id: string;
+  job_path: string;
+  job_name: string;
+  scout_id: string;
+  station_url: string;
+  approved_at: string;
+}
+
+interface LargeUploadApprovalsResponse extends ApiBody {
+  approvals?: LargeUploadApproval[];
 }
 
 interface UploadCircuit {
@@ -76,6 +90,7 @@ interface JobState {
   last_upload_started_at?: string;
   last_upload_updated_at?: string;
   last_error_detail?: string;
+  last_error_category?: string;
   last_backup_size_bytes?: number;
 }
 

@@ -131,6 +131,17 @@ curl --fail-with-body -sS --cookie scout.cookies \
 
 See [Scout configuration](/scout/configuration) for settings and environment precedence. The Station token field remains `scout_credential` in JSON. Settings and status responses can contain that token, so keep them out of public logs. Read current values again before a later update rather than replaying an old settings file.
 
+### Remembered large-upload approvals
+
+`auto_approve_large_uploads` is a boolean setting, on by default. Every job still needs one manual size approval through **Upload anyway**. Scout remembers that approval and uses it for future oversized archives of the same job when the setting is on. The setting does not bypass Scout's unusual-backup checks.
+
+| Method | Endpoint | Access | Request or response |
+|---|---|---|---|
+| `GET` | `/api/upload-approvals` | Admin | Returns `approvals`, each with `id`, `job_path`, `job_name`, `scout_id`, `station_url`, and `approved_at`. |
+| `DELETE` | `/api/upload-approvals/{approval_id}` | Admin | Removes the remembered approval and clears any retained approval for the job's staged archive. Its next oversized upload asks again. Returns `409` while backup or recovery work is running. |
+
+Turning the setting off keeps remembered entries but requires manual approval for each new oversized archive. See [Oversized backups](/scout/unusual-backups#oversized-backups).
+
 ## Jobs and files
 
 `relative_path` is relative to Scout's scan root, using `/` between folders. Use `.` for the scan root. Job actions identify the folder path, not the job name used on Station.
