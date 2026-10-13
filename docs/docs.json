@@ -41,7 +41,7 @@
           },
           {
             "group": "Both apps",
-            "pages": ["shared/sign-in", "shared/trusted-certificates"]
+            "pages": ["shared/sign-in", "shared/https", "shared/trusted-certificates"]
           },
           {
             "group": "Integrations",

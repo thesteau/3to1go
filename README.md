@@ -112,6 +112,7 @@ See [Design decisions](https://3to1go.docs.thesteau.com/concepts/design-decision
 | Browse, download, or verify backups | [Snapshots](https://3to1go.docs.thesteau.com/station/snapshots) |
 | Back up and recover Station itself | [Recover Station](https://3to1go.docs.thesteau.com/station/disaster-recovery) |
 | Manage sign-in or recover access | [Accounts](https://3to1go.docs.thesteau.com/shared/sign-in) · [Reset Station's password](https://3to1go.docs.thesteau.com/station/reset-admin-password) |
+| Set up HTTPS with homelab certificates | [HTTPS setup](https://3to1go.docs.thesteau.com/shared/https) |
 | Trust internal HTTPS services | [Trusted certificates](https://3to1go.docs.thesteau.com/shared/trusted-certificates) |
 
 
