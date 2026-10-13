@@ -124,15 +124,16 @@ func TestOversizedBackupApprovalLifecycle(t *testing.T) {
 			if tc.async {
 				runner.DirService = directories.NewDirectoryService(settings, runner.logger, runner.StateStore)
 				_, err = runner.StartForceSendAsync("docs")
-				runner.cycleLock.Lock()
-				runner.cycleLock.Unlock()
 			} else {
 				_, err = runner.ForceSendJob(context.Background(), "docs")
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Wait for asynchronous work to finish before reading its saved state.
+			runner.cycleLock.Lock()
 			approved := runner.StateStore.Get(jobRoot)
+			runner.cycleLock.Unlock()
 			if !approved.PendingUploadSizeApproved || approved.PendingArchive != held.PendingArchive || approved.LastStatus != "retry_scheduled" {
 				t.Fatalf("approval did not survive network failure: %+v", approved)
 			}
