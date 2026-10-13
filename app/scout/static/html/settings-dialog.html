@@ -36,6 +36,18 @@
       <option value="off">Off</option>
     </select>
 
+    <button type="button" class="toggle-btn" id="settings_auto_approve_large_uploads" role="switch" aria-checked="true" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">Auto-approve large uploads after first approval</span>
+    </button>
+    <p class="hint">Each backup job needs one manual size approval first. Turn this off to approve each oversized archive.</p>
+
+    <details class="settings-advanced">
+      <summary>Remembered large-upload approvals</summary>
+      <p class="hint">Remove an entry to require approval again. Removal takes effect immediately.</p>
+      <div id="large-upload-approvals" class="integration-table-wrap" aria-live="polite"></div>
+    </details>
+
     <label for="settings_scout_id">Scout ID</label>
     <input id="settings_scout_id" placeholder="scout-01" data-requires="settings" disabled>
 

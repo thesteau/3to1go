@@ -93,7 +93,7 @@ func TestUploadArchiveSuccess(t *testing.T) {
 	client := testUploadClient(server.URL)
 	client.http = server.Client()
 	var progress []int64
-	result, err := client.UploadArchive(context.Background(), "scout-1", "job", "abcdef123456", "2024-01-01T00:00:00Z", archivePath, "", 0, 0, func(_ string, offset, _ int64) {
+	result, err := client.UploadArchive(context.Background(), "scout-1", "job", "abcdef123456", "2024-01-01T00:00:00Z", archivePath, "", 0, 0, false, func(_ string, offset, _ int64) {
 		progress = append(progress, offset)
 	})
 	if err != nil {
@@ -138,7 +138,7 @@ func TestUploadArchiveCompletedDuplicateSkipsChunks(t *testing.T) {
 
 	client := testUploadClient(server.URL)
 	client.http = server.Client()
-	result, err := client.UploadArchive(context.Background(), "scout-1", "job", "fp", "ts", archivePath, "sha", 0, 0, nil)
+	result, err := client.UploadArchive(context.Background(), "scout-1", "job", "fp", "ts", archivePath, "sha", 0, 0, false, nil)
 	if err != nil {
 		t.Fatalf("UploadArchive: %v", err)
 	}
@@ -216,6 +216,7 @@ func TestUploadFailureClassificationAndHelpers(t *testing.T) {
 		{503, `service down`, "", "server", true},
 		{507, `capacity`, "", "capacity", false},
 		{413, `too big`, "", "too_large", false},
+		{413, `{"detail":{"status":"upload_approval_required","message":"Approve this archive in Scout"}}`, "", "upload_approval_required", false},
 		{401, `nope`, "", "unauthorized", false},
 		{418, `teapot`, "", "permanent", false},
 	}

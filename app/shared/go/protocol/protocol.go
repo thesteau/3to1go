@@ -6,8 +6,9 @@ const (
 
 	UploadInitiatePath = "/backup/uploads/initiate"
 
-	StatusOffsetMismatch   = "offset_mismatch"
-	StatusChecksumMismatch = "checksum_mismatch"
+	StatusOffsetMismatch         = "offset_mismatch"
+	StatusChecksumMismatch       = "checksum_mismatch"
+	StatusUploadApprovalRequired = "upload_approval_required"
 )
 
 // UploadInitRequest is the metadata exchanged when Scout creates or resumes an
@@ -20,6 +21,7 @@ type UploadInitRequest struct {
 	Timestamp                string  `json:"timestamp"`
 	ArchiveFormat            string  `json:"archive_format"`
 	ArchiveSizeBytes         int64   `json:"archive_size_bytes"`
+	AllowOversized           bool    `json:"allow_oversized,omitempty"`
 	ArchiveSHA256            string  `json:"archive_sha256"`
 	IdempotencyKey           string  `json:"idempotency_key"`
 	EncryptionKeyFingerprint *string `json:"encryption_key_fingerprint,omitempty"`

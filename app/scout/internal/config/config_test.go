@@ -279,6 +279,25 @@ func TestBuildSettings_Defaults(t *testing.T) {
 	if s.UploadChunkSizeMB != 8 {
 		t.Errorf("UploadChunkSizeMB = %d, want 8", s.UploadChunkSizeMB)
 	}
+	if !s.AutoApproveLargeUploads {
+		t.Error("large-upload auto-approval should be enabled by default")
+	}
+}
+
+func TestBuildSettings_AutoApproveLargeUploads(t *testing.T) {
+	for _, value := range []bool{false, true} {
+		s, err := BuildSettings(&SettingsPayload{AutoApproveLargeUploads: boolPtr(value)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s.AutoApproveLargeUploads != value {
+			t.Fatalf("auto-approval = %v, want %v", s.AutoApproveLargeUploads, value)
+		}
+		payload := SettingsToPayload(s)
+		if payload.AutoApproveLargeUploads == nil || *payload.AutoApproveLargeUploads != value {
+			t.Fatal("auto-approval setting lost during serialization")
+		}
+	}
 }
 
 func TestBuildSettings_EnvOverridePort(t *testing.T) {

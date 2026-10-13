@@ -28,6 +28,7 @@ type Settings struct {
 	Theme                             string
 	MaxDepth                          int
 	KeepLocalPending                  bool
+	AutoApproveLargeUploads           bool
 	UploadChunkSizeMB                 int
 	MinUploadChunkSizeMB              int
 	MaxUploadChunkSizeMB              int
@@ -163,6 +164,7 @@ type SettingsPayload struct {
 	Theme                             string `json:"theme"`
 	MaxDepth                          int    `json:"max_depth"`
 	KeepLocalPending                  *bool  `json:"keep_local_pending"`
+	AutoApproveLargeUploads           *bool  `json:"auto_approve_large_uploads"`
 	UploadChunkSizeMB                 int    `json:"upload_chunk_size_mb"`
 	MinUploadChunkSizeMB              int    `json:"min_upload_chunk_size_mb"`
 	MaxUploadChunkSizeMB              int    `json:"max_upload_chunk_size_mb"`
@@ -196,6 +198,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		Theme:                             s.Theme,
 		MaxDepth:                          s.MaxDepth,
 		KeepLocalPending:                  boolPtr(s.KeepLocalPending),
+		AutoApproveLargeUploads:           boolPtr(s.AutoApproveLargeUploads),
 		UploadChunkSizeMB:                 s.UploadChunkSizeMB,
 		MinUploadChunkSizeMB:              s.MinUploadChunkSizeMB,
 		MaxUploadChunkSizeMB:              s.MaxUploadChunkSizeMB,
@@ -259,6 +262,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		Theme:                             coerceTheme(raw.Theme),
 		MaxDepth:                          coerceInt(raw.MaxDepth, 10, 0),
 		KeepLocalPending:                  coerceBoolPtr(raw.KeepLocalPending, true),
+		AutoApproveLargeUploads:           coerceBoolPtr(raw.AutoApproveLargeUploads, true),
 		UploadChunkSizeMB:                 coerceInt(raw.UploadChunkSizeMB, 8, 1),
 		MinUploadChunkSizeMB:              coerceInt(raw.MinUploadChunkSizeMB, 1, 1),
 		MaxUploadChunkSizeMB:              coerceInt(raw.MaxUploadChunkSizeMB, 16, 1),

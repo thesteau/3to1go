@@ -76,11 +76,20 @@ async function deleteByPath(relativePath: string): Promise<void> {
 
 async function forceUpload(relativePath: string, jobName: string, btn: HTMLButtonElement): Promise<void> {
   const label = jobName || "this job";
+  const held = btn.dataset?.heldForReview === "true";
+  const rememberSizeApproval =
+    btn.dataset?.sizeApproval === "true" && (latestData?.settings?.auto_approve_large_uploads ?? true);
+  const approvalScope = rememberSizeApproval
+    ? "Future oversized backups of this job will upload automatically. You can remove this approval in Scout settings."
+    : "This approval applies only to this archive.";
+  const action = held ? "Upload anyway" : "Force Upload";
   if (
     !(await confirmApp({
-      title: "Force Upload",
-      message: `Upload ${label} even if unchanged? Station skips it if it's a duplicate.`,
-      confirmLabel: "Force Upload",
+      title: action,
+      message: held
+        ? `${btn.dataset.reviewReason || "This backup needs review."}\n\nUpload the staged backup for ${label}? ${approvalScope}`
+        : `Upload ${label} even if unchanged? Station skips it if it's a duplicate.`,
+      confirmLabel: action,
     }))
   ) {
     return;
@@ -107,7 +116,7 @@ async function forceUpload(relativePath: string, jobName: string, btn: HTMLButto
     }
     setActionStatus(
       body.manual_retry_cleared
-        ? `Force upload queued for ${label}. A manual block was cleared first.`
+        ? `${held ? "Approved upload" : "Force upload"} queued for ${label}. A manual block was cleared first.`
         : `Force upload queued for ${label}.`,
       "success",
     );

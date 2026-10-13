@@ -27,6 +27,7 @@ Most Scout settings are changed in **Edit Scout Settings** and saved in Scout's 
 | Unusual backups | `ANOMALY_MODE` | `hold` | Hold, alert on, or ignore backups that look very different from a job's history: `hold`, `alert`, or `off`. See [Unusual backups](/scout/unusual-backups). |
 | Pause backups | none | off | Skip scheduled cycles and Run Backup Cycle Now. Individual Force Upload actions still run. |
 | Keep failed uploads | `KEEP_LOCAL_PENDING` | on | Keep an archive that failed to upload so the next cycle retries it instead of rebuilding. |
+| Auto-approve large uploads after first approval | none | on | Each job needs one manual size approval. After that, its future oversized archives upload automatically. View or remove entries under **Remembered large-upload approvals**. Turn off to approve each new oversized archive. |
 | none | `SCAN_ROOT` | `/scan` | Folder Scout scans. Leave at `/scan` in Docker. |
 
 The schedule can't run more often than every **5 minutes**.

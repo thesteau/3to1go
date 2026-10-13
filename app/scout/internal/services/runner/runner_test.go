@@ -27,14 +27,15 @@ func testRunner(t *testing.T, settings *config.Settings, client *upload.UploadCl
 	stateStore := newMockStateStore()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	return &ScoutRunner{
-		Settings:     settings,
-		logger:       logger,
-		encKey:       []byte("0123456789abcdef0123456789abcdef"),
-		StateStore:   stateStore,
-		UploadClient: client,
-		LockManager:  locks.NewJobLockManager(),
-		HookManager:  hooks.NewHookManager("scout", t.TempDir(), logger),
-		Anomalies:    newMockAnomalyStore(),
+		Settings:        settings,
+		logger:          logger,
+		encKey:          []byte("0123456789abcdef0123456789abcdef"),
+		StateStore:      stateStore,
+		UploadClient:    client,
+		LockManager:     locks.NewJobLockManager(),
+		HookManager:     hooks.NewHookManager("scout", t.TempDir(), logger),
+		Anomalies:       newMockAnomalyStore(),
+		UploadApprovals: newMockUploadApprovalStore(),
 	}
 }
 
@@ -235,13 +236,14 @@ func TestRunnerRetryAndPendingHelpers(t *testing.T) {
 	s.PendingArchive = pending
 	s.PendingArchiveSize = ptrInt64(1)
 	s.PendingArchiveSHA256 = "sha"
+	s.PendingUploadSizeApproved = true
 	s.PendingFingerprint = "fp"
 	s.PendingTimestamp = "ts"
 	s.UploadID = "u"
 	s.UploadOffset = 3
 	s.CurrentChunkSizeBytes = ptrInt64(2)
 	runner.clearPendingArchive(s)
-	if s.PendingArchive != "" || s.PendingArchiveSize != nil || s.UploadID != "" {
+	if s.PendingArchive != "" || s.PendingArchiveSize != nil || s.UploadID != "" || s.PendingUploadSizeApproved {
 		t.Fatalf("clearPendingArchive = %+v", s)
 	}
 	if _, err := os.Stat(pending); !os.IsNotExist(err) {

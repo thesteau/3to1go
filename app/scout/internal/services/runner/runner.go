@@ -28,6 +28,7 @@ import (
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/hooks"
 	"github.com/3to1go/shared/integrations"
+	"github.com/3to1go/shared/protocol"
 )
 
 type jobStateStore interface {
@@ -45,6 +46,13 @@ type anomalyStore interface {
 	Delete(string) error
 }
 
+type uploadApprovalStore interface {
+	Get(context.Context, string) (*state.UploadApproval, error)
+	Save(context.Context, state.UploadApproval) error
+	List(context.Context) ([]state.UploadApproval, error)
+	Delete(context.Context, string) error
+}
+
 // ScoutRunner owns all runtime services and drives backup cycles.
 type ScoutRunner struct {
 	mu sync.Mutex
@@ -56,15 +64,16 @@ type ScoutRunner struct {
 	operationCtx    context.Context
 	operationCancel context.CancelFunc
 
-	StateStore   jobStateStore
-	UploadClient *upload.UploadClient
-	LockManager  *locks.JobLockManager
-	HookManager  *hooks.HookManager
-	CertManager  *certificates.CertManager
-	Integrations *integrations.Manager
-	DirService   *directories.DirectoryService
-	Recovery     *recovery.RecoveryService
-	Anomalies    anomalyStore
+	StateStore      jobStateStore
+	UploadClient    *upload.UploadClient
+	LockManager     *locks.JobLockManager
+	HookManager     *hooks.HookManager
+	CertManager     *certificates.CertManager
+	Integrations    *integrations.Manager
+	DirService      *directories.DirectoryService
+	Recovery        *recovery.RecoveryService
+	Anomalies       anomalyStore
+	UploadApprovals uploadApprovalStore
 }
 
 // uploadWork is the handoff between the compress goroutines and the serial upload worker.
@@ -97,6 +106,10 @@ func NewScoutRunner(settings *config.Settings, logger *slog.Logger, certMgr *cer
 	if err := anomalies.EnsureSchema(context.Background()); err != nil {
 		return nil, fmt.Errorf("anomaly schema: %w", err)
 	}
+	approvals := state.NewUploadApprovalStore(stateStore.DB())
+	if err := approvals.EnsureSchema(context.Background()); err != nil {
+		return nil, fmt.Errorf("large-upload approval schema: %w", err)
+	}
 
 	uploadClient := upload.NewUploadClient(settings, encKey, certMgr)
 	lockMgr := locks.NewJobLockManager()
@@ -109,18 +122,19 @@ func NewScoutRunner(settings *config.Settings, logger *slog.Logger, certMgr *cer
 	recoverySvc := recovery.NewRecoveryService(settings, logger, stateStore, uploadClient, encKey)
 
 	return &ScoutRunner{
-		Settings:     settings,
-		logger:       logger,
-		encKey:       encKey,
-		StateStore:   stateStore,
-		UploadClient: uploadClient,
-		LockManager:  lockMgr,
-		HookManager:  hookMgr,
-		CertManager:  certMgr,
-		Integrations: notifications,
-		DirService:   dirSvc,
-		Recovery:     recoverySvc,
-		Anomalies:    anomalies,
+		Settings:        settings,
+		logger:          logger,
+		encKey:          encKey,
+		StateStore:      stateStore,
+		UploadClient:    uploadClient,
+		LockManager:     lockMgr,
+		HookManager:     hookMgr,
+		CertManager:     certMgr,
+		Integrations:    notifications,
+		DirService:      dirSvc,
+		Recovery:        recoverySvc,
+		Anomalies:       anomalies,
+		UploadApprovals: approvals,
 	}, nil
 }
 
@@ -475,6 +489,15 @@ func (r *ScoutRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.J
 	if err := r.operationContext().Err(); err != nil {
 		return false, err
 	}
+	if s.ManualInterventionRequired && s.LastErrorCategory == protocol.StatusUploadApprovalRequired && settings.AutoApproveLargeUploads {
+		approval, err := r.UploadApprovals.Get(r.operationContext(), pendingLargeUploadApproval(job, s, settings).ID)
+		if err != nil {
+			r.logger.Warn("large_upload_approval_lookup_failed", "job_name", job.JobName, "error", err)
+		} else if approval != nil {
+			s.ManualInterventionRequired = false
+			s.NextRetryAt = ""
+		}
+	}
 	if !s.ManualInterventionRequired {
 		retry := r.checkRetry(job, s)
 		if retry == "waiting" {
@@ -486,12 +509,15 @@ func (r *ScoutRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.J
 	}
 
 	// A held archive keeps its reasons while its files stay the same.
-	held := s.ManualInterventionRequired && s.LastErrorCategory == unusualBackupCategory
+	held := s.ManualInterventionRequired && (s.LastErrorCategory == unusualBackupCategory || s.LastErrorCategory == protocol.StatusUploadApprovalRequired)
+	heldCategory := s.LastErrorCategory
 	heldDetail := s.LastErrorDetail
 
 	r.setActivePhase(job, s, "scanning", 5)
-	s.LastErrorDetail = ""
-	s.LastErrorCategory = ""
+	if !held {
+		s.LastErrorDetail = ""
+		s.LastErrorCategory = ""
+	}
 	r.saveState(job, *s)
 
 	files, err := backup.BuildFileListContext(r.operationContext(), job, func(format string, args ...any) {
@@ -528,8 +554,10 @@ func (r *ScoutRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.J
 			s.LastStatus = "manual_intervention_required"
 			if held {
 				s.LastStatus = heldForReviewStatus
-				s.LastErrorCategory = unusualBackupCategory
+				s.LastErrorCategory = heldCategory
 				s.LastErrorDetail = heldDetail
+				s.ActivePhase = ""
+				s.ActivePhasePercent = 0
 			}
 			r.saveState(job, *s)
 			r.logger.Warn("manual_intervention_required",
@@ -565,6 +593,7 @@ func (r *ScoutRunner) prepareArchiveLocked(job *backup.JobDefinition, s *state.J
 	s.PendingArchive = archivePath
 	s.PendingArchiveSize = &size
 	s.PendingArchiveSHA256 = sha256sum
+	s.PendingUploadSizeApproved = false
 	s.PendingFingerprint = fingerprint
 	s.PendingTimestamp = timestamp
 	s.UploadID = ""
@@ -710,6 +739,16 @@ func (r *ScoutRunner) processJobLocked(job *backup.JobDefinition, s *state.JobSt
 	r.publishJobStarted(job, settings)
 	if forceSend && s.PendingArchive != "" {
 		if _, err := os.Stat(s.PendingArchive); err == nil {
+			if s.LastErrorCategory == protocol.StatusUploadApprovalRequired {
+				if err := r.UploadApprovals.Save(r.operationContext(), pendingLargeUploadApproval(job, s, settings)); err != nil {
+					s.LastStatus = heldForReviewStatus
+					s.ManualInterventionRequired = true
+					s.LastErrorDetail = fmt.Sprintf("Could not save large-upload approval: %v. Try Upload anyway again.", err)
+					r.saveState(job, *s)
+					return
+				}
+				s.PendingUploadSizeApproved = true
+			}
 			s.NextRetryAt = ""
 			s.ManualInterventionRequired = false
 			s.LastStatus = "force_send_requested"
@@ -802,12 +841,22 @@ func (r *ScoutRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.J
 		r.saveState(job, *s)
 	}
 
+	allowOversized := false
+	if s.PendingUploadSizeApproved || settings.AutoApproveLargeUploads {
+		approval, err := r.UploadApprovals.Get(r.operationContext(), pendingLargeUploadApproval(job, s, settings).ID)
+		if err != nil {
+			r.logger.Warn("large_upload_approval_lookup_failed", "job_name", jobName, "error", err)
+		} else {
+			allowOversized = approval != nil
+		}
+	}
 	result, err := r.UploadClient.UploadArchive(
 		r.operationContext(),
 		settings.ScoutID, jobName,
 		s.PendingFingerprint, s.PendingTimestamp,
 		s.PendingArchive, s.PendingArchiveSHA256,
 		s.UploadOffset, preferredChunk,
+		allowOversized,
 		progress,
 	)
 
@@ -822,7 +871,11 @@ func (r *ScoutRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.J
 		if isUploadFail {
 			cat = uf.Category
 		}
-		r.logger.Error("upload_failure",
+		level := slog.LevelError
+		if cat == protocol.StatusUploadApprovalRequired {
+			level = slog.LevelWarn
+		}
+		r.logger.Log(r.operationContext(), level, "upload_failure",
 			"job_name", jobName, "archive", archiveName,
 			"category", cat, "detail", err)
 
@@ -840,6 +893,12 @@ func (r *ScoutRunner) uploadPendingArchive(job *backup.JobDefinition, s *state.J
 				s.ManualInterventionRequired = false
 			} else {
 				s.LastStatus = "manual_intervention_required"
+				if uf.Category == protocol.StatusUploadApprovalRequired {
+					s.LastStatus = heldForReviewStatus
+					s.LastErrorDetail = uf.Message
+					s.ActivePhase = ""
+					s.ActivePhasePercent = 0
+				}
 				s.NextRetryAt = ""
 				s.ManualInterventionRequired = true
 			}
@@ -944,6 +1003,7 @@ func (r *ScoutRunner) clearPendingArchive(s *state.JobState) {
 	s.PendingArchive = ""
 	s.PendingArchiveSize = nil
 	s.PendingArchiveSHA256 = ""
+	s.PendingUploadSizeApproved = false
 	s.PendingFingerprint = ""
 	s.PendingTimestamp = ""
 	s.UploadID = ""
@@ -961,6 +1021,7 @@ func (r *ScoutRunner) discardPendingArchiveFile(s *state.JobState) {
 	s.PendingArchive = ""
 	s.PendingArchiveSize = nil
 	s.PendingArchiveSHA256 = ""
+	s.PendingUploadSizeApproved = false
 	s.UploadID = ""
 	s.UploadOffset = 0
 	s.CurrentChunkSizeBytes = nil

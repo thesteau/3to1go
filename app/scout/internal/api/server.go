@@ -8,6 +8,7 @@ import (
 
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/services/directories"
+	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/store"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
@@ -34,6 +35,8 @@ type userStorer interface {
 type scoutRunner interface {
 	CurrentSettings() *config.Settings
 	UpdateSettings(s *config.Settings) error
+	LargeUploadApprovals(context.Context) ([]state.UploadApproval, error)
+	RemoveLargeUploadApproval(context.Context, string) error
 	EncryptionKeyFingerprint() string
 	EncryptionKeyBase64() string
 	RotateEncryptionKey() (string, error)
@@ -169,6 +172,8 @@ func (a *App) Handler() http.Handler {
 	// Settings
 	r.Get("/api/settings", a.handleGetSettings)
 	r.Post("/api/settings", a.handleSaveSettings)
+	r.Get("/api/upload-approvals", a.handleLargeUploadApprovals)
+	r.Delete("/api/upload-approvals/{approval_id}", httpx.WithPathValues(a.handleRemoveLargeUploadApproval, "approval_id"))
 
 	// Integrations
 	integrations.Register(r, a.integrations, "scout")

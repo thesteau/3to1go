@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -39,6 +40,7 @@ func stateValues(key string, js JobState) []driver.Value {
 		js.LastUploadStartedAt, js.LastUploadUpdatedAt, js.ActivePhase, js.ActivePhasePercent,
 		boolToInt(js.ManualInterventionRequired), js.LastStatus, js.LastStoredAs,
 		js.LastPruned, boolToInt(js.LastDuplicate), size,
+		boolToInt(js.PendingUploadSizeApproved),
 	}
 }
 
@@ -49,6 +51,7 @@ func stateRows() *sqlmock.Rows {
 func TestStateStore_EnsureSchema(t *testing.T) {
 	s, mock := newTestStore(t)
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_states").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	if err := s.EnsureSchema(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +59,25 @@ func TestStateStore_EnsureSchema(t *testing.T) {
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_states").WillReturnError(dbErr)
 	if err := s.EnsureSchema(context.Background()); !errors.Is(err, dbErr) {
 		t.Fatalf("EnsureSchema: %v", err)
+	}
+}
+
+func TestStateStore_MigrateUploadApprovalColumn(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(fmt.Sprint("migration_error=", fail), func(t *testing.T) {
+			s, mock := newTestStore(t)
+			mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_states").WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+			exec := mock.ExpectExec("ALTER TABLE job_states ADD COLUMN pending_upload_size_approved INTEGER NOT NULL DEFAULT 0")
+			if fail {
+				exec.WillReturnError(errors.New("migration failed"))
+			} else {
+				exec.WillReturnResult(sqlmock.NewResult(0, 0))
+			}
+			if err := s.EnsureSchema(context.Background()); (err != nil) != fail {
+				t.Fatalf("migration error = %v, want failure %v", err, fail)
+			}
+		})
 	}
 }
 
@@ -74,7 +96,8 @@ func TestStateStore_SetAndGet(t *testing.T) {
 		JobName: "photos", LastStatus: "success", LastSuccessfulFingerprint: "fingerprint",
 		LastSuccessfulUpload: "uploaded", PendingArchive: "/spool/photos.tar.zst",
 		PendingArchiveSize: &value, PendingArchiveSHA256: "sha256", PendingFingerprint: "pending",
-		PendingTimestamp: "timestamp", UploadID: "upload", UploadOffset: 12, UploadAttemptCount: 3,
+		PendingUploadSizeApproved: true,
+		PendingTimestamp:          "timestamp", UploadID: "upload", UploadOffset: 12, UploadAttemptCount: 3,
 		CurrentChunkSizeBytes: &value, NextRetryAt: "retry", LastErrorDetail: "detail",
 		LastErrorCategory: "network", LastUploadStartedAt: "started", LastUploadUpdatedAt: "updated",
 		ActivePhase: "upload", ActivePhasePercent: 50, ManualInterventionRequired: true,

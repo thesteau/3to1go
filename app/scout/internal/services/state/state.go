@@ -17,6 +17,7 @@ type JobState struct {
 	PendingArchive             string `json:"pending_archive,omitempty"`
 	PendingArchiveSize         *int64 `json:"pending_archive_size,omitempty"`
 	PendingArchiveSHA256       string `json:"pending_archive_sha256,omitempty"`
+	PendingUploadSizeApproved  bool   `json:"pending_upload_size_approved,omitempty"`
 	PendingFingerprint         string `json:"pending_fingerprint,omitempty"`
 	PendingTimestamp           string `json:"pending_timestamp,omitempty"`
 	UploadID                   string `json:"upload_id,omitempty"`
@@ -102,8 +103,19 @@ func (s *StateStore) EnsureSchema(ctx context.Context) error {
 			last_stored_as TEXT NOT NULL DEFAULT '',
 			last_pruned INTEGER NOT NULL DEFAULT 0,
 			last_duplicate INTEGER NOT NULL DEFAULT 0,
-			last_backup_size_bytes INTEGER
+			last_backup_size_bytes INTEGER,
+			pending_upload_size_approved INTEGER NOT NULL DEFAULT 0
 		)`)
+	if err != nil {
+		return err
+	}
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('job_states') WHERE name = 'pending_upload_size_approved'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		_, err = s.db.ExecContext(ctx, `ALTER TABLE job_states ADD COLUMN pending_upload_size_approved INTEGER NOT NULL DEFAULT 0`)
+	}
 	return err
 }
 
@@ -137,13 +149,13 @@ const selectCols = `key,
 	last_error_detail, last_error_category, last_upload_started_at,
 	last_upload_updated_at, active_phase, active_phase_percent,
 	manual_intervention_required, last_status, last_stored_as,
-	last_pruned, last_duplicate, last_backup_size_bytes`
+	last_pruned, last_duplicate, last_backup_size_bytes, pending_upload_size_approved`
 
 func scanJobState(scan func(...any) error) (string, JobState, error) {
 	var key string
 	var js JobState
 	var pendingArchiveSize, currentChunkSizeBytes, lastBackupSizeBytes sql.NullInt64
-	var manualIntervention, lastDuplicate int
+	var manualIntervention, lastDuplicate, pendingUploadSizeApproved int
 	err := scan(
 		&key,
 		&js.JobName, &js.LastSuccessfulFingerprint, &js.LastSuccessfulUpload,
@@ -154,6 +166,7 @@ func scanJobState(scan func(...any) error) (string, JobState, error) {
 		&js.LastUploadUpdatedAt, &js.ActivePhase, &js.ActivePhasePercent,
 		&manualIntervention, &js.LastStatus, &js.LastStoredAs,
 		&js.LastPruned, &lastDuplicate, &lastBackupSizeBytes,
+		&pendingUploadSizeApproved,
 	)
 	if err != nil {
 		return "", JobState{}, err
@@ -169,6 +182,7 @@ func scanJobState(scan func(...any) error) (string, JobState, error) {
 	}
 	js.ManualInterventionRequired = manualIntervention != 0
 	js.LastDuplicate = lastDuplicate != 0
+	js.PendingUploadSizeApproved = pendingUploadSizeApproved != 0
 	return key, js, nil
 }
 
@@ -196,8 +210,8 @@ func (s *StateStore) Set(key string, js JobState) error {
 			last_error_detail, last_error_category, last_upload_started_at,
 			last_upload_updated_at, active_phase, active_phase_percent,
 			manual_intervention_required, last_status, last_stored_as,
-			last_pruned, last_duplicate, last_backup_size_bytes
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+			last_pruned, last_duplicate, last_backup_size_bytes, pending_upload_size_approved
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(key) DO UPDATE SET
 			job_name = excluded.job_name,
 			last_successful_fingerprint = excluded.last_successful_fingerprint,
@@ -223,7 +237,8 @@ func (s *StateStore) Set(key string, js JobState) error {
 			last_stored_as = excluded.last_stored_as,
 			last_pruned = excluded.last_pruned,
 			last_duplicate = excluded.last_duplicate,
-			last_backup_size_bytes = excluded.last_backup_size_bytes`,
+			last_backup_size_bytes = excluded.last_backup_size_bytes,
+			pending_upload_size_approved = excluded.pending_upload_size_approved`,
 		key,
 		js.JobName, js.LastSuccessfulFingerprint, js.LastSuccessfulUpload,
 		js.PendingArchive, js.PendingArchiveSize, js.PendingArchiveSHA256,
@@ -233,6 +248,7 @@ func (s *StateStore) Set(key string, js JobState) error {
 		js.LastUploadUpdatedAt, js.ActivePhase, js.ActivePhasePercent,
 		boolToInt(js.ManualInterventionRequired), js.LastStatus, js.LastStoredAs,
 		js.LastPruned, boolToInt(js.LastDuplicate), js.LastBackupSizeBytes,
+		boolToInt(js.PendingUploadSizeApproved),
 	)
 	return err
 }

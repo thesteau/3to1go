@@ -99,7 +99,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
-| `GET` | `/health` | Public | Checks storage and returns storage and upload-limit information. Can return `503`. |
+| `GET` | `/health` | Public | Checks storage and returns storage and upload approval threshold information. Can return `503`. |
 | `GET` | `/health/ready` | Public | Checks storage and the staging directory; returns `{"status":"ok"}` or `503`. |
 | `GET` | `/api/overview` | Session | Returns storage information and Scouts with instances, jobs, and snapshots. Settings are included for admin accounts only. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns normalized `settings`. |
@@ -134,7 +134,7 @@ curl --fail-with-body -sS --cookie station.cookies \
   "$STATION_URL/api/settings"
 ```
 
-Station has no `GET /api/settings`; read settings from the overview. See [Station configuration](/station/configuration) for fields and environment precedence. `retention_keep_last` is the number of snapshots kept per job and Scout instance; the per-archive upload size limit is separate. Read current values again before a later update rather than replaying an old settings file.
+Station has no `GET /api/settings`; read settings from the overview. See [Station configuration](/station/configuration) for fields and environment precedence. `retention_keep_last` is the number of snapshots kept per job and Scout instance; `max_upload_size_mb` is the separate per-archive upload approval threshold. Read current values again before a later update rather than replaying an old settings file.
 
 ## Station tokens
 
@@ -266,6 +266,7 @@ Initiation takes:
 | `timestamp` | Required UTC timestamp in `YYYY-MM-DDTHH:MM:SSZ` format. |
 | `archive_format` | Required `tar.zst`. |
 | `archive_size_bytes` | Required positive size of the uploaded archive bytes. |
+| `allow_oversized` | Optional boolean, default `false`. Scout sets this after manual approval for the archive, or when auto-approval is enabled and this job has a remembered manual size approval. Allows this upload above the size threshold; available storage checks still apply. |
 | `archive_sha256` | Required 64-character lowercase hex SHA-256 checksum of the uploaded archive bytes. This verifies transfer integrity; it is separate from change detection. |
 | `idempotency_key` | Required key reused when resuming the same upload. Reusing it with a different archive checksum, size, or Scout/instance/job namespace returns `409`. |
 | `encryption_key_fingerprint` | Optional Scout key fingerprint; lets Station associate the instance with its key fingerprint. Never send the key itself. |
@@ -273,7 +274,7 @@ Initiation takes:
 
 Resume from the returned `next_offset`. Send chunks up to the recommended size and use the new `next_offset` after each successful chunk. If initiation reports a stored duplicate, the client can use `stored_as` without uploading it again. Finalize after sending all bytes.
 
-An offset conflict returns `409` with `detail.status: "offset_mismatch"` and `detail.next_offset`. A checksum failure at finalization returns `409` with `detail.status: "checksum_mismatch"` and a reset offset. Read the returned details before retrying. Station's [per-archive upload limit](/station/configuration) is independent of count-based retention.
+An offset conflict returns `409` with `detail.status: "offset_mismatch"` and `detail.next_offset`. A checksum failure at finalization returns `409` with `detail.status: "checksum_mismatch"` and a reset offset. Initiation above the [upload approval threshold](/station/configuration) returns `413` with `detail.status: "upload_approval_required"`, a readable `detail.message`, `detail.archive_size_bytes`, and `detail.max_upload_size_bytes`. Hold the archive for operator review, then initiate it again with `allow_oversized: true` after approval. The threshold is independent of count-based retention.
 
 ### Download for recovery
 
@@ -314,7 +315,7 @@ Send JSON bodies with `Content-Type: application/json`, except for multipart fil
 | `403` | Admin access or a password change is required, or a Station token is not authorized for the instance. |
 | `404` | Requested snapshot, instance, or accepted restore request was not found. |
 | `409` | Conflict such as token binding, upload offset/checksum mismatch, or an unavailable restore request. Inspect `detail`. |
-| `413` | Archive exceeds the per-upload size limit. |
+| `413` | Archive exceeds the upload approval threshold and needs manual approval in Scout. |
 | `429` | Rate limit reached; wait for the number of seconds in `Retry-After`. |
 | `500` | Server-side failure. |
 | `502` | A certificate operation or another upstream service could not complete the request. |
