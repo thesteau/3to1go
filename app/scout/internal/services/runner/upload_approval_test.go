@@ -60,7 +60,7 @@ func TestOversizedBackupApprovalLifecycle(t *testing.T) {
 						w.WriteHeader(http.StatusRequestEntityTooLarge)
 						writeTestJSON(t, w, map[string]any{"detail": map[string]any{
 							"status":  protocol.StatusUploadApprovalRequired,
-							"message": "Archive is 3 MB, above Station's 1 MB upload approval threshold. Choose Upload anyway.",
+							"message": "Backup is 3 MB; approval required above 1 MB.",
 						}})
 						return
 					}

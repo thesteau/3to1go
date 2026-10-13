@@ -225,7 +225,7 @@ Station's browser decryption needs a secure browser context: trusted HTTPS, or a
 | `502 Bad Gateway` | Check the proxy's HTTP upstream address, Docker network, and whether the app is running. `localhost` inside the proxy is not the app. |
 | Sign-in fails or settings writes return `403` | Use HTTPS when secure cookies are enabled. Preserve the original Host header and keep the UI and API on the same origin. |
 | Backup upload returns `401` or an HTML sign-in page | Preserve Authorization. A proxy login portal must allow Scout's machine requests to the upload/restore API using the app's Station token. |
-| Upload gets `413` | If Scout shows a size warning and **Upload anyway**, approve the archive or clear it. For a proxy's request-body rejection, raise the proxy's limit to accommodate Scout's maximum chunk size, or reduce that chunk size. The default maximum chunk size is 16 MiB. See [Station's upload approval threshold](/station/configuration). |
+| Upload gets `413` | If Scout shows a size warning, click **Approve & Upload** or clear the archive. For a proxy's request-body rejection, raise the proxy's limit to accommodate Scout's maximum chunk size, or reduce that chunk size. The default maximum chunk size is 16 MiB. See [Station's upload approval threshold](/station/configuration). |
 | Upload, download, or restore times out | Check every proxy's request/response timeouts and any intermediary limits. Large snapshots and slow links need longer than typical webpage requests. See [Scout upload settings](/scout/configuration#uploads). |
 | Certificate expires | Renew it through your CA/certificate tooling and make the proxy reload the renewed files. Scout and Station do not renew server certificates. |
 

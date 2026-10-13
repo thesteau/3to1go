@@ -8,6 +8,7 @@ import (
 
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/services/directories"
+	"github.com/3to1go/scout/internal/services/recovery"
 	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/store"
 	"github.com/3to1go/shared/auth"
@@ -65,6 +66,7 @@ type scoutRunner interface {
 	StartForceSendAsync(relativePath string) (map[string]any, error)
 	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
+	RecoveryProgress() recovery.Progress
 	restoreRunner
 }
 
@@ -161,6 +163,7 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/directories/exclude", a.handleExcludePath)
 
 	// Recovery
+	r.Get("/api/recovery/progress", a.handleRecoveryProgress)
 	r.Post("/api/recovery/preview", a.handleRecoveryPreview)
 	r.Post("/api/recovery/restore", a.handleRecoveryRestore)
 

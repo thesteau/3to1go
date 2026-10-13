@@ -56,12 +56,16 @@ func (m *mockStateStore) Delete(key string) error {
 // ---------------------------------------------------------------------------
 
 type mockDownloader struct {
+	download func(context.Context, string) (string, error)
 	err      error
 	filename string
 	content  []byte
 }
 
-func (m *mockDownloader) DownloadLatestSnapshot(_ context.Context, _, _, destPath string) (string, error) {
+func (m *mockDownloader) DownloadLatestSnapshot(ctx context.Context, _, _, destPath string) (string, error) {
+	if m.download != nil {
+		return m.download(ctx, destPath)
+	}
 	if m.err != nil {
 		return "", m.err
 	}
@@ -73,12 +77,12 @@ func (m *mockDownloader) DownloadLatestSnapshot(_ context.Context, _, _, destPat
 	return m.filename, nil
 }
 
-func (m *mockDownloader) DownloadSnapshotByFingerprint(_ context.Context, _, _, _, destPath string) (string, error) {
-	return m.DownloadLatestSnapshot(context.Background(), "", "", destPath)
+func (m *mockDownloader) DownloadSnapshotByFingerprint(ctx context.Context, _, _, _, destPath string) (string, error) {
+	return m.DownloadLatestSnapshot(ctx, "", "", destPath)
 }
 
-func (m *mockDownloader) DownloadSnapshotByFilename(_ context.Context, _, _, _, destPath string) (string, error) {
-	return m.DownloadLatestSnapshot(context.Background(), "", "", destPath)
+func (m *mockDownloader) DownloadSnapshotByFilename(ctx context.Context, _, _, _, destPath string) (string, error) {
+	return m.DownloadLatestSnapshot(ctx, "", "", destPath)
 }
 
 // ---------------------------------------------------------------------------

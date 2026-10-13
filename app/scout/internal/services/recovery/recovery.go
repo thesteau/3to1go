@@ -2,17 +2,21 @@ package recovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/3to1go/scout/internal/backup"
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/encryption"
 	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/services/upload"
+	"github.com/3to1go/scout/internal/transfer"
 )
 
 // jobStateStore is the persistence interface for per-job upload state.
@@ -60,6 +64,8 @@ type RecoveryService struct {
 	stateStore jobStateStore
 	downloader snapshotDownloader
 	encKey     []byte
+	progressMu sync.RWMutex
+	progress   Progress
 }
 
 func NewRecoveryService(settings *config.Settings, logger *slog.Logger, stateStore jobStateStore, downloader snapshotDownloader, encKey []byte) *RecoveryService {
@@ -72,8 +78,11 @@ func NewRecoveryService(settings *config.Settings, logger *slog.Logger, stateSto
 	}
 }
 
-func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition, fingerprint string) (*RecoveryResult, error) {
+func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition, fingerprint string) (_ *RecoveryResult, err error) {
 	jobState := r.beginRecovery(job)
+	r.beginProgress(ctx)
+	defer func() { r.finishProgress(err == nil) }()
+	ctx = transfer.WithReporter(ctx, r.reportBytes)
 
 	downloadPath := r.tempPath(".download.tar.zst")
 	decryptedPath := r.tempPath(".decrypted.tar.zst")
@@ -82,17 +91,20 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 
 	filename, err := r.downloadSnapshot(ctx, job, fingerprint, downloadPath)
 	if err != nil {
-		return nil, r.handleError(job, &jobState, err)
+		return nil, r.handleError(job, &jobState, r.storageError(err, r.settings.SpoolDir))
 	}
 
-	if err := encryption.DecryptFile(r.encKey, downloadPath, decryptedPath); err != nil {
-		re := &RecoveryError{Message: "unable to decrypt snapshot with this Scout key", StatusCode: 409}
+	r.setProgressPhase("decrypting")
+	if err := encryption.DecryptFileContext(ctx, r.encKey, downloadPath, decryptedPath); err != nil {
+		re := r.decryptError(err, "unable to decrypt snapshot with this Scout key")
 		return nil, r.handleError(job, &jobState, re)
 	}
+	_ = os.Remove(downloadPath)
 
-	restored, err := backup.ExtractArchive(decryptedPath, job.RootPath)
+	r.setProgressPhase("extracting")
+	restored, err := backup.ExtractArchiveContext(ctx, decryptedPath, job.RootPath, r.reportFiles)
 	if err != nil {
-		return nil, r.handleError(job, &jobState, &RecoveryError{Message: err.Error(), StatusCode: 500})
+		return nil, r.handleError(job, &jobState, r.storageError(err, job.RootPath))
 	}
 
 	jobState.LastStatus = "recovered"
@@ -118,32 +130,38 @@ func (r *RecoveryService) Recover(ctx context.Context, job *backup.JobDefinition
 // RecoverFilename restores one exact archive that Station asked for. The
 // destination may not be a job folder, so no job state is recorded for it.
 func (r *RecoveryService) RecoverFilename(ctx context.Context, job *backup.JobDefinition, filename string) (*RecoveryResult, error) {
-	return r.RecoverRequest(ctx, job, filename, r.encKey, func(path string) (string, error) {
-		return r.downloader.DownloadSnapshotByFilename(ctx, r.settings.ScoutID, job.JobName, filename, path)
+	return r.RecoverRequest(ctx, job, filename, r.encKey, func(downloadCtx context.Context, path string) (string, error) {
+		return r.downloader.DownloadSnapshotByFilename(downloadCtx, r.settings.ScoutID, job.JobName, filename, path)
 	})
 }
 
-func (r *RecoveryService) RecoverRequest(ctx context.Context, job *backup.JobDefinition, filename string, key []byte, download func(string) (string, error)) (*RecoveryResult, error) {
+func (r *RecoveryService) RecoverRequest(ctx context.Context, job *backup.JobDefinition, filename string, key []byte, download func(context.Context, string) (string, error)) (_ *RecoveryResult, err error) {
+	r.beginProgress(ctx)
+	defer func() { r.finishProgress(err == nil) }()
+	ctx = transfer.WithReporter(ctx, r.reportBytes)
 	downloadPath := r.tempPath(".download.tar.zst")
 	decryptedPath := r.tempPath(".decrypted.tar.zst")
 	defer func() { _ = os.Remove(downloadPath) }()
 	defer func() { _ = os.Remove(decryptedPath) }()
 
-	got, err := download(downloadPath)
+	got, err := download(ctx, downloadPath)
 	if err != nil {
-		return nil, r.handleRequestError(job, err)
+		return nil, r.handleRequestError(job, r.storageError(err, r.settings.SpoolDir))
 	}
 	if got != filename {
 		return nil, r.handleRequestError(job, &RecoveryError{Message: "Station returned a different snapshot than requested", StatusCode: 502})
 	}
 
-	if err := encryption.DecryptFile(key, downloadPath, decryptedPath); err != nil {
-		return nil, r.handleRequestError(job, &RecoveryError{Message: "unable to decrypt snapshot with the provided Scout key", StatusCode: 409})
+	r.setProgressPhase("decrypting")
+	if err := encryption.DecryptFileContext(ctx, key, downloadPath, decryptedPath); err != nil {
+		return nil, r.handleRequestError(job, r.decryptError(err, "unable to decrypt snapshot with the provided Scout key"))
 	}
+	_ = os.Remove(downloadPath)
 
-	restored, err := backup.ExtractArchive(decryptedPath, job.RootPath)
+	r.setProgressPhase("extracting")
+	restored, err := backup.ExtractArchiveContext(ctx, decryptedPath, job.RootPath, r.reportFiles)
 	if err != nil {
-		return nil, r.handleRequestError(job, &RecoveryError{Message: err.Error(), StatusCode: 500})
+		return nil, r.handleRequestError(job, r.storageError(err, job.RootPath))
 	}
 
 	r.logger.Info("restore_request_success",
@@ -169,13 +187,14 @@ func (r *RecoveryService) Preview(ctx context.Context, job *backup.JobDefinition
 
 	filename, err := r.downloadSnapshot(ctx, job, fingerprint, downloadPath)
 	if err != nil {
-		return nil, r.handlePreviewError(job, err)
+		return nil, r.handlePreviewError(job, r.storageError(err, r.settings.SpoolDir))
 	}
 
 	if err := encryption.DecryptFile(r.encKey, downloadPath, decryptedPath); err != nil {
-		re := &RecoveryError{Message: "unable to decrypt snapshot with this Scout key", StatusCode: 409}
+		re := r.decryptError(err, "unable to decrypt snapshot with this Scout key")
 		return nil, r.handlePreviewError(job, re)
 	}
+	_ = os.Remove(downloadPath)
 
 	preview, err := backup.ListArchiveEntries(decryptedPath, job.RootPath)
 	if err != nil {
@@ -271,6 +290,21 @@ func wrapRecoveryError(err error, isPreview bool) *RecoveryError {
 		}
 	}
 	return &RecoveryError{Message: err.Error(), StatusCode: 500}
+}
+
+func (r *RecoveryService) storageError(err error, folder string) error {
+	if errors.Is(err, syscall.ENOSPC) {
+		return &RecoveryError{Message: fmt.Sprintf("Not enough space in Scout's folder %s; check that mount's free space and inodes.", folder), StatusCode: 507}
+	}
+	return err
+}
+
+func (r *RecoveryService) decryptError(err error, message string) error {
+	var pathError *os.PathError
+	if errors.Is(err, syscall.ENOSPC) || errors.As(err, &pathError) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return r.storageError(err, r.settings.SpoolDir)
+	}
+	return &RecoveryError{Message: message, StatusCode: 409}
 }
 
 func (r *RecoveryService) tempPath(suffix string) string {

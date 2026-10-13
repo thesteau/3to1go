@@ -76,10 +76,10 @@ Choose **Unusual backups** in **Edit Scout Settings**, or set `ANOMALY_MODE` in 
 
 Station's **Upload Approval Above (MB)** setting defaults to `2048`. If a compressed, encrypted archive exceeds it, Scout keeps that backup staged and shows **held for review** with the archive size and threshold. This size check applies in every unusual-backup mode, including **Off**.
 
-Click **Upload anyway** and confirm the size warning, or **Clear staged backup** to discard it. **Auto-approve large uploads after first approval** is on by default in **Edit Scout Settings**. Every job needs its first manual size approval; Scout then remembers it and allows that job's future oversized archives automatically, including after restarts. An approval belongs to the job's folder, name, Scout ID, and Station URL, so changing those requires approval again. Scout's unusual-backup checks still apply, and Station still requires enough free staging and backup storage.
+Click **Approve & Upload** to send it, or **Clear staged backup** to discard it. **Remember large upload approvals** is on by default in Scout settings: approve once per job, then future large backups upload automatically. Turn it off to approve each new archive. Unusual-backup and free-space checks still apply.
 
-Open **Remembered large-upload approvals** in Scout settings to view the jobs and their approval dates. Click **Remove** to make a job ask for approval on its next oversized upload. Removal takes effect immediately; it doesn't delete backups. Wait for active backup or recovery work to finish before removing an entry.
+Under **Approved jobs**, click **Remove** to make a job ask again. Removal is immediate and also clears approval for its staged archive. Wait for active backup or recovery work to finish first.
 
-Turn auto-approval off to approve each new oversized archive. Remembered entries stay available if you turn it back on. An individual archive's manual approval still survives retries and restarts; removing its remembered entry also clears any approval retained for its staged archive.
+Approvals survive restarts and belong to the job's folder, name, Scout ID, and Station URL. Changing those requires approval again. Turning the setting off keeps remembered entries; a staged archive's own approval still survives retries.
 
 Station runs its own, simpler check on archive sizes as a second line of defense. See [Unusual sizes](/station/snapshots#unusual-sizes).
