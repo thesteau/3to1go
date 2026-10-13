@@ -14,6 +14,7 @@ const SCOUT_SETTINGS_HELP: Record<string, string> = {
   settings_log_level: "Log detail.",
   settings_max_depth: "Folder levels scanned below the scan root.",
   settings_keep_local_pending: "Keep failed uploads to retry.",
+  settings_auto_approve_large_uploads: "Approve once per job. Turn off to approve each large backup.",
   settings_upload_chunk_size_mb: "Preferred upload chunk size.",
   settings_min_upload_chunk_size_mb: "Smallest chunk on a slow network.",
   settings_max_upload_chunk_size_mb: "Largest chunk on a healthy network.",
@@ -43,6 +44,7 @@ async function openSettingsDialog(): Promise<void> {
     httpWarning.style.display = window.location.protocol === "http:" ? "" : "none";
   }
   openDialog("settings-dialog");
+  loadLargeUploadApprovals();
   try {
     await loadCertificateConfig();
   } catch (error) {
@@ -64,6 +66,7 @@ function fillSettings(settings: ScoutSettings | null | undefined): void {
   applyTheme(data.theme || "dark");
   input("settings_max_depth").value = String(data.max_depth ?? 10);
   setToggle("settings_keep_local_pending", data.keep_local_pending ?? true);
+  setToggle("settings_auto_approve_large_uploads", data.auto_approve_large_uploads ?? true);
   setToggle("settings_uploads_paused", data.uploads_paused || false);
   (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "hold";
   input("settings_upload_chunk_size_mb").value = String(data.upload_chunk_size_mb ?? 8);
@@ -96,6 +99,7 @@ function collectSettingsPayload(overrides: Partial<ScoutSettings> = {}): ScoutSe
     theme: getToggle("settings_theme_dark") ? "dark" : "light",
     max_depth: Number(value("settings_max_depth") || 0),
     keep_local_pending: getToggle("settings_keep_local_pending"),
+    auto_approve_large_uploads: getToggle("settings_auto_approve_large_uploads"),
     uploads_paused: getToggle("settings_uploads_paused"),
     anomaly_mode: value("settings_anomaly_mode"),
     upload_chunk_size_mb: Number(value("settings_upload_chunk_size_mb") || 1),
@@ -123,6 +127,54 @@ async function postSettings(payload: ScoutSettings): Promise<{ response: Respons
   });
   const body: SettingsResponse = await response.json();
   return { response, body };
+}
+
+let _largeUploadApprovalsRequest = 0;
+
+async function loadLargeUploadApprovals(): Promise<void> {
+  const container = document.getElementById("large-upload-approvals");
+  if (!container) return;
+  const user = currentUser;
+  const request = ++_largeUploadApprovalsRequest;
+  container.textContent = "Loading approvals…";
+  try {
+    const response = await fetch("/api/upload-approvals");
+    const body: LargeUploadApprovalsResponse = await response.json();
+    if (currentUser !== user || request !== _largeUploadApprovalsRequest) return;
+    if (!response.ok) throw new Error(body.detail || "Failed to load large-upload approvals.");
+    const approvals = body.approvals || [];
+    container.innerHTML = approvals.length
+      ? `<table><thead><tr><th>Backup</th><th>Station</th><th>Approved</th><th>Action</th></tr></thead><tbody>${approvals
+          .map(
+            (approval) =>
+              `<tr><td><strong>${escapeHtml(approval.job_name)}</strong><br><span class="hint">${escapeHtml(approval.scout_id)} · ${escapeHtml(approval.job_path)}</span></td><td>${escapeHtml(approval.station_url)}</td><td>${escapeHtml(formatLocalDateTime(approval.approved_at))}</td><td><button type="button" class="secondary" onclick="removeLargeUploadApproval(decodeURIComponent('${encodedPath(approval.id)}'), this)">Remove</button></td></tr>`,
+          )
+          .join("")}</tbody></table>`
+      : '<p class="hint">No approved jobs.</p>';
+  } catch (error) {
+    if (currentUser !== user || request !== _largeUploadApprovalsRequest) return;
+    container.innerHTML = `<p role="status">${escapeHtml((error as Error).message)} <button type="button" onclick="loadLargeUploadApprovals()">Retry</button></p>`;
+  }
+}
+
+async function removeLargeUploadApproval(id: string, button: HTMLButtonElement): Promise<void> {
+  if (!requirePanelReady("settings")) return;
+  const user = currentUser;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/upload-approvals/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const body: ApiBody = await response.json();
+    if (currentUser !== user) return;
+    if (!response.ok) throw new Error(body.detail || "Failed to remove approval.");
+    await loadLargeUploadApprovals();
+    setActionStatus("Approval removed. The next large backup will ask again.", "success");
+    loadData({ silent: true, includeKey: false });
+  } catch (error) {
+    if (currentUser !== user) return;
+    setActionStatus((error as Error).message || "Failed to remove approval.", "error");
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function saveSettings(): Promise<void> {

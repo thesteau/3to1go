@@ -36,13 +36,14 @@ func (a *App) handleRestoreDecision(w http.ResponseWriter, r *http.Request) {
 		ID            string `json:"id"`
 		Decision      string `json:"decision"`
 		RelativePath  string `json:"relative_path"`
+		OperationID   string `json:"operation_id"`
 	}
-	if httpx.ReadJSON(r, &body) != nil || body.ID == "" {
+	if httpx.ReadJSON(r, &body) != nil || body.ID == "" || len(body.OperationID) > 64 {
 		httpx.WriteError(w, 400, "invalid decision")
 		return
 	}
 	runner := a.runner
-	result, err := runner.DecideRestoreRequest(r.Context(), body.ID, body.Decision, body.RelativePath, body.EncryptionKey)
+	result, err := runner.DecideRestoreRequest(recovery.WithOperationID(r.Context(), body.OperationID), body.ID, body.Decision, body.RelativePath, body.EncryptionKey)
 	if err != nil {
 		if re, ok := err.(*recovery.RecoveryError); ok {
 			httpx.WriteError(w, re.StatusCode, re.Message)

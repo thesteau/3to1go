@@ -143,8 +143,8 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		return nil, err
 	}
 	job := &backup.JobDefinition{RootPath: destination, JobName: selected.JobName}
-	result, err := r.Recovery.RecoverRequest(ctx, job, selected.Filename, key, func(path string) (string, error) {
-		return client.DownloadRestoreRequest(ctx, settings.ScoutID, id, path)
+	result, err := r.Recovery.RecoverRequest(ctx, job, selected.Filename, key, func(downloadCtx context.Context, path string) (string, error) {
+		return client.DownloadRestoreRequest(downloadCtx, settings.ScoutID, id, path)
 	})
 	if err != nil {
 		return nil, err
@@ -154,4 +154,11 @@ func (r *ScoutRunner) DecideRestoreRequest(ctx context.Context, id, decision, re
 		return nil, &recovery.RecoveryError{Message: "files restored, but Station could not record completion; reject the request to dismiss it", StatusCode: 502}
 	}
 	return result, nil
+}
+
+func (r *ScoutRunner) RecoveryProgress() recovery.Progress {
+	r.mu.Lock()
+	service := r.Recovery
+	r.mu.Unlock()
+	return service.Progress()
 }

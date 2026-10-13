@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/3to1go/shared/integrations"
+	"github.com/3to1go/shared/protocol"
 	"github.com/3to1go/station/internal/store"
 )
 
@@ -153,13 +155,13 @@ func TestStartUpload_FindDuplicateError(t *testing.T) {
 	}
 }
 
-func TestStartUpload_UploadTooLarge(t *testing.T) {
+func TestStartUpload_OversizedRequiresApproval(t *testing.T) {
 	svc := newServiceWithIndex(t, &mockIndex{})
 	svc.settings.MaxUploadSizeMB = 1
 
 	req := UploadInitRequest{
 		JobName: "job", Fingerprint: "fp", Timestamp: "2024-01-01T00:00:00Z",
-		ArchiveSizeBytes: 10 * 1024 * 1024, // 10MB > 1MB limit
+		ArchiveSizeBytes: 10 * 1024 * 1024, // 10MB > 1MB threshold
 		ArchiveSHA256:    "sha", IdempotencyKey: "key-large",
 	}
 	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
@@ -168,7 +170,59 @@ func TestStartUpload_UploadTooLarge(t *testing.T) {
 	}
 	he, ok := err.(*HTTPError)
 	if !ok || he.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("expected 413, got %v", err)
+		t.Fatalf("expected 413, got %v", err)
+	}
+	detail, ok := he.Message.(map[string]any)
+	if !ok || detail["status"] != protocol.StatusUploadApprovalRequired || detail["archive_size_bytes"] != req.ArchiveSizeBytes || detail["max_upload_size_bytes"] != int64(1024*1024) {
+		t.Fatalf("wrong approval details: %+v", he.Message)
+	}
+	if message, ok := detail["message"].(string); !ok || !strings.Contains(message, "approval required") || !strings.Contains(message, "10.0 MB") || !strings.Contains(message, "1 MB") {
+		t.Fatalf("missing actionable size warning: %+v", detail)
+	}
+	if svc.reservedBytes() != 0 {
+		t.Fatal("held archive reserved Station storage")
+	}
+}
+
+func TestStartUpload_ApprovedOversizedArchiveCompletes(t *testing.T) {
+	svc := newServiceWithIndex(t, &mockIndex{})
+	svc.settings.MaxUploadSizeMB = 1
+	data := bytes.Repeat([]byte("x"), 2*1024*1024)
+	req := UploadInitRequest{
+		ScoutID: "scout", ScoutInstanceID: "instance", JobName: "job",
+		Fingerprint: "abcdef12", Timestamp: "2024-01-01T00:00:00Z", ArchiveFormat: "tar.zst",
+		ArchiveSizeBytes: int64(len(data)), ArchiveSHA256: computeSHA256(data), IdempotencyKey: "approved",
+		AllowOversized: true,
+	}
+	resp, err := svc.StartUpload(context.Background(), req, nil, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AppendChunk(context.Background(), resp.UploadID, 0, bytes.NewReader(data)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.FinalizeUpload(context.Background(), resp.UploadID)
+	if err != nil || result.Status != "ok" {
+		t.Fatalf("finalize approved archive: %+v, %v", result, err)
+	}
+	// A new oversized archive must ask again.
+	req.AllowOversized = false
+	req.IdempotencyKey = "next-archive"
+	req.ArchiveSHA256 = "different"
+	if _, err := svc.StartUpload(context.Background(), req, nil, nil, false); err == nil {
+		t.Fatal("approval applied to a new archive")
+	}
+}
+
+func TestStartUpload_ApprovalStillChecksCapacity(t *testing.T) {
+	svc := newServiceWithIndex(t, &mockIndex{})
+	req := UploadInitRequest{
+		JobName: "job", Fingerprint: "abcdef12", Timestamp: "2024-01-01T00:00:00Z",
+		ArchiveSizeBytes: 1 << 62, ArchiveSHA256: "sha", IdempotencyKey: "approved-too-large", AllowOversized: true,
+	}
+	_, err := svc.StartUpload(context.Background(), req, nil, nil, false)
+	if he, ok := err.(*HTTPError); !ok || he.Code != http.StatusInsufficientStorage {
+		t.Fatalf("expected storage rejection, got %v", err)
 	}
 }
 

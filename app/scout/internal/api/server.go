@@ -8,6 +8,8 @@ import (
 
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/services/directories"
+	"github.com/3to1go/scout/internal/services/recovery"
+	"github.com/3to1go/scout/internal/services/state"
 	"github.com/3to1go/scout/internal/store"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
@@ -34,6 +36,8 @@ type userStorer interface {
 type scoutRunner interface {
 	CurrentSettings() *config.Settings
 	UpdateSettings(s *config.Settings) error
+	LargeUploadApprovals(context.Context) ([]state.UploadApproval, error)
+	RemoveLargeUploadApproval(context.Context, string) error
 	EncryptionKeyFingerprint() string
 	EncryptionKeyBase64() string
 	RotateEncryptionKey() (string, error)
@@ -62,6 +66,7 @@ type scoutRunner interface {
 	StartForceSendAsync(relativePath string) (map[string]any, error)
 	PreviewRecovery(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
 	RecoverJob(ctx context.Context, relativePath, fingerprint string) (map[string]any, error)
+	RecoveryProgress() recovery.Progress
 	restoreRunner
 }
 
@@ -158,6 +163,7 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/directories/exclude", a.handleExcludePath)
 
 	// Recovery
+	r.Get("/api/recovery/progress", a.handleRecoveryProgress)
 	r.Post("/api/recovery/preview", a.handleRecoveryPreview)
 	r.Post("/api/recovery/restore", a.handleRecoveryRestore)
 
@@ -169,6 +175,8 @@ func (a *App) Handler() http.Handler {
 	// Settings
 	r.Get("/api/settings", a.handleGetSettings)
 	r.Post("/api/settings", a.handleSaveSettings)
+	r.Get("/api/upload-approvals", a.handleLargeUploadApprovals)
+	r.Delete("/api/upload-approvals/{approval_id}", httpx.WithPathValues(a.handleRemoveLargeUploadApproval, "approval_id"))
 
 	// Integrations
 	integrations.Register(r, a.integrations, "scout")

@@ -171,3 +171,16 @@
   padding-left: 26px;
   border-top: 1px solid var(--line-soft);
 }
+
+.job-activity.active .restore-indeterminate span {
+  animation: restore-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes restore-progress-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(290%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-activity.active .restore-indeterminate span { animation: none; }
+}

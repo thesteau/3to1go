@@ -76,11 +76,17 @@ async function deleteByPath(relativePath: string): Promise<void> {
 
 async function forceUpload(relativePath: string, jobName: string, btn: HTMLButtonElement): Promise<void> {
   const label = jobName || "this job";
+  const held = btn.dataset?.heldForReview === "true";
+  const sizeApproval = held && btn.dataset?.sizeApproval === "true";
+  const action = held ? "Upload anyway" : "Force Upload";
   if (
+    !sizeApproval &&
     !(await confirmApp({
-      title: "Force Upload",
-      message: `Upload ${label} even if unchanged? Station skips it if it's a duplicate.`,
-      confirmLabel: "Force Upload",
+      title: action,
+      message: held
+        ? `${btn.dataset.reviewReason || "This backup needs review."}\n\nUpload the staged backup for ${label}?`
+        : `Upload ${label} even if unchanged? Station skips it if it's a duplicate.`,
+      confirmLabel: action,
     }))
   ) {
     return;
@@ -105,12 +111,7 @@ async function forceUpload(relativePath: string, jobName: string, btn: HTMLButto
       setActionStatus("A backup or recovery operation is already running on this Scout.", "error");
       return;
     }
-    setActionStatus(
-      body.manual_retry_cleared
-        ? `Force upload queued for ${label}. A manual block was cleared first.`
-        : `Force upload queued for ${label}.`,
-      "success",
-    );
+    setActionStatus(`Upload queued for ${label}.`, "success");
   } catch (error) {
     setActionStatus((error as Error).message || `Force upload failed for ${label}.`, "error");
   } finally {

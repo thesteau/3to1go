@@ -134,6 +134,7 @@ func (a *App) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RelativePath string `json:"relative_path" validate:"required"`
 		Fingerprint  string `json:"fingerprint"`
+		OperationID  string `json:"operation_id" validate:"max=64"`
 	}
 	if err := httpx.ReadJSON(r, &body); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
@@ -143,7 +144,7 @@ func (a *App) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid recovery request")
 		return
 	}
-	result, err := a.runner.RecoverJob(r.Context(), body.RelativePath, body.Fingerprint)
+	result, err := a.runner.RecoverJob(recovery.WithOperationID(r.Context(), body.OperationID), body.RelativePath, body.Fingerprint)
 	if err != nil {
 		re, ok := err.(*recovery.RecoveryError)
 		if ok {
@@ -154,4 +155,16 @@ func (a *App) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, result)
+}
+
+func (a *App) handleRecoveryProgress(w http.ResponseWriter, r *http.Request) {
+	if requireAdmin(w, r) == nil {
+		return
+	}
+	progress := a.runner.RecoveryProgress()
+	if id := r.URL.Query().Get("operation_id"); id != "" && id != progress.OperationID {
+		progress = recovery.Progress{Status: "idle"}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteJSON(w, http.StatusOK, progress)
 }

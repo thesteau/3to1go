@@ -11,6 +11,7 @@ interface RecoverPreviewFilter {
 }
 
 let _recoverContext: RecoverContext | null = null;
+let _recoverBusy = false;
 
 function resetRecoverPreview(): void {
   if (_recoverContext) {
@@ -22,6 +23,8 @@ function resetRecoverPreview(): void {
     preview.hidden = true;
     preview.innerHTML = "";
   }
+  const progress = document.getElementById("recover-progress");
+  if (progress) progress.hidden = true;
   const btn = document.getElementById("recover-confirm-btn");
   if (btn) {
     btn.textContent = "Preview Restore";
@@ -151,6 +154,7 @@ function renderRecoverPreviewList(entries: RecoveryPreviewEntry[], { query, acti
 }
 
 function openRecoverDialog(relativePath: string, jobName: string): void {
+  if (_recoverBusy) return;
   _recoverContext = { relativePath, jobName, preview: null, previewFingerprint: null };
   document.getElementById("recover-dialog-job-name")!.textContent = jobName || relativePath;
   (document.getElementById("recover-fingerprint") as HTMLInputElement).value = "";
@@ -166,13 +170,19 @@ function openRecoverDialogFromEvent(event: Event, relativePath: string, jobName:
 }
 
 async function confirmRecover(): Promise<void> {
-  if (!_recoverContext) return;
+  if (!_recoverContext || _recoverBusy) return;
   const { relativePath, jobName } = _recoverContext;
   const label = jobName || relativePath;
-  const fingerprint = (document.getElementById("recover-fingerprint") as HTMLInputElement).value.trim();
+  const fingerprintInput = document.getElementById("recover-fingerprint") as HTMLInputElement;
+  const fingerprint = fingerprintInput.value.trim();
   const btn = document.getElementById("recover-confirm-btn") as HTMLButtonElement | null;
   const previewFingerprint = _recoverContext.preview?.snapshot_fingerprint || fingerprint;
 
+  let progress: ReturnType<typeof startRestoreProgress> | null = null;
+  let restored = false;
+  let restoredFiles = 0;
+  _recoverBusy = true;
+  fingerprintInput.disabled = true;
   if (btn) btn.disabled = true;
   try {
     if (!_recoverContext.preview || _recoverContext.previewFingerprint !== fingerprint) {
@@ -205,10 +215,15 @@ async function confirmRecover(): Promise<void> {
     }
 
     setStatus("recover-status", "Restoring...", "info");
+    progress = startRestoreProgress("recover-progress");
     const response = await fetch("/api/recovery/restore", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ relative_path: relativePath, fingerprint: previewFingerprint }),
+      body: JSON.stringify({
+        relative_path: relativePath,
+        fingerprint: previewFingerprint,
+        operation_id: progress.operationID,
+      }),
     });
     const body: RecoveryResponse = await response.json();
     if (!response.ok) {
@@ -221,18 +236,22 @@ async function confirmRecover(): Promise<void> {
       setActionStatus("A backup or recovery operation is already running on this Scout.", "error");
       return;
     }
-    const restoredFiles = Number(body.restored_files || 0);
+    restoredFiles = Number(body.restored_files || 0);
+    restored = true;
     const snapshotName = body.snapshot_filename || "snapshot";
     closeDialog("recover-dialog");
     setActionStatus(
       `Restored ${label} from ${snapshotName} — ${restoredFiles} file${restoredFiles === 1 ? "" : "s"} replaced.`,
       "success",
     );
-    await loadData({ silent: true });
+    await loadData({ silent: true, includeKey: false, refreshDirectoryTree: true });
   } catch (error) {
     setStatus("recover-status", (error as Error).message || `Restore failed for ${label}.`, "error");
     setActionStatus((error as Error).message || `Restore failed for ${label}.`, "error");
   } finally {
+    progress?.finish(restored, restored ? restoredFiles : undefined);
+    _recoverBusy = false;
+    fingerprintInput.disabled = false;
     if (btn) btn.disabled = false;
   }
 }

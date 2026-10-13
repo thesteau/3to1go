@@ -36,6 +36,16 @@
       <option value="off">Off</option>
     </select>
 
+    <button type="button" class="toggle-btn" id="settings_auto_approve_large_uploads" role="switch" aria-checked="true" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">Remember large upload approvals</span>
+    </button>
+    <details class="settings-advanced">
+      <summary>Approved jobs</summary>
+      <p class="hint">Remove a job to ask again on its next large backup.</p>
+      <div id="large-upload-approvals" class="integration-table-wrap" aria-live="polite"></div>
+    </details>
+
     <label for="settings_scout_id">Scout ID</label>
     <input id="settings_scout_id" placeholder="scout-01" data-requires="settings" disabled>
 

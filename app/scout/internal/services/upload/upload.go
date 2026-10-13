@@ -19,6 +19,7 @@ import (
 	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/encryption"
 	"github.com/3to1go/scout/internal/identity"
+	"github.com/3to1go/scout/internal/transfer"
 	"github.com/3to1go/shared/certificates"
 	"github.com/3to1go/shared/protocol"
 )
@@ -218,6 +219,7 @@ func (c *UploadClient) UploadArchive(
 	archiveSHA256 string,
 	uploadOffset int64,
 	preferredChunkSize int64,
+	allowOversized bool,
 	progress ProgressCallback,
 ) (*UploadResult, error) {
 	fi, err := os.Stat(archivePath)
@@ -236,7 +238,7 @@ func (c *UploadClient) UploadArchive(
 	idempotencyKey := buildIdempotencyKey(scoutID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256)
 
 	initiate := func() (map[string]any, error) {
-		return c.initiateSession(ctx, scoutID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256, idempotencyKey)
+		return c.initiateSession(ctx, scoutID, jobName, fingerprint, timestamp, archiveSize, archiveSHA256, idempotencyKey, allowOversized)
 	}
 	sessionInfo, err := c.retryPhaseContext(ctx, "initiate", initiate)
 	if err != nil {
@@ -398,7 +400,7 @@ func (c *UploadClient) downloadSnapshot(ctx context.Context, path, destPath stri
 	if err != nil {
 		return "", err
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	if _, err := io.Copy(f, transfer.Observe(ctx, resp.Body, resp.ContentLength)); err != nil {
 		_ = f.Close()
 		return "", err
 	}
@@ -437,7 +439,7 @@ func (c *UploadClient) retryPhaseContext(ctx context.Context, phase string, op f
 	}
 }
 
-func (c *UploadClient) initiateSession(ctx context.Context, scoutID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum, idempotencyKey string) (map[string]any, error) {
+func (c *UploadClient) initiateSession(ctx context.Context, scoutID, jobName, fingerprint, timestamp string, archiveSize int64, sha256sum, idempotencyKey string, allowOversized bool) (map[string]any, error) {
 	keyFingerprint := c.encryptionKeyFingerprint
 	advertisedURL := c.advertisedURL
 	body := protocol.UploadInitRequest{
@@ -445,6 +447,7 @@ func (c *UploadClient) initiateSession(ctx context.Context, scoutID, jobName, fi
 		Fingerprint: fingerprint, Timestamp: timestamp,
 		ArchiveFormat: protocol.ArchiveFormatTarZst, ArchiveSizeBytes: archiveSize,
 		ArchiveSHA256: sha256sum, IdempotencyKey: idempotencyKey,
+		AllowOversized:           allowOversized,
 		EncryptionKeyFingerprint: &keyFingerprint, AdvertisedURL: &advertisedURL,
 	}
 	return c.jsonPost(ctx, protocol.UploadInitiatePath, body, "initiate",
@@ -587,6 +590,8 @@ func buildUploadFailure(resp *http.Response, phase string) *UploadFailure {
 	}
 
 	switch {
+	case sc == 413 && detailStatus == protocol.StatusUploadApprovalRequired:
+		uf.Category, uf.Retryable = protocol.StatusUploadApprovalRequired, false
 	case sc == 409 && detailStatus == protocol.StatusChecksumMismatch:
 		uf.Category, uf.Retryable = "integrity", true
 	case sc == 409 && detailStatus == protocol.StatusOffsetMismatch:

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/3to1go/scout/internal/cancelio"
+	"github.com/3to1go/scout/internal/transfer"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/klauspost/compress/zstd"
 )
@@ -220,6 +221,13 @@ func ListArchiveEntries(archivePath, targetRoot string) (map[string]any, error) 
 
 // ExtractArchive streams the zstd+tar archive and writes files to targetRoot.
 func ExtractArchive(archivePath, targetRoot string) (int, error) {
+	return ExtractArchiveContext(context.Background(), archivePath, targetRoot, nil)
+}
+
+func ExtractArchiveContext(ctx context.Context, archivePath, targetRoot string, onFile func(int)) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	absTarget, err := filepath.Abs(targetRoot)
 	if err != nil {
 		return 0, err
@@ -238,7 +246,9 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 	defer dec.Close()
 
 	extractedCount := 0
-	tr := tar.NewReader(dec)
+	observed := transfer.Observe(ctx, dec, 0)
+	defer observed.Flush()
+	tr := tar.NewReader(observed)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -271,6 +281,9 @@ func ExtractArchive(archivePath, targetRoot string) (int, error) {
 			return extractedCount, err
 		}
 		extractedCount++
+		if onFile != nil {
+			onFile(extractedCount)
+		}
 	}
 	return extractedCount, nil
 }

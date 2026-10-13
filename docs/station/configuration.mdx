@@ -64,7 +64,7 @@ Configure HTTP notifications separately in **Integrations**. Destinations and th
 | Pause incoming uploads | off | Reject new upload sessions. Uploads already in progress can continue. |
 | Keep Last Snapshots | `3` | How many snapshots to keep per job and Scout instance. Older ones are pruned after each upload. |
 | Log Level | `INFO` | Container log verbosity. |
-| Max Upload (MB) | `2048` | Largest archive Station will accept. |
+| Upload Approval Above (MB) | `2048` | Archives above this size need approval in Scout. Applies to the compressed, encrypted archive, not individual source files. |
 | Chunk Size (MB) | `8` | Chunk size Station asks Scouts to use. |
 | Upload Expiry (hours) | `24` | Upload session lifetime, refreshed as upload activity continues. Expired sessions are removed by cleanup. |
 | Cleanup Interval (s) | `300` | How often expired upload sessions are cleaned up. Minimum `10`. |
@@ -76,5 +76,5 @@ Configure HTTP notifications separately in **Integrations**. Destinations and th
 Restart Station after changing **Log Level** or **Integrity Check (hours)** so the running logger or verification schedule uses the new value.
 
 <Note>
-  Raise **Max Upload (MB)** if a job's archive is larger than 2 GB. Otherwise Station rejects its upload.
+  Backups above the default 2 GB threshold wait in Scout. Click **Approve & Upload** once per job; Scout remembers the approval by default. Manage approvals in **Edit Scout Settings**. See [Oversized backups](/scout/unusual-backups#oversized-backups).
 </Note>

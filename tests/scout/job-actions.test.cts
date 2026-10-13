@@ -32,7 +32,7 @@ test("clear staged backup and cancellation use separate endpoints and report err
   assert.match(messages.at(-1)[0], /^Stopping\./);
 });
 
-test("a held backup offers Upload anyway with its reasons, other jobs keep Force Upload", () => {
+test("size holds offer Approve & Upload, unusual backups offer Upload anyway, other jobs keep Force Upload", () => {
   const jobs = { innerHTML: "" };
   const count = { innerHTML: "" };
   const ctx = vm.createContext({
@@ -57,15 +57,79 @@ test("a held backup offers Upload anyway with its reasons, other jobs keep Force
           "The archive barely compresses (100% of the original size, usually 41%), which is typical of encrypted files.",
       },
     },
+    {
+      relative_path: "large",
+      selected: true,
+      config: { job_name: "large" },
+      state: {
+        last_status: "held_for_review",
+        last_error_category: "upload_approval_required",
+        last_error_detail: "Backup is 3072 MB; approval required above 2048 MB.",
+      },
+    },
     { relative_path: "photos", selected: true, config: { job_name: "photos" }, state: { last_status: "success" } },
   ]);
-  const [held, normal] = jobs.innerHTML.split('class="job-card"').slice(1);
+  const [held, oversized, normal] = jobs.innerHTML.split('class="job-card"').slice(1);
   assert.match(held, />Upload anyway<\/button>/);
   assert.match(held, /Last state: held for review/);
   assert.match(held, /state-error/);
   assert.match(held, /typical of encrypted files/);
+  assert.match(oversized, />Approve &amp; Upload<\/button>/);
+  assert.match(oversized, /3072 MB/);
+  assert.match(oversized, /data-held-for-review="true"/);
+  assert.match(oversized, /Approve once for this job/);
   assert.match(normal, />Force Upload<\/button>/);
   assert.doesNotMatch(normal, /Upload anyway/);
+});
+
+test("size approval uploads in one click while unusual backups still need confirmation", async () => {
+  const confirmations = [];
+  const calls = [];
+  const messages = [];
+  let approve = false;
+  const ctx = vm.createContext({
+    latestData: { settings: { auto_approve_large_uploads: false } },
+    confirmApp: async (options) => {
+      confirmations.push(options);
+      return approve;
+    },
+    fetch: async (url, options) => {
+      calls.push([url, JSON.parse(options.body)]);
+      return { ok: true, json: async () => ({ status: "queued", manual_retry_cleared: true }) };
+    },
+    requestScoutActiveRefreshBurst() {},
+    window: { setTimeout() {} },
+    setActionStatus: (...args) => messages.push(args),
+  });
+  loadFeature(ctx, "scout", "jobs");
+  const btn = {
+    disabled: false,
+    dataset: {
+      heldForReview: "true",
+      sizeApproval: "true",
+      reviewReason: "Backup is 3072 MB; approval required above 2048 MB.",
+    },
+  };
+  await ctx.forceUpload("large", "large", btn);
+  assert.equal(calls.length, 1);
+  assert.equal(confirmations.length, 0);
+  ctx.latestData.settings.auto_approve_large_uploads = true;
+  await ctx.forceUpload("large", "large", btn);
+  assert.equal(calls.length, 2);
+  assert.equal(confirmations.length, 0);
+  assert.equal(messages.at(-1)[0], "Upload queued for large.");
+  calls.length = 0;
+  btn.dataset.sizeApproval = "false";
+  btn.dataset.reviewReason = "Unexpected change in file types.";
+  await ctx.forceUpload("large", "large", btn);
+  assert.equal(calls.length, 0);
+  assert.equal(confirmations[0].title, "Upload anyway");
+  assert.match(confirmations[0].message, /Unexpected change in file types/);
+  approve = true;
+  await ctx.forceUpload("large", "large", btn);
+  assert.deepEqual(calls, [["/api/directories/force-send", { relative_path: "large" }]]);
+  assert.equal(messages.at(-1)[0], "Upload queued for large.");
+  assert.equal(btn.disabled, false);
 });
 
 test("the job list says Scout is still looking until the first search finishes", () => {

@@ -70,6 +70,16 @@ Choose **Unusual backups** in **Edit Scout Settings**, or set `ANOMALY_MODE` in 
 | Alert only | `alert` | Uploads as normal and alerts |
 | Off | `off` | No checks. History is still recorded, so turning it back on works right away. |
 
-**Force Upload** always uploads without checking, since it's an explicit request.
+**Force Upload** skips Scout's unusual-backup checks, since it's an explicit request.
+
+## Oversized backups
+
+Station's **Upload Approval Above (MB)** setting defaults to `2048`. If a compressed, encrypted archive exceeds it, Scout keeps that backup staged and shows **held for review** with the archive size and threshold. This size check applies in every unusual-backup mode, including **Off**.
+
+Click **Approve & Upload** to send it, or **Clear staged backup** to discard it. **Remember large upload approvals** is on by default in Scout settings: approve once per job, then future large backups upload automatically. Turn it off to approve each new archive. Unusual-backup and free-space checks still apply.
+
+Under **Approved jobs**, click **Remove** to make a job ask again. Removal is immediate and also clears approval for its staged archive. Wait for active backup or recovery work to finish first.
+
+Approvals survive restarts and belong to the job's folder, name, Scout ID, and Station URL. Changing those requires approval again. Turning the setting off keeps remembered entries; a staged archive's own approval still survives retries.
 
 Station runs its own, simpler check on archive sizes as a second line of defense. See [Unusual sizes](/station/snapshots#unusual-sizes).
