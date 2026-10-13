@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/thesteau/3to1go/compare/v1.4.3...v1.5.0) (2026-10-13)
+
+
+### Features
+
+* Add large upload approval ([#130](https://github.com/thesteau/3to1go/issues/130)) ([44724ec](https://github.com/thesteau/3to1go/commit/44724ec869ebd17878ce28263362d5a1b80824d5))
+
+
+### Bug Fixes
+
+* restoration bug ([#132](https://github.com/thesteau/3to1go/issues/132)) ([8af7c9e](https://github.com/thesteau/3to1go/commit/8af7c9ee5e360f2a70cd83217c7cc8f3e2682745))
+
 ## [1.4.3](https://github.com/thesteau/3to1go/compare/v1.4.2...v1.4.3) (2026-10-13)
 
 
