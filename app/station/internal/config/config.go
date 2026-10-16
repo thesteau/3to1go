@@ -37,6 +37,7 @@ type Settings struct {
 	HTTPPort                    int
 	SnapshotVerifyIntervalHours int
 	UploadsPaused               bool
+	MetricsEnabled              bool
 	AnomalyMode                 string
 }
 
@@ -113,6 +114,7 @@ type SettingsPayload struct {
 	HookPostCommand             string `json:"hook_post_command"`
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
 	UploadsPaused               bool   `json:"uploads_paused"`
+	MetricsEnabled              bool   `json:"metrics_enabled"`
 	AnomalyMode                 string `json:"anomaly_mode"`
 }
 
@@ -129,6 +131,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HookPostCommand:             s.HookPostCommand,
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
 		UploadsPaused:               s.UploadsPaused,
+		MetricsEnabled:              s.MetricsEnabled,
 		AnomalyMode:                 s.AnomalyMode,
 	}
 }
@@ -185,10 +188,12 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	}
 
 	uploadsPaused := false
+	metricsEnabled := false
 	// Station can only alert: an archive has already left Scout when it arrives.
 	anomalyMode := anomaly.ModeAlert
 	if p != nil {
 		uploadsPaused = p.UploadsPaused
+		metricsEnabled = p.MetricsEnabled
 		if strings.EqualFold(strings.TrimSpace(p.AnomalyMode), anomaly.ModeOff) {
 			anomalyMode = anomaly.ModeOff
 		}
@@ -216,6 +221,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPPort:                    port,
 		SnapshotVerifyIntervalHours: verifyIntervalHours,
 		UploadsPaused:               uploadsPaused,
+		MetricsEnabled:              metricsEnabled,
 		AnomalyMode:                 anomalyMode,
 	}, nil
 }

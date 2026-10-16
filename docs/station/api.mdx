@@ -101,6 +101,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 |---|---|---|---|
 | `GET` | `/health` | Public | Checks storage and returns storage and upload approval threshold information. Can return `503`. |
 | `GET` | `/health/ready` | Public | Checks storage and the staging directory; returns `{"status":"ok"}` or `503`. |
+| `GET` | `/metrics` | Public when enabled | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
 | `GET` | `/api/overview` | Session | Returns storage information and Scouts with instances, jobs, and snapshots. Settings are included for admin accounts only. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns normalized `settings`. |
 | `POST` | `/api/admin/uploads/pause` | Admin | No body; pauses acceptance of new uploads. |
