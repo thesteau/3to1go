@@ -25,6 +25,7 @@ function fillSettings(settings: StationSettings | null | undefined): void {
     data.snapshot_verify_interval_hours ?? 0,
   );
   setToggle("settings_uploads_paused", data.uploads_paused || false);
+  setToggle("settings_metrics_enabled", data.metrics_enabled ?? false);
   (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "alert";
 }
 
@@ -49,6 +50,7 @@ function collectSettingsPayload(overrides: Partial<StationSettings> = {}): Stati
       (document.getElementById("settings_snapshot_verify_interval_hours") as HTMLInputElement).value || 0,
     ),
     uploads_paused: getToggle("settings_uploads_paused"),
+    metrics_enabled: getToggle("settings_metrics_enabled"),
     anomaly_mode: (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value,
     hook_pre_command: window.__stationSettings?.hook_pre_command || "",
     hook_post_command: window.__stationSettings?.hook_post_command || "",

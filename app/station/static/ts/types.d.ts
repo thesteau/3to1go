@@ -10,6 +10,7 @@ interface StationSettings {
   upload_cleanup_interval_seconds?: number;
   snapshot_verify_interval_hours?: number;
   uploads_paused?: boolean;
+  metrics_enabled?: boolean;
   anomaly_mode?: string;
   hook_pre_command?: string;
   hook_post_command?: string;
