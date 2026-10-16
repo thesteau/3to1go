@@ -1,8 +1,8 @@
 {
-  "version": "1.5.0",
-  "tag": "v1.5.0",
-  "prodSha": "8af7c9ee5e360f2a70cd83217c7cc8f3e2682745",
-  "previousTag": "v1.4.3",
-  "previousSha": "c3ec2f4d47f08bc5995681a3b5e1bc3ac68c067c",
-  "notes": "## [1.5.0](https://github.com/thesteau/3to1go/compare/v1.4.3...v1.5.0) (2026-10-13)\n\n\n### Features\n\n* Add large upload approval ([#130](https://github.com/thesteau/3to1go/issues/130)) ([44724ec](https://github.com/thesteau/3to1go/commit/44724ec869ebd17878ce28263362d5a1b80824d5))\n\n\n### Bug Fixes\n\n* restoration bug ([#132](https://github.com/thesteau/3to1go/issues/132)) ([8af7c9e](https://github.com/thesteau/3to1go/commit/8af7c9ee5e360f2a70cd83217c7cc8f3e2682745))"
+  "version": "1.6.0",
+  "tag": "v1.6.0",
+  "prodSha": "ef44decad17ce6db76890f2177820239500a5525",
+  "previousTag": "v1.5.0",
+  "previousSha": "8af7c9ee5e360f2a70cd83217c7cc8f3e2682745",
+  "notes": "## [1.6.0](https://github.com/thesteau/3to1go/compare/v1.5.0...v1.6.0) (2026-10-16)\n\n\n### Features\n\n* Add prometheus/grafana integration ([#136](https://github.com/thesteau/3to1go/issues/136)) ([ef44dec](https://github.com/thesteau/3to1go/commit/ef44decad17ce6db76890f2177820239500a5525))"
 }

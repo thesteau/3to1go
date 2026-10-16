@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/thesteau/3to1go/compare/v1.5.0...v1.6.0) (2026-10-16)
+
+
+### Features
+
+* Add prometheus/grafana integration ([#136](https://github.com/thesteau/3to1go/issues/136)) ([ef44dec](https://github.com/thesteau/3to1go/commit/ef44decad17ce6db76890f2177820239500a5525))
+
 ## [1.5.0](https://github.com/thesteau/3to1go/compare/v1.4.3...v1.5.0) (2026-10-13)
 
 
