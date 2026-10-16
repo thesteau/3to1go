@@ -15,6 +15,7 @@ import (
 	"github.com/3to1go/shared/hooks"
 	"github.com/3to1go/shared/httpx"
 	"github.com/3to1go/shared/integrations"
+	"github.com/3to1go/shared/metrics"
 	"github.com/3to1go/station/internal/config"
 	"github.com/3to1go/station/internal/ingest"
 	"github.com/3to1go/station/internal/services/verify"
@@ -209,6 +210,9 @@ func (a *App) Handler() http.Handler {
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
 	r.Get("/health/ready", a.handleHealthReady)
+	r.Handle("/metrics", metrics.NewHandler("station", func() bool {
+		return a.Settings().MetricsEnabled
+	}, a.collectMetrics))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
@@ -285,12 +289,20 @@ func (a *App) Handler() http.Handler {
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
 	return httpx.RequestLogger(a.logger, func(path string) bool {
-		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready"
+		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" || path == "/metrics"
 	}, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
-	return a.accountHandler().Middleware(next, isPublicPath)
+	sessions := a.accountHandler().Middleware(next, isPublicPath)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Scrapes need no session lookup; the endpoint checks its opt-in setting.
+		if r.URL.Path == "/metrics" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		sessions.ServeHTTP(w, r)
+	})
 }
 
 func isPublicPath(path string) bool {
@@ -299,6 +311,7 @@ func isPublicPath(path string) bool {
 		return true
 	}
 	return path == "/" ||
+		path == "/metrics" ||
 		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/health") ||
 		strings.HasPrefix(path, "/backup/uploads/") ||

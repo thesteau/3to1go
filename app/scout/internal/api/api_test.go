@@ -83,38 +83,41 @@ func (m *mockUserStore) ChangePassword(_ context.Context, _ int, _, _ string) (*
 // ---------------------------------------------------------------------------
 
 type mockRunner struct {
-	settings          *config.Settings
-	updateSettingsHit bool
-	updateSettingsErr error
-	fingerprint       string
-	keyBase64         string
-	statusSnapshot    map[string]any
-	dirSnapshot       map[string]any
-	certSnapshot      map[string]any
-	saveCertResult    any
-	saveCertErr       error
-	deleteCertErr     error
-	hookSnapshot      map[string]any
-	saveHookResult    any
-	saveHookErr       error
-	readHookName      string
-	readHookContent   string
-	readHookErr       error
-	deleteHookErr     error
-	saveJobResult     any
-	saveJobErr        error
-	deleteJobErr      error
-	forceSendResult   map[string]any
-	forceSendErr      error
-	previewResult     map[string]any
-	previewErr        error
-	recoverResult     map[string]any
-	recoverErr        error
-	recoveryProgress  recovery.Progress
-	rotateKeyResult   string
-	rotateKeyErr      error
-	pathActionErr     error
-	pathActionPath    string
+	settings           *config.Settings
+	updateSettingsHit  bool
+	updateSettingsErr  error
+	fingerprint        string
+	keyBase64          string
+	statusSnapshot     map[string]any
+	dirSnapshot        map[string]any
+	certSnapshot       map[string]any
+	saveCertResult     any
+	saveCertErr        error
+	deleteCertErr      error
+	hookSnapshot       map[string]any
+	saveHookResult     any
+	saveHookErr        error
+	readHookName       string
+	readHookContent    string
+	readHookErr        error
+	deleteHookErr      error
+	saveJobResult      any
+	saveJobErr         error
+	deleteJobErr       error
+	forceSendResult    map[string]any
+	forceSendErr       error
+	previewResult      map[string]any
+	previewErr         error
+	recoverResult      map[string]any
+	recoverErr         error
+	recoveryProgress   recovery.Progress
+	rotateKeyResult    string
+	rotateKeyErr       error
+	pathActionErr      error
+	pathActionPath     string
+	metricsJobs        []directories.DirectoryEntry
+	metricsDiscovering bool
+	metricsErr         error
 }
 
 func (m *mockRunner) CertSnapshot() map[string]any { return m.certSnapshot }
@@ -162,7 +165,10 @@ func (m *mockRunner) EncryptionKeyFingerprint() string    { return m.fingerprint
 func (m *mockRunner) EncryptionKeyBase64() string         { return m.keyBase64 }
 func (m *mockRunner) StatusSnapshot() map[string]any      { return m.statusSnapshot }
 func (m *mockRunner) DirectoriesSnapshot() map[string]any { return m.dirSnapshot }
-func (m *mockRunner) DeleteCertFile(_ string) error       { return m.deleteCertErr }
+func (m *mockRunner) MetricsSnapshot() ([]directories.DirectoryEntry, bool, error) {
+	return m.metricsJobs, m.metricsDiscovering, m.metricsErr
+}
+func (m *mockRunner) DeleteCertFile(_ string) error { return m.deleteCertErr }
 func (m *mockRunner) HookSnapshot(_, _ string) map[string]any {
 	return m.hookSnapshot
 }

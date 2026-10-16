@@ -68,6 +68,7 @@ function fillSettings(settings: ScoutSettings | null | undefined): void {
   setToggle("settings_keep_local_pending", data.keep_local_pending ?? true);
   setToggle("settings_auto_approve_large_uploads", data.auto_approve_large_uploads ?? true);
   setToggle("settings_uploads_paused", data.uploads_paused || false);
+  setToggle("settings_metrics_enabled", data.metrics_enabled ?? false);
   (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "hold";
   input("settings_upload_chunk_size_mb").value = String(data.upload_chunk_size_mb ?? 8);
   input("settings_min_upload_chunk_size_mb").value = String(data.min_upload_chunk_size_mb ?? 1);
@@ -101,6 +102,7 @@ function collectSettingsPayload(overrides: Partial<ScoutSettings> = {}): ScoutSe
     keep_local_pending: getToggle("settings_keep_local_pending"),
     auto_approve_large_uploads: getToggle("settings_auto_approve_large_uploads"),
     uploads_paused: getToggle("settings_uploads_paused"),
+    metrics_enabled: getToggle("settings_metrics_enabled"),
     anomaly_mode: value("settings_anomaly_mode"),
     upload_chunk_size_mb: Number(value("settings_upload_chunk_size_mb") || 1),
     min_upload_chunk_size_mb: Number(value("settings_min_upload_chunk_size_mb") || 1),

@@ -1,0 +1,103 @@
+---
+title: "Prometheus metrics"
+description: "Enable metrics in Scout and Station and scrape them with Prometheus for Grafana."
+---
+
+Scout and Station each serve **`GET /metrics`** on their existing HTTP port. Metrics are **off by default**, including on existing installations. Enable each app separately.
+
+## Enable metrics
+
+1. Sign in as an admin.
+2. Open **Edit Scout Settings** or **Edit Station Settings**.
+3. Turn on the **Prometheus metrics** pill and click **Save**.
+
+Changes apply immediately and are saved in the app's settings database. Turn the pill off and save to stop serving metrics. Disabled endpoints return **404**, including to signed-in admins. Collection failures return **503**, so Prometheus records a failed scrape instead of accepting incomplete backup metrics.
+
+The settings API field is `metrics_enabled`. Read the current settings and preserve the other fields when updating it, as described in the [Scout API](/scout/api#change-settings) and [Station API](/station/api#change-settings).
+
+<Note>
+  Enabled metrics do not require a session cookie or Station token. Keep `/metrics` reachable only by your monitoring network, using your firewall or reverse proxy. Labels include relative job paths on Scout, and Scout IDs, instance IDs, and job names on Station. Metrics omit passwords, tokens, keys, absolute folder paths, archive filenames, and error details.
+</Note>
+
+## Configure Prometheus
+
+Add scrape jobs to your existing Prometheus configuration. Replace these example addresses with hostnames reachable from Prometheus. Use `scheme: https` if your targets are served over HTTPS, and configure your internal CA in Prometheus if needed.
+
+```yaml
+scrape_configs:
+  - job_name: 3to1go-station
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["station.example.lan:6555"]
+
+  - job_name: 3to1go-scout
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["scout.example.lan:6556"]
+```
+
+Reload Prometheus and check that both targets are up. You can also check an enabled endpoint directly:
+
+```sh
+curl --fail http://station.example.lan:6555/metrics
+```
+
+Both apps include Go runtime and process metrics, plus `three_to_one_go_build_info` with `app`, `version`, and `commit` labels. Application measurements below are gauges representing current state. Deleted jobs disappear from future scrapes. They are not cumulative event counters.
+
+## Scout metrics
+
+Scout uses its existing job discovery cache. Until the initial search completes, `three_to_one_go_scout_discovering` is `1` and the job list may be incomplete. Job metrics have a `job_path` label relative to the scan root.
+
+| Metric | Meaning |
+|---|---|
+| `three_to_one_go_scout_jobs` | Discovered backup jobs, including invalid configurations. |
+| `three_to_one_go_scout_discovering` | Initial job discovery is still running (`1` or `0`). |
+| `three_to_one_go_scout_uploads_paused` | Scheduled backups are paused (`1` or `0`). Individual Force Upload actions can still run. |
+| `three_to_one_go_scout_cycle_running` | A scheduled or manually requested backup cycle is running (`1` or `0`). |
+| `three_to_one_go_scout_job_config_valid` | The job configuration is valid (`1` or `0`). |
+| `three_to_one_go_scout_job_last_successful_upload_timestamp_seconds` | Unix timestamp of the backup last successfully uploaded; `0` when never uploaded. |
+| `three_to_one_go_scout_job_last_backup_size_bytes` | Last uploaded archive size; `0` when unknown. |
+| `three_to_one_go_scout_job_pending_upload` | An archive is waiting to upload (`1` or `0`). |
+| `three_to_one_go_scout_job_pending_upload_size_bytes` | Pending archive size; `0` when none or unknown. |
+| `three_to_one_go_scout_job_manual_intervention_required` | The job requires operator intervention (`1` or `0`). |
+| `three_to_one_go_scout_job_upload_attempts` | Attempts for the current or most recent archive; resets after successful upload. |
+| `three_to_one_go_scout_job_upload_error` | The job has a recorded upload error (`1` or `0`). |
+
+An unchanged job does not upload a new archive, so the last successful upload timestamp can remain old while Scout is operating normally.
+
+## Station metrics
+
+Per-job metrics have `scout_id`, `scout_instance_id`, and `job_name` labels. The last-seen metric has only the two Scout labels. Archive counts and sizes come from Station's index; scraping does not walk the archive folder.
+
+| Metric | Meaning |
+|---|---|
+| `three_to_one_go_station_storage_healthy` | Snapshot storage is available (`1` or `0`). |
+| `three_to_one_go_station_disk_total_bytes` | Capacity of the filesystem containing the snapshot folder. |
+| `three_to_one_go_station_disk_free_bytes` | Free space on that filesystem. Disk capacity metrics are omitted if the filesystem probe fails. |
+| `three_to_one_go_station_stored_bytes` | Total indexed archive bytes. |
+| `three_to_one_go_station_snapshots` | Total retained snapshots. |
+| `three_to_one_go_station_jobs` | Indexed jobs across all Scout instances. |
+| `three_to_one_go_station_scout_instances` | Registered Scout instances. |
+| `three_to_one_go_station_retention_keep_last` | Configured snapshot count retained per job and instance. |
+| `three_to_one_go_station_uploads_paused` | New upload sessions are paused (`1` or `0`). |
+| `three_to_one_go_station_scout_last_seen_timestamp_seconds` | Last contact from a registered Scout instance, as Unix seconds. |
+| `three_to_one_go_station_job_snapshots` | Retained snapshots for the job and instance. |
+| `three_to_one_go_station_job_stored_bytes` | Indexed archive bytes for the job and instance. |
+| `three_to_one_go_station_job_latest_snapshot_timestamp_seconds` | Modification time of the latest stored archive, as Unix seconds; `0` when none. |
+
+## Grafana queries
+
+Use your existing Prometheus data source in Grafana. A few starting panels:
+
+| Panel | PromQL | Unit |
+|---|---|---|
+| Monitoring target reachable | `up{job=~"3to1go-.*"}` | Boolean |
+| Stored archives | `three_to_one_go_station_stored_bytes` | Bytes |
+| Snapshot disk free | `100 * three_to_one_go_station_disk_free_bytes / three_to_one_go_station_disk_total_bytes` | Percent |
+| Pending uploads | `sum by (instance) (three_to_one_go_scout_job_pending_upload)` | Count |
+| Jobs needing attention | `three_to_one_go_scout_job_manual_intervention_required == 1` | Boolean |
+| Age of last uploaded backup | `time() - three_to_one_go_scout_job_last_successful_upload_timestamp_seconds` | Seconds |
+
+For backup-age panels or alerts, account for the job's schedule, unchanged jobs, and timestamps of `0` indicating no successful upload yet.

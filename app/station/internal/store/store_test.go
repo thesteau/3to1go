@@ -963,7 +963,7 @@ func TestSettingsStore_Load_NotFound(t *testing.T) {
 }
 
 func TestSettingsStore_Load_Found(t *testing.T) {
-	payload := config.SettingsPayload{RetentionKeepLast: 7}
+	payload := config.SettingsPayload{RetentionKeepLast: 7, MetricsEnabled: true}
 	raw, _ := json.Marshal(payload)
 	s := newSettingsStore(&mockPool{queryRowFn: func(ctx context.Context, sql string, args ...any) pgx.Row {
 		return &mockRow{scanFn: func(dest ...any) error {
@@ -972,7 +972,7 @@ func TestSettingsStore_Load_Found(t *testing.T) {
 		}}
 	}})
 	p, err := s.Load(context.Background())
-	if err != nil || p == nil || p.RetentionKeepLast != 7 {
+	if err != nil || p == nil || p.RetentionKeepLast != 7 || !p.MetricsEnabled {
 		t.Errorf("Load: %v, %v", p, err)
 	}
 }

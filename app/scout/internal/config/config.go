@@ -45,6 +45,7 @@ type Settings struct {
 	HTTPHost                          string
 	HTTPPort                          int
 	UploadsPaused                     bool
+	MetricsEnabled                    bool
 	AnomalyMode                       string
 }
 
@@ -181,6 +182,7 @@ type SettingsPayload struct {
 	HTTPHost                          string `json:"http_host"`
 	HTTPPort                          int    `json:"http_port"`
 	UploadsPaused                     bool   `json:"uploads_paused"`
+	MetricsEnabled                    bool   `json:"metrics_enabled"`
 	AnomalyMode                       string `json:"anomaly_mode"`
 }
 
@@ -215,6 +217,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HTTPHost:                          s.HTTPHost,
 		HTTPPort:                          s.HTTPPort,
 		UploadsPaused:                     s.UploadsPaused,
+		MetricsEnabled:                    s.MetricsEnabled,
 		AnomalyMode:                       s.AnomalyMode,
 	}
 }
@@ -279,6 +282,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPHost:                          httpHost,
 		HTTPPort:                          httpPort,
 		UploadsPaused:                     raw.UploadsPaused,
+		MetricsEnabled:                    raw.MetricsEnabled,
 		AnomalyMode:                       coerceAnomalyMode(raw.AnomalyMode),
 	}, nil
 }

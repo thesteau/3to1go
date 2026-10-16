@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/3to1go/scout/internal/config"
+	"github.com/3to1go/scout/internal/services/directories"
 )
 
 // CurrentSettings returns the active settings under the runner lock.
@@ -19,6 +20,14 @@ func (r *ScoutRunner) StatusSnapshot() map[string]any {
 	s := r.Settings
 	r.mu.Unlock()
 	return BuildStatusResponse(s, r.EncryptionKeyFingerprint(), r.UploadClient.CircuitBreaker)
+}
+
+// MetricsSnapshot uses the existing job discovery cache and reads current job state.
+func (r *ScoutRunner) MetricsSnapshot() ([]directories.DirectoryEntry, bool, error) {
+	r.mu.Lock()
+	dirs := r.DirService
+	r.mu.Unlock()
+	return dirs.ListJobsWithState()
 }
 
 // DirectoriesSnapshot returns the /api/directories payload.

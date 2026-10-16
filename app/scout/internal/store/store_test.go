@@ -123,6 +123,7 @@ func TestSettingsStoreRoundTrip(t *testing.T) {
 	payload := &config.SettingsPayload{ScoutID: "scout-1", ScanRoot: "/data", StationURL: "https://station.example", CronSchedule: "*/30 * * * *", UploadChunkSizeMB: 16}
 	for _, name := range []string{"scout-1", "scout-2"} {
 		payload.ScoutID = name
+		payload.MetricsEnabled = name == "scout-1"
 		raw, err := json.Marshal(payload)
 		if err != nil {
 			t.Fatal(err)

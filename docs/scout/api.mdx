@@ -89,6 +89,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
 | `GET` | `/health` | Public | Returns `{"status":"ok"}` while Scout's HTTP server is running. |
+| `GET` | `/metrics` | Public when enabled | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
 | `GET` | `/api/status` | Session | Returns Scout and instance IDs, Scout key fingerprint, upload circuit status, and `scheduler`. Effective `settings` are included for admin accounts only. |
 | `POST` | `/api/run-now` | Session | No body; requests a backup cycle for the configured jobs. Returns `status: "queued"` or `"already_running"`. |
 | `GET` | `/api/settings` | Admin | Returns the current settings under `settings`. |

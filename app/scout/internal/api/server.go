@@ -14,6 +14,7 @@ import (
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
 	"github.com/3to1go/shared/integrations"
+	"github.com/3to1go/shared/metrics"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -44,6 +45,7 @@ type scoutRunner interface {
 
 	StatusSnapshot() map[string]any
 	DirectoriesSnapshot() map[string]any
+	MetricsSnapshot() ([]directories.DirectoryEntry, bool, error)
 
 	CertSnapshot() map[string]any
 	SaveCertFile(filename string, content []byte) (any, error)
@@ -126,6 +128,9 @@ func (a *App) Handler() http.Handler {
 	// SPA root
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
+	r.Handle("/metrics", metrics.NewHandler("scout", func() bool {
+		return a.runner.CurrentSettings().MetricsEnabled
+	}, a.collectMetrics))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
@@ -201,11 +206,21 @@ func (a *App) Handler() http.Handler {
 }
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
-	return httpx.RequestLogger(a.logger, func(path string) bool { return strings.HasPrefix(path, "/static/") || path == "/health" }, next)
+	return httpx.RequestLogger(a.logger, func(path string) bool {
+		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/metrics"
+	}, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
-	return a.accountHandler().Middleware(next, isPublicPath)
+	sessions := a.accountHandler().Middleware(next, isPublicPath)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Scrapes need no session lookup; the endpoint checks its opt-in setting.
+		if r.URL.Path == "/metrics" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		sessions.ServeHTTP(w, r)
+	})
 }
 
 func isPublicPath(path string) bool {
@@ -217,6 +232,7 @@ func isPublicPath(path string) bool {
 		return true
 	}
 	return path == "/" ||
+		path == "/metrics" ||
 		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/health")
 }
