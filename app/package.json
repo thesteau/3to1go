@@ -12,13 +12,13 @@
     "test": "npm run build && cd .. && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-report.cts --test-reporter-destination=stdout \"tests/**/*.test.cts\""
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
     "release-please": "17.11.2",
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "@zip.js/zip.js": "2.23.0",
+    "@zip.js/zip.js": "2.24.0",
     "fzstd": "0.1.1"
   }
 }
