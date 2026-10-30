@@ -3,10 +3,10 @@ module github.com/3to1go/shared
 go 1.26.0
 
 require (
-	github.com/go-chi/chi/v5 v5.4.0
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/prometheus/client_golang v1.25.0
-	github.com/prometheus/common v0.72.0
+	github.com/prometheus/common v0.72.1
 	golang.org/x/crypto v0.58.0
 )
 
