@@ -22,7 +22,7 @@
       </div>
     </div>
     <section id="automation-token-section" class="hook-section admin-only" hidden>
-      <h3>Automation Tokens</h3>
+      <h3>Station Auth Tokens <span class="field-help hover-hint" tabindex="0" aria-label="Not the same as the Station token that Scouts use to upload backups. A Station auth token is for scripts and tools, and can&#39;t upload or recover backups." title="Not the same as the Station token that Scouts use to upload backups. A Station auth token is for scripts and tools, and can&#39;t upload or recover backups.">?</span></h3>
       <p class="hint">For scripts and MCP clients. Tokens belong to your account and are shown once.</p>
       <div class="user-form">
         <input id="automation_token_name" type="text" placeholder="token name" maxlength="100" aria-label="Token name">
@@ -33,30 +33,15 @@
         <label class="checkbox"><input id="automation_scope_backup" type="checkbox"><span>Run backups</span></label>
         <label class="checkbox"><input id="automation_scope_restore" type="checkbox"><span>Restore</span></label>
         <label class="checkbox"><input id="automation_scope_manage" type="checkbox"><span>Manage settings</span></label>
+        <label class="checkbox"><input id="automation_scope_metrics" type="checkbox"><span>Read metrics</span></label>
+        <label class="checkbox"><input id="automation_scope_report" type="checkbox"><span>Read report</span></label>
       </div>
-      <p class="hint">Manage includes all app operations and secrets. Restore can replace files. Sign-in and automation token controls require a browser session.</p>
+      <p class="hint">Manage includes all app operations and secrets. Restore can replace files. Read metrics and Read report allow only <code>/metrics</code> and <code>/report</code>. Sign-in and auth token controls require a browser session.</p>
       <button type="button" onclick="createAutomationToken()">Create Token</button>
       <label for="automation_token_output">New token — copy before closing</label>
       <textarea id="automation_token_output" class="secret-value" readonly spellcheck="false" rows="2"></textarea>
       <div id="automation-token-list"></div>
       <p id="automation-token-status" class="hint" role="status"></p>
-    </section>
-    <section id="monitoring-token-section" class="hook-section admin-only" hidden>
-      <h3>Monitoring Tokens</h3>
-      <p class="hint">For curl, Postman, and Prometheus requests to <code>/metrics</code> and <code>/report</code>. Send one as <code>Authorization: Bearer &lt;token&gt;</code>. Tokens are shown once.</p>
-      <div class="user-form">
-        <input id="monitoring_token_name" type="text" placeholder="token name" maxlength="100" aria-label="Token name">
-        <input id="monitoring_token_days" type="number" value="90" min="1" max="3650" aria-label="Expires in days">
-      </div>
-      <div class="toolbar">
-        <label class="checkbox"><input id="monitoring_scope_metrics" type="checkbox" checked><span>Metrics</span></label>
-        <label class="checkbox"><input id="monitoring_scope_report" type="checkbox" checked><span>Report</span></label>
-      </div>
-      <button type="button" onclick="createMonitoringToken()">Create Token</button>
-      <label for="monitoring_token_output">New token — copy before closing</label>
-      <textarea id="monitoring_token_output" class="secret-value" readonly spellcheck="false" rows="2"></textarea>
-      <div id="monitoring-token-list"></div>
-      <p id="monitoring-token-status" class="hint" role="status"></p>
     </section>
     <div class="toolbar">
       <button type="button" class="secondary" onclick="openPasswordDialog(false)">Change My Password</button>

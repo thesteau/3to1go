@@ -7,14 +7,11 @@ interface UserUpdatePayload {
 async function openUserManagementDialog(): Promise<void> {
   clearStatus("users-status");
   openDialog("users-dialog");
-  for (const panel of [automationTokenPanel, monitoringTokenPanel]) {
-    const output = document.getElementById(`${panel.prefix}_token_output`) as HTMLTextAreaElement | null;
-    if (output) output.value = "";
-    clearStatus(`${panel.prefix}-token-status`);
-  }
+  const output = document.getElementById("automation_token_output") as HTMLTextAreaElement | null;
+  if (output) output.value = "";
+  clearStatus("automation-token-status");
   await loadUsers();
   await loadAutomationTokens();
-  await loadMonitoringTokens();
 }
 
 async function loadUsers(): Promise<void> {
@@ -167,153 +164,91 @@ async function deleteUser(userId: number): Promise<void> {
   if (response.ok) await loadUsers();
 }
 
-interface IssuedTokenInfo {
+interface AutomationTokenInfo {
   id: string;
   name: string;
-  scopes?: string[];
-  routes?: string[];
+  scopes: string[];
   created_at: string;
   expires_at: string;
 }
 
-// Automation and monitoring tokens share one flow. An app without a panel's section skips it.
-interface TokenPanel {
-  prefix: string;
-  label: string;
-  title: string;
-  endpoint: string;
-  field: "scopes" | "routes";
-  options: string[];
-  revokeHandler: string;
-}
-
-const automationTokenPanel: TokenPanel = {
-  prefix: "automation",
-  label: "automation token",
-  title: "Automation Token",
-  endpoint: "/api/automation-tokens",
-  field: "scopes",
-  options: ["read", "backup", "restore", "manage", "monitoring"],
-  revokeHandler: "revokeAutomationToken",
-};
-
-const monitoringTokenPanel: TokenPanel = {
-  prefix: "monitoring",
-  label: "monitoring token",
-  title: "Monitoring Token",
-  endpoint: "/api/monitoring-tokens",
-  field: "routes",
-  options: ["metrics", "report"],
-  revokeHandler: "revokeMonitoringToken",
-};
-
-function renderTokens(panel: TokenPanel, tokens: IssuedTokenInfo[]): string {
+function renderAutomationTokens(tokens: AutomationTokenInfo[]): string {
   return (
     tokens
       .map(
         (token) => `<div class="user-row"><div><strong>${escapeHtml(token.name)}</strong>
-    <p class="hint">${escapeHtml((token[panel.field] || []).join(", "))} · expires ${escapeHtml(token.expires_at)}</p></div>
-    <button type="button" class="danger" onclick="${panel.revokeHandler}(${escapeHtml(JSON.stringify(token.id))})">Revoke</button></div>`,
+    <p class="hint">${escapeHtml(token.scopes.join(", "))} · expires ${escapeHtml(token.expires_at)}</p></div>
+    <button type="button" class="danger" onclick="revokeAutomationToken(${escapeHtml(JSON.stringify(token.id))})">Revoke</button></div>`,
       )
-      .join("") || `<p class="hint">No ${panel.label}s.</p>`
+      .join("") || '<p class="hint">No auth tokens.</p>'
   );
 }
 
-async function loadTokens(panel: TokenPanel): Promise<void> {
-  const section = document.getElementById(`${panel.prefix}-token-section`);
+async function loadAutomationTokens(): Promise<void> {
+  const section = document.getElementById("automation-token-section");
   if (!section) return;
   section.hidden = !currentUser?.is_admin;
   if (section.hidden) return;
   try {
-    const response = await fetch(panel.endpoint, { signal: globalThis.AbortSignal?.timeout?.(30000) });
-    const body = await readJson<{ tokens?: IssuedTokenInfo[]; detail?: string }>(response);
-    if (!response.ok) throw new Error(body.detail || `Could not load ${panel.label}s.`);
-    document.getElementById(`${panel.prefix}-token-list`)!.innerHTML = renderTokens(panel, body.tokens || []);
+    const response = await fetch("/api/automation-tokens", { signal: globalThis.AbortSignal?.timeout?.(30000) });
+    const body = await readJson<{ tokens?: AutomationTokenInfo[]; detail?: string }>(response);
+    if (!response.ok) throw new Error(body.detail || "Could not load auth tokens.");
+    document.getElementById("automation-token-list")!.innerHTML = renderAutomationTokens(body.tokens || []);
   } catch (error) {
-    setStatus(`${panel.prefix}-token-status`, (error as Error).message || `Could not load ${panel.label}s.`, "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not load auth tokens.", "error");
   }
 }
 
-async function createToken(panel: TokenPanel): Promise<void> {
-  const status = `${panel.prefix}-token-status`;
-  const output = document.getElementById(`${panel.prefix}_token_output`) as HTMLTextAreaElement;
+async function createAutomationToken(): Promise<void> {
+  const output = document.getElementById("automation_token_output") as HTMLTextAreaElement;
   output.value = "";
-  const name = (document.getElementById(`${panel.prefix}_token_name`) as HTMLInputElement).value.trim();
-  const days = Number((document.getElementById(`${panel.prefix}_token_days`) as HTMLInputElement).value);
-  // Not every app offers every option.
-  const selected = panel.options.filter(
-    (option) => (document.getElementById(`${panel.prefix}_scope_${option}`) as HTMLInputElement | null)?.checked,
+  const name = (document.getElementById("automation_token_name") as HTMLInputElement).value.trim();
+  const days = Number((document.getElementById("automation_token_days") as HTMLInputElement).value);
+  // Not every app offers every scope.
+  const scopes = ["read", "backup", "restore", "manage", "metrics", "report"].filter(
+    (scope) => (document.getElementById(`automation_scope_${scope}`) as HTMLInputElement | null)?.checked,
   );
-  if (!name || !Number.isInteger(days) || days < 1 || days > 3650 || selected.length === 0) {
-    setStatus(status, "Enter a name, expiry from 1 to 3650 days, and at least one permission.", "error");
+  if (!name || !Number.isInteger(days) || days < 1 || days > 3650 || scopes.length === 0) {
+    setStatus(
+      "automation-token-status",
+      "Enter a name, expiry from 1 to 3650 days, and at least one permission.",
+      "error",
+    );
     return;
   }
   try {
-    const response = await fetch(panel.endpoint, {
+    const response = await fetch("/api/automation-tokens", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, ttl_days: days, [panel.field]: selected }),
+      body: JSON.stringify({ name, ttl_days: days, scopes }),
     });
     const body = await readJson<{ token?: string; detail?: string }>(response);
-    if (!response.ok || !body.token) throw new Error(body.detail || `Could not create ${panel.label}.`);
+    if (!response.ok || !body.token) throw new Error(body.detail || "Could not create auth token.");
     output.value = body.token;
-    setStatus(status, "Copy the token now. It will not be shown again.", "success");
-    await loadTokens(panel);
+    setStatus("automation-token-status", "Copy the token now. It will not be shown again.", "success");
+    await loadAutomationTokens();
   } catch (error) {
-    setStatus(status, (error as Error).message || `Could not create ${panel.label}.`, "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not create auth token.", "error");
   }
 }
 
-async function revokeToken(panel: TokenPanel, id: string): Promise<void> {
+async function revokeAutomationToken(id: string): Promise<void> {
   if (
     !(await confirmApp({
-      title: `Revoke ${panel.title}`,
+      title: "Revoke Auth Token",
       message: "Clients using this token will lose access immediately.",
       confirmLabel: "Revoke",
       danger: true,
     }))
   )
     return;
-  const status = `${panel.prefix}-token-status`;
   try {
-    const response = await fetch(`${panel.endpoint}/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const response = await fetch(`/api/automation-tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
     const body = await readJson(response);
-    if (!response.ok) throw new Error(body.detail || `Could not revoke ${panel.label}.`);
-    setStatus(status, "Token revoked.", "success");
-    await loadTokens(panel);
+    if (!response.ok) throw new Error(body.detail || "Could not revoke auth token.");
+    setStatus("automation-token-status", "Token revoked.", "success");
+    await loadAutomationTokens();
   } catch (error) {
-    setStatus(status, (error as Error).message || `Could not revoke ${panel.label}.`, "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not revoke auth token.", "error");
   }
-}
-
-function renderAutomationTokens(tokens: IssuedTokenInfo[]): string {
-  return renderTokens(automationTokenPanel, tokens);
-}
-
-async function loadAutomationTokens(): Promise<void> {
-  await loadTokens(automationTokenPanel);
-}
-
-async function createAutomationToken(): Promise<void> {
-  await createToken(automationTokenPanel);
-}
-
-async function revokeAutomationToken(id: string): Promise<void> {
-  await revokeToken(automationTokenPanel, id);
-}
-
-function renderMonitoringTokens(tokens: IssuedTokenInfo[]): string {
-  return renderTokens(monitoringTokenPanel, tokens);
-}
-
-async function loadMonitoringTokens(): Promise<void> {
-  await loadTokens(monitoringTokenPanel);
-}
-
-async function createMonitoringToken(): Promise<void> {
-  await createToken(monitoringTokenPanel);
-}
-
-async function revokeMonitoringToken(id: string): Promise<void> {
-  await revokeToken(monitoringTokenPanel, id);
 }

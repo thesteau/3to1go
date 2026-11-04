@@ -144,6 +144,11 @@ func EncryptionKeyPath() string {
 	return filepath.Join(DefaultConfigDir(), "encryption.key")
 }
 
+// AutomationKeyPath holds the key that signs this Scout's automation tokens.
+func AutomationKeyPath() string {
+	return filepath.Join(DefaultConfigDir(), "automation-token.key")
+}
+
 func InstallationIDPath() string {
 	return filepath.Join(DefaultConfigDir(), "installation.id")
 }

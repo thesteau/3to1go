@@ -115,8 +115,6 @@ async function logoutUser(allBrowsers = false): Promise<void> {
   }
   const tokenOutput = document.getElementById("automation_token_output") as HTMLTextAreaElement | null;
   if (tokenOutput) tokenOutput.value = "";
-  const monitoringOutput = document.getElementById("monitoring_token_output") as HTMLTextAreaElement | null;
-  if (monitoringOutput) monitoringOutput.value = "";
   currentUser = null;
   closeDialog("users-dialog");
   openLoginDialog();

@@ -19,16 +19,13 @@ Metrics never need a session cookie or a Station token. Labels include relative 
 
 ## Require a token
 
-**Require monitoring token** is in the same settings dialog. It's **on for new installs**. An install that already had saved settings keeps it off after upgrading, so existing scrapes keep working. Turn it on when you're ready.
+**Require auth token** is in the same settings dialog. It's **on for new installs**. An install that already had saved settings keeps it off after upgrading, so existing scrapes keep working. Turn it on when you're ready.
 
-When it's on, send a token with each request. A missing, invalid, expired, or revoked token returns **401**. Disabled metrics still return **404**.
+When it's on, send a signed auth token with each request. A missing, invalid, expired, or revoked token returns **401**, and a token without the right permission returns **403**. Disabled metrics still return **404**.
 
-| App | Token | Create it in |
-|---|---|---|
-| Station | A monitoring token, limited to `metrics`, `report`, or both. | **Users & Access → Monitoring Tokens** |
-| Scout | An automation token with the **Read metrics** permission. It's valid only on the Scout that issued it. | **Users & Access → Automation Tokens** |
+To create a token, open **Users & Access**, go to **Station Auth Tokens** or **Scout Auth Tokens**, untick **Read status**, and tick **Read metrics**. It's shown once, and it's valid only in the app that issued it, so Station and each Scout need their own. Use a separate token for each client so you can revoke one without affecting the others.
 
-Both are shown once. Use a separate token for each client so you can revoke one without affecting the others. Neither kind can upload or restore backups, and a Station token doesn't work on these routes.
+**Read metrics** allows only `/metrics`. It can't upload, restore, or call `/api/...`. An auth token is not the [Station token](/station/station-tokens) that Scouts use to upload backups, and a Station token doesn't work on this route.
 
 <Note>
   A token protects these routes, but it can be read if it's sent over plain HTTP. On any network you don't fully trust, [serve the apps over HTTPS](/shared/https). If you turn the requirement off, keep `/metrics` reachable only by your monitoring network, using your firewall or reverse proxy.

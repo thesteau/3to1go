@@ -99,7 +99,6 @@ type App struct {
 	settings      *config.Settings
 	userStore     userStorer
 	credStore     credStorer
-	monitoring    monitoringTokenStorer
 	settingsStore settingsStorer
 	snapIndex     snapIndexer
 	backend       storageBackend
@@ -118,7 +117,6 @@ func NewApp(
 	settings *config.Settings,
 	userStore userStorer,
 	credStore credStorer,
-	monitoring monitoringTokenStorer,
 	settingsStore settingsStorer,
 	snapIndex snapIndexer,
 	backend storageBackend,
@@ -133,7 +131,6 @@ func NewApp(
 		settings:      settings,
 		userStore:     userStore,
 		credStore:     credStore,
-		monitoring:    monitoring,
 		settingsStore: settingsStore,
 		snapIndex:     snapIndex,
 		backend:       backend,
@@ -185,12 +182,6 @@ func (a *App) StartCredentialCleanupLoop() {
 				} else if removed > 0 {
 					a.logger.Info("station_token_cleanup", "removed", removed)
 				}
-				removed, err = a.monitoring.CleanupExpired(context.Background())
-				if err != nil {
-					a.logger.Error("monitoring_token_cleanup_failed", "error", err)
-				} else if removed > 0 {
-					a.logger.Info("monitoring_token_cleanup", "removed", removed)
-				}
 			}
 		}
 	}()
@@ -219,24 +210,27 @@ func (a *App) Handler() http.Handler {
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
 	r.Get("/health/ready", a.handleHealthReady)
-	metricsEnabled := func() bool { return a.Settings().MetricsEnabled }
-	reportEnabled := func() bool { return a.Settings().BackupReportEnabled }
-	r.Handle("/metrics", a.requireMonitoringToken(signing.MonitoringRouteMetrics, metricsEnabled, metrics.NewHandler("station", metricsEnabled, a.collectMetrics)))
-	r.Handle("/report", a.requireMonitoringToken(signing.MonitoringRouteReport, reportEnabled, http.HandlerFunc(a.handleBackupReport)))
+	access := a.accountHandler()
+	r.Handle("/metrics", access.RequireRouteScope(auth.ScopeMetrics, func() bool {
+		s := a.Settings()
+		return s.MetricsEnabled && s.MonitoringTokenRequired
+	}, metrics.NewHandler("station", func() bool {
+		return a.Settings().MetricsEnabled
+	}, a.collectMetrics)))
+	r.Handle("/report", access.RequireRouteScope(auth.ScopeReport, func() bool {
+		s := a.Settings()
+		return s.BackupReportEnabled && s.MonitoringTokenRequired
+	}, http.HandlerFunc(a.handleBackupReport)))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
 	r.Post("/api/session/login", a.handleLogin)
 	r.Post("/api/session/logout", a.handleLogout)
-	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
 	r.Post("/api/session/logout-all", access.LogoutAll)
 	r.Get("/api/automation-tokens", access.ListAutomationTokens)
 	r.Post("/api/automation-tokens", access.CreateAutomationToken)
 	r.Delete("/api/automation-tokens/{token_id}", httpx.WithPathValues(access.RevokeAutomationToken, "token_id"))
 	r.Post("/api/session/change-password", a.handleChangePassword)
-	r.Get("/api/monitoring-tokens", a.handleListMonitoringTokens)
-	r.Post("/api/monitoring-tokens", a.handleCreateMonitoringToken)
-	r.Delete("/api/monitoring-tokens/{token_id}", httpx.WithPathValues(a.handleRevokeMonitoringToken, "token_id"))
 
 	// Users (auth required)
 	r.Get("/api/users", a.handleListUsers)

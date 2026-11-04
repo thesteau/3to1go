@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 )
 
 // Automation tokens belong to the signed-in operator, not a separate account.
-// Only the SHA-256 hash of the bearer secret is persisted.
+// Each token is a signed JWT, and only its SHA-256 hash is persisted.
 type AutomationToken struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`
@@ -31,8 +32,11 @@ type AutomationStore interface {
 
 const contextKeyAutomation ContextKey = "automation"
 
-// MonitoringScope allows reading monitoring routes and grants nothing under /api/.
-const MonitoringScope = "monitoring"
+// Route scopes allow one monitoring route and grant nothing under /api/.
+const (
+	ScopeMetrics = "metrics"
+	ScopeReport  = "report"
+)
 
 func CurrentAutomationToken(r *http.Request) *AutomationToken {
 	token, _ := r.Context().Value(contextKeyAutomation).(*AutomationToken)
@@ -93,28 +97,48 @@ func automationAllows(r *http.Request, token *AutomationToken) bool {
 	return false
 }
 
-// MonitoringAuthorized reports whether the request's bearer token is a live
-// automation token with the monitoring scope. An error means the store couldn't answer.
-func (a *Handler) MonitoringAuthorized(r *http.Request) (bool, error) {
-	secret, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+// automationFromBearer checks the token's signature, then looks it up so a revoked
+// token stops working. It returns no user for a token that can't be used, and an
+// error only if the key or store couldn't answer.
+func (a *Handler) automationFromBearer(ctx context.Context, header string) (*User, *AutomationToken, error) {
+	secret, found := strings.CutPrefix(header, "Bearer ")
 	s, ok := a.Store.(AutomationStore)
-	if !found || !ok || !strings.HasPrefix(secret, "3to1go_api_") {
-		return false, nil
+	if !found || !ok || a.SigningKey == nil {
+		return nil, nil, nil
 	}
-	user, token, err := s.UserForAutomationToken(r.Context(), AutomationTokenHash(secret))
+	key, err := a.SigningKey()
 	if err != nil {
-		return false, err
+		return nil, nil, err
 	}
-	if user == nil || token == nil || !user.IsAdmin || user.MustChangePassword {
-		return false, nil
+	if verifyAutomationToken(secret, key.Public().(ed25519.PublicKey)) != nil {
+		return nil, nil, nil
 	}
-	return slices.Contains(token.Scopes, MonitoringScope), nil
+	return s.UserForAutomationToken(ctx, AutomationTokenHash(secret))
 }
 
-// WriteMonitoringUnauthorized answers a monitoring route's missing or invalid token.
-func WriteMonitoringUnauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", "Bearer")
-	httpx.WriteError(w, http.StatusUnauthorized, "monitoring token required")
+// RequireRouteScope guards an opt-in monitoring route while required reports true.
+// Otherwise next answers, so a disabled route still returns its own 404.
+func (a *Handler) RequireRouteScope(scope string, required func() bool, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !required() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		user, token, err := a.automationFromBearer(r.Context(), r.Header.Get("Authorization"))
+		switch {
+		case err != nil:
+			// Keep key and database details out of this endpoint.
+			httpx.WriteError(w, http.StatusServiceUnavailable, "token check unavailable")
+		case user == nil || token == nil || !user.IsAdmin || user.MustChangePassword:
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			httpx.WriteError(w, http.StatusUnauthorized, "auth token required")
+		case !slices.Contains(token.Scopes, scope):
+			httpx.WriteError(w, http.StatusForbidden, "auth token does not allow this route")
+		default:
+			next.ServeHTTP(w, r)
+		}
+	})
 }
 
 func (a *Handler) automationAdmin(w http.ResponseWriter, r *http.Request) (*User, AutomationStore) {
@@ -123,12 +147,12 @@ func (a *Handler) automationAdmin(w http.ResponseWriter, r *http.Request) (*User
 		return nil, nil
 	}
 	if CurrentAutomationToken(r) != nil {
-		httpx.WriteError(w, http.StatusForbidden, "sign in to manage automation tokens")
+		httpx.WriteError(w, http.StatusForbidden, "sign in to manage auth tokens")
 		return nil, nil
 	}
 	s, ok := a.Store.(AutomationStore)
 	if !ok {
-		httpx.WriteError(w, http.StatusServiceUnavailable, "automation token store unavailable")
+		httpx.WriteError(w, http.StatusServiceUnavailable, "auth token store unavailable")
 		return nil, nil
 	}
 	return u, s
@@ -141,7 +165,7 @@ func (a *Handler) ListAutomationTokens(w http.ResponseWriter, r *http.Request) {
 	}
 	tokens, err := s.ListAutomationTokens(r.Context(), u.ID)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to list automation tokens")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to list auth tokens")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"tokens": tokens})
@@ -165,10 +189,7 @@ func (a *Handler) CreateAutomationToken(w http.ResponseWriter, r *http.Request) 
 	if body.TTLDays == 0 {
 		body.TTLDays = 90
 	}
-	allowedScopes := []string{"read", "backup", "restore", "manage"}
-	if a.AllowMonitoringScope {
-		allowedScopes = append(allowedScopes, MonitoringScope)
-	}
+	allowedScopes := append([]string{"read", "backup", "restore", "manage"}, a.RouteScopes...)
 	if body.Name == "" || len(body.Name) > 100 || body.TTLDays < 1 || body.TTLDays > 3650 || len(body.Scopes) == 0 || len(body.Scopes) > len(allowedScopes) {
 		httpx.WriteError(w, http.StatusBadRequest, "name, at least one scope, and ttl_days between 1 and 3650 are required")
 		return
@@ -181,21 +202,30 @@ func (a *Handler) CreateAutomationToken(w http.ResponseWriter, r *http.Request) 
 	}
 	slices.Sort(body.Scopes)
 	body.Scopes = slices.Compact(body.Scopes)
-	secret, err := RandomToken()
+	if a.SigningKey == nil {
+		httpx.WriteError(w, http.StatusServiceUnavailable, "auth token signing unavailable")
+		return
+	}
+	key, err := a.SigningKey()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to create automation token")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to create auth token")
 		return
 	}
 	id, err := RandomToken()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to create automation token")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to create auth token")
 		return
 	}
-	secret = "3to1go_api_" + secret
 	now := time.Now().UTC()
-	info := AutomationToken{ID: id[:32], Name: body.Name, Scopes: body.Scopes, CreatedAt: now.Format(time.RFC3339), ExpiresAt: now.Add(time.Duration(body.TTLDays) * 24 * time.Hour).Format(time.RFC3339)}
+	expires := now.Add(time.Duration(body.TTLDays) * 24 * time.Hour)
+	info := AutomationToken{ID: id[:32], Name: body.Name, Scopes: body.Scopes, CreatedAt: now.Format(time.RFC3339), ExpiresAt: expires.Format(time.RFC3339)}
+	secret, err := mintAutomationToken(key, u.ID, info.ID, info.Scopes, now, expires)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to create auth token")
+		return
+	}
 	if err := s.CreateAutomationToken(r.Context(), u.ID, AutomationTokenHash(secret), info); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to save automation token")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to save auth token")
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -209,11 +239,11 @@ func (a *Handler) RevokeAutomationToken(w http.ResponseWriter, r *http.Request) 
 	}
 	revoked, err := s.RevokeAutomationToken(r.Context(), u.ID, r.PathValue("token_id"))
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to revoke automation token")
+		httpx.WriteError(w, http.StatusInternalServerError, "failed to revoke auth token")
 		return
 	}
 	if !revoked {
-		httpx.WriteError(w, http.StatusNotFound, "automation token not found")
+		httpx.WriteError(w, http.StatusNotFound, "auth token not found")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
