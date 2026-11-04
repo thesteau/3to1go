@@ -58,7 +58,9 @@ test("there is one token section, named for its app, with a hint about the Stati
   ]) {
     const html = dialog(app, "users-dialog.html");
     assert.doesNotMatch(html, /monitoring-token-section|Automation Tokens/);
-    const heading = html.match(/<h3>([^<]*)<span class="field-help hover-hint" tabindex="0" aria-label="([^"]*)" title="([^"]*)">\?<\/span><\/h3>/);
+    const heading = html.match(
+      /<h3>([^<]*)<span class="field-help hover-hint" tabindex="0" aria-label="([^"]*)" title="([^"]*)">\?<\/span><\/h3>/,
+    );
     assert.ok(heading, `${app} heading has a hint`);
     assert.equal(heading[1].trim(), name);
     assert.match(heading[2], /^Not the same as the Station token/);
