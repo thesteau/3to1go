@@ -57,7 +57,6 @@ func run(logger *slog.Logger) error {
 	// Initialize stores
 	userStore := store.NewUserStore(pool)
 	credStore := store.NewCredentialStore(pool)
-	monitoringStore := store.NewMonitoringTokenStore(pool)
 	settingsStore := store.NewSettingsStore(pool)
 	snapIndex := store.NewSnapshotIndex(pool)
 	uploadSessionStore := ingest.NewPGSessionStore(pool)
@@ -68,9 +67,6 @@ func run(logger *slog.Logger) error {
 	}
 	if err := credStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("token schema: %w", err)
-	}
-	if err := monitoringStore.EnsureSchema(ctx); err != nil {
-		return fmt.Errorf("monitoring token schema: %w", err)
 	}
 	if err := settingsStore.EnsureSchema(ctx); err != nil {
 		return fmt.Errorf("settings schema: %w", err)
@@ -129,7 +125,7 @@ func run(logger *slog.Logger) error {
 	verifySvc := verify.New(snapIndex, backend)
 
 	app := api.NewApp(
-		settings, userStore, credStore, monitoringStore, settingsStore, snapIndex,
+		settings, userStore, credStore, settingsStore, snapIndex,
 		backend, ingestSvc, hookMgr, certMgr, notifications, verifySvc, logger,
 	)
 

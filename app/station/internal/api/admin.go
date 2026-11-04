@@ -1,10 +1,12 @@
 package api
 
 import (
+	"crypto/ed25519"
 	"net/http"
 
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
+	"github.com/3to1go/station/internal/signing"
 	"github.com/3to1go/station/internal/store"
 )
 
@@ -13,7 +15,16 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) accountHandler() *auth.Handler {
-	return &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
+	return &auth.Handler{
+		Store:      a.userStore,
+		CookieName: store.SessionCookie,
+		SigningKey: func() (ed25519.PrivateKey, error) {
+			// Station's issuer key; the audience claim keeps these apart from Station tokens.
+			key, _, err := signing.LoadOrCreateIssuerKeypair(a.Settings().IssuerKeyPath)
+			return key, err
+		},
+		RouteScopes: []string{auth.ScopeMetrics, auth.ScopeReport},
+	}
 }
 
 func (a *App) handleSessionMe(w http.ResponseWriter, r *http.Request) {

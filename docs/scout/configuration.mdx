@@ -74,7 +74,7 @@ HTTP destinations are configured separately in **Integrations**, with encrypted,
 |---|---|---|---|
 | Dark Mode | none | on | UI theme. |
 | Prometheus metrics | none | off | Serve `/metrics` to clients that aren't signed in. Applies immediately. See [Prometheus metrics](/shared/metrics). |
-| Require monitoring token | none | on for new installs, off for existing installs | Require an automation token with the `monitoring` scope on `/metrics`. Applies immediately. See [Require a token](/shared/metrics#require-a-token). |
+| Require auth token | none | on for new installs, off for existing installs | Require a Scout auth token with the `metrics` scope on `/metrics`. Applies immediately. See [Require a token](/shared/metrics#require-a-token). |
 | Log Level | `LOG_LEVEL` | `INFO` | Container log verbosity. |
 | State Folder | `STATE_DIR` | `/data/state` | Per-job state. |
 | Spool Folder | `SPOOL_DIR` | `/data/spool` | Archives waiting to upload. |

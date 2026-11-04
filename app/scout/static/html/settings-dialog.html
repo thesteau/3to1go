@@ -20,9 +20,9 @@
 
     <button type="button" class="toggle-btn" id="settings_monitoring_token_required" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      <span class="toggle-label">Require monitoring token</span>
+      <span class="toggle-label">Require auth token</span>
     </button>
-    <p class="hint">On for new installs. When on, <code>/metrics</code> needs an automation token with the Read metrics permission, sent as <code>Authorization: Bearer &lt;token&gt;</code>. Create tokens in Users &amp; Access.</p>
+    <p class="hint">When on, <code>/metrics</code> needs a Scout auth token with the Read metrics permission, sent as <code>Authorization: Bearer &lt;token&gt;</code>. Create tokens in Users &amp; Access.</p>
 
     <button type="button" class="toggle-btn" id="settings_theme_dark" role="switch" aria-checked="false" onclick="toggleSettingSwitch(this)" data-requires="settings" disabled>
       <span class="toggle-track"><span class="toggle-thumb"></span></span>

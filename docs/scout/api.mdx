@@ -9,7 +9,7 @@ Use the [Station API](/station/api) to manage stored snapshots and mint Station 
 
 ## Authenticate
 
-Management endpoints accept Scout's session cookie, `three_to_one_go_scout_session`, or a scoped [automation token](#automation-tokens). A Station token does **not** authenticate these endpoints. **Session** in the tables means a signed-in account; **Admin** also requires admin access. Accounts are intended for [one operator](/shared/sign-in#accounts-are-for-one-operator).
+Management endpoints accept Scout's session cookie, `three_to_one_go_scout_session`, or a scoped [Scout auth token](#scout-auth-tokens). A Station token does **not** authenticate these endpoints. **Session** in the tables means a signed-in account; **Admin** also requires admin access. Accounts are intended for [one operator](/shared/sign-in#accounts-are-for-one-operator).
 
 The examples use a POSIX shell and curl; the settings example also uses jq. Replace password placeholders with your own values. Use your HTTPS address for remote access; see [Session cookies over HTTPS](/shared/sign-in#session-cookies-over-https).
 
@@ -34,7 +34,7 @@ curl --fail-with-body -sS --cookie scout.cookies \
   "$SCOUT_URL/api/session/change-password"
 ```
 
-Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session. Changing your password signs out other browsers while keeping the calling session. **Sign Out All Browsers** ends all your browser sessions in this app. Automation tokens are revoked separately.
+Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session. Changing your password signs out other browsers while keeping the calling session. **Sign Out All Browsers** ends all your browser sessions in this app. Scout auth tokens are revoked separately.
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
@@ -44,21 +44,23 @@ Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it 
 | `POST` | `/api/session/logout` | Public | No body; clears the current session cookie. |
 | `POST` | `/api/session/logout-all` | Session | No body; invalidates all browser sessions for the signed-in account and clears its cookie. |
 
-## Automation tokens
+## Scout auth tokens
 
-For scripts or an external MCP adapter, open **Admin → Users & Access → Automation Tokens**. Choose a name, expiry, and permissions; copy the returned token once. The token belongs to the existing operator account. It is valid only in the app that issued it, and it stops working if revoked, expired, or its owner no longer has admin access or must change their password.
+For scripts or an external MCP adapter, open **Admin → Users & Access → Scout Auth Tokens**. Choose a name, expiry, and permissions; copy the returned token once. The token belongs to the existing operator account. It is valid only in the app that issued it, and it stops working if revoked, expired, or its owner no longer has admin access or must change their password.
 
 | Scope | Allowed requests |
 |---|---|
 | `read` | `GET /api/status`, directory listing/browsing/size endpoints, and `GET /api/restore-requests`. The status response omits `settings`. |
 | `backup` | `POST /api/run-now`, `/api/directories/force-send`, `/api/cancel-operation`, and `/api/uploads/pause` or `/api/uploads/resume`. |
 | `restore` | `POST /api/recovery/preview`, `/api/recovery/restore`, and `/api/restore-requests/decision`. Restore can replace destination files. |
-| `manage` | All app management operations and secrets, except account, session, and automation token controls. |
-| `monitoring` | `GET /metrics` when **Require monitoring token** is on. Grants nothing under `/api/`. Other scopes, including `manage`, don't include it. See [Require a token](/shared/metrics#require-a-token). |
+| `manage` | All app management operations and secrets, except account, session, and Scout auth token controls. |
+| `metrics` | `GET /metrics` when **Require auth token** is on. Grants nothing under `/api/`. See [Require a token](/shared/metrics#require-a-token). |
 
-Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available. There is no per-job or per-instance ownership model.
+Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available, but not `metrics`. There is no per-job or per-instance ownership model.
 
-Creating, listing, and revoking automation tokens requires an **admin session cookie**:
+Each token is a JWT that Scout signs with `automation-token.key` in its `config` folder. Its claims hold the audience, owner, scopes, issue time, expiry, and token ID. Scout rejects any token whose signature doesn't verify, then looks the token up on each request, so revoking one works immediately. If the key is lost, create new tokens. Claims are signed, not encrypted, so anyone holding a token can read them. Treat a token as a password, and [use HTTPS](/shared/https) on any network you don't fully trust. A Scout auth token is **not** the [Station token](/station/station-tokens) this Scout uses to upload backups, and that Station token doesn't work here.
+
+Creating, listing, and revoking Scout auth tokens requires an **admin session cookie**:
 
 | Method | Endpoint | Request or response |
 |---|---|---|
@@ -76,12 +78,12 @@ curl --fail-with-body -sS --cookie scout.cookies \
 Use the returned secret as a bearer token:
 
 ```sh
-API_TOKEN='<returned-automation-token>'
+API_TOKEN='<returned-scout-auth-token>'
 curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" \
   "$SCOUT_URL/api/status"
 ```
 
-`GET /api/session/me` also accepts an automation token and returns its metadata under `automation_token`. The endpoint tables below describe session access; automation tokens additionally require the applicable scope. An invalid bearer token returns `401` even if a valid cookie is also present.
+`GET /api/session/me` also accepts a Scout auth token and returns its metadata under `automation_token`. The endpoint tables below describe session access; Scout auth tokens additionally require the applicable scope. An invalid bearer token returns `401` even if a valid cookie is also present.
 
 Browser writes from another origin are rejected with `403`. Serve the UI through the same origin as its API, and preserve the request host through a reverse proxy. Ordinary curl requests without browser origin headers continue to work.
 
@@ -90,7 +92,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
 | `GET` | `/health` | Public | Returns `{"status":"ok"}` while Scout's HTTP server is running. |
-| `GET` | `/metrics` | Monitoring token, or public if the requirement is off | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/metrics` | Scout auth token, or public if the requirement is off | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
 | `GET` | `/api/status` | Session | Returns Scout and instance IDs, Scout key fingerprint, upload circuit status, and `scheduler`. Effective `settings` are included for admin accounts only. |
 | `POST` | `/api/run-now` | Session | No body; requests a backup cycle for the configured jobs. Returns `status: "queued"` or `"already_running"`. |
 | `GET` | `/api/settings` | Admin | Returns the current settings under `settings`. |
@@ -301,6 +303,6 @@ Scout's dashboard reads the same job and settings state as scripts. It normally 
 
 ### MCP and running without a browser
 
-An external MCP adapter can call these HTTP endpoints using a scoped automation token and expose actions such as listing jobs or running a backup. Use the API so the same validation and job state are used by both the adapter and the UI.
+An external MCP adapter can call these HTTP endpoints using a scoped Scout auth token and expose actions such as listing jobs or running a backup. Use the API so the same validation and job state are used by both the adapter and the UI.
 
 Scout currently has no built-in MCP server or setting to disable the frontend. You can automate it without using the UI; the published app still serves the UI alongside the API.

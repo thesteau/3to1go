@@ -128,8 +128,11 @@ func (a *App) Handler() http.Handler {
 	// SPA root
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
-	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie, AllowMonitoringScope: true}
-	r.Handle("/metrics", a.requireMonitoringToken(access, metrics.NewHandler("scout", func() bool {
+	access := a.accountHandler()
+	r.Handle("/metrics", access.RequireRouteScope(auth.ScopeMetrics, func() bool {
+		s := a.runner.CurrentSettings()
+		return s.MetricsEnabled && s.MonitoringTokenRequired
+	}, metrics.NewHandler("scout", func() bool {
 		return a.runner.CurrentSettings().MetricsEnabled
 	}, a.collectMetrics)))
 

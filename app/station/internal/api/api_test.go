@@ -230,7 +230,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	}
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
-	// Most tests don't exercise monitoring tokens; monitoring_test.go turns this on.
+	// Most tests don't exercise route tokens; route_token_test.go turns this on.
 	settings.MonitoringTokenRequired = false
 	backend := storage.NewLocalBackend(settings.BackupRoot)
 	hookMgr := hooks.NewHookManager("station", t.TempDir(), discardLogger())
@@ -252,7 +252,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, &mockMonitoringStore{}, ss, si, backend, &mockIngest{}, hookMgr, certMgr, notifications, nil, discardLogger())
+	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, notifications, nil, discardLogger())
 }
 
 func jsonReq(method, path string, body any) *http.Request {

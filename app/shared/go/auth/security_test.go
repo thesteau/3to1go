@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -112,9 +113,11 @@ func TestAutomationScopesAndAuthentication(t *testing.T) {
 	} {
 		t.Run(strings.Join(tc.scopes, ",")+tc.method+tc.path, func(t *testing.T) {
 			s := &automationStoreMock{sessionStore: &sessionStore{}, user: &User{ID: 1, IsAdmin: true}, info: &AutomationToken{Scopes: tc.scopes}}
-			h := &Handler{Store: s, CookieName: "session"}
+			key := testSigningKey(t)
+			token := testAutomationToken(t, key, tc.scopes...)
+			h := &Handler{Store: s, CookieName: "session", SigningKey: signingKeyFunc(key)}
 			r := httptest.NewRequest(tc.method, tc.path, nil)
-			r.Header.Set("Authorization", "Bearer 3to1go_api_secret")
+			r.Header.Set("Authorization", "Bearer "+token)
 			w := httptest.NewRecorder()
 			h.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if CurrentUser(r) == nil || CurrentAutomationToken(r) == nil {
@@ -122,16 +125,17 @@ func TestAutomationScopesAndAuthentication(t *testing.T) {
 				}
 				w.WriteHeader(204)
 			}), func(string) bool { return true }).ServeHTTP(w, r)
-			if w.Code != tc.want || s.hash != AutomationTokenHash("3to1go_api_secret") {
+			if w.Code != tc.want || s.hash != AutomationTokenHash(token) {
 				t.Fatalf("status %d: %s", w.Code, w.Body.String())
 			}
 		})
 	}
 	for _, user := range []*User{nil, {ID: 1}, {ID: 1, IsAdmin: true, MustChangePassword: true}} {
 		s := &automationStoreMock{sessionStore: &sessionStore{user: &User{ID: 1, IsAdmin: true}}, user: user, info: &AutomationToken{Scopes: []string{"manage"}}}
-		h := &Handler{Store: s, CookieName: "session"}
+		key := testSigningKey(t)
+		h := &Handler{Store: s, CookieName: "session", SigningKey: signingKeyFunc(key)}
 		r := httptest.NewRequest("GET", "/api/settings", nil)
-		r.Header.Set("Authorization", "Bearer 3to1go_api_revoked")
+		r.Header.Set("Authorization", "Bearer "+testAutomationToken(t, key, "manage"))
 		r.AddCookie(&http.Cookie{Name: "session", Value: "session-token"})
 		w := httptest.NewRecorder()
 		h.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("invalid bearer fell back to cookie") }), func(string) bool { return false }).ServeHTTP(w, r)
@@ -143,7 +147,8 @@ func TestAutomationScopesAndAuthentication(t *testing.T) {
 
 func TestAutomationSecretShownOnlyOnCreation(t *testing.T) {
 	s := &automationStoreMock{sessionStore: &sessionStore{}, user: &User{ID: 1, IsAdmin: true}}
-	h := &Handler{Store: s}
+	key := testSigningKey(t)
+	h := &Handler{Store: s, SigningKey: signingKeyFunc(key)}
 	r := httptest.NewRequest("POST", "/api/automation-tokens", strings.NewReader(`{"name":"nightly","scopes":["read","read","backup"],"ttl_days":10}`))
 	r = r.WithContext(context.WithValue(r.Context(), ContextKeyUser, s.user))
 	w := httptest.NewRecorder()
@@ -155,7 +160,7 @@ func TestAutomationSecretShownOnlyOnCreation(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if w.Code != 201 || !strings.HasPrefix(body.Token, "3to1go_api_") || s.createdHash != AutomationTokenHash(body.Token) || len(body.Info.Scopes) != 2 {
+	if w.Code != 201 || verifyAutomationToken(body.Token, key.Public().(ed25519.PublicKey)) != nil || s.createdHash != AutomationTokenHash(body.Token) || len(body.Info.Scopes) != 2 {
 		t.Fatalf("create: %d %s", w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()

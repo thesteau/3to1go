@@ -151,7 +151,7 @@ func VerifyCredential(tokenString string, pub ed25519.PublicKey) (*CredentialPay
 		return nil, errors.New("invalid token")
 	}
 
-	// Station tokens have no audience. Monitoring tokens share this key but must not upload or recover.
+	// Station tokens have no audience. Automation tokens share this key but must not upload or recover.
 	if len(claims.Audience) > 0 {
 		return nil, errors.New("not a Station token")
 	}
