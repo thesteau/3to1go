@@ -128,15 +128,15 @@ func (a *App) Handler() http.Handler {
 	// SPA root
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
-	r.Handle("/metrics", metrics.NewHandler("scout", func() bool {
+	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie, AllowMonitoringScope: true}
+	r.Handle("/metrics", a.requireMonitoringToken(access, metrics.NewHandler("scout", func() bool {
 		return a.runner.CurrentSettings().MetricsEnabled
-	}, a.collectMetrics))
+	}, a.collectMetrics)))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
 	r.Post("/api/session/login", a.handleLogin)
 	r.Post("/api/session/logout", a.handleLogout)
-	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
 	r.Post("/api/session/logout-all", access.LogoutAll)
 	r.Get("/api/automation-tokens", access.ListAutomationTokens)
 	r.Post("/api/automation-tokens", access.CreateAutomationToken)
@@ -214,7 +214,7 @@ func (a *App) requestLogger(next http.Handler) http.Handler {
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 	sessions := a.accountHandler().Middleware(next, isPublicPath)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Scrapes need no session lookup; the endpoint checks its opt-in setting.
+		// Scrapes need no session lookup; the endpoint checks its opt-in setting and token.
 		if r.URL.Path == "/metrics" {
 			next.ServeHTTP(w, r)
 			return

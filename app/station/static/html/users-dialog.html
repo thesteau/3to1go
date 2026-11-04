@@ -41,6 +41,23 @@
       <div id="automation-token-list"></div>
       <p id="automation-token-status" class="hint" role="status"></p>
     </section>
+    <section id="monitoring-token-section" class="hook-section admin-only" hidden>
+      <h3>Monitoring Tokens</h3>
+      <p class="hint">For curl, Postman, and Prometheus requests to <code>/metrics</code> and <code>/report</code>. Send one as <code>Authorization: Bearer &lt;token&gt;</code>. Tokens are shown once.</p>
+      <div class="user-form">
+        <input id="monitoring_token_name" type="text" placeholder="token name" maxlength="100" aria-label="Token name">
+        <input id="monitoring_token_days" type="number" value="90" min="1" max="3650" aria-label="Expires in days">
+      </div>
+      <div class="toolbar">
+        <label class="checkbox"><input id="monitoring_scope_metrics" type="checkbox" checked><span>Metrics</span></label>
+        <label class="checkbox"><input id="monitoring_scope_report" type="checkbox" checked><span>Report</span></label>
+      </div>
+      <button type="button" onclick="createMonitoringToken()">Create Token</button>
+      <label for="monitoring_token_output">New token — copy before closing</label>
+      <textarea id="monitoring_token_output" class="secret-value" readonly spellcheck="false" rows="2"></textarea>
+      <div id="monitoring-token-list"></div>
+      <p id="monitoring-token-status" class="hint" role="status"></p>
+    </section>
     <div class="toolbar">
       <button type="button" class="secondary" onclick="openPasswordDialog(false)">Change My Password</button>
       <button type="button" class="secondary" onclick="logoutUser()">Sign Out</button>

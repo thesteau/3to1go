@@ -17,6 +17,7 @@ Station separates management authentication from Scout upload authentication:
 |---|---|---|
 | `/api/...` | Operator session cookie, `three_to_one_go_session`, or a scoped automation token | Settings, token management, snapshot management, and requesting restores. |
 | `/backup/...` | `Authorization: Bearer <station-token>` | Scout's upload and recovery protocol. Recovery checks that the token is bound to the requested Scout instance. |
+| `/metrics`, `/report` | `Authorization: Bearer <monitoring-token>`, if **Require monitoring token** is on | Reading metrics and the backup report. See [Monitoring tokens](#monitoring-tokens). |
 
 Station recognizes an admin by looking up the session cookie (or the automation token's owner) and checking the account's `is_admin` flag in its database. Automation requests must also pass their token's scope checks. Call `GET /api/session/me` with your cookie to check `authenticated` and `user.is_admin`.
 
@@ -95,13 +96,46 @@ curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" \
 
 Browser writes from another origin are rejected with `403`. Serve the UI through the same origin as its API, and preserve the request host through a reverse proxy. Ordinary curl requests without browser origin headers continue to work.
 
+## Monitoring tokens
+
+Monitoring tokens let curl, Postman, Prometheus, and dashboards read `/metrics` and `/report`. They can't do anything else: they can't upload, recover, or call `/api/...`, and a Station token or automation token doesn't work in their place.
+
+To create one, open **Admin → Users & Access → Monitoring Tokens**. Choose a name, expiry, and routes, then copy the token once.
+
+```sh
+MONITORING_TOKEN='<returned-monitoring-token>'
+curl --fail-with-body -sS -H "Authorization: Bearer $MONITORING_TOKEN" "$STATION_URL/report"
+```
+
+In Postman, choose **Bearer Token** on the **Authorization** tab and paste the token.
+
+**Require monitoring token** in **Edit Station Settings** controls whether these routes need a token. It's on for new installs. An install that already had saved settings keeps it off after upgrading, so existing clients keep working. The settings API field is `monitoring_token_required`; a settings request that omits it keeps the current value.
+
+| Response | Meaning |
+|---|---|
+| `401` | The token is missing, invalid, expired, or revoked. |
+| `403` | The token doesn't include this route. |
+| `404` | The route itself is turned off. |
+| `503` | Station couldn't check the token, or couldn't read the requested data. |
+
+A token is a signed JWT with claims for its audience, allowed routes, issue time, expiry, and ID. Station checks the signature and also looks the token up on each request, so revoking one works immediately. Claims are signed, not encrypted, so anyone holding a token can read them. Treat it as a password, and [use HTTPS](/shared/https) on any network you don't fully trust.
+
+Creating, listing, and revoking monitoring tokens requires an **admin session cookie**:
+
+| Method | Endpoint | Request or response |
+|---|---|---|
+| `POST` | `/api/monitoring-tokens` | JSON `name`, `routes` (`metrics`, `report`, or both), and optional `ttl_days` (default 90, range 1–3650). Returns `201` with `token` and `monitoring_token` metadata. |
+| `GET` | `/api/monitoring-tokens` | Returns token metadata under `tokens`, including expired tokens until cleanup. Tokens are never returned again. |
+| `DELETE` | `/api/monitoring-tokens/{token_id}` | Revokes one token immediately. Use its metadata `id`. |
+
 ## Overview, settings, and maintenance
 
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
 | `GET` | `/health` | Public | Checks storage and returns storage and upload approval threshold information. Can return `503`. |
 | `GET` | `/health/ready` | Public | Checks storage and the staging directory; returns `{"status":"ok"}` or `503`. |
-| `GET` | `/metrics` | Public when enabled | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/metrics` | Monitoring token, or public if the requirement is off | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/report` | Monitoring token, or public if the requirement is off | Current backups as JSON; off by default (`404`). See [Backup report](#backup-report). |
 | `GET` | `/api/overview` | Session | Returns storage information and Scouts with instances, jobs, and snapshots. Settings are included for admin accounts only. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns normalized `settings`. |
 | `POST` | `/api/admin/uploads/pause` | Admin | No body; pauses acceptance of new uploads. |
@@ -119,6 +153,59 @@ curl --fail-with-body -sS --cookie station.cookies \
 ```
 
 The `scouts` array contains `scout_id`, each Scout's `instances`, and each instance's `scout_instance_id` and `jobs`. Each job has `job_name` and `snapshots`; each snapshot's filename is in `name`, alongside `size_bytes`, `mtime`, and optional `unusual` information. Use those filenames for downloads, deletion, and restore requests. URL-encode each path component when constructing a request URL.
+
+### Backup report
+
+`GET /report` lists the current backups for dashboards and scripts. It is **off by default**, including on existing installations. To enable it, sign in as an admin, open **Edit Station Settings**, turn on the **Backup report route** pill, and click **Save**. The settings API field is `backup_report_enabled`. Changes apply immediately. A disabled route returns `404`.
+
+```sh
+curl --fail-with-body -sS -H "Authorization: Bearer $MONITORING_TOKEN" "$STATION_URL/report"
+```
+
+```json
+{
+  "snapshot_count": 2,
+  "stored_bytes": 2350000000,
+  "instances": [
+    {
+      "scout_id": "scout-01",
+      "scout_instance_id": "<instance-id>",
+      "last_seen_at": "2026-11-03T11:59:00Z",
+      "jobs": [
+        {
+          "job_name": "documents",
+          "snapshot_count": 2,
+          "stored_bytes": 2350000000,
+          "latest_snapshot_at": "2026-11-03T03:00:00Z",
+          "snapshots": [
+            {"size_bytes": 1200000000, "modified_at": "2026-11-03T03:00:00Z", "unusual": false},
+            {"size_bytes": 1150000000, "modified_at": "2026-11-02T03:00:00Z", "unusual": false}
+          ]
+        }
+      ]
+    },
+    {
+      "scout_id": "scout-02",
+      "scout_instance_id": "<instance-id>",
+      "last_seen_at": "2026-11-03T11:57:00Z",
+      "jobs": []
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `last_seen_at` | Last contact from the Scout instance, in UTC. `null` if the instance has snapshots but no registration. |
+| `jobs` | The instance's jobs with stored snapshots. Empty for a registered Scout with no backups yet. |
+| `latest_snapshot_at`, `modified_at` | The stored archive's modification time, in UTC. Snapshots are newest first. |
+| `unusual` | The archive's size was flagged. See [Unusual sizes](/station/snapshots#unusual-sizes). |
+
+An unchanged job doesn't upload a new archive, so `latest_snapshot_at` can be old while the Scout is working normally. Check `last_seen_at` as well. Counts and sizes come from Station's index, so a request doesn't walk the archive folder. If the index can't be read, the route returns `503`.
+
+<Note>
+  This route uses a [monitoring token](#monitoring-tokens), not a session cookie. If you turn the token requirement off, anyone who can reach Station can read it, so keep it reachable only from your own network. It shows Scout IDs, instance IDs, job names, last-seen times, and snapshot counts, sizes, and times. It omits archive filenames, fingerprints, tokens, keys, Scout URLs, folder paths, and the reason a size was flagged.
+</Note>
 
 ### Change settings
 

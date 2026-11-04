@@ -99,6 +99,7 @@ type App struct {
 	settings      *config.Settings
 	userStore     userStorer
 	credStore     credStorer
+	monitoring    monitoringTokenStorer
 	settingsStore settingsStorer
 	snapIndex     snapIndexer
 	backend       storageBackend
@@ -117,6 +118,7 @@ func NewApp(
 	settings *config.Settings,
 	userStore userStorer,
 	credStore credStorer,
+	monitoring monitoringTokenStorer,
 	settingsStore settingsStorer,
 	snapIndex snapIndexer,
 	backend storageBackend,
@@ -131,6 +133,7 @@ func NewApp(
 		settings:      settings,
 		userStore:     userStore,
 		credStore:     credStore,
+		monitoring:    monitoring,
 		settingsStore: settingsStore,
 		snapIndex:     snapIndex,
 		backend:       backend,
@@ -182,6 +185,12 @@ func (a *App) StartCredentialCleanupLoop() {
 				} else if removed > 0 {
 					a.logger.Info("station_token_cleanup", "removed", removed)
 				}
+				removed, err = a.monitoring.CleanupExpired(context.Background())
+				if err != nil {
+					a.logger.Error("monitoring_token_cleanup_failed", "error", err)
+				} else if removed > 0 {
+					a.logger.Info("monitoring_token_cleanup", "removed", removed)
+				}
 			}
 		}
 	}()
@@ -210,9 +219,10 @@ func (a *App) Handler() http.Handler {
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
 	r.Get("/health/ready", a.handleHealthReady)
-	r.Handle("/metrics", metrics.NewHandler("station", func() bool {
-		return a.Settings().MetricsEnabled
-	}, a.collectMetrics))
+	metricsEnabled := func() bool { return a.Settings().MetricsEnabled }
+	reportEnabled := func() bool { return a.Settings().BackupReportEnabled }
+	r.Handle("/metrics", a.requireMonitoringToken(signing.MonitoringRouteMetrics, metricsEnabled, metrics.NewHandler("station", metricsEnabled, a.collectMetrics)))
+	r.Handle("/report", a.requireMonitoringToken(signing.MonitoringRouteReport, reportEnabled, http.HandlerFunc(a.handleBackupReport)))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
@@ -224,6 +234,9 @@ func (a *App) Handler() http.Handler {
 	r.Post("/api/automation-tokens", access.CreateAutomationToken)
 	r.Delete("/api/automation-tokens/{token_id}", httpx.WithPathValues(access.RevokeAutomationToken, "token_id"))
 	r.Post("/api/session/change-password", a.handleChangePassword)
+	r.Get("/api/monitoring-tokens", a.handleListMonitoringTokens)
+	r.Post("/api/monitoring-tokens", a.handleCreateMonitoringToken)
+	r.Delete("/api/monitoring-tokens/{token_id}", httpx.WithPathValues(a.handleRevokeMonitoringToken, "token_id"))
 
 	// Users (auth required)
 	r.Get("/api/users", a.handleListUsers)
@@ -289,15 +302,15 @@ func (a *App) Handler() http.Handler {
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
 	return httpx.RequestLogger(a.logger, func(path string) bool {
-		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" || path == "/metrics"
+		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" || path == "/metrics" || path == "/report"
 	}, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 	sessions := a.accountHandler().Middleware(next, isPublicPath)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Scrapes need no session lookup; the endpoint checks its opt-in setting.
-		if r.URL.Path == "/metrics" {
+		// Polling needs no session lookup; each endpoint checks its own opt-in setting and token.
+		if r.URL.Path == "/metrics" || r.URL.Path == "/report" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -312,6 +325,7 @@ func isPublicPath(path string) bool {
 	}
 	return path == "/" ||
 		path == "/metrics" ||
+		path == "/report" ||
 		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/health") ||
 		strings.HasPrefix(path, "/backup/uploads/") ||

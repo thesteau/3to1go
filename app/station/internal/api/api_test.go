@@ -230,6 +230,8 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	}
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
+	// Most tests don't exercise monitoring tokens; monitoring_test.go turns this on.
+	settings.MonitoringTokenRequired = false
 	backend := storage.NewLocalBackend(settings.BackupRoot)
 	hookMgr := hooks.NewHookManager("station", t.TempDir(), discardLogger())
 	certMgr := certificates.NewCertManager(t.TempDir())
@@ -250,7 +252,7 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	if si == nil {
 		si = &mockSnapIndex{}
 	}
-	return NewApp(settings, us, cs, ss, si, backend, &mockIngest{}, hookMgr, certMgr, notifications, nil, discardLogger())
+	return NewApp(settings, us, cs, &mockMonitoringStore{}, ss, si, backend, &mockIngest{}, hookMgr, certMgr, notifications, nil, discardLogger())
 }
 
 func jsonReq(method, path string, body any) *http.Request {
@@ -283,7 +285,7 @@ func regularUser() *store.User {
 
 func TestIsPublicPath(t *testing.T) {
 	public := []string{
-		"/", "/health", "/health/ready",
+		"/", "/health", "/health/ready", "/report",
 		"/static/app.js",
 		"/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/change-password",
 		"/backup/uploads/abc", "/backup/recovery/scout/inst/job",

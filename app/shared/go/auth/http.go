@@ -252,4 +252,6 @@ type Store interface {
 type Handler struct {
 	Store      Store
 	CookieName string
+	// AllowMonitoringScope lets automation tokens carry the monitoring scope.
+	AllowMonitoringScope bool
 }

@@ -33,8 +33,9 @@
         <label class="checkbox"><input id="automation_scope_backup" type="checkbox"><span>Run backups</span></label>
         <label class="checkbox"><input id="automation_scope_restore" type="checkbox"><span>Restore</span></label>
         <label class="checkbox"><input id="automation_scope_manage" type="checkbox"><span>Manage settings</span></label>
+        <label class="checkbox"><input id="automation_scope_monitoring" type="checkbox"><span>Read metrics</span></label>
       </div>
-      <p class="hint">Manage includes all app operations and secrets. Restore can replace files. Sign-in and automation token controls require a browser session.</p>
+      <p class="hint">Manage includes all app operations and secrets. Restore can replace files. Read metrics allows only <code>/metrics</code>. Sign-in and automation token controls require a browser session.</p>
       <button type="button" onclick="createAutomationToken()">Create Token</button>
       <label for="automation_token_output">New token — copy before closing</label>
       <textarea id="automation_token_output" class="secret-value" readonly spellcheck="false" rows="2"></textarea>

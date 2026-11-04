@@ -8,7 +8,7 @@ import (
 
 func specsForPath(path string) []httpx.RateSpec {
 	var specs []httpx.RateSpec
-	if strings.HasPrefix(path, "/api/") {
+	if strings.HasPrefix(path, "/api/") || path == "/metrics" {
 		specs = append(specs, httpx.RateSpec{Name: "all-api", PerSecond: 50, Burst: 600, RetryAfter: 1})
 	}
 	switch path {
