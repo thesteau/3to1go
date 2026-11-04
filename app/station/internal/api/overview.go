@@ -54,6 +54,11 @@ func (a *App) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	// A partial save must not silently change who can read metrics and reports.
+	if body.MonitoringTokenRequired == nil {
+		current := a.Settings().MonitoringTokenRequired
+		body.MonitoringTokenRequired = &current
+	}
 	newSettings, err := config.BuildSettings(&body)
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())

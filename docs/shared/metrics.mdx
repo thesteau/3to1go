@@ -15,34 +15,55 @@ Changes apply immediately and are saved in the app's settings database. Turn the
 
 The settings API field is `metrics_enabled`. Read the current settings and preserve the other fields when updating it, as described in the [Scout API](/scout/api#change-settings) and [Station API](/station/api#change-settings).
 
+Metrics never need a session cookie or a Station token. Labels include relative job paths on Scout, and Scout IDs, instance IDs, and job names on Station. Metrics omit passwords, tokens, keys, absolute folder paths, archive filenames, and error details.
+
+## Require a token
+
+**Require monitoring token** is in the same settings dialog. It's **on for new installs**. An install that already had saved settings keeps it off after upgrading, so existing scrapes keep working. Turn it on when you're ready.
+
+When it's on, send a token with each request. A missing, invalid, expired, or revoked token returns **401**. Disabled metrics still return **404**.
+
+| App | Token | Create it in |
+|---|---|---|
+| Station | A monitoring token, limited to `metrics`, `report`, or both. | **Users & Access → Monitoring Tokens** |
+| Scout | An automation token with the **Read metrics** permission. It's valid only on the Scout that issued it. | **Users & Access → Automation Tokens** |
+
+Both are shown once. Use a separate token for each client so you can revoke one without affecting the others. Neither kind can upload or restore backups, and a Station token doesn't work on these routes.
+
 <Note>
-  Enabled metrics do not require a session cookie or Station token. Keep `/metrics` reachable only by your monitoring network, using your firewall or reverse proxy. Labels include relative job paths on Scout, and Scout IDs, instance IDs, and job names on Station. Metrics omit passwords, tokens, keys, absolute folder paths, archive filenames, and error details.
+  A token protects these routes, but it can be read if it's sent over plain HTTP. On any network you don't fully trust, [serve the apps over HTTPS](/shared/https). If you turn the requirement off, keep `/metrics` reachable only by your monitoring network, using your firewall or reverse proxy.
 </Note>
 
 ## Configure Prometheus
 
-Add scrape jobs to your existing Prometheus configuration. Replace these example addresses with hostnames reachable from Prometheus. Use `scheme: https` if your targets are served over HTTPS, and configure your internal CA in Prometheus if needed.
+Add scrape jobs to your existing Prometheus configuration. Replace these example addresses with hostnames reachable from Prometheus, and save each token in a file only Prometheus can read. Use `scheme: https` if your targets are served over HTTPS, and configure your internal CA in Prometheus if needed. Leave out `authorization` if that app doesn't require a token.
 
 ```yaml
 scrape_configs:
   - job_name: 3to1go-station
     scrape_interval: 30s
     metrics_path: /metrics
+    authorization:
+      credentials_file: /etc/prometheus/3to1go-station.token
     static_configs:
       - targets: ["station.example.lan:6555"]
 
   - job_name: 3to1go-scout
     scrape_interval: 30s
     metrics_path: /metrics
+    authorization:
+      credentials_file: /etc/prometheus/3to1go-scout.token
     static_configs:
       - targets: ["scout.example.lan:6556"]
 ```
 
-Reload Prometheus and check that both targets are up. You can also check an enabled endpoint directly:
+Reload Prometheus and check that both targets are up. You can also check an enabled endpoint directly with curl, or send the same header from Postman:
 
 ```sh
-curl --fail http://station.example.lan:6555/metrics
+curl --fail -H "Authorization: Bearer $TOKEN" http://station.example.lan:6555/metrics
 ```
+
+Tokens expire, so create a new one and update the file before then.
 
 Both apps include Go runtime and process metrics, plus `three_to_one_go_build_info` with `app`, `version`, and `commit` labels. Application measurements below are gauges representing current state. Deleted jobs disappear from future scrapes. They are not cumulative event counters.
 

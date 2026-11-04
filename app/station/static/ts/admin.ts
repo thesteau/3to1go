@@ -26,6 +26,8 @@ function fillSettings(settings: StationSettings | null | undefined): void {
   );
   setToggle("settings_uploads_paused", data.uploads_paused || false);
   setToggle("settings_metrics_enabled", data.metrics_enabled ?? false);
+  setToggle("settings_backup_report_enabled", data.backup_report_enabled ?? false);
+  setToggle("settings_monitoring_token_required", data.monitoring_token_required ?? false);
   (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value = data.anomaly_mode || "alert";
 }
 
@@ -51,6 +53,8 @@ function collectSettingsPayload(overrides: Partial<StationSettings> = {}): Stati
     ),
     uploads_paused: getToggle("settings_uploads_paused"),
     metrics_enabled: getToggle("settings_metrics_enabled"),
+    backup_report_enabled: getToggle("settings_backup_report_enabled"),
+    monitoring_token_required: getToggle("settings_monitoring_token_required"),
     anomaly_mode: (document.getElementById("settings_anomaly_mode") as HTMLSelectElement).value,
     hook_pre_command: window.__stationSettings?.hook_pre_command || "",
     hook_post_command: window.__stationSettings?.hook_post_command || "",

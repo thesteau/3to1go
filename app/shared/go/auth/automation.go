@@ -31,6 +31,9 @@ type AutomationStore interface {
 
 const contextKeyAutomation ContextKey = "automation"
 
+// MonitoringScope allows reading monitoring routes and grants nothing under /api/.
+const MonitoringScope = "monitoring"
+
 func CurrentAutomationToken(r *http.Request) *AutomationToken {
 	token, _ := r.Context().Value(contextKeyAutomation).(*AutomationToken)
 	return token
@@ -90,6 +93,30 @@ func automationAllows(r *http.Request, token *AutomationToken) bool {
 	return false
 }
 
+// MonitoringAuthorized reports whether the request's bearer token is a live
+// automation token with the monitoring scope. An error means the store couldn't answer.
+func (a *Handler) MonitoringAuthorized(r *http.Request) (bool, error) {
+	secret, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	s, ok := a.Store.(AutomationStore)
+	if !found || !ok || !strings.HasPrefix(secret, "3to1go_api_") {
+		return false, nil
+	}
+	user, token, err := s.UserForAutomationToken(r.Context(), AutomationTokenHash(secret))
+	if err != nil {
+		return false, err
+	}
+	if user == nil || token == nil || !user.IsAdmin || user.MustChangePassword {
+		return false, nil
+	}
+	return slices.Contains(token.Scopes, MonitoringScope), nil
+}
+
+// WriteMonitoringUnauthorized answers a monitoring route's missing or invalid token.
+func WriteMonitoringUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	httpx.WriteError(w, http.StatusUnauthorized, "monitoring token required")
+}
+
 func (a *Handler) automationAdmin(w http.ResponseWriter, r *http.Request) (*User, AutomationStore) {
 	u := RequireAdmin(w, r)
 	if u == nil {
@@ -138,12 +165,16 @@ func (a *Handler) CreateAutomationToken(w http.ResponseWriter, r *http.Request) 
 	if body.TTLDays == 0 {
 		body.TTLDays = 90
 	}
-	if body.Name == "" || len(body.Name) > 100 || body.TTLDays < 1 || body.TTLDays > 3650 || len(body.Scopes) == 0 || len(body.Scopes) > 4 {
+	allowedScopes := []string{"read", "backup", "restore", "manage"}
+	if a.AllowMonitoringScope {
+		allowedScopes = append(allowedScopes, MonitoringScope)
+	}
+	if body.Name == "" || len(body.Name) > 100 || body.TTLDays < 1 || body.TTLDays > 3650 || len(body.Scopes) == 0 || len(body.Scopes) > len(allowedScopes) {
 		httpx.WriteError(w, http.StatusBadRequest, "name, at least one scope, and ttl_days between 1 and 3650 are required")
 		return
 	}
 	for _, scope := range body.Scopes {
-		if !slices.Contains([]string{"read", "backup", "restore", "manage"}, scope) {
+		if !slices.Contains(allowedScopes, scope) {
 			httpx.WriteError(w, http.StatusBadRequest, "unknown automation scope")
 			return
 		}

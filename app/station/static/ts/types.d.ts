@@ -11,6 +11,8 @@ interface StationSettings {
   snapshot_verify_interval_hours?: number;
   uploads_paused?: boolean;
   metrics_enabled?: boolean;
+  backup_report_enabled?: boolean;
+  monitoring_token_required?: boolean;
   anomaly_mode?: string;
   hook_pre_command?: string;
   hook_post_command?: string;

@@ -54,6 +54,7 @@ For scripts or an external MCP adapter, open **Admin → Users & Access → Auto
 | `backup` | `POST /api/run-now`, `/api/directories/force-send`, `/api/cancel-operation`, and `/api/uploads/pause` or `/api/uploads/resume`. |
 | `restore` | `POST /api/recovery/preview`, `/api/recovery/restore`, and `/api/restore-requests/decision`. Restore can replace destination files. |
 | `manage` | All app management operations and secrets, except account, session, and automation token controls. |
+| `monitoring` | `GET /metrics` when **Require monitoring token** is on. Grants nothing under `/api/`. Other scopes, including `manage`, don't include it. See [Require a token](/shared/metrics#require-a-token). |
 
 Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available. There is no per-job or per-instance ownership model.
 
@@ -89,7 +90,7 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 | Method | Endpoint | Access | What it does |
 |---|---|---|---|
 | `GET` | `/health` | Public | Returns `{"status":"ok"}` while Scout's HTTP server is running. |
-| `GET` | `/metrics` | Public when enabled | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/metrics` | Monitoring token, or public if the requirement is off | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
 | `GET` | `/api/status` | Session | Returns Scout and instance IDs, Scout key fingerprint, upload circuit status, and `scheduler`. Effective `settings` are included for admin accounts only. |
 | `POST` | `/api/run-now` | Session | No body; requests a backup cycle for the configured jobs. Returns `status: "queued"` or `"already_running"`. |
 | `GET` | `/api/settings` | Admin | Returns the current settings under `settings`. |

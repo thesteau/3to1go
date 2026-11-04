@@ -46,6 +46,7 @@ type Settings struct {
 	HTTPPort                          int
 	UploadsPaused                     bool
 	MetricsEnabled                    bool
+	MonitoringTokenRequired           bool
 	AnomalyMode                       string
 }
 
@@ -183,6 +184,7 @@ type SettingsPayload struct {
 	HTTPPort                          int    `json:"http_port"`
 	UploadsPaused                     bool   `json:"uploads_paused"`
 	MetricsEnabled                    bool   `json:"metrics_enabled"`
+	MonitoringTokenRequired           *bool  `json:"monitoring_token_required"`
 	AnomalyMode                       string `json:"anomaly_mode"`
 }
 
@@ -218,6 +220,7 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		HTTPPort:                          s.HTTPPort,
 		UploadsPaused:                     s.UploadsPaused,
 		MetricsEnabled:                    s.MetricsEnabled,
+		MonitoringTokenRequired:           boolPtr(s.MonitoringTokenRequired),
 		AnomalyMode:                       s.AnomalyMode,
 	}
 }
@@ -251,6 +254,9 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 	spoolDir := coerceText(raw.SpoolDir, DefaultSpoolDir())
 	httpHost := coerceText(raw.HTTPHost, DefaultHTTPHost())
 	httpPort := coerceInt(raw.HTTPPort, 6556, 1)
+	// A new install has no saved settings and requires a token. Settings saved
+	// before this field existed leave it off, so existing scrapes keep working.
+	monitoringTokenRequired := p == nil || coerceBoolPtr(raw.MonitoringTokenRequired, false)
 
 	return &Settings{
 		ScoutID:                           coerceText(raw.ScoutID, "scout-01"),
@@ -283,6 +289,7 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		HTTPPort:                          httpPort,
 		UploadsPaused:                     raw.UploadsPaused,
 		MetricsEnabled:                    raw.MetricsEnabled,
+		MonitoringTokenRequired:           monitoringTokenRequired,
 		AnomalyMode:                       coerceAnomalyMode(raw.AnomalyMode),
 	}, nil
 }

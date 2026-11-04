@@ -61,7 +61,9 @@ Configure HTTP notifications separately in **Integrations**. Destinations and th
 | Setting | Default | Description |
 |---|---|---|
 | Dark Mode | on | UI theme. |
-| Prometheus metrics | off | Allow Prometheus to scrape `/metrics` without signing in. Applies immediately. See [Prometheus metrics](/shared/metrics). |
+| Prometheus metrics | off | Serve `/metrics` to clients that aren't signed in. Applies immediately. See [Prometheus metrics](/shared/metrics). |
+| Backup report route | off | Serve the current backups as JSON from `/report` to clients that aren't signed in. Applies immediately. See [Backup report](/station/api#backup-report). |
+| Require monitoring token | on for new installs, off for existing installs | Require a monitoring token on `/metrics` and `/report`. Applies immediately. See [Monitoring tokens](/station/api#monitoring-tokens). |
 | Pause incoming uploads | off | Reject new upload sessions. Uploads already in progress can continue. |
 | Keep Last Snapshots | `3` | How many snapshots to keep per job and Scout instance. Older ones are pruned after each upload. |
 | Log Level | `INFO` | Container log verbosity. |

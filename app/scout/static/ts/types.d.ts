@@ -15,6 +15,7 @@ interface ScoutSettings {
   auto_approve_large_uploads?: boolean;
   uploads_paused?: boolean;
   metrics_enabled?: boolean;
+  monitoring_token_required?: boolean;
   anomaly_mode?: string;
   upload_chunk_size_mb?: number;
   min_upload_chunk_size_mb?: number;
