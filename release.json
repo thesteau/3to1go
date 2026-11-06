@@ -1,8 +1,8 @@
 {
-  "version": "1.6.0",
-  "tag": "v1.6.0",
-  "prodSha": "ef44decad17ce6db76890f2177820239500a5525",
-  "previousTag": "v1.5.0",
-  "previousSha": "8af7c9ee5e360f2a70cd83217c7cc8f3e2682745",
-  "notes": "## [1.6.0](https://github.com/thesteau/3to1go/compare/v1.5.0...v1.6.0) (2026-10-16)\n\n\n### Features\n\n* Add prometheus/grafana integration ([#136](https://github.com/thesteau/3to1go/issues/136)) ([ef44dec](https://github.com/thesteau/3to1go/commit/ef44decad17ce6db76890f2177820239500a5525))"
+  "version": "1.7.0",
+  "tag": "v1.7.0",
+  "prodSha": "f19d9b45c2cf517f267f93d4dcc0cc34cf2d9514",
+  "previousTag": "v1.6.0",
+  "previousSha": "ef44decad17ce6db76890f2177820239500a5525",
+  "notes": "## [1.7.0](https://github.com/thesteau/3to1go/compare/v1.6.0...v1.7.0) (2026-11-06)\n\n\n### Features\n\n* Add a new report endpoint ([#144](https://github.com/thesteau/3to1go/issues/144)) ([7016eec](https://github.com/thesteau/3to1go/commit/7016eec72d8954245756c60506d32b0ad43bd05f))\n* Add station token auth token and simplify release ([#145](https://github.com/thesteau/3to1go/issues/145)) ([266553c](https://github.com/thesteau/3to1go/commit/266553c6a29242d8d28b17eee346beaede8bd39c))"
 }
