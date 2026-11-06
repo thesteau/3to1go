@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0](https://github.com/thesteau/3to1go/compare/v1.6.0...v1.7.0) (2026-11-06)
+
+
+### Features
+
+* Add a new report endpoint ([#144](https://github.com/thesteau/3to1go/issues/144)) ([7016eec](https://github.com/thesteau/3to1go/commit/7016eec72d8954245756c60506d32b0ad43bd05f))
+* Add station token auth token and simplify release ([#145](https://github.com/thesteau/3to1go/issues/145)) ([266553c](https://github.com/thesteau/3to1go/commit/266553c6a29242d8d28b17eee346beaede8bd39c))
+
 ## [1.6.0](https://github.com/thesteau/3to1go/compare/v1.5.0...v1.6.0) (2026-10-16)
 
 
