@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/thesteau/3to1go/compare/v1.7.0...v1.7.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* depednabot security ([#149](https://github.com/thesteau/3to1go/issues/149)) ([d684ac8](https://github.com/thesteau/3to1go/commit/d684ac8a86c52c39f7b92867709a848e9095626e))
+
 ## [1.7.0](https://github.com/thesteau/3to1go/compare/v1.6.0...v1.7.0) (2026-11-06)
 
 

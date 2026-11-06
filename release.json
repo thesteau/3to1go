@@ -1,8 +1,8 @@
 {
-  "version": "1.7.0",
-  "tag": "v1.7.0",
-  "prodSha": "f19d9b45c2cf517f267f93d4dcc0cc34cf2d9514",
-  "previousTag": "v1.6.0",
-  "previousSha": "ef44decad17ce6db76890f2177820239500a5525",
-  "notes": "## [1.7.0](https://github.com/thesteau/3to1go/compare/v1.6.0...v1.7.0) (2026-11-06)\n\n\n### Features\n\n* Add a new report endpoint ([#144](https://github.com/thesteau/3to1go/issues/144)) ([7016eec](https://github.com/thesteau/3to1go/commit/7016eec72d8954245756c60506d32b0ad43bd05f))\n* Add station token auth token and simplify release ([#145](https://github.com/thesteau/3to1go/issues/145)) ([266553c](https://github.com/thesteau/3to1go/commit/266553c6a29242d8d28b17eee346beaede8bd39c))"
+  "version": "1.7.1",
+  "tag": "v1.7.1",
+  "prodSha": "d684ac8a86c52c39f7b92867709a848e9095626e",
+  "previousTag": "v1.7.0",
+  "previousSha": "f19d9b45c2cf517f267f93d4dcc0cc34cf2d9514",
+  "notes": "## [1.7.1](https://github.com/thesteau/3to1go/compare/v1.7.0...v1.7.1) (2026-11-06)\n\n\n### Bug Fixes\n\n* depednabot security ([#149](https://github.com/thesteau/3to1go/issues/149)) ([d684ac8](https://github.com/thesteau/3to1go/commit/d684ac8a86c52c39f7b92867709a848e9095626e))"
 }
