@@ -58,13 +58,9 @@ func (a *Handler) Middleware(next http.Handler, isPublicPath func(string) bool) 
 		var user *User
 		var automation *AutomationToken
 		if strings.HasPrefix(path, "/api/") && r.Header.Get("Authorization") != "" {
-			store, ok := a.Store.(AutomationStore)
-			header := r.Header.Get("Authorization")
-			if ok && strings.HasPrefix(header, "Bearer 3to1go_api_") {
-				user, automation, _ = store.UserForAutomationToken(r.Context(), AutomationTokenHash(strings.TrimPrefix(header, "Bearer ")))
-			}
+			user, automation, _ = a.automationFromBearer(r.Context(), r.Header.Get("Authorization"))
 			if user == nil || automation == nil || !user.IsAdmin {
-				httpx.WriteError(w, http.StatusUnauthorized, "invalid automation token")
+				httpx.WriteError(w, http.StatusUnauthorized, "invalid auth token")
 				return
 			}
 			if user.MustChangePassword {
@@ -72,7 +68,7 @@ func (a *Handler) Middleware(next http.Handler, isPublicPath func(string) bool) 
 				return
 			}
 			if !automationAllows(r, automation) {
-				httpx.WriteError(w, http.StatusForbidden, "automation token scope does not allow this request")
+				httpx.WriteError(w, http.StatusForbidden, "auth token scope does not allow this request")
 				return
 			}
 		} else {

@@ -15,10 +15,11 @@ Station separates management authentication from Scout upload authentication:
 
 | API | Authentication | Used for |
 |---|---|---|
-| `/api/...` | Operator session cookie, `three_to_one_go_session`, or a scoped automation token | Settings, token management, snapshot management, and requesting restores. |
+| `/api/...` | Operator session cookie, `three_to_one_go_session`, or a scoped Station auth token | Settings, token management, snapshot management, and requesting restores. |
 | `/backup/...` | `Authorization: Bearer <station-token>` | Scout's upload and recovery protocol. Recovery checks that the token is bound to the requested Scout instance. |
+| `/metrics`, `/report` | `Authorization: Bearer <station-auth-token>`, if **Require auth token** is on | Reading metrics and the backup report. See [Read metrics and the report with a token](#read-metrics-and-the-report-with-a-token). |
 
-Station recognizes an admin by looking up the session cookie (or the automation token's owner) and checking the account's `is_admin` flag in its database. Automation requests must also pass their token's scope checks. Call `GET /api/session/me` with your cookie to check `authenticated` and `user.is_admin`.
+Station recognizes an admin by looking up the session cookie (or the Station auth token's owner) and checking the account's `is_admin` flag in its database. Auth token requests must also pass their token's scope checks. Call `GET /api/session/me` with your cookie to check `authenticated` and `user.is_admin`.
 
 A Station token does **not** grant management access to `/api/...`, and an operator session does **not** authenticate `/backup/...`. **Session** in the tables means a signed-in account; **Admin** also requires admin access. Accounts are intended for [one operator](/shared/sign-in#accounts-are-for-one-operator), and Scout has its own separate session.
 
@@ -45,7 +46,7 @@ curl --fail-with-body -sS --cookie station.cookies \
   "$STATION_URL/api/session/change-password"
 ```
 
-Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session. Changing your password signs out other browsers while keeping the calling session. **Sign Out All Browsers** ends all your browser sessions in this app. Automation tokens are revoked separately.
+Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it between calls, and sign in again when it expires. Signing out deletes the current session. Changing your password signs out other browsers while keeping the calling session. **Sign Out All Browsers** ends all your browser sessions in this app. Station auth tokens are revoked separately.
 
 | Method | Endpoint | Access | Request or response |
 |---|---|---|---|
@@ -55,20 +56,24 @@ Sessions expire seven days after sign-in. Keep the cookie jar private, reuse it 
 | `POST` | `/api/session/logout` | Public | No body; clears the current session cookie. |
 | `POST` | `/api/session/logout-all` | Session | No body; invalidates all browser sessions for the signed-in account and clears its cookie. |
 
-## Automation tokens
+## Station auth tokens
 
-For scripts or an external MCP adapter, open **Admin → Users & Access → Automation Tokens**. Choose a name, expiry, and permissions; copy the returned token once. The token belongs to the existing operator account. It is valid only in the app that issued it, and it stops working if revoked, expired, or its owner no longer has admin access or must change their password.
+For scripts or an external MCP adapter, open **Admin → Users & Access → Station Auth Tokens**. Choose a name, expiry, and permissions; copy the returned token once. The token belongs to the existing operator account. It is valid only in the app that issued it, and it stops working if revoked, expired, or its owner no longer has admin access or must change their password.
 
 | Scope | Allowed requests |
 |---|---|
 | `read` | `GET /api/overview` (storage and snapshots; omits `settings`) and `GET /api/admin/verify`. `section=settings` is forbidden. |
 | `backup` | `POST /api/admin/uploads/pause` or `/api/admin/uploads/resume`. Trigger individual backups through Scout. |
 | `restore` | Snapshot download endpoints and `POST /api/snapshots/{scout_id}/{scout_instance_id}/{job_name}/{filename}/restore`. Restore can replace destination files. |
-| `manage` | All app management operations and secrets, except account, session, and automation token controls. |
+| `manage` | All app management operations and secrets, except account, session, and Station auth token controls. |
+| `metrics` | `GET /metrics` when **Require auth token** is on. Grants nothing under `/api/`. |
+| `report` | `GET /report` when **Require auth token** is on. Grants nothing under `/api/`. |
 
-Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available. There is no per-job or per-instance ownership model.
+Select multiple scopes when needed. `read` excludes settings and secret-bearing key, hook, certificate, and notification endpoints. `manage` is broad: it includes settings, hooks, keys where available, deletion, and Station token management where available, but not `metrics` or `report`. There is no per-job or per-instance ownership model.
 
-Creating, listing, and revoking automation tokens requires an **admin session cookie**:
+Each token is a JWT that Station signs with its `issuer.key`. Its claims hold the audience, owner, scopes, issue time, expiry, and token ID. Station rejects any token whose signature doesn't verify, then looks the token up on each request, so revoking one works immediately. Claims are signed, not encrypted, so anyone holding a token can read them. Treat a token as a password, and [use HTTPS](/shared/https) on any network you don't fully trust. A Station auth token is **not** the [Station token](/station/station-tokens) that Scouts use to upload backups. It can't upload or recover backups, and a Station token doesn't work on `/api/...`, `/metrics`, or `/report`.
+
+Creating, listing, and revoking Station auth tokens requires an **admin session cookie**:
 
 | Method | Endpoint | Request or response |
 |---|---|---|
@@ -86,14 +91,34 @@ curl --fail-with-body -sS --cookie station.cookies \
 Use the returned secret as a bearer token:
 
 ```sh
-API_TOKEN='<returned-automation-token>'
+API_TOKEN='<returned-station-auth-token>'
 curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" \
   "$STATION_URL/api/overview?section=snapshots"
 ```
 
-`GET /api/session/me` also accepts an automation token and returns its metadata under `automation_token`. The endpoint tables below describe session access; automation tokens additionally require the applicable scope. An invalid bearer token returns `401` even if a valid cookie is also present.
+`GET /api/session/me` also accepts a Station auth token and returns its metadata under `automation_token`. The endpoint tables below describe session access; Station auth tokens additionally require the applicable scope. An invalid bearer token returns `401` even if a valid cookie is also present.
 
 Browser writes from another origin are rejected with `403`. Serve the UI through the same origin as its API, and preserve the request host through a reverse proxy. Ordinary curl requests without browser origin headers continue to work.
+
+### Read metrics and the report with a token
+
+To let curl, Postman, Prometheus, or a dashboard read `/metrics` or `/report`, create a token with only the `metrics` or `report` scope. In the UI, untick **Read status** and tick **Read metrics** or **Read report**.
+
+```sh
+API_TOKEN='<returned-station-auth-token>'
+curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" "$STATION_URL/report"
+```
+
+In Postman, choose **Bearer Token** on the **Authorization** tab and paste the token.
+
+**Require auth token** in **Edit Station Settings** controls whether these routes need a token. It's on for new installs. An install that already had saved settings keeps it off after upgrading, so existing clients keep working. The settings API field is `monitoring_token_required`; a settings request that omits it keeps the current value.
+
+| Response | Meaning |
+|---|---|
+| `401` | The token is missing, invalid, expired, or revoked. |
+| `403` | The token doesn't include this route. |
+| `404` | The route itself is turned off. |
+| `503` | Station couldn't check the token, or couldn't read the requested data. |
 
 ## Overview, settings, and maintenance
 
@@ -101,7 +126,8 @@ Browser writes from another origin are rejected with `403`. Serve the UI through
 |---|---|---|---|
 | `GET` | `/health` | Public | Checks storage and returns storage and upload approval threshold information. Can return `503`. |
 | `GET` | `/health/ready` | Public | Checks storage and the staging directory; returns `{"status":"ok"}` or `503`. |
-| `GET` | `/metrics` | Public when enabled | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/metrics` | Station auth token, or public if the requirement is off | Prometheus metrics; off by default (`404`). Enable with the admin settings pill or `metrics_enabled`. See [Prometheus metrics](/shared/metrics). |
+| `GET` | `/report` | Station auth token, or public if the requirement is off | Current backups as JSON; off by default (`404`). See [Backup report](#backup-report). |
 | `GET` | `/api/overview` | Session | Returns storage information and Scouts with instances, jobs, and snapshots. Settings are included for admin accounts only. |
 | `POST` | `/api/settings` | Admin | Applies a full settings object and returns normalized `settings`. |
 | `POST` | `/api/admin/uploads/pause` | Admin | No body; pauses acceptance of new uploads. |
@@ -119,6 +145,59 @@ curl --fail-with-body -sS --cookie station.cookies \
 ```
 
 The `scouts` array contains `scout_id`, each Scout's `instances`, and each instance's `scout_instance_id` and `jobs`. Each job has `job_name` and `snapshots`; each snapshot's filename is in `name`, alongside `size_bytes`, `mtime`, and optional `unusual` information. Use those filenames for downloads, deletion, and restore requests. URL-encode each path component when constructing a request URL.
+
+### Backup report
+
+`GET /report` lists the current backups for dashboards and scripts. It is **off by default**, including on existing installations. To enable it, sign in as an admin, open **Edit Station Settings**, turn on the **Backup report route** pill, and click **Save**. The settings API field is `backup_report_enabled`. Changes apply immediately. A disabled route returns `404`.
+
+```sh
+curl --fail-with-body -sS -H "Authorization: Bearer $API_TOKEN" "$STATION_URL/report"
+```
+
+```json
+{
+  "snapshot_count": 2,
+  "stored_bytes": 2350000000,
+  "instances": [
+    {
+      "scout_id": "scout-01",
+      "scout_instance_id": "<instance-id>",
+      "last_seen_at": "2026-11-03T11:59:00Z",
+      "jobs": [
+        {
+          "job_name": "documents",
+          "snapshot_count": 2,
+          "stored_bytes": 2350000000,
+          "latest_snapshot_at": "2026-11-03T03:00:00Z",
+          "snapshots": [
+            {"size_bytes": 1200000000, "modified_at": "2026-11-03T03:00:00Z", "unusual": false},
+            {"size_bytes": 1150000000, "modified_at": "2026-11-02T03:00:00Z", "unusual": false}
+          ]
+        }
+      ]
+    },
+    {
+      "scout_id": "scout-02",
+      "scout_instance_id": "<instance-id>",
+      "last_seen_at": "2026-11-03T11:57:00Z",
+      "jobs": []
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `last_seen_at` | Last contact from the Scout instance, in UTC. `null` if the instance has snapshots but no registration. |
+| `jobs` | The instance's jobs with stored snapshots. Empty for a registered Scout with no backups yet. |
+| `latest_snapshot_at`, `modified_at` | The stored archive's modification time, in UTC. Snapshots are newest first. |
+| `unusual` | The archive's size was flagged. See [Unusual sizes](/station/snapshots#unusual-sizes). |
+
+An unchanged job doesn't upload a new archive, so `latest_snapshot_at` can be old while the Scout is working normally. Check `last_seen_at` as well. Counts and sizes come from Station's index, so a request doesn't walk the archive folder. If the index can't be read, the route returns `503`.
+
+<Note>
+  This route uses an [Station auth token](#read-metrics-and-the-report-with-a-token), not a session cookie. If you turn the token requirement off, anyone who can reach Station can read it, so keep it reachable only from your own network. It shows Scout IDs, instance IDs, job names, last-seen times, and snapshot counts, sizes, and times. It omits archive filenames, fingerprints, tokens, keys, Scout URLs, folder paths, and the reason a size was flagged.
+</Note>
 
 ### Change settings
 
@@ -333,6 +412,6 @@ Scout keys supplied to Station's UI stay in the browser session. Managing snapsh
 
 ### MCP and running without a browser
 
-An external MCP adapter can call these HTTP endpoints using an automation token and expose actions such as listing snapshots or requesting a restore. Use the API so the same validation and snapshot state are used by both the adapter and the UI.
+An external MCP adapter can call these HTTP endpoints using a Station auth token and expose actions such as listing snapshots or requesting a restore. Use the API so the same validation and snapshot state are used by both the adapter and the UI.
 
 Station currently has no built-in MCP server or setting to disable the frontend. You can automate it without using the UI; the published app still serves the UI alongside the API.

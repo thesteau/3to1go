@@ -180,7 +180,7 @@ function renderAutomationTokens(tokens: AutomationTokenInfo[]): string {
     <p class="hint">${escapeHtml(token.scopes.join(", "))} · expires ${escapeHtml(token.expires_at)}</p></div>
     <button type="button" class="danger" onclick="revokeAutomationToken(${escapeHtml(JSON.stringify(token.id))})">Revoke</button></div>`,
       )
-      .join("") || '<p class="hint">No automation tokens.</p>'
+      .join("") || '<p class="hint">No auth tokens.</p>'
   );
 }
 
@@ -192,10 +192,10 @@ async function loadAutomationTokens(): Promise<void> {
   try {
     const response = await fetch("/api/automation-tokens", { signal: globalThis.AbortSignal?.timeout?.(30000) });
     const body = await readJson<{ tokens?: AutomationTokenInfo[]; detail?: string }>(response);
-    if (!response.ok) throw new Error(body.detail || "Could not load automation tokens.");
+    if (!response.ok) throw new Error(body.detail || "Could not load auth tokens.");
     document.getElementById("automation-token-list")!.innerHTML = renderAutomationTokens(body.tokens || []);
   } catch (error) {
-    setStatus("automation-token-status", (error as Error).message || "Could not load automation tokens.", "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not load auth tokens.", "error");
   }
 }
 
@@ -204,8 +204,9 @@ async function createAutomationToken(): Promise<void> {
   output.value = "";
   const name = (document.getElementById("automation_token_name") as HTMLInputElement).value.trim();
   const days = Number((document.getElementById("automation_token_days") as HTMLInputElement).value);
-  const scopes = ["read", "backup", "restore", "manage"].filter(
-    (scope) => (document.getElementById(`automation_scope_${scope}`) as HTMLInputElement).checked,
+  // Not every app offers every scope.
+  const scopes = ["read", "backup", "restore", "manage", "metrics", "report"].filter(
+    (scope) => (document.getElementById(`automation_scope_${scope}`) as HTMLInputElement | null)?.checked,
   );
   if (!name || !Number.isInteger(days) || days < 1 || days > 3650 || scopes.length === 0) {
     setStatus(
@@ -222,19 +223,19 @@ async function createAutomationToken(): Promise<void> {
       body: JSON.stringify({ name, ttl_days: days, scopes }),
     });
     const body = await readJson<{ token?: string; detail?: string }>(response);
-    if (!response.ok || !body.token) throw new Error(body.detail || "Could not create automation token.");
+    if (!response.ok || !body.token) throw new Error(body.detail || "Could not create auth token.");
     output.value = body.token;
     setStatus("automation-token-status", "Copy the token now. It will not be shown again.", "success");
     await loadAutomationTokens();
   } catch (error) {
-    setStatus("automation-token-status", (error as Error).message || "Could not create automation token.", "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not create auth token.", "error");
   }
 }
 
 async function revokeAutomationToken(id: string): Promise<void> {
   if (
     !(await confirmApp({
-      title: "Revoke Automation Token",
+      title: "Revoke Auth Token",
       message: "Clients using this token will lose access immediately.",
       confirmLabel: "Revoke",
       danger: true,
@@ -244,10 +245,10 @@ async function revokeAutomationToken(id: string): Promise<void> {
   try {
     const response = await fetch(`/api/automation-tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
     const body = await readJson(response);
-    if (!response.ok) throw new Error(body.detail || "Could not revoke automation token.");
+    if (!response.ok) throw new Error(body.detail || "Could not revoke auth token.");
     setStatus("automation-token-status", "Token revoked.", "success");
     await loadAutomationTokens();
   } catch (error) {
-    setStatus("automation-token-status", (error as Error).message || "Could not revoke automation token.", "error");
+    setStatus("automation-token-status", (error as Error).message || "Could not revoke auth token.", "error");
   }
 }

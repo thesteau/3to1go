@@ -38,6 +38,8 @@ type Settings struct {
 	SnapshotVerifyIntervalHours int
 	UploadsPaused               bool
 	MetricsEnabled              bool
+	BackupReportEnabled         bool
+	MonitoringTokenRequired     bool
 	AnomalyMode                 string
 }
 
@@ -115,6 +117,8 @@ type SettingsPayload struct {
 	SnapshotVerifyIntervalHours int    `json:"snapshot_verify_interval_hours"`
 	UploadsPaused               bool   `json:"uploads_paused"`
 	MetricsEnabled              bool   `json:"metrics_enabled"`
+	BackupReportEnabled         bool   `json:"backup_report_enabled"`
+	MonitoringTokenRequired     *bool  `json:"monitoring_token_required"`
 	AnomalyMode                 string `json:"anomaly_mode"`
 }
 
@@ -132,6 +136,8 @@ func SettingsToPayload(s *Settings) SettingsPayload {
 		SnapshotVerifyIntervalHours: s.SnapshotVerifyIntervalHours,
 		UploadsPaused:               s.UploadsPaused,
 		MetricsEnabled:              s.MetricsEnabled,
+		BackupReportEnabled:         s.BackupReportEnabled,
+		MonitoringTokenRequired:     boolPtr(s.MonitoringTokenRequired),
 		AnomalyMode:                 s.AnomalyMode,
 	}
 }
@@ -189,11 +195,17 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 
 	uploadsPaused := false
 	metricsEnabled := false
+	backupReportEnabled := false
+	// A new install has no saved settings and requires a token. Settings saved
+	// before this field existed leave it off, so existing scrapes keep working.
+	monitoringTokenRequired := p == nil
 	// Station can only alert: an archive has already left Scout when it arrives.
 	anomalyMode := anomaly.ModeAlert
 	if p != nil {
 		uploadsPaused = p.UploadsPaused
 		metricsEnabled = p.MetricsEnabled
+		backupReportEnabled = p.BackupReportEnabled
+		monitoringTokenRequired = p.MonitoringTokenRequired != nil && *p.MonitoringTokenRequired
 		if strings.EqualFold(strings.TrimSpace(p.AnomalyMode), anomaly.ModeOff) {
 			anomalyMode = anomaly.ModeOff
 		}
@@ -222,6 +234,8 @@ func BuildSettings(p *SettingsPayload) (*Settings, error) {
 		SnapshotVerifyIntervalHours: verifyIntervalHours,
 		UploadsPaused:               uploadsPaused,
 		MetricsEnabled:              metricsEnabled,
+		BackupReportEnabled:         backupReportEnabled,
+		MonitoringTokenRequired:     monitoringTokenRequired,
 		AnomalyMode:                 anomalyMode,
 	}, nil
 }
@@ -250,6 +264,8 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
+
+func boolPtr(b bool) *bool { return &b }
 
 func maxInt(a, b int) int {
 	if a > b {

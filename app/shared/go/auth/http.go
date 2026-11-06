@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -252,4 +253,8 @@ type Store interface {
 type Handler struct {
 	Store      Store
 	CookieName string
+	// SigningKey signs and verifies automation tokens.
+	SigningKey func() (ed25519.PrivateKey, error)
+	// RouteScopes lists the app's route-only scopes, such as ScopeMetrics.
+	RouteScopes []string
 }

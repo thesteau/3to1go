@@ -11,4 +11,6 @@ regexes = [
   '''^(YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk=|MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=)$''',
   '''^(abcdef0123456789|0123456789abcdef)+$''',
   '''^idem-[a-z]?\d+$''',
+  # The rejected old-format automation token in Scout's route token test.
+  '''^3to1go_api_secret$''',
 ]

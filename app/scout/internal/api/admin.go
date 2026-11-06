@@ -1,8 +1,10 @@
 package api
 
 import (
+	"crypto/ed25519"
 	"net/http"
 
+	"github.com/3to1go/scout/internal/config"
 	"github.com/3to1go/scout/internal/store"
 	"github.com/3to1go/shared/auth"
 	"github.com/3to1go/shared/httpx"
@@ -13,7 +15,14 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) accountHandler() *auth.Handler {
-	return &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
+	return &auth.Handler{
+		Store:      a.userStore,
+		CookieName: store.SessionCookie,
+		SigningKey: func() (ed25519.PrivateKey, error) {
+			return auth.LoadOrCreateSigningKey(config.AutomationKeyPath())
+		},
+		RouteScopes: []string{auth.ScopeMetrics},
+	}
 }
 
 func (a *App) handleSessionMe(w http.ResponseWriter, r *http.Request) {

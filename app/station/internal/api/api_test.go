@@ -230,6 +230,8 @@ func newTestApp(t *testing.T, us userStorer, cs credStorer, ss settingsStorer, s
 	}
 	settings.BackupRoot = t.TempDir()
 	settings.StagingDir = t.TempDir()
+	// Most tests don't exercise route tokens; route_token_test.go turns this on.
+	settings.MonitoringTokenRequired = false
 	backend := storage.NewLocalBackend(settings.BackupRoot)
 	hookMgr := hooks.NewHookManager("station", t.TempDir(), discardLogger())
 	certMgr := certificates.NewCertManager(t.TempDir())
@@ -283,7 +285,7 @@ func regularUser() *store.User {
 
 func TestIsPublicPath(t *testing.T) {
 	public := []string{
-		"/", "/health", "/health/ready",
+		"/", "/health", "/health/ready", "/report",
 		"/static/app.js",
 		"/api/session/me", "/api/session/login", "/api/session/logout", "/api/session/change-password",
 		"/backup/uploads/abc", "/backup/recovery/scout/inst/job",

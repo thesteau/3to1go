@@ -210,15 +210,22 @@ func (a *App) Handler() http.Handler {
 	r.Get("/", a.handleIndex)
 	r.Get("/health", a.handleHealth)
 	r.Get("/health/ready", a.handleHealthReady)
-	r.Handle("/metrics", metrics.NewHandler("station", func() bool {
+	access := a.accountHandler()
+	r.Handle("/metrics", access.RequireRouteScope(auth.ScopeMetrics, func() bool {
+		s := a.Settings()
+		return s.MetricsEnabled && s.MonitoringTokenRequired
+	}, metrics.NewHandler("station", func() bool {
 		return a.Settings().MetricsEnabled
-	}, a.collectMetrics))
+	}, a.collectMetrics)))
+	r.Handle("/report", access.RequireRouteScope(auth.ScopeReport, func() bool {
+		s := a.Settings()
+		return s.BackupReportEnabled && s.MonitoringTokenRequired
+	}, http.HandlerFunc(a.handleBackupReport)))
 
 	// Session (public)
 	r.Get("/api/session/me", a.handleSessionMe)
 	r.Post("/api/session/login", a.handleLogin)
 	r.Post("/api/session/logout", a.handleLogout)
-	access := &auth.Handler{Store: a.userStore, CookieName: store.SessionCookie}
 	r.Post("/api/session/logout-all", access.LogoutAll)
 	r.Get("/api/automation-tokens", access.ListAutomationTokens)
 	r.Post("/api/automation-tokens", access.CreateAutomationToken)
@@ -289,15 +296,15 @@ func (a *App) Handler() http.Handler {
 
 func (a *App) requestLogger(next http.Handler) http.Handler {
 	return httpx.RequestLogger(a.logger, func(path string) bool {
-		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" || path == "/metrics"
+		return strings.HasPrefix(path, "/static/") || path == "/health" || path == "/health/ready" || path == "/metrics" || path == "/report"
 	}, next)
 }
 
 func (a *App) sessionMiddleware(next http.Handler) http.Handler {
 	sessions := a.accountHandler().Middleware(next, isPublicPath)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Scrapes need no session lookup; the endpoint checks its opt-in setting.
-		if r.URL.Path == "/metrics" {
+		// Polling needs no session lookup; each endpoint checks its own opt-in setting and token.
+		if r.URL.Path == "/metrics" || r.URL.Path == "/report" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -312,6 +319,7 @@ func isPublicPath(path string) bool {
 	}
 	return path == "/" ||
 		path == "/metrics" ||
+		path == "/report" ||
 		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/health") ||
 		strings.HasPrefix(path, "/backup/uploads/") ||
