@@ -132,10 +132,11 @@ You can mount a whole drive instead of one folder on it. Give each drive its own
 
 <Tabs>
   <Tab title="Linux">
-    Mount each drive's mount point:
+    Mount `/home` and `/etc` alongside each additional drive's mount point:
 
     ```yaml
-          - "/:/scan/root"
+          - "/home:/scan/home"
+          - "/etc:/scan/etc"
           - "/mnt/data:/scan/data"
           - "/mnt/media:/scan/media"
     ```
@@ -156,16 +157,16 @@ You can mount a whole drive instead of one folder on it. Give each drive its own
 Then create jobs for the folders you want on each drive.
 
 <Warning>
-  Don't make a whole drive, such as `/scan/root` or `/scan/c`, a job. On a system drive, that would also back up the operating system, installed programs, and swap or page files. Choose the folders you need instead.
+  Don't make a whole drive, such as `/scan/data` or `/scan/c`, a job. On a system drive, that would also back up the operating system, installed programs, and swap or page files. Choose the folders you need instead.
 </Warning>
 
 ### Switching from one drive mounted as `/scan`
 
-If `SCAN_DIR` points at a whole drive today, moving to the entries above puts every folder one level deeper. For example, `/scan/home/alice` becomes `/scan/root/home/alice`, and `/scan/Users/Alice` becomes `/scan/c/Users/Alice`.
+If `SCAN_DIR` points at a whole drive today, check how the new mounts change your folder paths. On Linux, `/scan/home/alice` stays at the same path with `/home:/scan/home`. On Windows, `/scan/Users/Alice` becomes `/scan/c/Users/Alice`.
 
-- **Existing jobs keep working.** Their settings are stored in the folders, so Scout finds them at the new paths.
-- **Job names stay the same,** so each job's history on Station continues. The next cycle may upload each job again, because Scout tracks local state by path.
-- **Raise Max Depth by 1** so deep jobs are still found.
+- **Existing jobs in mounted folders keep working.** Their settings are stored in the folders, so Scout finds them through the new mounts. Folders outside those mounts are no longer visible.
+- **Job names stay the same,** so each job's history on Station continues. If a job's path changes, the next cycle may upload it again, because Scout tracks local state by path.
+- **Check Max Depth.** Raise it by 1 if the new mount adds a path level so deep jobs are still found.
 
 ## Things to know
 
