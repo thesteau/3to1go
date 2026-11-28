@@ -9,11 +9,11 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/go-chi/chi/v5 v5.5.0
-	github.com/klauspost/compress v1.20.4
+	github.com/klauspost/compress v1.20.5
 	github.com/minio/sio v0.5.1
 	github.com/robfig/cron/v3 v3.0.1
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.62.0
+	modernc.org/sqlite v1.63.0
 )
 
 require (
